@@ -1,5 +1,6 @@
 from __future__ import division
 from pytools import memoize_method
+import numpy as np
 
 
 
@@ -52,3 +53,29 @@ class ArrayFlags:
 def get_common_dtype(obj1, obj2):
     return (obj1.dtype.type(0) + obj2.dtype.type(0)).dtype
 
+
+
+
+# {{{ as_strided implementation
+
+# stolen from numpy to be compatible with older versions of numpy
+
+class _DummyArray(object):
+    """ Dummy object that just exists to hang __array_interface__ dictionaries
+    and possibly keep alive a reference to a base array.
+    """
+    def __init__(self, interface, base=None):
+        self.__array_interface__ = interface
+        self.base = base
+
+def as_strided(x, shape=None, strides=None):
+    """ Make an ndarray from the given array with the given shape and strides.
+    """
+    interface = dict(x.__array_interface__)
+    if shape is not None:
+        interface['shape'] = tuple(shape)
+    if strides is not None:
+        interface['strides'] = tuple(strides)
+    return np.asarray(_DummyArray(interface, base=x))
+
+# }}}
