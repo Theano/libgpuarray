@@ -1,6 +1,6 @@
 import numpy
 
-import gpu_ndarray
+import pygpu_ndarray as gpu_ndarray
 
 
 def test_transfer():
