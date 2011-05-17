@@ -408,18 +408,35 @@ PyGpuNdArray_set_shape(PyGpuNdArrayObject *self, PyObject *value, void *closure)
     return -1;
 }
 
+static PyObject *
+PyGpuNdArray_get_strides(PyGpuNdArrayObject *self, void *closure)
+{
+  if ( PyGpuNdArray_NDIM(self) < 0){
+      PyErr_SetString(PyExc_ValueError, "PyGpuNdArrayObject not initialized");
+      return NULL;
+    }
+  PyObject * rval = PyTuple_New( PyGpuNdArray_NDIM(self));
+  for (int i = 0; i < PyGpuNdArray_NDIM(self); ++i){
+      if (!rval || PyTuple_SetItem(rval, i, PyInt_FromLong(PyGpuNdArray_STRIDES(self)[i]))){
+	  Py_XDECREF(rval);
+	  return NULL;
+        }
+    }
+  return rval;
+}
+
 static PyGetSetDef PyGpuNdArray_getset[] = {
     {"shape",
         (getter)PyGpuNdArray_get_shape,
         (setter)PyGpuNdArray_set_shape,
         "shape of this ndarray (tuple)",
         NULL},
-    /*
-    {"_strides",
+    {"strides",
         (getter)PyGpuNdArray_get_strides,
-        (setter)PyGpuNdArray_set_strides,
+        NULL,//(setter)PyGpuNdArray_set_strides,
         "data pointer strides (in elements)",
         NULL},
+    /*
     //gpudata is needed to allow calling pycuda fct with PyGpuNdArray input.
     {"gpudata",
         (getter)PyGpuNdArray_get_dev_data,
