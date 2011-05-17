@@ -1,0 +1,274 @@
+#ifndef _GPU_NDARRAY_H
+#define _GPU_NDARRAY_H
+
+#include <numpy/arrayobject.h>
+#include <stdio.h>
+
+#include <cublas.h>
+
+#ifdef __DEVICE_EMULATION__
+#define NUM_VECTOR_OP_BLOCKS                4096
+#define NUM_VECTOR_OP_THREADS_PER_BLOCK     1  //This prevents printf from getting tangled up
+#else
+#define NUM_VECTOR_OP_BLOCKS                4096 //Max number of blocks to launch.  Should be read from device properties. (#10)
+#define NUM_VECTOR_OP_THREADS_PER_BLOCK     256  //Should be read from device properties. (#10)
+#endif
+
+#if 0
+// Do not wait after every kernel & transfer.
+#define CNDA_THREAD_SYNC
+#else
+// This is useful for using normal profiling tools
+#define CNDA_THREAD_SYNC cudaThreadSynchronize();
+#endif
+
+
+#ifndef SHARED_SIZE 
+#define SHARED_SIZE (16*1024)
+#endif
+
+/**
+ * Allocation and freeing of device memory should go through these functions so that the lib can track memory usage.
+ *
+ * device_malloc will set the Python error message before returning None.
+ * device_free will return nonzero on failure (after setting the python error message)
+ */
+void * device_malloc(size_t size);
+int device_free(void * ptr);
+
+/**
+ * struct PyGPUArrayObject
+ *
+ * This is a Python type.  
+ *
+ */
+typedef struct PyGpuNdArrayObject{
+  PyObject_HEAD
+
+  char* data; //pointer to data element [0,..,0].
+  int offset;
+  int nd; //the number of dimensions of the tensor
+
+  /**
+   * base:
+   *  either NULL or a pointer to a fellow CudaNdarray into which this one is viewing.
+   *  This pointer is never followed, except during Py_DECREF when we do not need it any longer.
+   */
+  PyObject * base;
+  npy_intp * dimensions; //dim0, dim1, ... dim nd
+  npy_intp * strides; //stride0, stride1, ... stride nd
+  int flags; // Flags, see numpy flags
+  PyArray_Descr *descr;   /* Pointer to type structure */
+
+
+  int data_allocated; //the number of bytes allocated for devdata
+} PyGpuNdArrayObject;
+
+/**
+ * Return 1 for a PyGpuNdArrayObject otw 0
+ */
+int 
+PyGpuNdArray_Check(const PyObject * ob);
+
+/**
+ * Return 1 for a PyGpuNdArrayObject otw 0
+ */
+int 
+PyGpuNdArray_CheckExact(const PyObject * ob);
+
+const npy_intp * 
+PyGpuNdArray_DIMS(const PyGpuNdArrayObject * self)
+{
+    return self->dimensions;
+}
+const npy_intp * 
+PyGpuNdArray_STRIDES(const PyGpuNdArrayObject * self)
+{
+    return self->strides;
+}
+
+#define PyGpuNdArray_NDIM(obj) (((PyGpuNdArrayObject *)obj)->nd)
+#define PyGpuNdArray_DATA(obj) (((PyGpuNdArrayObject *)obj)->data)
+#define PyGpuNdArray_BYTES(obj) (((PyGpuNdArrayObject *)obj)->data)
+#define PyGpuNdArray_DIMS(obj) (((PyGpuNdArrayObject *)obj)->dimensions)
+#define PyGpuNdArray_STRIDES(obj) (((PyGpuNdArrayObject *)obj)->strides)
+#define PyGpuNdArray_DIM(obj,n) (PyGpuNdArray_DIMS(obj)[n])
+#define PyGpuNdArray_STRIDE(obj,n) (PyGpuNdArray_STRIDES(obj)[n])
+#define PyGpuNdArray_BASE(obj) (((PyGpuNdArrayObject *)obj)->base)
+#define PyGpuNdArray_DESCR(obj) (((PyGpuNdArrayObject *)obj)->descr)
+#define PyGpuNdArray_FLAGS(obj) (((PyGpuNdArrayObject *)obj)->flags)
+#define PyGpuNdArray_ITEMSIZE(obj) (((PyGpuNdArrayObject *)obj)->descr->elsize)
+#define PyGpuNdArray_TYPE(obj) (((PyGpuNdArrayObject *)(obj))->descr->type_num)
+
+#define PyGpuNdArray_SIZE(obj) PyArray_MultiplyList(PyGpuNdArray_DIMS(obj),PyGpuNdArray_NDIM(obj))
+//npy_intp PyGpuNdArray_Size(PyObject* obj);
+//npy_intp PyGpuNdArray_NBYTES(PyObject* arr);
+
+/*
+  Flags accessor
+ */
+#define PyGpuNdArray_CHKFLAGS(m, FLAGS)                              \
+        ((((PyGpuNdArrayObject *)(m))->flags & (FLAGS)) == (FLAGS))
+
+#define PyGpuNdArray_ISCONTIGUOUS(m) PyGpuNdArray_CHKFLAGS(m, NPY_CONTIGUOUS)
+#define PyGpuNdArray_ISWRITEABLE(m) PyGpuNdArray_CHKFLAGS(m, NPY_WRITEABLE)
+#define PyGpuNdArray_ISALIGNED(m) PyGpuNdArray_CHKFLAGS(m, NPY_ALIGNED)
+
+#define PyGpuNdArray_ISNBO(arg) ((arg) != NPY_OPPBYTE)
+#define PyGpuNdArray_IsNativeByteOrder PyArray_ISNBO
+#define PyGpuNdArray_ISNOTSWAPPED(m) PyArray_ISNBO(PyArray_DESCR(m)->byteorder)
+#define PyGpuNdArray_FLAGSWAP(m, flags) (PyGpuNdArray_CHKFLAGS(m, flags) &&       \
+					 PyGpuNdArray_ISNOTSWAPPED(m))
+
+#define PyGpuNdArray_ISCARRAY(m) PyGpuNdArray_FLAGSWAP(m, NPY_CARRAY)
+#define PyGpuNdArray_ISCARRAY_RO(m) PyGpuNdArray_FLAGSWAP(m, NPY_CARRAY_RO)
+#define PyGpuNdArray_ISFARRAY(m) PyGpuNdArray_FLAGSWAP(m, NPY_FARRAY)
+#define PyGpuNdArray_ISFARRAY_RO(m) PyGpuNdArray_FLAGSWAP(m, NPY_FARRAY_RO)
+#define PyGpuNdArray_ISBEHAVED(m) PyGpuNdArray_FLAGSWAP(m, NPY_BEHAVED)
+#define PyGpuNdArray_ISBEHAVED_RO(m) PyGpuNdArray_FLAGSWAP(m, NPY_ALIGNED)
+
+
+void PyGpuNdArray_fprint(FILE * fd, const PyGpuNdArrayObject *self)
+{
+    fprintf(fd, "PyGpuNdArrayObject <%p, %p> nd=%i data_allocated=%d\n",
+	    self, self->data, self->nd, self->data_allocated);
+    fprintf(fd, "\tHOST_DIMS:      ");
+    for (int i = 0; i < self->nd; ++i)
+    {
+        fprintf(fd, "%i\t", PyGpuNdArray_DIMS(self)[i]);
+    }
+    fprintf(fd, "\n\tHOST_STRIDES: ");
+    for (int i = 0; i < self->nd; ++i)
+    {
+        fprintf(fd, "%i\t", PyGpuNdArray_STRIDES(self)[i]);
+    }
+    fprintf(fd, "\n");
+}
+
+
+/**
+ * Transfer the contents of numpy array `obj` to `self`.
+ *
+ * self is reallocated to have the correct dimensions if necessary.
+ */
+int PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj);
+
+/**
+ * [Re]allocate a PyGpuNdArrayObject with access to 'nd' dimensions.
+ *
+ * Note: This does not allocate storage for data.
+ */
+int PyGpuNdArray_set_nd(PyGpuNdArrayObject * self, const int nd)
+{
+    if (nd != self->nd)
+    {
+        if(0) fprintf(stderr, "PyGpuNdArray_set_nd: modif nd=%i to nd=%i\n", self->nd, nd);
+    
+        if (self->dimensions){
+            free(self->dimensions);
+            self->dimensions = NULL;
+            self->nd = -1;
+        }
+        if (self->strides){
+            free(self->strides);
+            self->strides = NULL;
+            self->nd = -1;
+        }
+        if (nd == -1) return 0;
+
+        self->dimensions = (npy_intp*)malloc(nd*sizeof(npy_intp));
+        if (NULL == self->dimensions)
+        {
+            PyErr_SetString(PyExc_MemoryError, "PyGpuNdArray_set_nd: Failed to allocate dimensions");
+            return -1;
+        }
+        self->strides = (npy_intp*)malloc(nd*sizeof(npy_intp));
+        if (NULL == self->strides)
+        {
+            PyErr_SetString(PyExc_MemoryError, "PyGpuNdArray_set_nd: Failed to allocate str");
+            return -1;
+        }
+        //initialize all dimensions and strides to 0
+        for (int i = 0; i < nd; ++i)
+        {
+            self->dimensions[i] = 0;
+            self->strides[i] = 0;
+        }
+
+        self->nd = nd;
+	if(0) fprintf(stderr, "PyGpuNdArray_set_nd: end\n");
+    }
+    return 0;
+}
+
+/**
+ * PyGpuNdArray_alloc_contiguous
+ *
+ * Allocate storage space for a tensor of rank 'nd' and given dimensions.
+ *
+ * Note: PyGpuNdArray_alloc_contiguous is templated to work for both int dimensions and npy_intp dimensions
+ */
+template<typename inttype>
+int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const inttype * dim)
+{
+    if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: start nd=%i\n", nd);
+    // allocate an empty ndarray with c_contiguous access
+    // return 0 on success
+    int size = 1; //set up the strides for contiguous tensor
+    assert (nd >= 0);
+    if (PyGpuNdArray_set_nd(self, nd))
+    {
+        return -1;
+    }
+    //TODO: check if by any chance our current dims are correct,
+    //      and strides already contiguous
+    //      in that case we can return right here.
+    if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: before itemsize descr=%p elsize=%i\n", self->descr, self->descr->elsize);
+    int elsize = PyGpuNdArray_ITEMSIZE((PyObject*)self);
+    if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: set_nd! elsize=%i\n", nd,elsize);
+    for (int i = nd-1; i >= 0; --i)
+    {
+        self->strides[i] = size * elsize;
+        self->dimensions[i] = dim[i];
+        size = size * dim[i];
+    }
+
+    if (self->data_allocated != size)
+    {
+        if (device_free(self->data))
+        {
+            // Does this ever happen??  Do we need to set data_allocated or data to 0?
+            return -1;
+        }
+        assert(size>0);
+	if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: will allocate for size=%d elements\n", size);
+
+        self->data = (char*)device_malloc(size * PyGpuNdArray_ITEMSIZE((PyObject *)self));
+        if (!self->data)
+        {
+            PyGpuNdArray_set_nd(self,-1);
+            self->data_allocated = 0;
+            self->data = 0;
+            return -1;
+        }
+        if (0)
+            fprintf(stderr,
+                "Allocated data %p (self=%p)\n",
+                self->data,
+                self);
+        self->data_allocated = size;
+	self->flags = NPY_DEFAULT;
+    }
+    return 0;
+}
+
+
+
+
+template <typename T>
+static T ceil_intdiv(T a, T b)
+{
+    return (a/b) + ((a % b) ? 1: 0);
+}
+
+#endif

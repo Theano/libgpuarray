@@ -10,3 +10,4 @@ setuptools*egg
 setuptools.pth
 distribute*egg
 distribute*tar.gz
+*.so
