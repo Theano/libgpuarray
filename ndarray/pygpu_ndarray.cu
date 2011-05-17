@@ -233,7 +233,11 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
 {
     if(0) fprintf(stderr, "PyGpuNdArray_CopyFromArray: start descr=%p\n", self->descr);
 
-    int err = PyGpuNdArray_alloc_contiguous(self, obj->nd, obj->dimensions);
+    int err;
+    if(PyArray_ISFORTRAN(obj))
+      err = PyGpuNdArray_alloc_contiguous(self, obj->nd, obj->dimensions, NPY_FORTRANORDER);
+    else
+      err = PyGpuNdArray_alloc_contiguous(self, obj->nd, obj->dimensions);
     if (err) {
         return err;
     }

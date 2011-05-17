@@ -199,7 +199,7 @@ int PyGpuNdArray_set_nd(PyGpuNdArrayObject * self, const int nd)
  * Note: PyGpuNdArray_alloc_contiguous is templated to work for both int dimensions and npy_intp dimensions
  */
 template<typename inttype>
-int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const inttype * dim)
+int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const inttype * dim, NPY_ORDER order=NPY_CORDER)
 {
     if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: start nd=%i\n descr=%p", nd);
     // allocate an empty ndarray with c_contiguous access
@@ -216,11 +216,23 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
     if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: before itemsize descr=%p elsize=%i\n", self->descr, self->descr->elsize);
     int elsize = PyGpuNdArray_ITEMSIZE((PyObject*)self);
     if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: set_nd! elsize=%i\n", nd,elsize);
-    for (int i = nd-1; i >= 0; --i)
-    {
+    if(order != NPY_FORTRANORDER){
+      if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: NPY_CORDER\n");
+      for (int i = nd-1; i >= 0; --i){
         PyGpuNdArray_STRIDE(self,i) = size * elsize;
         PyGpuNdArray_DIM(self,i) = dim[i];
         size = size * dim[i];
+      }
+    }else{
+      if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: NPY_FORTRANORDER\n");
+      size = dim[nd-1];
+      PyGpuNdArray_STRIDE(self, 0) = elsize;
+      PyGpuNdArray_DIM(self, nd-1) = dim[nd-1];
+      for (int i = 1; i < nd; ++i){
+        PyGpuNdArray_STRIDE(self, i) = PyGpuNdArray_STRIDE(self, i-1) * dim[i-1];
+        PyGpuNdArray_DIM(self, nd-i-1) = dim[nd-i-1];
+        size = size * dim[i];
+      }
     }
 
     if (self->data_allocated != size)
