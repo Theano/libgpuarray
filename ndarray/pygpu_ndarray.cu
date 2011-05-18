@@ -232,6 +232,10 @@ int
 PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
 {
     if(0) fprintf(stderr, "PyGpuNdArray_CopyFromArray: start descr=%p\n", self->descr);
+    //modif done to the new array won't be updated!
+    assert(!PyArray_CHKFLAGS(self, NPY_UPDATEIFCOPY));
+    //Aligned are not tested, so don't allow it for now
+    assert(!PyArray_CHKFLAGS(self, NPY_ALIGNED));
 
     int err;
     if(PyArray_ISFORTRAN(obj))
@@ -242,6 +246,14 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
         return err;
     }
 
+    //check that the flag are the same
+    assert(PyArray_ISCONTIGUOUS(self) == PyGpuNdArray_ISCONTIGUOUS(obj));
+    assert(PyArray_ISFORTRAN(self) == PyGpuNdArray_ISFORTRAN(obj));
+    assert(PyArray_ISALIGNED(self) == PyGpuNdArray_ISALIGNED(obj));
+    // New memory, so we should own it.
+    assert(PyGpuNdArray_CHKFLAGS(self, NPY_OWNDATA));
+    // New memory, so it should be writable
+    assert(PyGpuNdArray_ISWRITEABLE(self));
 
     int typenum = PyArray_TYPE(obj);
     PyObject * py_src = PyArray_ContiguousFromAny((PyObject*)obj, typenum, PyGpuNdArray_NDIM(self), PyGpuNdArray_NDIM(self));
@@ -295,7 +307,7 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
     {
         contiguous_self = self;
         Py_INCREF(contiguous_self);
-        if (verbose) std::cerr << "CreateArrayObj already contiguous" << contiguous_self << '\n';
+        if (verbose) std::cerr << "PyGpuNdArray_CreateArrayObj:gpu array already contiguous" << contiguous_self << '\n';
     }
     else
     {

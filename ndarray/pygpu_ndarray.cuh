@@ -132,7 +132,39 @@ void PyGpuNdArray_fprint(FILE * fd, const PyGpuNdArrayObject *self)
     {
         fprintf(fd, "%i\t", PyGpuNdArray_STRIDES(self)[i]);
     }
+    fprintf(fd, "\n\tFLAGS: ");
+    fprintf(fd, "\n\t\tC_CONTIGUOUS: %d", PyGpuNdArray_ISCONTIGUOUS(self));
+    fprintf(fd, "\n\t\tF_CONTIGUOUS: %d", PyGpuNdArray_ISFORTRAN(self));
+    fprintf(fd, "\n\t\tOWNDATA: %d", PyGpuNdArray_CHKFLAGS(self, NPY_OWNDATA));
+    fprintf(fd, "\n\t\tWRITEABLE: %d", PyGpuNdArray_ISWRITEABLE(self));
+    fprintf(fd, "\n\t\tALIGNED: %d", PyGpuNdArray_ISALIGNED(self));
+    fprintf(fd, "\n\t\tUPDATEIFCOPY: %d", PyGpuNdArray_CHKFLAGS(self, NPY_UPDATEIFCOPY));
     fprintf(fd, "\n");
+
+}
+void PyArray_fprint(FILE * fd, const PyArrayObject *self)
+{
+    fprintf(fd, "PyArrayObject <%p, %p> nd=%i\n",
+	    self, PyArray_DATA(self), PyArray_NDIM(self));
+    fprintf(fd, "\tHOST_DIMS:      ");
+    for (int i = 0; i < PyArray_NDIM(self); ++i)
+    {
+        fprintf(fd, "%i\t", PyArray_DIMS(self)[i]);
+    }
+    fprintf(fd, "\n\tHOST_STRIDES: ");
+    for (int i = 0; i < PyArray_NDIM(self); ++i)
+    {
+        fprintf(fd, "%i\t", PyArray_STRIDES(self)[i]);
+    }
+    fprintf(fd, "\n\tFLAGS: ");
+    fprintf(fd, "\n\t\tC_CONTIGUOUS: %d", PyArray_ISCONTIGUOUS(self));
+    fprintf(fd, "\n\t\tF_CONTIGUOUS: %d", PyArray_ISFORTRAN(self));
+    fprintf(fd, "\n\t\tOWNDATA: %d", PyArray_CHKFLAGS(self, NPY_OWNDATA));
+    fprintf(fd, "\n\t\tWRITEABLE: %d", PyArray_ISWRITEABLE(self));
+    fprintf(fd, "\n\t\tALIGNED: %d", PyArray_ISALIGNED(self));
+    fprintf(fd, "\n\t\tUPDATEIFCOPY: %d", PyArray_CHKFLAGS(self, NPY_UPDATEIFCOPY));
+    fprintf(fd, "\n");
+
 }
 
 
