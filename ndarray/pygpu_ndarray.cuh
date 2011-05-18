@@ -102,6 +102,8 @@ PyGpuNdArray_STRIDES(const PyGpuNdArrayObject * self)
         ((((PyGpuNdArrayObject *)(m))->gpu_ndarray.flags & (FLAGS)) == (FLAGS))
 
 #define PyGpuNdArray_ISCONTIGUOUS(m) PyGpuNdArray_CHKFLAGS(m, NPY_CONTIGUOUS)
+#define PyGpuNdArray_ISFORTRAN(m) PyGpuNdArray_CHKFLAGS(m, NPY_F_CONTIGUOUS)
+#define PyGpuNdArray_ISONESEGMENT(m) (PyGpuNdArray_ISCONTIGUOUS(m) || PyGpuNdArray_ISFORTRAN(m))
 #define PyGpuNdArray_ISWRITEABLE(m) PyGpuNdArray_CHKFLAGS(m, NPY_WRITEABLE)
 #define PyGpuNdArray_ISALIGNED(m) PyGpuNdArray_CHKFLAGS(m, NPY_ALIGNED)
 
@@ -292,6 +294,24 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
                 self);
         self->data_allocated = size;
 	self->gpu_ndarray.flags = NPY_DEFAULT;
+	PyGpuNdArray_FLAGS(self) |= NPY_WRITEABLE;
+	PyGpuNdArray_FLAGS(self) |= NPY_OWNDATA;
+	if(nd == 0){
+	  PyGpuNdArray_FLAGS(self) &= ~NPY_F_CONTIGUOUS;
+	  PyGpuNdArray_FLAGS(self) |= NPY_C_CONTIGUOUS;
+	}else if(nd == 1){//set c and f contiguous
+	  PyGpuNdArray_FLAGS(self) |= NPY_F_CONTIGUOUS;
+	  PyGpuNdArray_FLAGS(self) |= NPY_C_CONTIGUOUS;	  
+	}else if(order != NPY_FORTRANORDER){//set c contiguous
+	  PyGpuNdArray_FLAGS(self) &= ~NPY_F_CONTIGUOUS;
+	  PyGpuNdArray_FLAGS(self) |= NPY_C_CONTIGUOUS;
+	}else{//set f contiguous
+	  PyGpuNdArray_FLAGS(self) |= NPY_F_CONTIGUOUS;
+	  PyGpuNdArray_FLAGS(self) &= ~NPY_C_CONTIGUOUS;
+	}
+	PyGpuNdArray_FLAGS(self) &= ~NPY_UPDATEIFCOPY;
+    }else{
+      assert(0);// How to check for the flags? Need to check if already contiguous.
     }
     if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: end\n");
     return 0;

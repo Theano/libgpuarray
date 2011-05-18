@@ -307,7 +307,7 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
         return NULL;
     }
     PyGpuNdArrayObject * contiguous_self = NULL;
-    if (PyGpuNdArray_ISCONTIGUOUS(self))
+    if (PyGpuNdArray_ISONESEGMENT(self))
     {
         contiguous_self = self;
         Py_INCREF(contiguous_self);
@@ -331,7 +331,10 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
     npy_intp * npydims = (npy_intp*)malloc(PyGpuNdArray_NDIM(self) * sizeof(npy_intp));
     assert (npydims);
     for (int i = 0; i < PyGpuNdArray_NDIM(self); ++i) npydims[i] = (npy_intp)(PyGpuNdArray_DIMS(self)[i]);
-    PyObject * rval = PyArray_SimpleNew(PyGpuNdArray_NDIM(self), npydims, PyGpuNdArray_TYPE(self));
+    PyObject * rval = PyArray_Empty(PyGpuNdArray_NDIM(self),
+				    npydims,
+				    PyGpuNdArray_DESCR(self),
+				    0);//PyGpuNdArray_ISFORTRAN(self));
     free(npydims);
     if (!rval)
     {
