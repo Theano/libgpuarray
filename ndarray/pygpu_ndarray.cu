@@ -256,7 +256,7 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
     assert(PyGpuNdArray_ISWRITEABLE(self));
 
     int typenum = PyArray_TYPE(obj);
-    PyObject * py_src = PyArray_ContiguousFromAny((PyObject*)obj, typenum, PyGpuNdArray_NDIM(self), PyGpuNdArray_NDIM(self));
+    PyObject * py_src = PyArray_ContiguousFromAny((PyObject*)obj, typenum, PyArray_NDIM(obj), PyArray_NDIM(obj));
     if(0) fprintf(stderr, "PyGpuNdArray_CopyFromArray: contiguous!\n");
     if (!py_src) {
         return -1;
@@ -276,20 +276,24 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
     return 0;
 }
 
-//updated for offset and dtype
+//updated for offset
 PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
 {
-    if(0) fprintf(stderr, "PyGpuNdArray_CreateArrayObj\n");
-
     int verbose = 0;
+
+    if(verbose) fprintf(stderr, "PyGpuNdArray_CreateArrayObj\n");
 
     assert(PyGpuNdArray_OFFSET(self)==0);//TODO implement when offset is not 0!
 
     if(PyGpuNdArray_NDIM(self)>=0 && PyGpuNdArray_SIZE(self)==0){
       npy_intp * npydims = (npy_intp*)malloc(PyGpuNdArray_NDIM(self) * sizeof(npy_intp));
       assert (npydims);
-      for (int i = 0; i < PyGpuNdArray_NDIM(self); ++i) npydims[i] = (npy_intp)(PyGpuNdArray_DIMS(self)[i]);
-      PyObject * rval = PyArray_SimpleNew(PyGpuNdArray_NDIM(self), npydims, PyGpuNdArray_TYPE(self));
+      for (int i = 0; i < PyGpuNdArray_NDIM(self); ++i)
+	npydims[i] = (npy_intp)(PyGpuNdArray_DIMS(self)[i]);
+      //TODO: refcount on descr!
+      PyObject * rval = PyArray_Empty(PyGpuNdArray_NDIM(self),
+				      npydims, self->descr,
+				      PyGpuNdArray_ISFARRAY(self));
       free(npydims);
       if (!rval){
         return NULL;
@@ -307,7 +311,8 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
     {
         contiguous_self = self;
         Py_INCREF(contiguous_self);
-        if (verbose) std::cerr << "PyGpuNdArray_CreateArrayObj:gpu array already contiguous" << contiguous_self << '\n';
+        if (verbose) std::cerr << "PyGpuNdArray_CreateArrayObj:gpu array already contiguous" <<
+		       contiguous_self << '\n';
     }
     else
     {
