@@ -91,12 +91,18 @@ PyGpuNdArray_CheckExact(const PyObject * ob);
         ((((PyGpuNdArrayObject *)(m))->gpu_ndarray.flags & (FLAGS)) == (FLAGS))
 
 #define PyGpuNdArray_ISCONTIGUOUS(m) PyGpuNdArray_CHKFLAGS(m, NPY_CONTIGUOUS)
-#define PyGpuNdArray_ISFORTRAN(m) PyGpuNdArray_CHKFLAGS(m, NPY_F_CONTIGUOUS)
-#define PyGpuNdArray_ISONESEGMENT(m) (PyGpuNdArray_ISCONTIGUOUS(m) || PyGpuNdArray_ISFORTRAN(m))
+#define PyGpuNdArray_ISFORTRAN(m) (PyGpuNdArray_CHKFLAGS(m, NPY_F_CONTIGUOUS) && \
+                                   PyGpuNdArray_NDIM(m) > 1)
+#define PyGpuNdArray_FORTRAN_IF(m) (PyGpuNdArray_CHKFLAGS(m, NPY_F_CONTIGUOUS)? \
+                                    NPY_F_CONTIGUOUS : 0)
+#define PyGpuNdArray_ISONESEGMENT(m) (PyGpuNdArray_NDIM(m) == 0 || \
+                                      PyGpuNdArray_ISCONTIGUOUS(m) || \
+                                      PyGpuNdArray_ISFORTRAN(m))
 #define PyGpuNdArray_ISWRITEABLE(m) PyGpuNdArray_CHKFLAGS(m, NPY_WRITEABLE)
 #define PyGpuNdArray_ISALIGNED(m) PyGpuNdArray_CHKFLAGS(m, NPY_ALIGNED)
 
 #define PyGpuNdArray_ISNBO(arg) ((arg) != NPY_OPPBYTE)
+// THE NEXT ONE SEEM BAD...
 #define PyGpuNdArray_IsNativeByteOrder PyArray_ISNBO
 #define PyGpuNdArray_ISNOTSWAPPED(m) PyArray_ISNBO(PyArray_DESCR(m)->byteorder)
 #define PyGpuNdArray_FLAGSWAP(m, flags) (PyGpuNdArray_CHKFLAGS(m, flags) && PyGpuNdArray_ISNOTSWAPPED(m))
@@ -125,6 +131,8 @@ void PyGpuNdArray_fprint(FILE * fd, const PyGpuNdArrayObject *self)
     }
     fprintf(fd, "\n\tFLAGS: ");
     fprintf(fd, "\n\t\tC_CONTIGUOUS: %d", PyGpuNdArray_ISCONTIGUOUS(self));
+    fprintf(fd, "\n\t\tPyGpuNdArray_ISFORTRAN: %d PyGpuNdArray_FORTRAN_IF:%d F_CONTIGUOUS: %d",
+            PyGpuNdArray_ISFORTRAN(self), PyGpuNdArray_FORTRAN_IF(self), PyGpuNdArray_CHKFLAGS(self, NPY_FORTRAN));
     fprintf(fd, "\n\t\tF_CONTIGUOUS: %d", PyGpuNdArray_ISFORTRAN(self));
     fprintf(fd, "\n\t\tOWNDATA: %d", PyGpuNdArray_CHKFLAGS(self, NPY_OWNDATA));
     fprintf(fd, "\n\t\tWRITEABLE: %d", PyGpuNdArray_ISWRITEABLE(self));
@@ -149,7 +157,8 @@ void PyArray_fprint(FILE * fd, const PyArrayObject *self)
     }
     fprintf(fd, "\n\tFLAGS: ");
     fprintf(fd, "\n\t\tC_CONTIGUOUS: %d", PyArray_ISCONTIGUOUS(self));
-    fprintf(fd, "\n\t\tF_CONTIGUOUS: %d", PyArray_ISFORTRAN(self));
+    fprintf(fd, "\n\t\tPyArray_ISFORTRAN: %d PyArray_FORTRAN_IF:%d F_CONTIGUOUS: %d",
+            PyArray_ISFORTRAN(self), PyArray_FORTRAN_IF(self), PyArray_CHKFLAGS(self, NPY_FORTRAN));
     fprintf(fd, "\n\t\tOWNDATA: %d", PyArray_CHKFLAGS(self, NPY_OWNDATA));
     fprintf(fd, "\n\t\tWRITEABLE: %d", PyArray_ISWRITEABLE(self));
     fprintf(fd, "\n\t\tALIGNED: %d", PyArray_ISALIGNED(self));
