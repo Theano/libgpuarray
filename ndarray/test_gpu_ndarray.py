@@ -21,6 +21,10 @@ def test_transfer():
             assert c.flags.c_contiguous
 
 def test_transfer_not_contiguous():
+    """
+    Test transfer when the input on the CPU is not contiguous
+    TODO: test when the input on the gpu is not contiguous
+    """
     for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
         for dtype in ["int8", "int16", "int32", "int64",
                       "uint8", "uint16", "uint32", "uint64",

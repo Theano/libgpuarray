@@ -245,24 +245,26 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
     if (err) {
         return err;
     }
+    int typenum = PyArray_TYPE(obj);
+    PyObject * py_src = PyArray_ContiguousFromAny((PyObject*)obj, typenum, PyArray_NDIM(obj), PyArray_NDIM(obj));
+    if(1) fprintf(stderr, "PyGpuNdArray_CopyFromArray: contiguous!\n");
+    if (!py_src) {
+        return -1;
+    }
 
     //check that the flag are the same
-    assert(PyArray_ISCONTIGUOUS(self) == PyGpuNdArray_ISCONTIGUOUS(obj));
-    assert(PyArray_ISFORTRAN(self) == PyGpuNdArray_ISFORTRAN(obj));
-    assert(PyArray_ISALIGNED(self) == PyGpuNdArray_ISALIGNED(obj));
+    assert(PyArray_ISCONTIGUOUS(py_src) == PyGpuNdArray_ISCONTIGUOUS(self));
+    assert(PyArray_ISFORTRAN(py_src) == PyGpuNdArray_ISFORTRAN(self));
+    assert(PyArray_ISALIGNED(py_src) == PyGpuNdArray_ISALIGNED(self));
+
     // New memory, so we should own it.
     assert(PyGpuNdArray_CHKFLAGS(self, NPY_OWNDATA));
     // New memory, so it should be writable
     assert(PyGpuNdArray_ISWRITEABLE(self));
 
-    int typenum = PyArray_TYPE(obj);
-    PyObject * py_src = PyArray_ContiguousFromAny((PyObject*)obj, typenum, PyArray_NDIM(obj), PyArray_NDIM(obj));
-    if(0) fprintf(stderr, "PyGpuNdArray_CopyFromArray: contiguous!\n");
-    if (!py_src) {
-        return -1;
-    }
+
     cublasSetVector(PyArray_SIZE(py_src),
-		    PyArray_ITEMSIZE(obj),
+		    PyArray_ITEMSIZE(py_src),
 		    PyArray_DATA(py_src), 1,
 		    PyGpuNdArray_DATA(self), 1);
     CNDA_THREAD_SYNC;
