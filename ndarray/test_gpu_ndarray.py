@@ -60,7 +60,7 @@ def test_transfer_fortran():
 
             assert a.shape == b.shape == c.shape
             assert a.dtype == c.dtype
-            #assert c.flags.f_contiguous
-            #print a.strides, b.strides, c.strides//TODO: fix why the strides are not the same...
-            assert a.strides == b.strides #== c.strides
+            assert a.flags.f_contiguous
+            assert c.flags.f_contiguous
+            assert a.strides == b.strides == c.strides
             assert numpy.allclose(c,a)
