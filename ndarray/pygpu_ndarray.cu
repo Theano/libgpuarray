@@ -449,6 +449,12 @@ PyGpuNdArray_get_strides(PyGpuNdArrayObject *self, void *closure)
   return rval;
 }
 
+static PyObject *
+PyGpuNdArray_get_data(PyGpuNdArrayObject *self, void *closure)
+{
+    return PyInt_FromLong((long int) PyGpuNdArray_DATA(self));
+}
+
 static PyGetSetDef PyGpuNdArray_getset[] = {
     {"shape",
         (getter)PyGpuNdArray_get_shape,
@@ -460,18 +466,12 @@ static PyGetSetDef PyGpuNdArray_getset[] = {
         NULL,//(setter)PyGpuNdArray_set_strides,
         "data pointer strides (in elements)",
         NULL},
-    /*
-    //gpudata is needed to allow calling pycuda fct with PyGpuNdArray input.
-    {"gpudata",
-        (getter)PyGpuNdArray_get_dev_data,
+    {"bytes",
+        (getter)PyGpuNdArray_get_data,
         NULL,
         "device data pointer",
         NULL},
-    {"_dev_data",
-        (getter)PyGpuNdArray_get_dev_data,
-        (setter)PyGpuNdArray_set_dev_data,
-        "device data pointer",
-        NULL},
+    /*
     {"dtype",
         (getter)PyGpuNdArray_get_dtype,
         NULL,
