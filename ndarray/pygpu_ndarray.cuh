@@ -66,17 +66,6 @@ PyGpuNdArray_Check(const PyObject * ob);
 int 
 PyGpuNdArray_CheckExact(const PyObject * ob);
 
-const npy_intp * 
-PyGpuNdArray_DIMS(const PyGpuNdArrayObject * self)
-{
-    return self->gpu_ndarray.dimensions;
-}
-const npy_intp * 
-PyGpuNdArray_STRIDES(const PyGpuNdArrayObject * self)
-{
-    return self->gpu_ndarray.strides;
-}
-
 #define PyGpuNdArray_NDIM(obj) (((PyGpuNdArrayObject *)obj)->gpu_ndarray.nd)
 #define PyGpuNdArray_DATA(obj) (((PyGpuNdArrayObject *)obj)->gpu_ndarray.data)
 #define PyGpuNdArray_BYTES(obj) (((PyGpuNdArrayObject *)obj)->gpu_ndarray.data)
