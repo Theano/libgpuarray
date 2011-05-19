@@ -121,7 +121,7 @@ outstanding_mallocs(PyObject* self, PyObject * args)
 /////////////////////////
 
 static void
-PyGpuNdArrayObject_null_init(PyGpuNdArrayObject *self)
+PyGpuNdArray_null_init(PyGpuNdArrayObject *self)
 {
     if(0) fprintf(stderr, "PyGpuNdArrayObject_null_init\n");
 
@@ -199,7 +199,7 @@ PyGpuNdArray_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     self = (PyGpuNdArrayObject *)type->tp_alloc(type, 0);
     if (self != NULL){
-        PyGpuNdArrayObject_null_init(self);
+        PyGpuNdArray_null_init(self);
         ++_outstanding_mallocs[1];
     }
     return (PyObject *)self;
