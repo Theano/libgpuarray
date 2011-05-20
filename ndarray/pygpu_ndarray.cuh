@@ -8,6 +8,7 @@
 #include <stdio.h>
 
 #include <cublas.h>
+#include <pygpu_language.h>
 
 #ifdef __DEVICE_EMULATION__
 #define NUM_VECTOR_OP_BLOCKS                4096
@@ -29,15 +30,6 @@
 #ifndef SHARED_SIZE 
 #define SHARED_SIZE (16*1024)
 #endif
-
-/**
- * Allocation and freeing of device memory should go through these functions so that the lib can track memory usage.
- *
- * device_malloc will set the Python error message before returning None.
- * device_free will return nonzero on failure (after setting the python error message)
- */
-void * device_malloc(size_t size);
-int device_free(void * ptr);
 
 /**
  * struct PyGPUArrayObject
