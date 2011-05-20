@@ -54,6 +54,12 @@ typedef struct PyGpuNdArrayObject{
   int data_allocated; //the number of bytes allocated for devdata
 } PyGpuNdArrayObject;
 
+/*
+ * Return a PyGpuNdArray whose 'nd' dimensions are all 0.
+ * if nd==-1, it is not initialized.
+ */
+PyObject * PyGpuNdArray_New(int nd=-1);
+
 /**
  * Return 1 for a PyGpuNdArrayObject otw 0
  */

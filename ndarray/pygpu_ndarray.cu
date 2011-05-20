@@ -560,6 +560,28 @@ static PyTypeObject PyGpuNdArrayType =
 // C API FOR PyGpuNdArrayObject
 //
 //////////////////////////////////////
+PyObject *
+PyGpuNdArray_New(int nd)
+{
+    PyGpuNdArrayObject *self = (PyGpuNdArrayObject *)PyGpuNdArrayType.tp_alloc(&PyGpuNdArrayType, 0);
+    if (self == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "PyGpuNdArray_New failed to allocate self");
+        return NULL;
+    }
+    PyGpuNdArray_null_init(self);
+
+    if (nd == 0) {
+        PyGpuNdArray_NDIM(self) = 0;
+    }
+    else if (nd > 0) {
+        if (PyGpuNdArray_set_nd(self, nd)) {
+            Py_DECREF(self);
+            return NULL;
+        }
+    }
+    ++_outstanding_mallocs[1];
+    return (PyObject *)self;
+}
 
 int
 PyGpuNdArray_Check(const PyObject * ob)
