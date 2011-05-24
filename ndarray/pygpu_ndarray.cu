@@ -404,8 +404,15 @@ PyGpuNdArray_get_base(PyGpuNdArrayObject *self, void *closure)
 static PyObject *
 PyGpuNdArray_get_dtype(PyArrayObject *self)
 {
-    Py_INCREF(self->descr);
-    return (PyObject *)PyGpuNdArray_DESCR(self);
+    Py_INCREF(PyGpuNdArray_DESCR(self));
+    PyObject * ret = (PyObject *)PyGpuNdArray_DESCR(self);
+    return ret;
+}
+
+static PyObject *
+PyGpuNdArray_get_itemsize(PyArrayObject *self)
+{
+    return (PyObject *)PyGpuNdArray_ITEMSIZE(self);
 }
 
 static PyGetSetDef PyGpuNdArray_getset[] = {
@@ -449,12 +456,17 @@ static PyGetSetDef PyGpuNdArray_getset[] = {
         NULL,
         "The size of the allocated memory on the device.",
         NULL},
-    /*
+    {"itemsize",
+        (getter)PyGpuNdArray_get_itemsize,
+        NULL,
+        "The size of the base element.",
+        NULL},
     {"dtype",
 	(getter)PyGpuNdArray_get_dtype,
 	NULL,
 	"The dtype of the element",
 	NULL},
+     /*
     {"_flags",
         (getter)PyGpuNdArray_get_flags,
         NULL,
