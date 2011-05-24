@@ -1,5 +1,5 @@
-#ifndef _GPU_NDARRAY_H
-#define _GPU_NDARRAY_H
+#ifndef _PYGPU_NDARRAY_H
+#define _PYGPU_NDARRAY_H
 
 //#include <Python.h>
 //#include <structmember.h>
@@ -112,7 +112,7 @@ PyGpuNdArray_CheckExact(const PyObject * ob);
 #define PyGpuNdArray_ISBEHAVED(m) PyGpuNdArray_FLAGSWAP(m, NPY_BEHAVED)
 #define PyGpuNdArray_ISBEHAVED_RO(m) PyGpuNdArray_FLAGSWAP(m, NPY_ALIGNED)
 
-
+static
 void PyGpuNdArray_fprint(FILE * fd, const PyGpuNdArrayObject *self)
 {
     fprintf(fd, "PyGpuNdArrayObject <%p, %p> nd=%i data_allocated=%d\n",
@@ -139,6 +139,7 @@ void PyGpuNdArray_fprint(FILE * fd, const PyGpuNdArrayObject *self)
     fprintf(fd, "\n");
 
 }
+static
 void PyArray_fprint(FILE * fd, const PyArrayObject *self)
 {
     fprintf(fd, "PyArrayObject <%p, %p> nd=%i\n",
@@ -178,6 +179,7 @@ int PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj);
  *
  * Note: This does not allocate storage for data.
  */
+static
 int PyGpuNdArray_set_nd(PyGpuNdArrayObject * self, const int nd)
 {
     if (nd != PyGpuNdArray_NDIM(self))

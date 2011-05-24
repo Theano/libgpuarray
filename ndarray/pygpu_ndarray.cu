@@ -7,7 +7,7 @@
 #include "pygpu_ndarray.cuh"
 #include "pygpu_language.h"
 
-#include "pygpu_ndarray_ctor.cu"//TODO correctly handle the compilation...
+//#include "pygpu_ndarray_ctor.cu"//TODO correctly handle the compilation...
 
 
 /////////////////////////
@@ -530,6 +530,7 @@ initpygpu_ndarray(void)
     //{
         //std::cerr << "WARNING: initcuda_ndarray: error initializing device\n";
     //}
+/*
     if (0) //TODO: is this necessary?
     {
         int deviceId = 0; // TODO: what number goes here?
@@ -540,6 +541,7 @@ initpygpu_ndarray(void)
             std::cerr << "Error in SetDevice:" << cudaGetErrorString(err) << "\n";
         }
     }
+*/
 }
 
 /*
