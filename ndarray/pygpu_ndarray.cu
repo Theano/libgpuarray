@@ -365,7 +365,60 @@ PyGpuNdArray_get_data(PyGpuNdArrayObject *self, void *closure)
     return PyInt_FromLong((long int) PyGpuNdArray_DATA(self));
 }
 
+static PyObject *
+PyGpuNdArray_get_flags(PyGpuNdArrayObject *self, void *closure)
+{
+    return PyInt_FromLong((long int) PyGpuNdArray_FLAGS(self));
+}
+static PyObject *
+PyGpuNdArray_get_ndim(PyGpuNdArrayObject *self, void *closure)
+{
+    return PyInt_FromLong((long int) PyGpuNdArray_NDIM(self));
+}
+static PyObject *
+PyGpuNdArray_get_offset(PyGpuNdArrayObject *self, void *closure)
+{
+    return PyInt_FromLong((long int) PyGpuNdArray_OFFSET(self));
+}
+static PyObject *
+PyGpuNdArray_get_data_allocated(PyGpuNdArrayObject *self, void *closure)
+{
+    return PyInt_FromLong((long int) self->data_allocated);
+}
+static PyObject *
+PyGpuNdArray_get_size(PyGpuNdArrayObject *self, void *closure)
+{
+    return PyInt_FromLong((long int) PyGpuNdArray_SIZE(self));
+}
+
+static PyObject *
+PyGpuNdArray_get_base(PyGpuNdArrayObject *self, void *closure)
+{
+    if (!PyGpuNdArray_BASE(self)){
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+    return PyGpuNdArray_BASE(self);
+}
+
+static PyObject *
+PyGpuNdArray_get_dtype(PyArrayObject *self)
+{
+    Py_INCREF(self->descr);
+    return (PyObject *)PyGpuNdArray_DESCR(self);
+}
+
 static PyGetSetDef PyGpuNdArray_getset[] = {
+    {"base",
+        (getter)PyGpuNdArray_get_base,
+        NULL,
+        "Return the object stored in the base attribute",
+        NULL},
+    {"bytes",
+        (getter)PyGpuNdArray_get_data,
+        NULL,
+        "device data pointer",
+        NULL},
     {"shape",
         (getter)PyGpuNdArray_get_shape,
         (setter)PyGpuNdArray_set_shape,
@@ -376,32 +429,36 @@ static PyGetSetDef PyGpuNdArray_getset[] = {
         NULL,//(setter)PyGpuNdArray_set_strides,
         "data pointer strides (in elements)",
         NULL},
-    {"bytes",
-        (getter)PyGpuNdArray_get_data,
-        NULL,
-        "device data pointer",
-        NULL},
-    /*
-    {"dtype",
-        (getter)PyGpuNdArray_get_dtype,
-        NULL,
-        "The dtype of the element. Now always float32",
-        NULL},
-    {"size",
-        (getter)PyGpuNdArray_SIZE_Object,
-        NULL,
-        "The number of elements in this object.",
-        NULL},
-    //mem_size is neede for pycuda.elementwise.ElementwiseKernel Why do they use size and mem_size of the same value?
-    {"mem_size",
-        (getter)PyGpuNdArray_SIZE_Object,
-        NULL,
-        "The number of elements in this object.",
-        NULL},
     {"ndim",
         (getter)PyGpuNdArray_get_ndim,
         NULL,
-        "The number of dimensions in this object.",
+        "The number of dimensions in this object",
+        NULL},
+    {"offset",
+        (getter)PyGpuNdArray_get_offset,
+        NULL,
+        "Return the offset value",
+        NULL},
+    {"size",
+        (getter)PyGpuNdArray_get_size,
+        NULL,
+        "The number of elements in this object.",
+        NULL},
+    {"data_allocated",
+        (getter)PyGpuNdArray_get_data_allocated,
+        NULL,
+        "The size of the allocated memory on the device.",
+        NULL},
+    /*
+    {"dtype",
+	(getter)PyGpuNdArray_get_dtype,
+	NULL,
+	"The dtype of the element",
+	NULL},
+    {"_flags",
+        (getter)PyGpuNdArray_get_flags,
+        NULL,
+        "Return the flags as an int",
         NULL},
     */
     {NULL, NULL, NULL, NULL}  /* Sentinel */
