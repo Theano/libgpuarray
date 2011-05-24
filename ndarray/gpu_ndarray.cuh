@@ -1,3 +1,7 @@
+#ifndef _GPU_NDARRAY_H
+#define _GPU_NDARRAY_H
+
+
 typedef struct GpuNdArray{
   char* data; //pointer to data element [0,..,0].
   int offset;
@@ -17,7 +21,7 @@ typedef struct GpuNdArray{
   //PyArray_Descr *descr;   /* Pointer to type structure */
 } GpuNdArray;
 
-
+#endif
 /*
   Local Variables:
   mode:c++
