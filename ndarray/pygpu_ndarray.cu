@@ -42,7 +42,7 @@ static void
 PyGpuNdArrayObject_dealloc(PyGpuNdArrayObject* self)
 {
     if(0) fprintf(stderr, "PyGpuNdArrayObject_dealloc\n");
-    if (0) std::cerr << "PyGpuNdArrayObject dealloc " << self << '\n';
+    if (0) std::cerr << "PyGpuNdArrayObject dealloc " << self << " "<<self->data_allocated<<'\n';
     if (0) std::cerr << "PyGpuNdArrayObject dealloc " << self << " " << PyGpuNdArray_DATA(self) << '\n';
 
     if(self->ob_refcnt>1)
@@ -83,6 +83,7 @@ PyGpuNdArrayObject_dealloc(PyGpuNdArrayObject* self)
                 _outstanding_mallocs[0],
                 _outstanding_mallocs[1]);
     }
+    if(0) fprintf(stderr, "PyGpuNdArrayObject_dealloc end\n");
 }
 
 static PyObject *
@@ -96,6 +97,7 @@ PyGpuNdArray_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         PyGpuNdArray_null_init(self);
         ++_outstanding_mallocs[1];
     }
+    if(0) fprintf(stderr, "PyGpuNdArray_new end %p\n", self);
     return (PyObject *)self;
 }
 
@@ -117,7 +119,7 @@ PyGpuNdArray_init(PyGpuNdArrayObject *self, PyObject *args, PyObject *kwds)
     self->descr = type;
     Py_XINCREF(self->descr);//TODO: How to handle the refcont on this object?
     int rval = PyGpuNdArray_CopyFromArray(self, (PyArrayObject*)arr);
-    if(0) fprintf(stderr, "PyGpuNdArray_init: type=%p\n", self->descr);
+    if(0) fprintf(stderr, "PyGpuNdArray_init: end %p type=%p\n", self, self->descr);
     return rval;
 }
 
