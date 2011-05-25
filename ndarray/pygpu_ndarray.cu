@@ -72,7 +72,7 @@ PyGpuNdArrayObject_dealloc(PyGpuNdArrayObject* self)
         PyGpuNdArray_STRIDES(self) = NULL;
     }
     PyGpuNdArray_FLAGS(self) = NPY_DEFAULT;
-    Py_XDECREF(self->descr);//TODO: How to handle the refcont on this object?
+    //Py_XDECREF(self->descr);//TODO: How to handle the refcont on this object?
     self->descr = NULL;
     self->data_allocated = 0;
 
