@@ -404,7 +404,9 @@ PyGpuNdArray_get_base(PyGpuNdArrayObject *self, void *closure)
         Py_INCREF(Py_None);
         return Py_None;
     }
-    return PyGpuNdArray_BASE(self);
+    PyObject * ret = PyGpuNdArray_BASE(self);
+    Py_INCREF(ret);
+    return ret;
 }
 
 static PyObject *
