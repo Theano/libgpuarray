@@ -117,6 +117,8 @@ void PyGpuNdArray_fprint(FILE * fd, const PyGpuNdArrayObject *self)
 {
     fprintf(fd, "PyGpuNdArrayObject <%p, %p> nd=%i data_allocated=%d\n",
 	    self, PyGpuNdArray_DATA(self), PyGpuNdArray_NDIM(self), self->data_allocated);
+    fprintf(fd, "\tRefcount: %d\n", self->ob_refcnt);
+    fprintf(fd, "\tBASE: %p\n", PyGpuNdArray_BASE(self));
     fprintf(fd, "\tHOST_DIMS:      ");
     for (int i = 0; i < PyGpuNdArray_NDIM(self); ++i)
     {
