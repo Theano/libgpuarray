@@ -219,7 +219,11 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
         return NULL;
     }
     PyGpuNdArrayObject * contiguous_self = NULL;
-    if (PyGpuNdArray_ISONESEGMENT(self) && (PyGpuNdArray_NDIM(self)==0 || PyGpuNdArray_STRIDE(self,0)>0))
+    bool pos_stride = true;
+    for (int i = 0; i < PyGpuNdArray_NDIM(self); ++i)
+        if (PyGpuNdArray_STRIDE(self,i)<0)
+            pos_stride = false;
+    if (PyGpuNdArray_ISONESEGMENT(self) && pos_stride)
     {
         contiguous_self = self;
         Py_INCREF(contiguous_self);
