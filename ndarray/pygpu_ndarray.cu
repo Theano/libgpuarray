@@ -487,6 +487,305 @@ static PyGetSetDef PyGpuNdArray_getset[] = {
     */
     {NULL, NULL, NULL, NULL}  /* Sentinel */
 };
+
+// Will by called by __len__ in Python
+static Py_ssize_t
+PyGpuNdArray_len(PyObject * py_self)
+{
+    PyGpuNdArrayObject * self = (PyGpuNdArrayObject*) py_self;
+    if (PyGpuNdArray_NDIM(self) <= 0)
+    {
+        return (Py_ssize_t) 0;
+    }
+    else
+    {
+        return (Py_ssize_t) PyGpuNdArray_DIMS(self)[0];
+    }
+}
+
+int PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base)
+{
+    if (self->data_allocated)
+    {
+        assert(PyGpuNdArray_DATA(self));
+        if (device_free(PyGpuNdArray_DATA(self)))
+        {
+            PyGpuNdArray_DATA(self) = NULL;
+            self->data_allocated = 0;
+            return -1;
+        }
+    }
+    //N.B. XDECREF and XINCREF are no-ops for NULL pointers
+    if (PyGpuNdArray_BASE(self) != base)
+    {
+        Py_XDECREF(PyGpuNdArray_BASE(self));
+        PyGpuNdArray_BASE(self) = base;
+        Py_XINCREF(PyGpuNdArray_BASE(self));
+    }
+    self->data_allocated = 0;
+    PyGpuNdArray_DATA(self) = data;
+    return 0;
+}
+
+// Will by called by __getitem__ in Python
+static PyObject *
+PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
+{
+    int verbose = 2;
+    if (verbose) fprintf(stderr, "Subscript .... \n");
+    PyGpuNdArrayObject * self = (PyGpuNdArrayObject*) py_self;
+    PyObject * py_rval = NULL;
+    PyGpuNdArrayObject * rval = NULL;
+    PyObject * intobj = NULL;
+
+    //PyObject_Print(key, stderr, 0);
+
+    if (key == Py_Ellipsis)
+    {
+        if (verbose) fprintf(stderr, "Subscript with ellipse \n");
+        Py_INCREF(py_self);
+        if (verbose) fprintf(stderr, "Subscript with ellipse end\n");
+        return py_self;
+    }
+    if ((intobj=PyNumber_Int(key))) //INDEXING BY INTEGER
+    //else if (PyInt_Check(key)) //INDEXING BY INTEGER
+    {
+        if (verbose>1) PyGpuNdArray_fprint(stderr, self);
+        if (verbose) fprintf(stderr, "Subscript with int \n");
+
+        int d_idx = PyInt_AsLong(intobj);
+        Py_DECREF(intobj); intobj=NULL;
+
+        if (verbose) fprintf(stderr, "Subscript with int 1\n");
+        if (PyGpuNdArray_NDIM(self) == 0) {
+            PyErr_SetString(PyExc_IndexError, "0-d arrays can't be indexed");
+            return NULL;
+        }else if (PyGpuNdArray_NDIM(self)< 0){
+            PyErr_SetString(PyExc_IndexError, "nd arrays must have a number of dim > 0!");
+            return NULL;
+        }
+        int d_dim = PyGpuNdArray_DIMS(self)[0];
+        int offset = 0;
+        if (verbose) fprintf(stderr, "Subscript with int 2\n");
+
+        if ((d_idx >= 0) && (d_idx < d_dim)) {
+            //normal indexing
+            offset += d_idx * PyGpuNdArray_STRIDES(self)[0];
+        }
+        else if ((d_idx < 0) && (d_idx >= -d_dim)) {
+            //end-based indexing
+            // d_idx is negative
+            offset += (d_dim + d_idx) * PyGpuNdArray_STRIDES(self)[0];
+        } else {
+            PyErr_SetString(PyExc_IndexError, "index out of bounds");
+            return NULL;
+        }
+        if (verbose) fprintf(stderr, "Subscript with int 3\n");
+
+        //allocate our subtensor view
+        py_rval = PyGpuNdArray_New(PyGpuNdArray_NDIM(self) - 1);
+        rval = (PyGpuNdArrayObject*) py_rval;
+        if (!rval) return NULL;
+
+        //TODO: find how to refcount on the descr!
+        PyGpuNdArray_DESCR(py_rval) = PyGpuNdArray_DESCR(self);
+
+        if (verbose) fprintf(stderr, "Subscript with int 4\n");
+        //initialize the view's data pointer to our own.
+        assert (0 == rval->data_allocated);
+        if (PyGpuNdArray_set_data(rval, PyGpuNdArray_DATA(self) + offset, (PyObject *) self)){
+            Py_DECREF(rval);
+            return NULL;
+        }
+        if (verbose) fprintf(stderr, "Subscript with int 5\n");
+
+        for (int d = 1; d < PyGpuNdArray_NDIM(self); ++d) {
+            PyGpuNdArray_STRIDE(rval, d-1) = PyGpuNdArray_STRIDES(self)[d];
+            PyGpuNdArray_DIM(rval, d-1) = PyGpuNdArray_DIMS(self)[d];
+        }
+    }
+    else {
+        PyErr_Clear();
+    }
+    if (PySlice_Check(key)) //INDEXING BY SLICE
+    {
+        if (verbose) fprintf(stderr, "Subscript with slice \n");
+        if (PyGpuNdArray_NDIM(self) == 0)
+        {
+            PyErr_SetString(PyExc_ValueError, "cannot slice a 0-d array");
+            return NULL;
+        }
+
+        int d_dim = PyGpuNdArray_DIMS(self)[0];
+        Py_ssize_t start, stop, step, slen;
+        if (PySlice_GetIndicesEx((PySliceObject*)key, d_dim, &start, &stop, &step, &slen)) {
+            return NULL;
+        }
+        if (verbose>2) {
+            std::cerr << "start " << start << "\n";
+            std::cerr << "stop " << stop << "\n";
+            std::cerr << "step " << step << "\n";
+            std::cerr << "slen " << slen << "\n";
+        }
+
+        //allocate our subtensor view
+        py_rval = PyGpuNdArray_New(PyGpuNdArray_NDIM(self));
+        rval = (PyGpuNdArrayObject*) py_rval;
+        if (!rval) return NULL;
+
+        //TODO: find how to refcount on the descr!
+        PyGpuNdArray_DESCR(py_rval) = PyGpuNdArray_DESCR(self);
+        assert (0 == rval->data_allocated);
+        if (PyGpuNdArray_set_data(rval,
+                                  PyGpuNdArray_DATA(self) + start * PyGpuNdArray_STRIDE(self, 0),
+                                  py_self)) {
+            Py_DECREF(rval);
+            return NULL;
+        }
+
+        //initialize dimension 0 of rval
+        PyGpuNdArray_STRIDE(rval, 0) = step * PyGpuNdArray_STRIDES(self)[0];
+        PyGpuNdArray_DIM(rval, 0) = slen;
+        if (verbose) std::cerr << "rval stride " << PyGpuNdArray_STRIDES(rval)[0] << "\n";
+        // initialize dimensions > 0 of rval
+        for (int d = 1; d < PyGpuNdArray_NDIM(self); ++d) {
+            PyGpuNdArray_STRIDE(rval, d) = PyGpuNdArray_STRIDES(self)[d];
+            PyGpuNdArray_DIM(rval, d) = PyGpuNdArray_DIMS(self)[d];
+        }
+    }
+    if (PyTuple_Check(key)) //INDEXING BY TUPLE
+    {
+        if (verbose) fprintf(stderr, "Subscript with tuple \n");
+        //PyErr_SetString(PyExc_NotImplementedError, "tuple is not supported for now");
+        //return NULL;
+        //elements of the tuple can be either integers or slices
+        //the dimensionality of the view we will return is diminished for each slice in the tuple
+
+        if (PyTuple_Size(key) > PyGpuNdArray_NDIM(self))
+        {
+            PyErr_SetString(PyExc_IndexError, "index error");
+            return NULL;
+        }
+
+        //calculate the number of dimensions in the return value
+        int rval_nd = PyGpuNdArray_NDIM(self);
+        for (int d = 0; d < PyTuple_Size(key); ++d)
+        {
+            //On some paltform PyInt_Check(<type 'numpy.int64'>) return true, other it return false.
+            //So we use PyArray_IsAnyScalar that should covert everything.
+            rval_nd -= PyArray_IsAnyScalar(PyTuple_GetItem(key, d));
+        }
+
+        //allocate our subtensor view
+        py_rval = PyGpuNdArray_New(rval_nd);
+        rval = (PyGpuNdArrayObject*) py_rval;
+        if (!rval) return NULL;
+        assert (0 == rval->data_allocated);
+
+        //TODO: find how to refcount on the descr!
+        PyGpuNdArray_DESCR(py_rval) = PyGpuNdArray_DESCR(self);
+
+        //initialize the view's data pointer to our own.
+        if (PyGpuNdArray_set_data(rval, PyGpuNdArray_DATA(self), py_self))
+        {
+            Py_DECREF(rval);
+            return NULL;
+        }
+
+        // rval_d will refer to the current dimension in the rval.
+        // It will not be incremented for integer keys, but will be incremented for slice
+        // keys
+        int rval_d = 0;
+
+        for (int d = 0; d < PyGpuNdArray_NDIM(self); ++d)
+        {
+            // keys can be shorter than PyGpuNdArray_NDIM(self).
+            // when that happens, it means that the remaining dimensions are "full slices"
+            if (d >=PyTuple_Size(key))
+            {
+                PyGpuNdArray_STRIDE(rval, rval_d) = PyGpuNdArray_STRIDES(self)[d];
+                PyGpuNdArray_DIM(rval, rval_d) = PyGpuNdArray_DIMS(self)[d];
+                ++rval_d;
+            }
+            else
+            {
+                PyObject * key_d = PyTuple_GetItem(key, d);
+
+                if (PySlice_Check(key_d))
+                {
+                    Py_ssize_t start, stop, step, slen;
+                    if (PySlice_GetIndicesEx((PySliceObject*)key_d, PyGpuNdArray_DIMS(self)[d], &start, &stop, &step, &slen))
+                    {
+                        Py_DECREF(rval);
+                        return NULL;
+                    }
+                    PyGpuNdArray_DATA(rval) += start * PyGpuNdArray_STRIDES(self)[d];
+                    PyGpuNdArray_STRIDE(rval, rval_d) = step * PyGpuNdArray_STRIDES(self)[d];
+                    PyGpuNdArray_DIM(rval, rval_d) = slen;
+                    if (0)
+                    {
+                        std::cerr << "start " << start << "\n";
+                        std::cerr << "stop " << stop << "\n";
+                        std::cerr << "step " << step << "\n";
+                        std::cerr << "slen " << slen << "\n";
+                    }
+                    ++rval_d;
+                }
+                else if ((intobj=PyNumber_Int(key_d)))
+                {
+                    assert(PyArray_IsAnyScalar(key_d));
+                    int d_idx = PyInt_AsLong(intobj);
+                    Py_DECREF(intobj);
+                    intobj = NULL;
+                    int d_dim = PyGpuNdArray_DIMS(self)[d];
+
+                    if ((d_idx >= 0) && (d_idx < d_dim))
+                    {
+                        //normal indexing
+                        PyGpuNdArray_DATA(rval) += d_idx * PyGpuNdArray_STRIDES(self)[d];
+                    }
+                    else if ((d_idx < 0) && (d_idx >= -d_dim))
+                    {
+                        //end-based indexing
+                        PyGpuNdArray_DATA(rval) += (d_dim + d_idx) * PyGpuNdArray_STRIDES(self)[d];
+                    }
+                    else
+                    {
+                        PyErr_SetString(PyExc_IndexError, "index out of bounds");
+                        Py_DECREF(rval);
+                        return NULL;
+                    }
+                }
+                else
+                {
+                    PyErr_Clear(); // clear the error set by PyNumber_Int
+                    PyErr_SetString(PyExc_IndexError, "index must be either int or slice");
+                    Py_DECREF(rval);
+                    return NULL;
+                }
+            }
+        }
+    }
+    if (py_rval)
+    {
+        if (verbose>1) PyGpuNdArray_fprint(stderr, self);
+        if (verbose>1) PyGpuNdArray_fprint(stderr, rval);
+    }
+    else
+    {
+        PyErr_SetString(PyExc_NotImplementedError, "Unknown key type");
+        return NULL;
+    }
+    if (verbose) fprintf(stderr, "Subscript end\n");
+    return py_rval;
+}
+
+PyMappingMethods PyGpuNdArrayMappingMethods = {
+    PyGpuNdArray_len, //lenfunc mp_length;               __len__
+    PyGpuNdArray_Subscript, //binaryfunc mp_subscript;   __getitem__
+    0 //PyGpuNdArray_setitem //objobjargproc mp_ass_subscript;                __setitem__
+};
+
 static PyTypeObject PyGpuNdArrayType =
 {
     PyObject_HEAD_INIT(NULL)
@@ -502,7 +801,7 @@ static PyTypeObject PyGpuNdArrayType =
     0,                         /*tp_repr*/
     0, //&PyGpuNdArrayObjectNumberMethods, /*tp_as_number*/
     0,                         /*tp_as_sequence*/
-    0, //&PyGpuNdArrayObjectMappingMethods,/*tp_as_mapping*/
+    &PyGpuNdArrayMappingMethods,/*tp_as_mapping*/
     0,                         /*tp_hash */
     0,                         /*tp_call*/
     0,                         /*tp_str*/
