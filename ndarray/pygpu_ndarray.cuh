@@ -199,14 +199,6 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
 }
 
 
-
-
-template <typename T>
-static T ceil_intdiv(T a, T b)
-{
-    return (a/b) + ((a % b) ? 1: 0);
-}
-
 #endif
 
 /*

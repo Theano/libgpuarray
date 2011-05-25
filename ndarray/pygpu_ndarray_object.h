@@ -120,4 +120,9 @@ void PyArray_fprint(FILE * fd, const PyArrayObject *self)
 
 }
 
+template <typename T>
+static T ceil_intdiv(T a, T b)
+{
+    return (a/b) + ((a % b) ? 1: 0);
+}
 #endif
