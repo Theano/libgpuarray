@@ -2,14 +2,20 @@ import numpy
 
 import pygpu_ndarray as gpu_ndarray
 
+dtypes_all = ["float32", "float64",
+              "int8", "int16", "int32", "int64",
+              "uint8", "uint16", "uint32", "uint64",
+              "complex64", "complex128",
+              ]
+
+dtypes_no_complex = ["float32", "float64",
+                     "int8", "int16", "int32", "int64",
+                     "uint8", "uint16", "uint32", "uint64",
+                     ]
 
 def test_transfer():
     for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
-        for dtype in ["int8", "int16", "int32", "int64",
-                      "uint8", "uint16", "uint32", "uint64",
-                      "float32", "float64",
-                      "complex64", "complex128"
-                      ]:
+        for dtype in dtypes_all:
             a = numpy.random.rand(*shp) * 10
             b = gpu_ndarray.GpuNdArrayObject(a)
             c = numpy.asarray(b)
@@ -26,11 +32,7 @@ def test_transfer_not_contiguous():
     TODO: test when the input on the gpu is not contiguous
     """
     for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
-        for dtype in ["int8", "int16", "int32", "int64",
-                      "uint8", "uint16", "uint32", "uint64",
-                      "float32", "float64",
-                      "complex64", "complex128"
-                      ]:
+        for dtype in dtypes_all:
             a = numpy.random.rand(*shp) * 10
             a = a[::-1]
             b = gpu_ndarray.GpuNdArrayObject(a)
@@ -45,11 +47,7 @@ def test_transfer_not_contiguous():
 
 def test_transfer_fortran():
     for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
-        for dtype in ["int8", "int16", "int32", "int64",
-                      "uint8", "uint16", "uint32", "uint64",
-                      "float32", "float64",
-                      "complex64", "complex128"
-                      ]:
+        for dtype in dtypes_all:
             a = numpy.random.rand(*shp) * 10
             a_ = numpy.asfortranarray(a)
             if len(shp)>1:
@@ -67,11 +65,7 @@ def test_transfer_fortran():
 
 def test_mapping_getitem_ellipsis():
     for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
-        for dtype in ["int8", "int16", "int32", "int64",
-                      "uint8", "uint16", "uint32", "uint64",
-                      "float32", "float64",
-                      "complex64", "complex128"
-                      ]:
+        for dtype in dtypes_all:
             a = numpy.asarray(numpy.random.rand(*shp), dtype=dtype)
             a_gpu = gpu_ndarray.GpuNdArrayObject(a)
 
@@ -84,11 +78,7 @@ def test_mapping_getitem_ellipsis():
 
 def test_len():
     for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
-        for dtype in ["int8", "int16", "int32", "int64",
-                      "uint8", "uint16", "uint32", "uint64",
-                      "float32", "float64",
-                      "complex64", "complex128"
-                      ]:
+        for dtype in dtypes_all:
             a = numpy.asarray(numpy.random.rand(*shp), dtype=dtype)
             a_gpu = gpu_ndarray.GpuNdArrayObject(a)
             assert len(a_gpu) == shp[0]
@@ -98,6 +88,17 @@ def test_mapping_getitem_w_int():
         assert x.shape == y.shape
         assert x.dtype == y.dtype
         assert x.strides == y.strides
+        assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
+        assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
+        if x.flags["WRITEABLE"] != y.flags["WRITEABLE"]:
+            assert x.ndim == 0
+            assert not x.flags["OWNDATA"]
+            assert y.flags["OWNDATA"]
+        else:
+            assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"]
+            assert x.flags["OWNDATA"] == y.flags["OWNDATA"]
+        assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
+        assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
         x = numpy.asarray(x)
         assert x.shape == y.shape
         assert x.dtype == y.dtype
@@ -137,11 +138,7 @@ def test_mapping_getitem_w_int():
         else:
             raise Exception("Did not generate not implemented error.")
 
-    for dtype in ["int8", "int16", "int32", "int64",
-                  "uint8", "uint16", "uint32", "uint64",
-                  "float32", "float64",
-                  "complex64", "complex128"
-                  ]:
+    for dtype in dtypes_all:
 
         # test vector
         dim =(2,)

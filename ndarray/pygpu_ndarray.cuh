@@ -95,7 +95,15 @@ int PyGpuNdArray_set_nd(PyGpuNdArrayObject * self, const int nd)
 template<typename inttype>
 int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const inttype * dim, NPY_ORDER order=NPY_CORDER)
 {
-    if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: start nd=%i\n descr=%p", nd);
+    int verbose = 0;
+    if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: start nd=%i\n descr=%p", nd);
+
+    if (!PyGpuNdArray_DESCR(self)){
+        PyErr_SetString(PyExc_ValueError,
+                        "PyGpuNdArray_alloc_contiguous: The array don't have a type! We can't allocate it!\n");
+        return -1;
+    }
+    
     // allocate an empty ndarray with c_contiguous access
     // return 0 on success
     int size = 1; //set up the strides for contiguous tensor
@@ -107,18 +115,18 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
     //TODO: check if by any chance our current dims are correct,
     //      and strides already contiguous
     //      in that case we can return right here.
-    if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: before itemsize descr=%p elsize=%i\n", self->descr, self->descr->elsize);
+    if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: before itemsize descr=%p elsize=%i\n", self->descr, self->descr->elsize);
     int elsize = PyGpuNdArray_ITEMSIZE((PyObject*)self);
-    if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: set_nd! elsize=%i\n", nd,elsize);
+    if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: set_nd! elsize=%i\n", nd,elsize;)
     if(order != NPY_FORTRANORDER){
-      if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: NPY_CORDER\n");
+      if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: NPY_CORDER\n");
       for (int i = nd-1; i >= 0; --i){
         PyGpuNdArray_STRIDE(self,i) = size * elsize;
         PyGpuNdArray_DIM(self,i) = dim[i];
         size = size * dim[i];
       }
     }else{
-      if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: NPY_FORTRANORDER\n");
+      if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: NPY_FORTRANORDER\n");
       size = dim[nd-1];
       PyGpuNdArray_STRIDE(self, 0) = elsize;
       PyGpuNdArray_DIM(self, nd-1) = dim[nd-1];
@@ -137,7 +145,7 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
             return -1;
         }
         assert(size>0);
-	if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: will allocate for size=%d elements\n", size);
+	if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: will allocate for size=%d elements\n", size);
 
         PyGpuNdArray_DATA(self) = (char*)device_malloc(size * PyGpuNdArray_ITEMSIZE((PyObject *)self));
         if (!PyGpuNdArray_DATA(self))
@@ -147,11 +155,7 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
             PyGpuNdArray_DATA(self) = 0;
             return -1;
         }
-        if (0)
-            fprintf(stderr,
-                "Allocated data %p (self=%p)\n",
-                PyGpuNdArray_DATA(self),
-                self);
+
         self->data_allocated = size;
 	self->gpu_ndarray.flags = NPY_DEFAULT;
 	PyGpuNdArray_FLAGS(self) |= NPY_WRITEABLE;
@@ -173,7 +177,13 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
     }else{
       assert(0);// How to check for the flags? Need to check if already contiguous.
     }
-    if(0) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: end\n");
+
+    if (order != NPY_FORTRANORDER) {
+        assert(PyGpuNdArray_is_c_contiguous(self));
+    } else {
+        assert(PyGpuNdArray_is_f_contiguous(self));
+    }
+    if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: end\n");
     return 0;
 }
 
