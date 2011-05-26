@@ -129,9 +129,9 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
 {
     if(0) fprintf(stderr, "PyGpuNdArray_CopyFromArray: start descr=%p\n", self->descr);
     //modif done to the new array won't be updated!
-    assert(!PyArray_CHKFLAGS(self, NPY_UPDATEIFCOPY));
+    assert(!PyGpuNdArray_CHKFLAGS(self, NPY_UPDATEIFCOPY));
     //Aligned are not tested, so don't allow it for now
-    assert(!PyArray_CHKFLAGS(self, NPY_ALIGNED));
+    assert(PyGpuNdArray_CHKFLAGS(self, NPY_ALIGNED));
 
     int typenum = PyArray_TYPE(obj);
     PyObject * py_src = NULL;
@@ -575,6 +575,8 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
     PyObject * intobj = NULL;
 
     //PyObject_Print(key, stderr, 0);
+
+    assert(PyGpuNdArray_OFFSET(self)==0);
 
     if (key == Py_Ellipsis)
     {
