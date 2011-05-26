@@ -191,6 +191,34 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
     return 0;
 }
 
+static PyObject * PyGpuNdArray_Copy(PyGpuNdArrayObject * self)
+{
+    int verbose = 0;
+    if (verbose) fprintf(stderr, "PyGpuNdArray_Copy start\n");
+    PyObject * rval = PyGpuNdArray_New();
+    //TODO find how to refcount descr.
+    PyGpuNdArray_DESCR(rval) = PyGpuNdArray_DESCR(self);
+    if ((!rval) || (-1 == PyGpuNdArray_NDIM(self)))
+    {
+        return rval;
+    }
+    if (PyGpuNdArray_alloc_contiguous((PyGpuNdArrayObject*)rval, PyGpuNdArray_NDIM(self), PyGpuNdArray_DIMS(self)))
+    {
+        Py_DECREF(rval);
+        return NULL;
+    }
+
+    if (PyGpuNdArray_CopyFromPyGpuNdArray((PyGpuNdArrayObject*)rval, self))
+    {
+        Py_DECREF(rval);
+        return NULL;
+    }
+    if (verbose>1) PyGpuNdArray_fprint(stderr, self);
+    if (verbose>1) PyGpuNdArray_fprint(stderr, (PyGpuNdArrayObject *)rval);
+    if (verbose) fprintf(stderr, "PyGpuNdArray_Copy end\n");
+    return rval;
+}
+
 //updated for offset
 PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
 {
@@ -286,7 +314,11 @@ static PyMethodDef PyGpuNdArray_methods[] =
     {"__array__",
         (PyCFunction)PyGpuNdArray_CreateArrayObj, METH_NOARGS,
         "Copy from the device to a numpy ndarray"},
-    /*    {"__copy__",
+    {"copy",
+        (PyCFunction)PyGpuNdArray_Copy, METH_NOARGS,
+        "Create a deep copy of this object."},
+/*
+    {"__copy__",
         (PyCFunction)PyGpuNdArray_View, METH_NOARGS,
         "Create a shallow copy of this object. used by module copy"},
     {"__deepcopy__",

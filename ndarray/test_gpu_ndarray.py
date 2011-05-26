@@ -1,3 +1,5 @@
+import copy
+
 import numpy
 
 import pygpu_ndarray as gpu_ndarray
@@ -75,6 +77,23 @@ def test_mapping_getitem_ellipsis():
             assert b.shape == a.shape
             b_cpu = numpy.asarray(b)
             assert numpy.allclose(a, b_cpu)
+
+def test_copy():
+    for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
+        for dtype in dtypes_all:
+            #TODO test with not contiguous memory got from subtensor! in the subtensor test!
+            #TODO test copy unbroadcast!
+            shape = (5,)
+            a = numpy.asarray(numpy.random.rand(*shape), dtype='float32')
+
+            b = gpu_ndarray.GpuNdArrayObject(a)
+            c = b.copy()
+            #d = copy.copy(b)
+            #e = copy.deepcopy(b)
+
+            assert numpy.allclose(a, numpy.asarray(b))
+            assert numpy.allclose(a, numpy.asarray(c))
+            #assert numpy.allclose(a, numpy.asarray(d))
 
 def test_len():
     for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:

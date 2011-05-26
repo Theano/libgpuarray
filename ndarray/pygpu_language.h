@@ -63,4 +63,6 @@ outstanding_mallocs(PyObject* self, PyObject * args)
     return PyInt_FromLong(_outstanding_mallocs[0]);
 }
 
+int PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject * other, bool unbroadcast = false);
+
 #endif
