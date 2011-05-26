@@ -117,7 +117,7 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
     //      in that case we can return right here.
     if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: before itemsize descr=%p elsize=%i\n", self->descr, self->descr->elsize);
     int elsize = PyGpuNdArray_ITEMSIZE((PyObject*)self);
-    if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: set_nd! elsize=%i\n", nd,elsize;)
+    if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: set_nd! elsize=%i\n", nd,elsize);
     if(order != NPY_FORTRANORDER){
       if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: NPY_CORDER\n");
       for (int i = nd-1; i >= 0; --i){
