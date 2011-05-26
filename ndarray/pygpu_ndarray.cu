@@ -378,7 +378,45 @@ PyGpuNdArray_get_data(PyGpuNdArrayObject *self, void *closure)
 static PyObject *
 PyGpuNdArray_get_flags(PyGpuNdArrayObject *self, void *closure)
 {
-    return PyInt_FromLong((long int) PyGpuNdArray_FLAGS(self));
+    PyObject * dict = PyDict_New();
+
+    PyObject * str= PyString_FromString("C_CONTIGUOUS");
+    PyObject * i = PyInt_FromLong(PyGpuNdArray_ISCONTIGUOUS(self));
+    PyDict_SetItem(dict, str, i);
+    Py_DECREF(str);
+    Py_DECREF(i);
+
+    str= PyString_FromString("F_CONTIGUOUS");
+    i = PyInt_FromLong(PyGpuNdArray_FORTRAN_IF(self));
+    PyDict_SetItem(dict, str, i);
+    Py_DECREF(str);
+    Py_DECREF(i);
+
+    str= PyString_FromString("WRITEABLE");
+    i = PyInt_FromLong(PyGpuNdArray_ISWRITEABLE(self));
+    PyDict_SetItem(dict, str, i);
+    Py_DECREF(str);
+    Py_DECREF(i);
+
+    str= PyString_FromString("ALIGNED");
+    i = PyInt_FromLong(PyGpuNdArray_ISALIGNED(self));
+    PyDict_SetItem(dict, str, i);
+    Py_DECREF(str);
+    Py_DECREF(i);
+
+    str= PyString_FromString("UPDATEIFCOPY");
+    i = PyInt_FromLong(PyGpuNdArray_CHKFLAGS(self, NPY_UPDATEIFCOPY));
+    PyDict_SetItem(dict, str, i);
+    Py_DECREF(str);
+    Py_DECREF(i);
+
+    str= PyString_FromString("OWNDATA");
+    i = PyInt_FromLong(PyGpuNdArray_CHKFLAGS(self, NPY_OWNDATA));
+    PyDict_SetItem(dict, str, i);
+    Py_DECREF(str);
+    Py_DECREF(i);
+
+    return dict;
 }
 static PyObject *
 PyGpuNdArray_get_ndim(PyGpuNdArrayObject *self, void *closure)
@@ -478,13 +516,11 @@ static PyGetSetDef PyGpuNdArray_getset[] = {
 	NULL,
 	"The dtype of the element",
 	NULL},
-     /*
-    {"_flags",
+    {"flags",
         (getter)PyGpuNdArray_get_flags,
         NULL,
-        "Return the flags as an int",
+        "Return the flags as a dictionary",
         NULL},
-    */
     {NULL, NULL, NULL, NULL}  /* Sentinel */
 };
 
