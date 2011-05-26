@@ -233,7 +233,9 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
       assert (npydims);
       for (int i = 0; i < PyGpuNdArray_NDIM(self); ++i)
 	npydims[i] = (npy_intp)(PyGpuNdArray_DIMS(self)[i]);
-      //TODO: refcount on descr!
+
+      // Numpy will do a decref on the description.
+      Py_INCREF(PyGpuNdArray_DESCR(self));
       PyObject * rval = PyArray_Empty(PyGpuNdArray_NDIM(self),
 				      npydims, self->descr,
 				      PyGpuNdArray_ISFARRAY(self));
@@ -301,6 +303,7 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
     if (CUBLAS_STATUS_SUCCESS != cublasGetError())
     {
         PyErr_SetString(PyExc_RuntimeError, "error copying data to host");
+        Py_DECREF(contiguous_self);
         Py_DECREF(rval);
         rval = NULL;
     }
