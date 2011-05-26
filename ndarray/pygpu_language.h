@@ -7,6 +7,27 @@
 //#include <iostream>
 //#include <pygpu_ndarray.cuh>
 
+#ifdef __DEVICE_EMULATION__
+#define NUM_VECTOR_OP_BLOCKS                4096
+#define NUM_VECTOR_OP_THREADS_PER_BLOCK     1  //This prevents printf from getting tangled up
+#else
+#define NUM_VECTOR_OP_BLOCKS                4096 //Max number of blocks to launch.  Should be read from device properties. (#10)
+#define NUM_VECTOR_OP_THREADS_PER_BLOCK     256  //Should be read from device properties. (#10)
+#endif
+
+#if 0
+// Do not wait after every kernel & transfer.
+#define CNDA_THREAD_SYNC
+#else
+// This is useful for using normal profiling tools
+#define CNDA_THREAD_SYNC cudaThreadSynchronize();
+#endif
+
+
+#ifndef SHARED_SIZE 
+#define SHARED_SIZE (16*1024)
+#endif
+
 /////////////////////////
 // Alloc and Free
 /////////////////////////
