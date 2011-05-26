@@ -381,37 +381,37 @@ PyGpuNdArray_get_flags(PyGpuNdArrayObject *self, void *closure)
     PyObject * dict = PyDict_New();
 
     PyObject * str= PyString_FromString("C_CONTIGUOUS");
-    PyObject * i = PyInt_FromLong(PyGpuNdArray_ISCONTIGUOUS(self));
+    PyObject * i = PyBool_FromLong(PyGpuNdArray_ISCONTIGUOUS(self));
     PyDict_SetItem(dict, str, i);
     Py_DECREF(str);
     Py_DECREF(i);
 
     str= PyString_FromString("F_CONTIGUOUS");
-    i = PyInt_FromLong(PyGpuNdArray_FORTRAN_IF(self));
+    i = PyBool_FromLong(PyGpuNdArray_CHKFLAGS(self, NPY_F_CONTIGUOUS));
     PyDict_SetItem(dict, str, i);
     Py_DECREF(str);
     Py_DECREF(i);
 
     str= PyString_FromString("WRITEABLE");
-    i = PyInt_FromLong(PyGpuNdArray_ISWRITEABLE(self));
+    i = PyBool_FromLong(PyGpuNdArray_ISWRITEABLE(self));
     PyDict_SetItem(dict, str, i);
     Py_DECREF(str);
     Py_DECREF(i);
 
     str= PyString_FromString("ALIGNED");
-    i = PyInt_FromLong(PyGpuNdArray_ISALIGNED(self));
+    i = PyBool_FromLong(PyGpuNdArray_ISALIGNED(self));
     PyDict_SetItem(dict, str, i);
     Py_DECREF(str);
     Py_DECREF(i);
 
     str= PyString_FromString("UPDATEIFCOPY");
-    i = PyInt_FromLong(PyGpuNdArray_CHKFLAGS(self, NPY_UPDATEIFCOPY));
+    i = PyBool_FromLong(PyGpuNdArray_CHKFLAGS(self, NPY_UPDATEIFCOPY));
     PyDict_SetItem(dict, str, i);
     Py_DECREF(str);
     Py_DECREF(i);
 
     str= PyString_FromString("OWNDATA");
-    i = PyInt_FromLong(PyGpuNdArray_CHKFLAGS(self, NPY_OWNDATA));
+    i = PyBool_FromLong(PyGpuNdArray_CHKFLAGS(self, NPY_OWNDATA));
     PyDict_SetItem(dict, str, i);
     Py_DECREF(str);
     Py_DECREF(i);
