@@ -262,19 +262,14 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
         Py_INCREF(contiguous_self);
         if (verbose) std::cerr << "PyGpuNdArray_CreateArrayObj: gpu array already contiguous" <<
 		       contiguous_self << '\n';
-    }else if(PyGpuNdArray_ISONESEGMENT(self)){
-        //TODO implement PyGpuNdArray_Copy or special object handling
-        //contiguous_self = (PyGpuNdArrayObject*)PyGpuNdArray_Copy(self);
-        //  if (verbose) std::cerr << "CreateArrayObj created contiguous" << contiguous_self << '\n';
-        PyErr_SetString(PyExc_ValueError, "PyGpuNdArray_CreateArrayObj: Need PyGpuNdArray_Copy or some other nd array mandling to transfer contiguous bloc with negative stride.");
-        return NULL;
+        //}else if(PyGpuNdArray_ISONESEGMENT(self)){
+        //TODO implement special object handling to speed up transfer
+        //  if (verbose) std::cerr << "CreateArrayObj one segment, with special handling" << contiguous_self << '\n';
+        //PyErr_SetString(PyExc_ValueError, "PyGpuNdArray_CreateArrayObj: Need PyGpuNdArray_Copy or some other nd array mandling to transfer contiguous bloc with negative stride.");
+        //return NULL;
     }else{
-        //TODO implement PyGpuNdArray_Copy
-        //contiguous_self = (PyGpuNdArrayObject*)PyGpuNdArray_Copy(self);
-        //  if (verbose) std::cerr << "CreateArrayObj created contiguous" << contiguous_self << '\n';
-        PyErr_SetString(PyExc_ValueError, "PyGpuNdArray_CreateArrayObj: Need PyGpuNdArray_Copy to be implemented to be able to transfer not contiguous memory block.");
-        return NULL;
-
+        contiguous_self = (PyGpuNdArrayObject*)PyGpuNdArray_Copy(self);
+        if (verbose) std::cerr << "CreateArrayObj created contiguous" << contiguous_self << '\n';
     }
     if (!contiguous_self)
     {
