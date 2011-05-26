@@ -7,6 +7,10 @@
 #ifndef _PYGPU_NDARRAY_OBJECT_H
 #define _PYGPU_NDARRAY_OBJECT_H
 
+#include <Python.h>
+#include <numpy/arrayobject.h>
+#include "gpu_ndarray.cuh"
+
 typedef struct PyGpuNdArrayObject{
   PyObject_HEAD
 
@@ -125,4 +129,47 @@ static T ceil_intdiv(T a, T b)
 {
     return (a/b) + ((a % b) ? 1: 0);
 }
+
+
+//Compute if the resulting array is c contiguous
+static bool
+PyGpuNdArray_is_c_contiguous(const PyGpuNdArrayObject * self)
+{
+    bool c_contiguous = true;
+    int size = PyGpuNdArray_ITEMSIZE(self);
+    for (int i = PyGpuNdArray_NDIM(self)-1; (i >= 0) && c_contiguous; --i) {
+        if (PyGpuNdArray_STRIDE(self, i) != size) {
+            c_contiguous = false;
+        }
+        size = size * PyGpuNdArray_DIM(self, i);
+    }
+    return c_contiguous;
+}
+
+//Compute if the resulting array is f contiguous
+static bool
+PyGpuNdArray_is_f_contiguous(const PyGpuNdArrayObject * self)
+{
+    bool f_contiguous = true;
+    int size = PyGpuNdArray_ITEMSIZE(self);
+    for (int i = 0; i < PyGpuNdArray_NDIM(self) && f_contiguous; ++i) {
+        if (PyGpuNdArray_STRIDE(self, i) != size) {
+            f_contiguous = false;
+        }
+        size = size * PyGpuNdArray_DIM(self, i);
+    }
+    return f_contiguous;
+}
+
 #endif
+/*
+  Local Variables:
+  mode:c++
+  c-basic-offset:4
+  c-file-style:"stroustrup"
+  c-file-offsets:((innamespace . 0)(inline-open . 0))
+  indent-tabs-mode:nil
+  fill-column:79
+  End:
+*/
+// vim: filetype=cpp:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:encoding=utf-8:textwidth=79 :
