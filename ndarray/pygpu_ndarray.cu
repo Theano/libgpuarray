@@ -814,6 +814,41 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         PyErr_SetString(PyExc_NotImplementedError, "Unknown key type");
         return NULL;
     }
+
+    // Set flags
+    if (PyGpuNdArray_ISWRITEABLE(self)) {
+        PyGpuNdArray_FLAGS(rval) |= NPY_WRITEABLE;
+    } else {
+        PyGpuNdArray_FLAGS(rval) &= ~NPY_WRITEABLE;
+    }
+    PyGpuNdArray_FLAGS(rval) &= ~NPY_OWNDATA;
+    if (PyGpuNdArray_ISALIGNED(self)) {
+        PyGpuNdArray_FLAGS(rval) |= NPY_ALIGNED;
+    } else {
+        PyGpuNdArray_FLAGS(rval) &= ~NPY_ALIGNED;
+    }
+    PyGpuNdArray_FLAGS(rval) &= ~NPY_UPDATEIFCOPY;
+
+    if (false && PyGpuNdArray_NDIM(rval) == 0) {
+        //Numpy is not consistent here
+        //When we create a new numpy ndarray of 0 dim, it is not f contiguous
+        //But when we take a subtensor that is of 0 dim, it is f contiguous!
+        //We make as them for now...
+        PyGpuNdArray_FLAGS(rval) &= ~NPY_F_CONTIGUOUS;
+        PyGpuNdArray_FLAGS(rval) |= NPY_C_CONTIGUOUS;
+    } else {
+        if (PyGpuNdArray_is_c_contiguous(rval)) {
+            PyGpuNdArray_FLAGS(rval) |= NPY_C_CONTIGUOUS;
+        } else {
+            PyGpuNdArray_FLAGS(rval) &= ~NPY_C_CONTIGUOUS;
+        }
+        if (PyGpuNdArray_is_f_contiguous(rval)) {
+            PyGpuNdArray_FLAGS(rval) |= NPY_F_CONTIGUOUS;
+        } else {
+            PyGpuNdArray_FLAGS(rval) &= ~NPY_F_CONTIGUOUS;
+        }
+    }
+
     if (verbose) fprintf(stderr, "Subscript end\n");
     return py_rval;
 }
