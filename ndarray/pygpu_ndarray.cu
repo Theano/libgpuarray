@@ -127,7 +127,8 @@ PyGpuNdArray_init(PyGpuNdArrayObject *self, PyObject *args, PyObject *kwds)
 int
 PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
 {
-    if(0) fprintf(stderr, "PyGpuNdArray_CopyFromArray: start descr=%p\n", self->descr);
+    int verbose = 0;
+    if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromArray: start descr=%p\n", self->descr);
     //modif done to the new array won't be updated!
     assert(!PyGpuNdArray_CHKFLAGS(self, NPY_UPDATEIFCOPY));
     //Aligned are not tested, so don't allow it for now
@@ -141,16 +142,17 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
     }else{
         py_src = PyArray_ContiguousFromAny((PyObject*)obj, typenum, PyArray_NDIM(obj), PyArray_NDIM(obj));
     }
-    if(0) fprintf(stderr, "PyGpuNdArray_CopyFromArray: contiguous!\n");
+    if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromArray: contiguous!\n");
     if (!py_src) {
         return -1;
     }
 
     int err;
     if(PyArray_ISFORTRAN(obj) && ! PyArray_ISCONTIGUOUS(obj)){
-      err = PyGpuNdArray_alloc_contiguous(self, obj->nd, obj->dimensions, NPY_FORTRANORDER);
+        if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromArray: fortran!\n");
+        err = PyGpuNdArray_alloc_contiguous(self, obj->nd, obj->dimensions, NPY_FORTRANORDER);
     }else{
-      err = PyGpuNdArray_alloc_contiguous(self, obj->nd, obj->dimensions);
+        err = PyGpuNdArray_alloc_contiguous(self, obj->nd, obj->dimensions);
     }
     if (err) {
         return err;
@@ -185,6 +187,7 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
         return -1;
     }
     Py_DECREF(py_src);
+    if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromArray: end\n");
     return 0;
 }
 
@@ -586,7 +589,6 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         return py_self;
     }
     if ((intobj=PyNumber_Int(key))) //INDEXING BY INTEGER
-    //else if (PyInt_Check(key)) //INDEXING BY INTEGER
     {
         if (verbose>1) PyGpuNdArray_fprint(stderr, self);
         if (verbose) fprintf(stderr, "Subscript with int \n");
@@ -694,8 +696,6 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
     if (PyTuple_Check(key)) //INDEXING BY TUPLE
     {
         if (verbose) fprintf(stderr, "Subscript with tuple \n");
-        //PyErr_SetString(PyExc_NotImplementedError, "tuple is not supported for now");
-        //return NULL;
         //elements of the tuple can be either integers or slices
         //the dimensionality of the view we will return is diminished for each slice in the tuple
 
