@@ -42,6 +42,9 @@ int PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * bas
 static PyObject *
 PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key);
 
+static PyObject *
+PyGpuNdArray_Zeros(int nd, npy_intp* dims, PyArray_Descr* dtype, int fortran);
+
 /**
  * [Re]allocate a PyGpuNdArrayObject with access to 'nd' dimensions.
  *

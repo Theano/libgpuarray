@@ -356,6 +356,128 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
     return rval;
 }
 
+//DONE: dtype, offset not needed, flags
+static PyObject * 
+PyGpuNdArray_Zeros(int nd, npy_intp* dims, PyArray_Descr* dtype, int fortran)
+{
+
+    int total_elements = 1;
+    for(int i=0;i<nd;i++)
+      total_elements*=dims[i];
+
+    // total_elements now contains the size of the array, in reals
+    int total_size = total_elements * dtype->elsize;
+    
+    PyGpuNdArrayObject* rval = (PyGpuNdArrayObject*)PyGpuNdArray_New();
+    PyGpuNdArray_DESCR(rval) = dtype;
+    if (!rval) {
+        return NULL;
+    }
+    NPY_ORDER order = NPY_CORDER;
+    if (fortran!=0)
+        order = NPY_FORTRANORDER;
+
+    if (PyGpuNdArray_alloc_contiguous(rval, nd, dims, order)) {
+        Py_DECREF(rval);
+        return NULL;
+    }
+
+    // Fill with zeros
+    if (cudaSuccess != cudaMemset(PyGpuNdArray_DATA(rval), 0, total_size)) {
+        PyErr_Format(PyExc_MemoryError, "PyGpuNdArray_Zeros: Error memsetting %d bytes of device memory.", total_size);
+        Py_DECREF(rval);
+        return NULL;
+    }
+
+    return (PyObject*) rval;
+}
+
+// declared as a static method (hence "dummy" is not used)
+// numpy.zeros(shape, dtype=float, order='C')
+static PyObject * 
+PyGpuNdArray_zeros(PyObject* dummy, PyObject* args, PyObject *kargs)
+{
+    static char *kwlist[] = {"shape","dtype","order",NULL}; /* XXX ? */
+    PyArray_Descr *typecode = NULL;
+    PyObject * shape = NULL;
+    NPY_ORDER order = PyArray_CORDER;
+    bool fortran = false;
+    PyObject *ret = NULL;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kargs, "O|O&O&",
+                                     kwlist,
+	                             &shape,
+                                     PyArray_DescrConverter,
+                                     &typecode,
+                                     PyArray_OrderConverter,
+                                     &order)) {
+        Py_XDECREF(typecode);
+        Py_XDECREF(shape);
+        return ret;
+    }
+    if (order == PyArray_FORTRANORDER) {
+        fortran = true;
+    }
+    else {
+        fortran = false;
+    }
+
+    if(!PySequence_Check(shape))
+    {
+        PyErr_SetString(PyExc_TypeError, "shape argument must be a sequence");
+        return NULL;
+    }
+
+    int shplen = PySequence_Length(shape);
+
+    if (shplen == 0)
+    {
+        PyErr_SetString(PyExc_ValueError,
+            "PyGpuNdArray_Zeros: empty shape not allowed");
+        return NULL;
+    }
+
+    npy_intp* newdims = (npy_intp *)malloc(sizeof(npy_intp) * shplen);
+
+    if (!newdims)
+    {
+        PyErr_SetString(PyExc_MemoryError,
+            "PyGpuNdArray_Zeros: Failed to allocate temporary space");
+        return NULL;
+    }
+
+    // start from the end to compute strides
+    for (int i = shplen-1; i >= 0; --i)
+    {
+        PyObject* shp_el_obj = PySequence_GetItem(shape, i);
+        if(shp_el_obj == NULL)
+        {
+            // shouldn't happen since we checked length before...
+            PyErr_SetString(PyExc_RuntimeError, "PyGpuNdArray_Zeros: Index out of bound in sequence");
+            free(newdims);
+            return NULL;
+        }
+
+        int shp_el = PyInt_AsLong(shp_el_obj);
+        Py_DECREF(shp_el_obj);
+
+        if (shp_el <= 0)
+        {
+            PyErr_SetString(PyExc_ValueError, "PyGpuNdArray_Zeros: shape must not contain 0 (or negative value) for size of a dimension");
+            free(newdims);
+            return NULL;
+        }
+
+        newdims[i] = shp_el;
+    }
+
+    PyObject* rval = PyGpuNdArray_Zeros(shplen, newdims, typecode, fortran);
+
+    free(newdims);
+
+    return (PyObject*)rval;
+}
+
 static PyMethodDef PyGpuNdArray_methods[] =
 {
     {"__array__",
@@ -374,9 +496,6 @@ static PyMethodDef PyGpuNdArray_methods[] =
         (PyCFunction)PyGpuNdArray_DeepCopy, METH_O,
         "Create a copy of this object"},
 /*
-    {"zeros",
-        (PyCFunction)PyGpuNdArray_Zeros, METH_STATIC,
-        "Create a new PyGpuNdArray with specified shape, filled with zeros."},
     {"reduce_sum",
         (PyCFunction)PyGpuNdArray_ReduceSum, METH_O,
         "Reduce over the given dimensions by summation"},
@@ -1025,6 +1144,9 @@ PyGpuNdArray_CheckExact(const PyObject * ob)
 static PyMethodDef module_methods[] = {
     //{"dimshuffle", PyGpuNdArray_Dimshuffle, METH_VARARGS, "Returns the dimshuffle of a PyGpuNdArray."},
     {"outstanding_mallocs", outstanding_mallocs, METH_VARARGS, "how many more mallocs have been called than free's"},
+    {"zeros",
+       (PyCFunction)PyGpuNdArray_zeros, METH_VARARGS|METH_KEYWORDS,
+       "Create a new PyGpuNdArray with specified shape, filled with zeros."},
     {NULL, NULL, NULL, NULL}  /* Sentinel */
 };
 

@@ -15,6 +15,24 @@ dtypes_no_complex = ["float32", "float64",
                      "uint8", "uint16", "uint32", "uint64",
                      ]
 
+def check_flags(x, y):
+    assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
+    assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
+    assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"]
+    assert x.flags["OWNDATA"] == y.flags["OWNDATA"]
+    assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
+    assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
+
+def check_meta(x, y):
+    assert x.shape == y.shape
+    assert x.dtype == y.dtype
+    assert x.strides == y.strides
+    check_flags(x, y)
+
+def check_all(x, y):
+    check_meta(x, y)
+    assert numpy.allclose(numpy.asarray(x), numpy.asarray(y))
+
 def test_transfer():
     for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
         for dtype in dtypes_all:
@@ -65,6 +83,14 @@ def test_transfer_fortran():
             assert a.strides == b.strides == c.strides
             assert numpy.allclose(c,a)
 
+def test_zeros():
+    for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
+        for order in ["C", "F"]:
+            for dtype in dtypes_all:
+                x = numpy.zeros(shp, dtype, order)
+                y = gpu_ndarray.zeros(shp, dtype, order)
+                check_all(x, y)
+
 def test_mapping_getitem_ellipsis():
     for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
         for dtype in dtypes_all:
@@ -87,15 +113,6 @@ def test_copy_view():
             assert b_op.base is None
         else:
             assert a_op.base is a and b_op.base is b
-
-
-    def check_flags(x, y):
-        assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
-        assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
-        assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"]
-        assert x.flags["OWNDATA"] == y.flags["OWNDATA"]
-        assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
-        assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
 
     for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
         for dtype in dtypes_all:
