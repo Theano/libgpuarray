@@ -216,6 +216,62 @@ static PyObject * PyGpuNdArray_Copy(PyGpuNdArrayObject * self)
     return rval;
 }
 
+PyObject * PyGpuNdArray_DeepCopy(PyGpuNdArrayObject * self, PyObject * memo)
+{
+    int verbose = 0;
+
+    assert(PyDict_Check(memo));
+    PyObject * selfkey = PyInt_FromLong((long)self);
+    assert(selfkey);
+
+    if (PyDict_Contains(memo, selfkey)) {
+        PyObject * rval = PyDict_GetItem(memo, selfkey);
+        Py_DECREF(selfkey);
+        Py_XINCREF(rval);
+        return rval;
+    } else {
+        if (verbose) fprintf(stderr, "PyGpuNdArray_DeepCopy: startd deepcopy\n");
+        PyObject * rval = PyGpuNdArray_Copy(self);
+        if (NULL == rval) {
+            Py_DECREF(selfkey);
+            return NULL;
+        }
+
+        if (verbose) fprintf(stderr, "DeepCopy created %p\n", rval);
+        if (verbose) fprintf(stderr, "DeepCopy created %p %p\n", PyGpuNdArray_DESCR(rval), PyGpuNdArray_DATA(rval));
+        if (PyDict_SetItem(memo, selfkey, rval)) {
+            Py_DECREF(rval);
+            Py_DECREF(selfkey);
+            return NULL;
+        }
+        Py_DECREF(selfkey);
+        if (verbose) fprintf(stderr, "PyGpuNdArray_DeepCopy: startd end\n");
+        return rval;
+    }
+}
+
+PyObject * PyGpuNdArray_View(PyGpuNdArrayObject * self)
+{
+    PyGpuNdArrayObject * rval = (PyGpuNdArrayObject*)PyGpuNdArray_New(PyGpuNdArray_NDIM(self));
+    if (!rval || PyGpuNdArray_set_data(rval, PyGpuNdArray_DATA(self), (PyObject *)self)) {
+        Py_XDECREF(rval);
+        rval = NULL;
+    } else {
+        for (int i = 0; i < PyGpuNdArray_NDIM(self); ++i) {
+            PyGpuNdArray_DIM(rval, i) = PyGpuNdArray_DIMS(self)[i];
+            PyGpuNdArray_STRIDE(rval, i) = PyGpuNdArray_STRIDES(self)[i];
+        }
+    }
+    //TODO: find how to refcount on the descr!
+    //Py_INCREF(PyGpuNdArray_DESCR(self));
+    PyGpuNdArray_DESCR(rval) = PyGpuNdArray_DESCR(self);
+    PyGpuNdArray_FLAGS(rval) = PyGpuNdArray_FLAGS(self);
+    PyGpuNdArray_FLAGS(rval) &= ~NPY_OWNDATA;
+    
+
+    return (PyObject*)rval;
+}
+
 //updated for offset
 PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
 {
@@ -308,19 +364,19 @@ static PyMethodDef PyGpuNdArray_methods[] =
     {"copy",
         (PyCFunction)PyGpuNdArray_Copy, METH_NOARGS,
         "Create a deep copy of this object."},
-/*
-    {"__copy__",
+    {"view",
         (PyCFunction)PyGpuNdArray_View, METH_NOARGS,
-        "Create a shallow copy of this object. used by module copy"},
+        "Create a view of this object."},
+    {"__copy__",
+        (PyCFunction)PyGpuNdArray_Copy, METH_NOARGS,
+        "Create a copy of this object as numpy does. Why numpy do a copy of the data when the object is a view?"},
     {"__deepcopy__",
         (PyCFunction)PyGpuNdArray_DeepCopy, METH_O,
         "Create a copy of this object"},
+/*
     {"zeros",
         (PyCFunction)PyGpuNdArray_Zeros, METH_STATIC,
         "Create a new PyGpuNdArray with specified shape, filled with zeros."},
-    {"copy",
-        (PyCFunction)PyGpuNdArray_Copy, METH_NOARGS,
-        "Create a copy of this object"},
     {"reduce_sum",
         (PyCFunction)PyGpuNdArray_ReduceSum, METH_O,
         "Reduce over the given dimensions by summation"},
@@ -331,9 +387,6 @@ static PyMethodDef PyGpuNdArray_methods[] =
         (PyCFunction)PyGpuNdArray_Reshape, METH_O,
         "Return a reshaped view (or copy) of this ndarray\n\
             The required argument is a tuple of integers specifying the shape of the new ndarray."},
-    {"view",
-        (PyCFunction)PyGpuNdArray_View, METH_NOARGS,
-        "Return an alias of this ndarray"},
     {"_set_stride",
         (PyCFunction)PyGpuNdArray_SetStride, METH_VARARGS,
         "For integer arguments (i, s), set the 'i'th stride to 's'"},

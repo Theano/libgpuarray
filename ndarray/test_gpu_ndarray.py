@@ -78,22 +78,60 @@ def test_mapping_getitem_ellipsis():
             b_cpu = numpy.asarray(b)
             assert numpy.allclose(a, b_cpu)
 
-def test_copy():
+def test_copy_view():
+    from ..array import may_share_memory
+    def check_memory_region(a, a_op, b, b_op):
+        assert numpy.may_share_memory(a, a_op) == may_share_memory(b, b_op)
+
+        if a_op.base is None:
+            assert b_op.base is None
+        else:
+            assert a_op.base is a and b_op.base is b
+
+
+    def check_flags(x, y):
+        assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
+        assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
+        assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"]
+        assert x.flags["OWNDATA"] == y.flags["OWNDATA"]
+        assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
+        assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
+
     for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
         for dtype in dtypes_all:
-            #TODO test with not contiguous memory got from subtensor! in the subtensor test!
             #TODO test copy unbroadcast!
             shape = (5,)
             a = numpy.asarray(numpy.random.rand(*shape), dtype='float32')
 
             b = gpu_ndarray.GpuNdArrayObject(a)
-            c = b.copy()
-            #d = copy.copy(b)
-            #e = copy.deepcopy(b)
-
             assert numpy.allclose(a, numpy.asarray(b))
+            check_flags(a, b)
+
+            c = b.copy()
             assert numpy.allclose(a, numpy.asarray(c))
-            #assert numpy.allclose(a, numpy.asarray(d))
+            check_flags(c, a.copy())
+            check_memory_region(a, a.copy(), b, c)
+
+            d = copy.copy(b)
+            assert numpy.allclose(a, numpy.asarray(d))
+            check_flags(d, copy.copy(a))
+            check_memory_region(a, copy.copy(a), b, d)
+
+            e = b.view()
+            assert numpy.allclose(a, numpy.asarray(e))
+            check_flags(e, a.view())
+            check_memory_region(a, a.view(), b, e)
+
+            f = copy.deepcopy(b)
+            assert numpy.allclose(a, numpy.asarray(f))
+            check_flags(f, copy.deepcopy(a))
+            check_memory_region(a, copy.deepcopy(a), b, f)
+
+            g = copy.copy(b.view())
+            assert numpy.allclose(a, numpy.asarray(g))
+            check_memory_region(a, copy.copy(a.view()), b, g)
+            check_flags(g, copy.copy(a.view()))
+
 
 def test_len():
     for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:

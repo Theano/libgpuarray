@@ -36,6 +36,12 @@ PyGpuNdArray_CheckExact(const PyObject * ob);
  */
 int PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj);
 
+static
+int PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base);
+
+static PyObject *
+PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key);
+
 /**
  * [Re]allocate a PyGpuNdArrayObject with access to 'nd' dimensions.
  *
