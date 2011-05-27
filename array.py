@@ -54,6 +54,30 @@ def get_common_dtype(obj1, obj2):
     return (obj1.dtype.type(0) + obj2.dtype.type(0)).dtype
 
 
+def bound(a):
+    high = a.bytes
+    low = a.bytes
+
+    for stri, shp in zip(a.strides, a.shape):
+        if stri<0:
+            low += (stri)*(shp-1)
+        else:
+            high += (stri)*(shp-1)
+    return low, high
+
+def may_share_memory(a,b):
+    #when this is called with a an ndarray and b
+    #a sparce matrix, numpy.may_share_memory fail.
+    if a is b:
+        return True
+    if a.__class__ is b.__class__:
+        a_l, a_h = bound(a)
+        b_l, b_h = bound(b)
+        if b_l >= a_h or a_l >= b_h:
+            return False
+        return True
+    else:
+        return False
 
 
 # {{{ as_strided implementation
