@@ -152,7 +152,7 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
     if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromPyGpuNdArray start nd=%d\n", PyGpuNdArray_NDIM(self));
     assert(PyGpuNdArray_OFFSET(self) == 0 && PyGpuNdArray_OFFSET(other) == 0);
     assert(PyGpuNdArray_TYPE(self) == PyGpuNdArray_TYPE(other));
-
+    assert(PyGpuNdArray_ISWRITEABLE(self));
     //standard elemwise size checks
     if (PyGpuNdArray_NDIM(self) == -1) {
         PyErr_SetString(PyExc_TypeError, "can't copy into un-initialized PyGpuNdArrayObject");
@@ -498,6 +498,27 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
                 free(strides_host);
             }
     };
+    // Set flags
+    if (false && PyGpuNdArray_NDIM(self) == 0) {
+        //Numpy 1.4.1 is not consistent here
+        //When we create a new numpy ndarray of 0 dim, it is not f contiguous
+        //But when we take a subtensor that is of 0 dim, it is f contiguous!
+        //We make as them for now...
+        PyGpuNdArray_FLAGS(self) &= ~NPY_F_CONTIGUOUS;
+        PyGpuNdArray_FLAGS(self) |= NPY_C_CONTIGUOUS;
+    } else {
+        if (PyGpuNdArray_is_c_contiguous(self)) {
+            PyGpuNdArray_FLAGS(self) |= NPY_C_CONTIGUOUS;
+        } else {
+            PyGpuNdArray_FLAGS(self) &= ~NPY_C_CONTIGUOUS;
+        }
+        if (PyGpuNdArray_is_f_contiguous(self)) {
+            PyGpuNdArray_FLAGS(self) |= NPY_F_CONTIGUOUS;
+        } else {
+            PyGpuNdArray_FLAGS(self) &= ~NPY_F_CONTIGUOUS;
+        }
+    }
+
     if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromPyGpuNdArray end\n");
     return 0;
 }
