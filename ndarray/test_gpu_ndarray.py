@@ -91,6 +91,16 @@ def test_zeros():
                 y = gpu_ndarray.zeros(shp, dtype, order)
                 check_all(x, y)
 
+def test_empty():
+    for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
+        for order in ["C", "F"]:
+            for dtype in dtypes_all:
+                x = numpy.zeros(shp, dtype, order)
+                y = gpu_ndarray.empty(shp, dtype, order)
+                check_meta(x, y)
+
+
+
 def test_mapping_getitem_ellipsis():
     for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
         for dtype in dtypes_all:
