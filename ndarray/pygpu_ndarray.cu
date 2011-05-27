@@ -279,6 +279,7 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
     npy_intp * npydims = (npy_intp*)malloc(PyGpuNdArray_NDIM(self) * sizeof(npy_intp));
     assert (npydims);
     for (int i = 0; i < PyGpuNdArray_NDIM(self); ++i) npydims[i] = (npy_intp)(PyGpuNdArray_DIMS(self)[i]);
+    Py_INCREF(PyGpuNdArray_DESCR(self));
     PyObject * rval = PyArray_Empty(PyGpuNdArray_NDIM(self),
 				    npydims,
 				    PyGpuNdArray_DESCR(self),
@@ -572,7 +573,8 @@ PyGpuNdArray_len(PyObject * py_self)
     }
 }
 
-int PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base)
+static int
+PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base)
 {
     if (self->data_allocated)
     {
