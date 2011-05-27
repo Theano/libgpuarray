@@ -198,18 +198,15 @@ static PyObject * PyGpuNdArray_Copy(PyGpuNdArrayObject * self)
     PyObject * rval = PyGpuNdArray_New();
     //TODO find how to refcount descr.
     PyGpuNdArray_DESCR(rval) = PyGpuNdArray_DESCR(self);
-    if ((!rval) || (-1 == PyGpuNdArray_NDIM(self)))
-    {
+    if ((!rval) || (-1 == PyGpuNdArray_NDIM(self))) {
         return rval;
     }
-    if (PyGpuNdArray_alloc_contiguous((PyGpuNdArrayObject*)rval, PyGpuNdArray_NDIM(self), PyGpuNdArray_DIMS(self)))
-    {
+    if (PyGpuNdArray_alloc_contiguous((PyGpuNdArrayObject*)rval, PyGpuNdArray_NDIM(self), PyGpuNdArray_DIMS(self))) {
         Py_DECREF(rval);
         return NULL;
     }
 
-    if (PyGpuNdArray_CopyFromPyGpuNdArray((PyGpuNdArrayObject*)rval, self))
-    {
+    if (PyGpuNdArray_CopyFromPyGpuNdArray((PyGpuNdArrayObject*)rval, self)) {
         Py_DECREF(rval);
         return NULL;
     }
@@ -246,8 +243,7 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
       assert (PyArray_ITEMSIZE(rval) == PyGpuNdArray_ITEMSIZE(self));
       return rval;
     }
-    if ((PyGpuNdArray_NDIM(self) < 0) || (PyGpuNdArray_DATA(self) == 0))
-    {
+    if ((PyGpuNdArray_NDIM(self) < 0) || (PyGpuNdArray_DATA(self) == 0)) {
         PyErr_SetString(PyExc_ValueError, "can't copy from un-initialized PyGpuNdArray");
         return NULL;
     }
@@ -256,8 +252,7 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
     for (int i = 0; i < PyGpuNdArray_NDIM(self); ++i)
         if (PyGpuNdArray_STRIDE(self,i)<0)
             pos_stride = false;
-    if (PyGpuNdArray_ISONESEGMENT(self) && pos_stride)
-    {
+    if (PyGpuNdArray_ISONESEGMENT(self) && pos_stride) {
         contiguous_self = self;
         Py_INCREF(contiguous_self);
         if (verbose) std::cerr << "PyGpuNdArray_CreateArrayObj: gpu array already contiguous" <<
@@ -267,12 +262,11 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
         //  if (verbose) std::cerr << "CreateArrayObj one segment, with special handling" << contiguous_self << '\n';
         //PyErr_SetString(PyExc_ValueError, "PyGpuNdArray_CreateArrayObj: Need PyGpuNdArray_Copy or some other nd array mandling to transfer contiguous bloc with negative stride.");
         //return NULL;
-    }else{
+    } else {
         contiguous_self = (PyGpuNdArrayObject*)PyGpuNdArray_Copy(self);
         if (verbose) std::cerr << "CreateArrayObj created contiguous" << contiguous_self << '\n';
     }
-    if (!contiguous_self)
-    {
+    if (!contiguous_self) {
         return NULL;
     }
 
@@ -285,8 +279,7 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
 				    PyGpuNdArray_DESCR(self),
 				    PyGpuNdArray_ISFORTRAN(self));
     free(npydims);
-    if (!rval)
-    {
+    if (!rval) {
         Py_DECREF(contiguous_self);
         return NULL;
     }
@@ -296,8 +289,7 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
 		    PyArray_DATA(rval), 1);
     CNDA_THREAD_SYNC;
 
-    if (CUBLAS_STATUS_SUCCESS != cublasGetError())
-    {
+    if (CUBLAS_STATUS_SUCCESS != cublasGetError()) {
         PyErr_SetString(PyExc_RuntimeError, "error copying data to host");
         Py_DECREF(contiguous_self);
         Py_DECREF(rval);
