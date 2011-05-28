@@ -4,16 +4,21 @@ import numpy
 
 import pygpu_ndarray as gpu_ndarray
 
-dtypes_all = ["float32", "float64",
+enable_double = True
+
+dtypes_all = ["float32",
               "int8", "int16", "int32", "int64",
               "uint8", "uint16", "uint32", "uint64",
-              "complex64", "complex128",
+              "complex64",
               ]
 
 dtypes_no_complex = ["float32", "float64",
                      "int8", "int16", "int32", "int64",
                      "uint8", "uint16", "uint32", "uint64",
                      ]
+if enable_double:
+    dtypes_all += ["float64", "complex128"]
+    dtypes_no_complex += ["float64"]
 
 def check_flags(x, y):
     assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
