@@ -71,6 +71,18 @@ class _DummyArray(object):
 def as_strided(x, shape=None, strides=None):
     """ Make an ndarray from the given array with the given shape and strides.
     """
+    # work around Numpy bug 1873 (reported by Irwin Zaid)
+    # Since this is stolen from numpy, this implementation has the same bug.
+    # Workaround as suggested by Irwin.
+
+    if not x.dtype.isnative:
+        if x.shape != shape or x.strides != strides:
+            raise NotImplementedError(
+                    "as_strided won't work on non-native arrays for now."
+                    "See http://projects.scipy.org/numpy/ticket/1873")
+        else:
+            return x
+
     interface = dict(x.__array_interface__)
     if shape is not None:
         interface['shape'] = tuple(shape)
