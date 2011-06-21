@@ -11,3 +11,4 @@ setuptools.pth
 distribute*egg
 distribute*tar.gz
 *.so
+*.o
