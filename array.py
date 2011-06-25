@@ -97,10 +97,11 @@ def as_strided(x, shape=None, strides=None):
     """
     # work around Numpy bug 1873 (reported by Irwin Zaid)
     # Since this is stolen from numpy, this implementation has the same bug.
-    # Workaround as suggested by Irwin.
+    # http://projects.scipy.org/numpy/ticket/1873
 
-    if not x.dtype.isnative:
-        if x.shape != shape or x.strides != strides:
+    if not x.dtype.isbuiltin:
+        if (shape is not None and x.shape != shape) \
+                or (strides is not None and x.strides != strides):
             raise NotImplementedError(
                     "as_strided won't work on non-native arrays for now."
                     "See http://projects.scipy.org/numpy/ticket/1873")
