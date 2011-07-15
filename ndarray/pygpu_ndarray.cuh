@@ -49,55 +49,6 @@ static PyObject *
 PyGpuNdArray_Empty(int nd, npy_intp* dims, PyArray_Descr* dtype, int fortran);
 
 /**
- * [Re]allocate a PyGpuNdArrayObject with access to 'nd' dimensions.
- *
- * Note: This does not allocate storage for data.
- */
-static
-int PyGpuNdArray_set_nd(PyGpuNdArrayObject * self, const int nd)
-{
-    if (nd != PyGpuNdArray_NDIM(self))
-    {
-        if(0) fprintf(stderr, "PyGpuNdArray_set_nd: modif nd=%i to nd=%i\n", PyGpuNdArray_NDIM(self), nd);
-    
-        if (PyGpuNdArray_DIMS(self)){
-            free(PyGpuNdArray_DIMS(self));
-            PyGpuNdArray_DIMS(self) = NULL;
-            PyGpuNdArray_NDIM(self) = -1;
-        }
-        if (PyGpuNdArray_STRIDES(self)){
-            free(PyGpuNdArray_STRIDES(self));
-            PyGpuNdArray_STRIDES(self) = NULL;
-            PyGpuNdArray_NDIM(self) = -1;
-        }
-        if (nd == -1) return 0;
-
-        PyGpuNdArray_DIMS(self) = (npy_intp*)malloc(nd*sizeof(npy_intp));
-        if (NULL == PyGpuNdArray_DIMS(self))
-        {
-            PyErr_SetString(PyExc_MemoryError, "PyGpuNdArray_set_nd: Failed to allocate dimensions");
-            return -1;
-        }
-        PyGpuNdArray_STRIDES(self) = (npy_intp*)malloc(nd*sizeof(npy_intp));
-        if (NULL == PyGpuNdArray_STRIDES(self))
-        {
-            PyErr_SetString(PyExc_MemoryError, "PyGpuNdArray_set_nd: Failed to allocate str");
-            return -1;
-        }
-        //initialize all dimensions and strides to 0
-        for (int i = 0; i < nd; ++i)
-        {
-            PyGpuNdArray_DIM(self, i) = 0;
-            PyGpuNdArray_STRIDES(self)[i] = 0;
-        }
-
-        PyGpuNdArray_NDIM(self) = nd;
-	if(0) fprintf(stderr, "PyGpuNdArray_set_nd: end\n");
-    }
-    return 0;
-}
-
-/**
  * PyGpuNdArray_alloc_contiguous
  *
  * Allocate storage space for a tensor of rank 'nd' and given dimensions.
