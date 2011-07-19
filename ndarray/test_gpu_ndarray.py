@@ -12,7 +12,7 @@ dtypes_all = ["float32",
               "complex64",
               ]
 
-dtypes_no_complex = ["float32", "float64",
+dtypes_no_complex = ["float32",
                      "int8", "int16", "int32", "int64",
                      "uint8", "uint16", "uint32", "uint64",
                      ]
