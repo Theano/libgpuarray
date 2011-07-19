@@ -8,7 +8,6 @@
 #include <pygpu_ndarray_object.h>
 #include <stdio.h>
 
-#include <cublas.h>
 #include <pygpu_language.h>
 
 /*

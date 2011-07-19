@@ -176,28 +176,14 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
     // New memory, so it should be writable
     assert(PyGpuNdArray_ISWRITEABLE(self));
 
-    if (0) {
-        cublasSetVector(PyArray_SIZE(py_src),
-                        PyArray_ITEMSIZE(py_src),
-                        PyArray_DATA(py_src), 1,
-                        PyGpuNdArray_DATA(self), 1);
-        CNDA_THREAD_SYNC;
-        if (CUBLAS_STATUS_SUCCESS != cublasGetError()) {
-                PyErr_SetString(PyExc_RuntimeError, "error copying data to device memory");
-                Py_DECREF(py_src);
-                return -1;
-        }
-    } else {
-        cudaError_t err = cudaMemcpy(PyGpuNdArray_DATA(self),
-                                 PyArray_DATA(py_src),
-                                 PyArray_SIZE(py_src) * PyArray_ITEMSIZE(py_src),
-                                 cudaMemcpyHostToDevice);
-        CNDA_THREAD_SYNC;
-        if (cudaSuccess != err) {
-            PyErr_SetString(PyExc_RuntimeError, "cudaMemcpy: error copying data to device memory");
-            Py_DECREF(py_src);
-            return -1;
-        }
+    err = PyGpuMemcpy(PyGpuNdArray_DATA(self),
+                    PyArray_DATA(py_src),
+                    PyArray_SIZE(py_src) * PyArray_ITEMSIZE(py_src),
+                    PyGpuHostToDevice);
+    CNDA_THREAD_SYNC;
+    if (err) {
+        Py_DECREF(py_src);
+        return -1;
     }
     Py_DECREF(py_src);
     if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromArray: end\n");
@@ -284,26 +270,6 @@ PyObject * PyGpuNdArray_View(PyGpuNdArrayObject * self)
 
     return (PyObject*)rval;
 }
-char *
-cublasGetErrorString(cublasStatus err)
-{
-    if (err == CUBLAS_STATUS_NOT_INITIALIZED) {
-        return "CUBLAS_STATUS_NOT_INITIALIZED";
-    } else if (err == CUBLAS_STATUS_ALLOC_FAILED){
-        return "CUBLAS_STATUS_ALLOC_FAILED";
-    } else if (err == CUBLAS_STATUS_INVALID_VALUE){
-        return "CUBLAS_STATUS_INVALID_VALUE";
-    } else if (err == CUBLAS_STATUS_MAPPING_ERROR){
-        return "CUBLAS_STATUS_MAPPING_ERROR";
-    } else if (err == CUBLAS_STATUS_EXECUTION_FAILED){
-        return "CUBLAS_STATUS_EXECUTION_FAILED";
-    } else if (err == CUBLAS_STATUS_INTERNAL_ERROR){
-        return "CUBLAS_STATUS_INTERNAL_ERROR";
-    } else {
-        return "UNKNOW ERROR";
-    }
-
-}
 
 //updated for offset
 PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
@@ -372,33 +338,16 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
         Py_DECREF(contiguous_self);
         return NULL;
     }
-    if (0) {
-        cublasGetVector(PyArray_SIZE(rval), PyArray_ITEMSIZE(rval),
-                        PyGpuNdArray_DATA(contiguous_self), 1,
-                        PyArray_DATA(rval), 1);
-        CNDA_THREAD_SYNC;
-        cublasStatus err = cublasGetError();
 
-        if (CUBLAS_STATUS_SUCCESS != err) {
-            PyErr_Format(PyExc_RuntimeError, "error copying data to host %s",
-                         cublasGetErrorString(err));
-            Py_DECREF(contiguous_self);
-            Py_DECREF(rval);
-            rval = NULL;
-        }
-    } else {
-        cudaError_t err = cudaMemcpy(PyArray_DATA(rval),
-                                     PyGpuNdArray_DATA(contiguous_self),
-                                     PyArray_SIZE(rval) * PyArray_ITEMSIZE(rval),
-                                     cudaMemcpyDeviceToHost);
-        CNDA_THREAD_SYNC;
-        if (cudaSuccess != err) {
-            PyErr_Format(PyExc_RuntimeError, "cudaMemcpy: error copying data to host (%s)",
-                         cudaGetErrorString(err));
-            Py_DECREF(contiguous_self);
-            Py_DECREF(rval);
-            rval = NULL;
-        }
+    int err = PyGpuMemcpy(PyArray_DATA(rval),
+                          PyGpuNdArray_DATA(contiguous_self),
+                          PyArray_SIZE(rval) * PyArray_ITEMSIZE(rval),
+                          PyGpuDeviceToHost);
+    CNDA_THREAD_SYNC;
+    if (err) {
+        Py_DECREF(contiguous_self);
+        Py_DECREF(rval);
+        rval = NULL;
     }
     Py_DECREF(contiguous_self);
     return rval;
