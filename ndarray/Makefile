@@ -1,18 +1,28 @@
 all: pygpu_ndarray.so
 
-PYTHON_VERSION=2.5
-NPY_INCLUDE=-I/opt/lisa/byhost/lib/python${PYTHON_VERSION}/site-packages/numpy/core/include
-THEANO_CUDA_INCLUDE=-I/u/bastienf/repos/theano/sandbox/cuda
-CUDA_INCLUDE=-I/opt/lisa/os/cuda/include
-PYTHON_INCLUDE=-I/home/nouiz/local_python${PYTHON_VERSION}.1/include/python${PYTHON_VERSION}
+PYTHON_VERSION ?= 2.5
+CUDA_ROOT ?= /opt/lisa/os/cuda
+THEANO_ROOT ?= /u/bastienf/repos/Theano
+
+CFLAGS=-g
+#BINDIR=--compiler-bindir ${HOME}/.theano.nvcc-bindir
+
+#NPY_PATH!=python -c "import numpy;print numpy.__path__"
+#NPY_INCLUDE=-I${NPY_PATH}/core/include
+THEANO_CUDA_INCLUDE=-I${THEANO_ROOT}/theano/sandbox/cuda
+CUDA_INCLUDE=-I${CUDA_ROOT}/include
 #PYTHON_INCLUDE=-I/usr/include/python${PYTHON_VERSION}
-#BINDIR=--compiler-bindir /home/nouiz/.theano.nvcc-bindir
+INCLUDES=${CUDA_INCLUDE} ${THEANO_CUDA_INCLUDE} ${PYTHON_INCLUDE}
+CUDA_FLAGS=-Xlinker -rpath,${CUDA_ROOT}/lib64 -Xlinker -rpath,${CUDA_ROOT}/lib
 
 pygpu_language_cuda.o: pygpu_language_cuda.cu pygpu_language.h
-	nvcc -c -g -m64 -Xcompiler -fPIC,-m64 -Xlinker -rpath,/opt/lisa/os/cuda/lib -Xlinker -rpath,/opt/lisa/os/cuda/lib64 ${PYTHON_INCLUDE} ${CUDA_INCLUDE} ${NPY_INCLUDE} ${BINDIR} -I/usr/include/python${PYTHON_VERSION} -o $@ $<
+	nvcc -c ${CFLAGS} -m64 -Xcompiler -fPIC,-m64 ${CUDA_FLAGS} ${INCLUDES} ${BINDIR} -o $@ $<
 
-pygpu_ndarray.so: pygpu_ndarray.cu pygpu_ndarray.cuh pygpu_language_cuda.o
-	nvcc -shared -g -m64 -Xcompiler -fPIC,-m64 -Xlinker -rpath,/opt/lisa/os/cuda/lib -Xlinker -rpath,/opt/lisa/os/cuda/lib64 ${PYTHON_INCLUDE} ${CUDA_INCLUDE} ${NPY_INCLUDE} ${BINDIR} -I/usr/include/python${PYTHON_VERSION} -o $@ $< pygpu_language_cuda.o -L/opt/lisa/os/cuda/lib -L/opt/lisa/os/cuda/lib64 -L/usr/lib64 -lpython${PYTHON_VERSION} -lcublas -lcudart
+pygpu_ndarray.so: pygpu_ndarray.cu pygpu_ndarray.cuh pygpu_language_cuda.o pygpu_ndarray_object.h
+	nvcc -shared ${CFLAGS} -m64 -Xcompiler -fPIC,-m64 ${CUDA_FLAGS} ${INCLUDES} ${BINDIR} -o $@ pygpu_language_cuda.o $< -lpython${PYTHON_VERSION} -lcublas -lcudart
 
 clean:
 	rm -f pygpu_ndarray.so core.* *.o *~
+
+cleantmp:
+	rm -f core.* *.o *~
