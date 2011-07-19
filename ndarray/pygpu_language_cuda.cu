@@ -363,7 +363,7 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
                 }
                 if (verbose>1) {
                     for(int i=0;i<3*ndim;i++)
-                        printf(" %d", ((ssize_t *)strides_host)[i]);
+                        printf(" %ld", ((ssize_t *)strides_host)[i]);
                     printf("\n");
                 }
                 CNDA_THREAD_SYNC;

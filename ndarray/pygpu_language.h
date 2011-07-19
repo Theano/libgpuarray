@@ -76,7 +76,7 @@ template<typename inttype>
 int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const inttype * dim, NPY_ORDER order=NPY_CORDER)
 {
     int verbose = 0;
-    if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: start nd=%i\n descr=%p", nd);
+    if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: start nd=%i\n descr=%p", nd, self);
 
     if (!PyGpuNdArray_DESCR(self)){
         PyErr_SetString(PyExc_ValueError,
@@ -97,7 +97,7 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
     //      in that case we can return right here.
     if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: before itemsize descr=%p elsize=%i\n", self->descr, self->descr->elsize);
     int elsize = PyGpuNdArray_ITEMSIZE((PyObject*)self);
-    if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: set_nd! elsize=%i\n", nd,elsize);
+    if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: set_nd %d! elsize=%i\n", nd, elsize);
     if(order != NPY_FORTRANORDER){
       if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: NPY_CORDER\n");
       for (int i = nd-1; i >= 0; --i){

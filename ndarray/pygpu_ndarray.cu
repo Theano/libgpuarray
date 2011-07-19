@@ -1257,6 +1257,8 @@ static PyTypeObject PyGpuNdArrayType =
 PyObject *
 PyGpuNdArray_New(int nd)
 {
+    int verbose = 0;
+    if (verbose) fprintf(stderr,"PyGpuNdArray_New start\n");
     PyGpuNdArrayObject *self = (PyGpuNdArrayObject *)PyGpuNdArrayType.tp_alloc(&PyGpuNdArrayType, 0);
     if (self == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "PyGpuNdArray_New failed to allocate self");
@@ -1274,6 +1276,7 @@ PyGpuNdArray_New(int nd)
         }
     }
     ++_outstanding_mallocs[1];
+    if (verbose) fprintf(stderr,"PyGpuNdArray_New end\n");
     return (PyObject *)self;
 }
 
