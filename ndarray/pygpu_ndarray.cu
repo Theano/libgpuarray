@@ -396,10 +396,8 @@ PyGpuNdArray_Zeros(int nd, npy_intp* dims, PyArray_Descr* dtype, int fortran)
     int total_size = total_elements * dtype->elsize;
     
     // Fill with zeros
-    cudaError_t err = cudaMemset(PyGpuNdArray_DATA(rval), 0, total_size);
-    if (cudaSuccess != err) {
-        PyErr_Format(PyExc_MemoryError, "PyGpuNdArray_Zeros: Error memsetting %d bytes of device memory(%s). %p",
-                     total_size, cudaGetErrorString(err), PyGpuNdArray_DATA(rval));
+    int err = PyGpuMemset(PyGpuNdArray_DATA(rval), 0, total_size);
+    if (err) {
         Py_DECREF(rval);
         return NULL;
     }

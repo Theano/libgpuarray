@@ -166,7 +166,9 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
     if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: end\n");
     return 0;
 }
+
 enum PyGpuTransfert { PyGpuHostToDevice, PyGpuDeviceToHost };
 int PyGpuMemcpy(void * dst, const void * src, size_t bytes, PyGpuTransfert direction);
 
+int PyGpuMemset(void * dst, int data, size_t bytes);
 #endif

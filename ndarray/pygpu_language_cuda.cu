@@ -565,6 +565,17 @@ int PyGpuMemcpy(void * dst, const void * src, size_t bytes, PyGpuTransfert direc
     return 0;
 }
 
+int PyGpuMemset(void * dst, int data, size_t bytes){
+    cudaError_t err = cudaMemset(dst, data, bytes);
+    CNDA_THREAD_SYNC;
+    if (cudaSuccess != err) {
+        PyErr_Format(PyExc_MemoryError, "PyGpuMemset: Error memsetting %d bytes of device memory(%s). %p",
+                     bytes, cudaGetErrorString(err), PyGpuNdArray_DATA(dst));
+        return -1;
+    }
+    return 0;
+}
+
 /*
   Local Variables:
   mode:c++
