@@ -846,11 +846,22 @@ PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base)
             return -1;
         }
     }
+
+    // Get the original base object (base.base.base...)
+    // TODO: check that base is indeed a CudaNdarray?
+    PyObject * orig_base = base;
+    // base is not always a PyGpuNdArrayObject. It can be a GpuArray from pycuda, ...
+    while (orig_base && PyGpuNdArray_Check(orig_base) && ((PyGpuNdArrayObject*) orig_base)->base)
+    {
+        // base_base is itself a view
+        orig_base = ((PyGpuNdArrayObject*) orig_base)->base;
+    }
+
     //N.B. XDECREF and XINCREF are no-ops for NULL pointers
-    if (PyGpuNdArray_BASE(self) != base)
+    if (PyGpuNdArray_BASE(self) != orig_base)
     {
         Py_XDECREF(PyGpuNdArray_BASE(self));
-        PyGpuNdArray_BASE(self) = base;
+        PyGpuNdArray_BASE(self) = orig_base;
         Py_XINCREF(PyGpuNdArray_BASE(self));
     }
     self->data_allocated = 0;
