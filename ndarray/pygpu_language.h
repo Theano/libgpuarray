@@ -139,9 +139,14 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
             return -1;
         }
 
+	// The structure of self will be reused with newly allocated memory.
+	// If self was a view, we should remove the reference to its base.
+	// (If base was already NULL, the following has no effect.)
+	Py_XDECREF(self->base);
+	self->base = NULL;
+
         self->data_allocated = size;
 	self->gpu_ndarray.flags = NPY_DEFAULT;
-	self->base = NULL; // In case it was a view.
 	PyGpuNdArray_FLAGS(self) |= NPY_WRITEABLE;
 	PyGpuNdArray_FLAGS(self) |= NPY_OWNDATA;
 	if (nd == 0) {
