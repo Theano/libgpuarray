@@ -105,7 +105,7 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
         PyGpuNdArray_DIM(self,i) = dim[i];
         size = size * dim[i];
       }
-    }else{
+    }else if (nd>0){
       if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: NPY_FORTRANORDER\n");
       size = dim[nd-1];
       PyGpuNdArray_STRIDE(self, 0) = elsize;
@@ -140,9 +140,14 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
 	self->gpu_ndarray.flags = NPY_DEFAULT;
 	PyGpuNdArray_FLAGS(self) |= NPY_WRITEABLE;
 	PyGpuNdArray_FLAGS(self) |= NPY_OWNDATA;
-	if(nd == 0){
-	  PyGpuNdArray_FLAGS(self) &= ~NPY_F_CONTIGUOUS;
+	if (nd == 0) {
 	  PyGpuNdArray_FLAGS(self) |= NPY_C_CONTIGUOUS;
+	  if (order != NPY_FORTRANORDER) {
+	    PyGpuNdArray_FLAGS(self) &= ~NPY_F_CONTIGUOUS;
+	  } else {
+	    PyGpuNdArray_FLAGS(self) |= NPY_F_CONTIGUOUS;
+	  }
+
 	}else if(nd == 1){//set c and f contiguous
 	  PyGpuNdArray_FLAGS(self) |= NPY_F_CONTIGUOUS;
 	  PyGpuNdArray_FLAGS(self) |= NPY_C_CONTIGUOUS;	  

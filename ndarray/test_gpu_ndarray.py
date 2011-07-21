@@ -89,7 +89,7 @@ def test_transfer_fortran():
             assert numpy.allclose(c,a)
 
 def test_zeros():
-    for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
+    for shp in [(), (5,),(6,7),(4,8,9),(1,8,9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
                 x = numpy.zeros(shp, dtype, order)
@@ -97,7 +97,7 @@ def test_zeros():
                 check_all(x, y)
 
 def test_empty():
-    for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
+    for shp in [(), (5,),(6,7),(4,8,9),(1,8,9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
                 x = numpy.zeros(shp, dtype, order)

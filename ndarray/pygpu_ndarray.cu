@@ -446,9 +446,7 @@ PyGpuNdArray_zeros(PyObject* dummy, PyObject* args, PyObject *kargs)
 
     if (shplen == 0)
     {
-        PyErr_SetString(PyExc_ValueError,
-            "PyGpuNdArray_Zeros: empty shape not allowed");
-        return NULL;
+        return PyGpuNdArray_Zeros(0, NULL, typecode, fortran);
     }
 
     npy_intp* newdims = (npy_intp *)malloc(sizeof(npy_intp) * shplen);
@@ -532,9 +530,7 @@ PyGpuNdArray_empty(PyObject* dummy, PyObject* args, PyObject *kargs)
 
     if (shplen == 0)
     {
-        PyErr_SetString(PyExc_ValueError,
-            "PyGpuNdArray_empty: empty shape not allowed");
-        return NULL;
+        return PyGpuNdArray_Empty(0, NULL, typecode, fortran);
     }
 
     npy_intp* newdims = (npy_intp *)malloc(sizeof(npy_intp) * shplen);
