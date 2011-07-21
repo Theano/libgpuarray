@@ -442,6 +442,9 @@ PyGpuNdArray_zeros(PyObject* dummy, PyObject* args, PyObject *kargs)
         return NULL;
     }
 
+    if (!typecode)
+        typecode = PyArray_DescrFromType(NPY_FLOAT64);
+
     int shplen = PySequence_Length(shape);
 
     if (shplen == 0)
@@ -525,6 +528,9 @@ PyGpuNdArray_empty(PyObject* dummy, PyObject* args, PyObject *kargs)
         PyErr_SetString(PyExc_TypeError, "shape argument must be a sequence");
         return NULL;
     }
+
+    if (!typecode)
+        typecode = PyArray_DescrFromType(NPY_FLOAT64);
 
     int shplen = PySequence_Length(shape);
 

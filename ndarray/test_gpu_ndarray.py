@@ -95,6 +95,15 @@ def test_zeros():
                 x = numpy.zeros(shp, dtype, order)
                 y = gpu_ndarray.zeros(shp, dtype, order)
                 check_all(x, y)
+    x = gpu_ndarray.zeros(())# no dtype and order param
+    y = numpy.zeros(())
+    check_meta(x, y)
+
+    try:
+        gpu_ndarray.zeros()
+        assert False
+    except TypeError:
+        pass
 
 def test_empty():
     for shp in [(), (5,),(6,7),(4,8,9),(1,8,9)]:
@@ -103,6 +112,14 @@ def test_empty():
                 x = numpy.zeros(shp, dtype, order)
                 y = gpu_ndarray.empty(shp, dtype, order)
                 check_meta(x, y)
+    x = gpu_ndarray.zeros(())# no dtype and order param
+    y = numpy.zeros(())
+    check_meta(x, y)
+    try:
+        gpu_ndarray.empty()
+        assert False
+    except TypeError:
+        pass
 
 
 
