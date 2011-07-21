@@ -119,11 +119,14 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
 
     if (self->data_allocated != size)
     {
-        if (device_free(PyGpuNdArray_DATA(self)))
-        {
-            // Does this ever happen??  Do we need to set data_allocated or data to 0?
-            return -1;
-        }
+        // If self is a view, do not try to free its memory
+        if (self->data_allocated && device_free(PyGpuNdArray_DATA(self))) {
+	  // Does this ever happen??  Do we need to set data_allocated or devdata to 0?
+	  PyGpuNdArray_DATA(self) = NULL;
+	  self->data_allocated = 0;
+	  return -1;
+	}
+
         assert(size>0);
 	if (verbose) fprintf(stderr, "PyGpuNdArray_alloc_contiguous: will allocate for size=%d elements\n", size);
 
@@ -138,6 +141,7 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
 
         self->data_allocated = size;
 	self->gpu_ndarray.flags = NPY_DEFAULT;
+	self->base = NULL; // In case it was a view.
 	PyGpuNdArray_FLAGS(self) |= NPY_WRITEABLE;
 	PyGpuNdArray_FLAGS(self) |= NPY_OWNDATA;
 	if (nd == 0) {
