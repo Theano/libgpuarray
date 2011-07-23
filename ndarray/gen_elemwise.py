@@ -1134,6 +1134,7 @@ __global__ void multiply_them(unsigned int numEls,
 
 
 def call_elemwise(fct, input_vals, block, grid=(1,1)):
+    """ broadcast not supported for now"""
     inp = input_vals[0]
     for i in input_vals[1:]:
         #dtype checked by pycuda before gpu call
@@ -1142,25 +1143,118 @@ def call_elemwise(fct, input_vals, block, grid=(1,1)):
         o = gpuarray.zeros(inp.shape, dtype=inp.dtype)
     else:
         o = gpu_ndarray.zeros(inp.shape, dtype=inp.dtype)
-    oh = to_cpu(o)
-    assert numpy.allclose(oh,
-                          numpy.zeros(inp.shape, dtype=inp.dtype))
+
+    # nb element
     args = [cast_uint(inp.size)]
+    # output shape
     for i in range(len(i.shape)):
-        args.append(cast_int(inp.shape[i]))
-        
+        args.append(cast_int(o.shape[i]))
+    
+    # for each input and the outputs
+    # the ptr and there strides
+    nd = len(inp.shape)
     for i in input_vals+[o]:
         itemsize = i.dtype.itemsize
-        args.extend([i, cast_int(i.strides[0]/itemsize),  cast_int(i.strides[1]/itemsize)])
-    args.extend
+        args.append(i)
+        for j in range(nd):
+            args.append(cast_int(i.strides[j]/itemsize))
     d = {"block":block, "grid":grid}
     fct( *args, **d)
-    assert o.shape == inp.shape
-    assert o.dtype == inp.dtype
-    assert o.strides == inp.strides
-    to_cpu(o)
     return o
             
+
+class MyGpuNdArray():
+    # nb_dims -> dict of fct -> list of nd inputs
+    _compiled_fct = []
+    MAX_INPUTS = 16
+    def __init__(self, gpu_nd_array):
+        #assert isinstance(gpu_nd_array, gpu_ndarray.GpuNdArrayObject)
+        self.gpu_nd_array = gpu_nd_array
+        #self._compiled_fct = {} #nb inputs array -> dict of op -> list of nd
+        while len(self._compiled_fct) < len(gpu_nd_array.shape)+1:
+            l = {}
+            l[theano.tensor.add] = [None]*self.MAX_INPUTS
+            l[theano.tensor.sub] = [None]*self.MAX_INPUTS
+            l[theano.tensor.mul] = [None]*self.MAX_INPUTS
+            l[theano.tensor.true_div] = [None]*self.MAX_INPUTS
+            self._compiled_fct.append(l)
+
+    @staticmethod
+    def gen_fct(op, nb_in, nd, nodename = "TestNodeName"):
+        # Generate the gpu function
+        type = theano.tensor.TensorType(dtype, (False,)*nd)
+        out = op(*[type() for i in range(nb_in)])
+        node = out.owner
+        elemwise_algo = ElemwiseAlgo(node.op.scalar_op)
+        
+        # Compile the gpu function with pycuda
+        mod = SourceModule(
+            elemwise_algo.c_src_kernel(node, nodename, nd, static=""))
+        fct = mod.get_function("kernel_%s_%s_%d"%(
+                op.scalar_op.__class__.__name__, nodename, nd))
+
+        def call_fct(inputs):
+            assert len(inputs) == nb_in
+            inputs = [i.gpu_nd_array for i in inputs]
+            return call_elemwise(fct, inputs, block=(inputs[0].shape[-1],1,1))
+        return call_fct
+        
+    def __elemwise2__(self, other, op):
+        """ Call this code on this op with 2 inputs """
+        nd = len(self.gpu_nd_array.shape)#self.gpu_nd_array.ndim
+        assert nd == len(other.gpu_nd_array.shape)#ndim
+        d = self._compiled_fct[nd][op]
+        if d[2] is None:
+            fct = MyGpuNdArray.gen_fct(op, 2, nd)
+            d[2] = fct
+        else:
+            fct = d[2]
+        return fct((self, other))
+        
+    @classmethod
+    def __elemwise__(cls, inputs, op):
+        """ Call this code on this op with * inputs """
+        nd = len(inputs[0].gpu_nd_array.shape)#self.gpu_nd_array.ndim
+        for i in inputs[1:]:
+            assert nd == len(i.gpu_nd_array.shape)#ndim
+        nb = len(inputs)
+        d = cls._compiled_fct[nd][op]
+        if d[nb] is None:
+            fct = MyGpuNdArray.gen_fct(op, len(inputs), nd)
+            d[nb] = fct
+        else:
+            fct = d[nb]
+        return fct(inputs)
+        
+
+    def __add__(self, other):
+        return self.__elemwise2__(other, theano.tensor.add)
+
+    def __sub__(self, other):
+        return self.__elemwise2__(other, theano.tensor.sub)
+
+    def __mul__(self, other):
+        return self.__elemwise2__(other, theano.tensor.mul)
+
+    def __div__(self, other):
+        assert (str(self.gpu_nd_array.dtype).startswith("float") or 
+                str(other.gpu_nd_array.dtype).startswith("float"))
+        return self.__elemwise2__(other, theano.tensor.true_div)
+
+    @classmethod
+    def add(cls, x, y, out=None):
+        """ add all inputs togethers element-wise """
+        return cls.__elemwise__(inputs, theano.tensor.add)
+
+    @classmethod
+    def adds(cls, *inputs):
+        """ add all inputs togethers element-wise """
+        return cls.__elemwise__(inputs, theano.tensor.add)
+
+    @classmethod
+    def multiplys(cls, *inputs):
+        """ multiply all inputs togethers element-wise """
+        return cls.__elemwise__(inputs, theano.tensor.mul)
 
 if __name__ == "__main__":
     run_pycuda_web_example()
@@ -1168,11 +1262,6 @@ if __name__ == "__main__":
     run_test1()
     import theano
 
-    shape = (50, 5)
-    nd = len(shape)
-    nb_in = 3
-    dtype = "float32"
-    nodename = "TestNodeName"
     pycuda_array = False
 
     if pycuda_array:
@@ -1180,26 +1269,14 @@ if __name__ == "__main__":
         import pycuda.driver as drv
         from pycuda.compiler import SourceModule
         from pycuda import gpuarray
-    else: 
+    else:
         import pycuda.autoinit
         import pycuda.driver as drv
         from pycuda.compiler import SourceModule
         import pygpu_ndarray as gpu_ndarray
 
-    # Generate the gpu function
-    type = theano.tensor.TensorType(dtype, (False,)*nd)
-    inputs = [type() for i in range(nb_in)]
-    op = theano.tensor.add
-    out = op(*inputs)
-    outputs = [out]
-    node = out.owner
-    elemwise_algo = ElemwiseAlgo(node.op.scalar_op)
 
-    # Compile the gpu function with pycuda
-    mod = SourceModule(
-        elemwise_algo.c_src_kernel(node, nodename, nd, static=""))
-    fct = mod.get_function("kernel_Add_TestNodeName_2")
-
+    #nodename = "TestNodeName"
     #print elemwise_algo.c_src_kernel(node, nodename, nd)
     #print elemwise_algo.c_src_kernel_Ccontiguous(node, nodename)
     #print elemwise_algo.c_src_callkernel(node, nodename)
@@ -1208,17 +1285,51 @@ if __name__ == "__main__":
     ##sub = {}#Need to include "fail" keys in the dict
     ##print elemwise_algo.c_code(node, nodename, inputs, outputs, sub)
 
-    input_vals = [numpy.random.randn(*shape).astype(dtype) for i in range(nb_in)]
-    if pycuda_array:
-        gpu_vals = [gpuarray.to_gpu(i) for i in input_vals]
-        to_cpu = lambda a: a.get()
-    else:
-        gpu_vals = [gpu_ndarray.GpuNdArrayObject(i) for i in input_vals]
-        to_cpu = numpy.asarray
-    assert all([numpy.allclose(to_cpu(ig), i) for ig,i in zip(gpu_vals,input_vals)])
+    for dtype in ["float32"]:
 
-    cg=call_elemwise(fct, gpu_vals, block=(shape[-1],1,1))
-    cgh = to_cpu(cg)
-    assert numpy.allclose(cgh, reduce(lambda a,b: a+b, input_vals))
+        for shape in [(500,),(50,5),(5,6,7)]:
+            print "Test inside a wrapping python object 2 inputs", shape
+            input_vals = [numpy.random.randn(*shape).astype(dtype) for i in range(2)]
+            if pycuda_array:
+                gpu_vals = [gpuarray.to_gpu(i) for i in input_vals]
+                to_cpu = lambda a: a.get()
+            else:
+                gpu_vals = [gpu_ndarray.GpuNdArrayObject(i) for i in input_vals]
+                to_cpu = numpy.asarray
+            assert all([numpy.allclose(to_cpu(ig), i) for ig,i in zip(gpu_vals,input_vals)])
+
+            gpu_vals = [MyGpuNdArray(x) for x in gpu_vals]
+            out = gpu_vals[0]+gpu_vals[1]
+            assert numpy.allclose(to_cpu(out), input_vals[0]+input_vals[1])
+            out = gpu_vals[0]-gpu_vals[1]
+            assert numpy.allclose(to_cpu(out), input_vals[0]-input_vals[1])
+            out = gpu_vals[0]*gpu_vals[1]
+            assert numpy.allclose(to_cpu(out), input_vals[0]*input_vals[1])
+            out = gpu_vals[0]/gpu_vals[1]
+            assert numpy.allclose(to_cpu(out), input_vals[0]/input_vals[1])
+
+        nb_in = 4
+        for shape in [(500,),(50,5),(5,6,7)]:
+            print "Test inside a wrapping python object %d inputs"%nb_in, shape
+            input_vals = [numpy.random.randn(*shape).astype(dtype)
+                          for i in range(nb_in)]
+            if pycuda_array:
+                gpu_vals = [gpuarray.to_gpu(i) for i in input_vals]
+                to_cpu = lambda a: a.get()
+            else:
+                gpu_vals = [gpu_ndarray.GpuNdArrayObject(i)
+                            for i in input_vals]
+                to_cpu = numpy.asarray
+            assert all([numpy.allclose(to_cpu(ig), i)
+                        for ig,i in zip(gpu_vals,input_vals)])
+
+            gpu_vals = [MyGpuNdArray(x) for x in gpu_vals]
+            out = MyGpuNdArray.adds(*gpu_vals)
+            assert numpy.allclose(to_cpu(out),
+                                  reduce(numpy.add, input_vals))
+
+            out = MyGpuNdArray.multiplys(*gpu_vals)
+            assert numpy.allclose(to_cpu(out),
+                                  reduce(numpy.multiply, input_vals))
 
     print "All test finished!"
