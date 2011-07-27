@@ -1020,118 +1020,6 @@ def dummy_holder_for_code_not_used():
         return sio.getvalue()
 
     
-def run_pycuda_web_example():
-    import pycuda.autoinit
-    import pycuda.driver as drv
-    import numpy
-
-    from pycuda.compiler import SourceModule
-    mod = SourceModule("""
-    __global__ void multiply_them(float *dest, float *a, float *b)
-    {
-      const int i = threadIdx.x;
-      dest[i] = a[i] * b[i];
-    }
-    """)
-
-    multiply_them = mod.get_function("multiply_them")
-
-    a = numpy.random.randn(400).astype(numpy.float32)
-    b = numpy.random.randn(400).astype(numpy.float32)
-
-    dest = numpy.zeros_like(a)
-    multiply_them(
-            drv.Out(dest), drv.In(a), drv.In(b),
-            block=(400,1,1), grid=(1,1))
-
-    assert numpy.allclose(dest, a*b)
-
-def run_modified_web_example():
-    import pycuda.autoinit
-    import pycuda.driver as drv
-    import numpy
-
-    from pycuda.compiler import SourceModule
-    mod = SourceModule("""
-    __global__ void multiply_them(float *dest, float *a, float *b)
-    {
-      const int i = threadIdx.x;
-      dest[i] = a[i] * b[i];
-    }
-    """)
-
-    multiply_them = mod.get_function("multiply_them")
-    from pycuda import gpuarray
-    
-    a = gpuarray.to_gpu(numpy.random.randn(400).astype(numpy.float32))
-    b = gpuarray.to_gpu(numpy.random.randn(400).astype(numpy.float32))
-    
-    dest = gpuarray.zeros_like(a)
-    multiply_them(
-            dest, a, b, 
-            block=(400,1,1), grid=(1,1))
-
-    assert numpy.allclose(dest.get(), a.get()*b.get())
-
-def run_test1():
-    import theano
-
-    shape = (9, 10)
-    dtype = "float32"
-
-    import pycuda.autoinit
-    import pycuda.driver as drv
-    from pycuda.compiler import SourceModule
-    from pycuda import gpuarray
-       
-
-    mod = SourceModule("""
-__global__ void multiply_them(unsigned int numEls,
-	int dim0, int dim1,
-	float * i0_data, int i0_str_0, int i0_str_1,
-	float * i1_data, int i1_str_0, int i1_str_1,
-	float * o0_data, int o0_str_0, int o0_str_1
-	)
-{
-  const int idx = threadIdx.x + blockDim.x*blockIdx.x;
-  const int numThreads = blockDim.x * gridDim.x;
-  for (int i = idx; i < numEls; i += numThreads)
-    o0_data[i] = i0_data[i] + i1_data[i];
-}
-""")
-
-    fct = mod.get_function("multiply_them")
-
-    a = numpy.random.randn(*shape).astype(dtype)
-    b = numpy.random.randn(*shape).astype(dtype)
-    ag = gpuarray.to_gpu(a)
-    bg = gpuarray.to_gpu(b)
-    to_cpu = lambda a: a.get()
-
-    assert numpy.allclose(to_cpu(ag), a)
-    assert numpy.allclose(to_cpu(bg), b)
-    assert numpy.allclose(to_cpu(ag)+to_cpu(bg), a+b)
-
-    assert ag.size == bg.size
-    assert ag.dtype == bg.dtype## assert input of fct
-    assert ag.shape == bg.shape
-    og = gpuarray.zeros(ag.shape, dtype=ag.dtype)
-    oh = to_cpu(og)
-    assert numpy.allclose(oh,
-                          numpy.zeros(ag.shape, dtype=ag.dtype))
-    fct(cast_uint(ag.size),
-        cast_int(ag.shape[0]), cast_int(a.shape[1]),
-        ag,  cast_int(a.strides[0]),  cast_int(a.strides[1]),
-        bg,  cast_int(b.strides[0]),  cast_int(b.strides[1]),
-        og,  cast_int(og.strides[0]),  cast_int(og.strides[1]),
-        block=(shape[-1],1,1), grid=(1,1))
-    assert og.shape == a.shape
-    assert og.dtype == a.dtype
-    assert og.strides == a.strides
-    oh = to_cpu(og)
-            
-    assert numpy.allclose(oh, a+b)
-
 
 def call_elemwise(fct, input_vals, block, grid=(1,1)):
     """ broadcast not supported for now"""
@@ -1257,9 +1145,6 @@ class MyGpuNdArray():
         return cls.__elemwise__(inputs, theano.tensor.mul)
 
 if __name__ == "__main__":
-    run_pycuda_web_example()
-    run_modified_web_example()
-    run_test1()
     import theano
 
     pycuda_array = False
