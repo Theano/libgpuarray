@@ -71,7 +71,7 @@ class ElemwiseAlgo(object):
             print >> sio, "//    Input  ", ipos, str(i.type)
         for ipos, i in enumerate(node.outputs):
             print >> sio, "//    Output ", ipos, str(i.type)
-        print >> sio, static, "__global__ void kernel_%s_%s_%s(unsigned int numEls" %(self.scalar_op.__class__.__name__,nodename, nd)
+        print >> sio, static, "__global__ void kernel_%s_%s(unsigned int numEls" %(nodename, nd)
         if (nd):
             print >> sio, "\t,", ", ".join("const int dim%i" % i for i in xrange(nd))
         #declare inputs
@@ -138,7 +138,7 @@ class ElemwiseAlgo(object):
             print >> sio, "//    Input  ", ipos, str(i.type)
         for ipos, i in enumerate(node.outputs):
             print >> sio, "//    Output ", ipos, str(i.type)
-        print >> sio, static, "__global__ void kernel_%s_%s_Ccontiguous (unsigned int numEls" %(self.scalar_op.__class__.__name__,nodename)
+        print >> sio, static, "__global__ void kernel_%s_Ccontiguous (unsigned int numEls" %(nodename)
         #declare inputs
         for ipos, i in enumerate(node.inputs):
             print >> sio, "\t,", "const float * i%i_data" % ipos
@@ -207,8 +207,6 @@ class ElemwiseAlgo(object):
 
         prod_dims = '*'.join(["dims[%i]"%di for di in xrange(nd)]+['1'])
 
-        scalar_op=self.scalar_op.__class__.__name__
-
         sio = StringIO.StringIO()
         print >> sio, """
         static void can_collapse_%(nodename)s(int nd, const int * dims, const int * strides, int collapse[])
@@ -231,7 +229,7 @@ class ElemwiseAlgo(object):
         """ %locals()
         if self.verbose:
             print >> sio, """
-                std::cerr << "calling kernel_%(scalar_op)s_%(nodename)s     w numEls" << numEls << " dims"<< d << "\\n";
+                std::cerr << "calling kernel_%(nodename)s     w numEls" << numEls << " dims"<< d << "\\n";
             """ %locals()
             print >> sio, 'std::cerr << ' + " << ' ' <<  ".join(['"  "']+list("dims[%i]"%di
                 for di in xrange(nd)) + ["'\\n';"])
@@ -432,7 +430,7 @@ nd_collapse_[i]=0;
                 // next start adding more warps per multiprocessor
                 if (threads_per_block * n_blocks < numEls)
                     threads_per_block = std::min(numEls/n_blocks, (unsigned int)NUM_VECTOR_OP_THREADS_PER_BLOCK);
-                kernel_%(scalar_op)s_%(nodename)s_Ccontiguous<<<n_blocks, threads_per_block>>>(%(kernel_call_args)s);
+                kernel_%(nodename)s_Ccontiguous<<<n_blocks, threads_per_block>>>(%(kernel_call_args)s);
 
                 //std::cerr << "calling callkernel returned\\n";
                 """ %locals()
@@ -443,9 +441,9 @@ nd_collapse_[i]=0;
                 if( cudaSuccess != err)
                 {
                     PyErr_Format(PyExc_RuntimeError, "Cuda error: %%s: %%s.\\n    n_blocks=%%i threads_per_block=%%i\\n   Call: %%s\\n",
-                         "GpuElemwise %(nodename)s %(scalar_op)s", cudaGetErrorString(err),
+                         "GpuElemwise %(nodename)s", cudaGetErrorString(err),
                          n_blocks, threads_per_block,
-                         "kernel_%(scalar_op)s_%(nodename)s_Ccontiguous<<<n_blocks, threads_per_block>>>(%(kernel_call_args)s)");
+                         "kernel_%(nodename)s_Ccontiguous<<<n_blocks, threads_per_block>>>(%(kernel_call_args)s)");
                     return -1;
 
                 }
@@ -486,7 +484,7 @@ nd_collapse_[i]=0;
                 if (threads_per_block * n_blocks < numEls)
                     threads_per_block = std::min(numEls/n_blocks, (unsigned int)NUM_VECTOR_OP_THREADS_PER_BLOCK);
 
-                kernel_%(scalar_op)s_%(nodename)s_%(force_nd)s<<<n_blocks, threads_per_block>>>(%(kernel_call_args)s);
+                kernel_%(nodename)s_%(force_nd)s<<<n_blocks, threads_per_block>>>(%(kernel_call_args)s);
                 """ %locals()
             print >> sio, """
                 CNDA_THREAD_SYNC;
@@ -494,9 +492,9 @@ nd_collapse_[i]=0;
                 if( cudaSuccess != err)
                 {
                     PyErr_Format(PyExc_RuntimeError, "Cuda error: %%s: %%s.\\n    n_blocks=%%i threads_per_block=%%i\\n   Call: %%s\\n",
-                         "GpuElemwise %(nodename)s %(scalar_op)s", cudaGetErrorString(err),
+                         "GpuElemwise %(nodename)s", cudaGetErrorString(err),
                          n_blocks, threads_per_block,
-                         "kernel_%(scalar_op)s_%(nodename)s_Ccontiguous<<<n_blocks, threads_per_block>>>(%(kernel_call_args)s)");
+                         "kernel_%(nodename)s_Ccontiguous<<<n_blocks, threads_per_block>>>(%(kernel_call_args)s)");
                     return -1;
 
                 }
@@ -777,8 +775,7 @@ def dummy_holder_for_code_not_used():
                 print >> sio, "//    Input  ", ipos, str(i.type)
             for ipos, i in enumerate(node.outputs):
                 print >> sio, "//    Output ", ipos, str(i.type)
-            print >> sio, "static __global__ void kernel_%s_%s_%s(unsigned int numEls" %(
-                    self.scalar_op.__class__.__name__,
+            print >> sio, "static __global__ void kernel_%s_%s(unsigned int numEls" %(
                     nodename,
                     'tiling%i'%nd)
             if (nd):
@@ -871,8 +868,7 @@ def dummy_holder_for_code_not_used():
             print >> sio, "//    Input  ", ipos, str(i.type)
         for ipos, i in enumerate(node.outputs):
             print >> sio, "//    Output ", ipos, str(i.type)
-        print >> sio, "static __global__ void kernel_%s_%s_%s(unsigned int numEls" %(
-                self.scalar_op.__class__.__name__,
+        print >> sio, "static __global__ void kernel_%s_%s(unsigned int numEls" %(
                 nodename,
                 'tiling%i_less_registers'%nd)
         if (nd):
@@ -1064,8 +1060,7 @@ class MyGpuNdArray():
         # Compile the gpu function with pycuda
         mod = SourceModule(
             elemwise_algo.c_src_kernel(node, nodename, nd, static=""))
-        fct = mod.get_function("kernel_%s_%s_%d"%(
-                op.scalar_op.__class__.__name__, nodename, nd))
+        fct = mod.get_function("kernel_%s_%d"%(nodename, nd))
 
         def call_fct(inputs):
             assert len(inputs) == nb_in
