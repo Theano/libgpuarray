@@ -49,6 +49,20 @@ class ElemwiseAlgo(object):
         self.scalar_op = scalar_op
         self.inplace_pattern = inplace_pattern
 
+    def task_code(self, node, sio, nodename, iname=None, oname=None):
+        if iname == None:
+            iname = get_str_list_logical_scalar(node)
+        if oname == None:
+            oname = ['ii_o%i_data[0]'%ipos for ipos, i in enumerate(node.outputs)]
+        print >> sio, self.scalar_op.c_code(
+            Apply(self.scalar_op,
+                  [scalar.Scalar(dtype = input.type.dtype)() for input in node.inputs],
+                  [scalar.Scalar(dtype = output.type.dtype)() for output in node.outputs]),
+            nodename + '_scalar_',
+            iname,
+            oname,
+            sub=dict(fail='return;')) #TODO: set a failure code somehow!!!
+
     def c_src_kernel(self, node, nodename, nd, static="static"):
         sio = StringIO.StringIO()
         #print 'C_SRC_KERNEL', sio.getvalue()
@@ -104,15 +118,7 @@ class ElemwiseAlgo(object):
 
         # perform the scalar operation on the input and output references
         #TODO: What if the scalar_op needs support_code??
-        task_code = self.scalar_op.c_code(
-                Apply(self.scalar_op,
-                    [scalar.Scalar(dtype = input.type.dtype)() for input in node.inputs],
-                    [scalar.Scalar(dtype = output.type.dtype)() for output in node.outputs])
-                , nodename + '_scalar_'
-                , get_str_list_logical_scalar(node)
-                , ['ii_o%i_data[0]'%ipos for ipos, i in enumerate(node.outputs)]
-                , sub=dict(fail='return;')) #TODO: set a failure code somehow!!!
-        print >> sio, "       ", task_code
+        self.task_code(node, sio, nodename)
         print >> sio, "    }"
 
         #indent = " "*(4*d+7)
@@ -154,16 +160,9 @@ class ElemwiseAlgo(object):
         print >> sio, "    for (int i = idx; i < numEls; i += numThreads) {"
         # perform the scalar operation on the input and output references
         #TODO: What if the scalar_op needs support_code??
-        task_code = self.scalar_op.c_code(
-                Apply(self.scalar_op,
-                    [scalar.Scalar(dtype = input.type.dtype)() for input in node.inputs],
-                    [scalar.Scalar(dtype = output.type.dtype)() for output in node.outputs])
-                , nodename + '_scalar_'
-                #, ['i%i_data[i]'%ipos for ipos, i in enumerate(node.inputs)]
-                , get_str_list_logical_scalar(node, data_str='i%i_data[i]')
-                , ['o%i_data[i]'%ipos for ipos, i in enumerate(node.outputs)]
-                , sub=dict(fail='return;')) #TODO: set a failure code somehow!!!
-        print >> sio, "       ", task_code
+        self.task_code(node, sio, nodename,
+                       iname = get_str_list_logical_scalar(node, data_str='i%i_data[i]'),
+                       oname = ['o%i_data[i]'%ipos for ipos, i in enumerate(node.outputs)])
         print >> sio, "    }"
         print >> sio, "}"
 
@@ -841,16 +840,8 @@ def dummy_holder_for_code_not_used():
 
             # perform the scalar operation on the input and output references
             #TODO: What if the scalar_op needs support_code??
-            task_code = self.scalar_op.c_code(
-                    Apply(self.scalar_op,
-                        [scalar.Scalar(dtype = input.type.dtype)() for input in node.inputs],
-                        [scalar.Scalar(dtype = output.type.dtype)() for output in node.outputs])
-                    , nodename + '_scalar_'
-                    , get_str_list_logical_scalar(node, value_str='value0[%i]')
-                    , ['ii_o%i_data[0]'%ipos for ipos, i in enumerate(node.outputs)]
-                    , sub=dict(fail='return;')) #TODO: set a failure code somehow!!!
-            print >> sio, "       ", task_code
-
+            self.task_code(node, sio, nodename,
+                           iname = get_str_list_logical_scalar(node, value_str='value0[%i]'))
             print >> sio, "    }" * nd
 
             #TODO: insert runtime stride checks that select the best loop order either here, or in
@@ -977,14 +968,9 @@ def dummy_holder_for_code_not_used():
             print >> sio, "}"
 
         def task_code(d):
-            print >> sio, self.scalar_op.c_code(
-                Apply(self.scalar_op,
-                    [scalar.Scalar(dtype = input.type.dtype)() for input in node.inputs],
-                    [scalar.Scalar(dtype = output.type.dtype)() for output in node.outputs])
-                , nodename + '_scalar_'
-                , ['i%i_data_%i[0]'%(ipos,d) for ipos, i in enumerate(node.inputs)]
-                , ['o%i_data_%i[0]'%(ipos,d) for ipos, i in enumerate(node.outputs)]
-                , sub=dict(fail='return;')) #TODO: set a failure code somehow!!!
+            self.task_code(node, sio, nodename,
+                           iname = ['i%i_data_%i[0]'%(ipos,d) for ipos, i in enumerate(node.inputs)],
+                           oname = ['o%i_data_%i[0]'%(ipos,d) for ipos, i in enumerate(node.outputs)])
 
         if nd == 4:
             decl_shared_stride(n_in, n_out, nd)
