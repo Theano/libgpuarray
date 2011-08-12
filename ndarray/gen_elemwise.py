@@ -37,6 +37,13 @@ def get_str_list_logical_scalar(inputs, value_str='ii_i%i_value', data_str='ii_i
         else: l+=[data_str%ipos]
     return l
 
+def ctype_from_dtype(dtype):
+    if dtype == "float32":
+        return "float"
+    if dtype == "float64":
+        return "double"
+    return str(dtype)+"_t"
+
 class ElemwiseAlgo(object):
     verbose = 0 # 1, 2 or 3 for more verbose output.
     cache_version = ()
@@ -76,11 +83,13 @@ class ElemwiseAlgo(object):
             print >> sio, "\t,", ", ".join("const int dim%i" % i for i in xrange(nd))
         #declare inputs
         for ipos, i in enumerate(inputs):
-            s = ", ".join(["const float * i%i_data" % ipos] + list("int i%i_str_%i" % (ipos, d) for d in xrange(nd)))
+            s = ", ".join(["const %s * i%i_data" % (ctype_from_dtype(i.dtype), ipos)]+
+                          list("int i%i_str_%i" % (ipos, d) for d in xrange(nd)))
             print >> sio, "\t,", s
         #declare outputs
         for ipos, i in enumerate(outputs):
-            s = ", ".join(["float * o%i_data" % ipos] + list("int o%i_str_%i" % (ipos, d) for d in xrange(nd)))
+            s = ", ".join(["%s * o%i_data" % (ctype_from_dtype(i.dtype), ipos)]
+                          + list("int o%i_str_%i" % (ipos, d) for d in xrange(nd)))
             print >> sio, "\t,", s
             #print >> sio, "\t,", ", ".join("int o%i_str_%i" % (ipos, d) for d in xrange(nd))
             #print >> sio, "\t,", "float * o%i_data" % ipos
@@ -92,7 +101,8 @@ class ElemwiseAlgo(object):
         #     load it into a local variable
         for ipos, i in enumerate(inputs):
             if _logical_scalar(i):
-                print >> sio, "    const float ii_i%i_value = i%i_data[0];" % (ipos, ipos)
+                print >> sio, "    const %s ii_i%i_value = i%i_data[0];" % (
+                    ctype_from_dtype(i.dtype), ipos, ipos)
 
         #loop over the elements to be treated by this kernel call
         print >> sio, "    for (int i = idx; i < numEls; i += numThreads) {"
@@ -100,9 +110,11 @@ class ElemwiseAlgo(object):
         print >> sio, "        int ii = i;"
         for ipos, i in enumerate(inputs):
             if not _logical_scalar(i):
-                print >> sio, "        const float * ii_i%i_data = i%i_data;" % (ipos, ipos)
+                print >> sio, "        const %s * ii_i%i_data = i%i_data;" % (
+                    ctype_from_dtype(i.dtype), ipos, ipos)
         for ipos, i in enumerate(outputs):
-            print >> sio, "        float * ii_o%i_data = o%i_data;" % (ipos, ipos)
+            print >> sio, "        %s * ii_o%i_data = o%i_data;" % (
+                ctype_from_dtype(i.dtype), ipos, ipos)
         for d in xrange(nd-1, -1, -1):
             if d > 0:
                 print >> sio, "        int pos%i = ii %% dim%i;" %(d, d)
@@ -141,10 +153,10 @@ class ElemwiseAlgo(object):
         print >> sio, static, "__global__ void kernel_%s_Ccontiguous (unsigned int numEls" %(nodename)
         #declare inputs
         for ipos, i in enumerate(inputs):
-            print >> sio, "\t,", "const float * i%i_data" % ipos
+            print >> sio, "\t,", "const %s * i%i_data" % (ctype_from_dtype(i.dtype), ipos)
         #declare outputs
         for ipos, i in enumerate(outputs):
-            print >> sio, "\t,", "float * o%i_data" % ipos
+            print >> sio, "\t,", "%s * o%i_data" % (ctype_from_dtype(i.dtype), ipos)
         print >> sio, "\t)\n{"
         print >> sio, "    const int idx = blockIdx.x * blockDim.x + threadIdx.x;"
         print >> sio, "    const int numThreads = blockDim.x * gridDim.x;"
@@ -153,7 +165,8 @@ class ElemwiseAlgo(object):
         #     load it into a local variable
         for ipos, i in enumerate(inputs):
             if _logical_scalar(i):
-                print >> sio, "    const float ii_i%i_value = i%i_data[0];" % (ipos, ipos)
+                print >> sio, "    const %s ii_i%i_value = i%i_data[0];" % (
+                    ctype_from_dtype(i.dtype), ipos, ipos)
 
 
         #loop over the elements to be treated by this kernel call
@@ -194,10 +207,12 @@ class ElemwiseAlgo(object):
         nb_outputs = len(outputs)
         d = dict()
         #input_params and output_params go into the function declaration/definition
-        input_params = ", ".join("const float * i%i_data, const int * i%i_str"%(ipos, ipos)
-                for ipos in xrange(len(inputs)))
-        output_params = ", ".join("float * o%i_data, const int * o%i_str"%(ipos, ipos)
-                for ipos in xrange(len(outputs)))
+        input_params = ", ".join("const %s * i%i_data, const int * i%i_str"%
+                                 (ctype_from_dtype(inputs[i].dtype), ipos, ipos)
+                                 for ipos in xrange(len(inputs)))
+        output_params = ", ".join("%s * o%i_data, const int * o%i_str"%
+                                  (ctype_from_dtype(outputs[i].dtype), ipos, ipos)
+                                  for ipos in xrange(len(outputs)))
 
         #input_args and output_args go into the recursive call.
         input_args = ", ".join("i%i_data, i%i_str"%(ipos, ipos)
@@ -1034,20 +1049,11 @@ def call_elemwise(fct, input_vals, block, grid=(1,1)):
             
 
 class MyGpuNdArray():
-    # nb_dims -> dict of fct -> list of nd inputs
-    _compiled_fct = []
-    MAX_INPUTS = 16
+    _compiled_fct = {}
     def __init__(self, gpu_nd_array):
         #assert isinstance(gpu_nd_array, gpu_ndarray.GpuNdArrayObject)
         self.gpu_nd_array = gpu_nd_array
-        #self._compiled_fct = {} #nb inputs array -> dict of op -> list of nd
-        while len(self._compiled_fct) < len(gpu_nd_array.shape)+1:
-            l = {}
-            l["add"] = [None]*self.MAX_INPUTS
-            l["sub"] = [None]*self.MAX_INPUTS
-            l["mul"] = [None]*self.MAX_INPUTS
-            l["true_div"] = [None]*self.MAX_INPUTS
-            self._compiled_fct.append(l)
+        self.ctype = ctype_from_dtype(self.gpu_nd_array.dtype)
 
     @staticmethod
     def gen_fct(op, nb_in, nd, nodename = "TestNodeName"):
@@ -1072,12 +1078,13 @@ class MyGpuNdArray():
         """ Call this code on this op with 2 inputs """
         nd = len(self.gpu_nd_array.shape)#self.gpu_nd_array.ndim
         assert nd == len(other.gpu_nd_array.shape)#ndim
-        d = self._compiled_fct[nd][name]
-        if d[2] is None:
+        tag = name+'_'+str(self.gpu_nd_array.dtype)+str(self.gpu_nd_array.ndim)
+        tag += '_'+str(other.gpu_nd_array.dtype)+str(other.gpu_nd_array.ndim)
+        fct = self._compiled_fct.get(tag, None)
+        if fct is None:
+            print "compile", tag
             fct = MyGpuNdArray.gen_fct(op, 2, nd)
-            d[2] = fct
-        else:
-            fct = d[2]
+            self._compiled_fct[tag] = fct
         return fct((self, other))
         
     @classmethod
@@ -1087,12 +1094,13 @@ class MyGpuNdArray():
         for i in inputs[1:]:
             assert nd == len(i.gpu_nd_array.shape)#ndim
         nb = len(inputs)
-        d = cls._compiled_fct[nd][name]
-        if d[nb] is None:
+        tag = name+"_".join([str(i.gpu_nd_array.dtype) +
+                             str(i.gpu_nd_array.ndim) for i in inputs])
+        fct = cls._compiled_fct.get(tag, None)
+        if fct is None:
+            print "compile", tag
             fct = MyGpuNdArray.gen_fct(op, len(inputs), nd)
-            d[nb] = fct
-        else:
-            fct = d[nb]
+            cls._compiled_fct[tag] = fct
         return fct(inputs)
         
 
@@ -1125,6 +1133,11 @@ class MyGpuNdArray():
         """ multiply all inputs togethers element-wise """
         return cls.__elemwise__(inputs, "mul", theano.tensor.mul)
 
+# numpy.allclose seam to have problem with int8...
+def all_close(x,y):
+    return (numpy.allclose(x,y) or
+            numpy.absolute(x-y).max() == 0)
+
 if __name__ == "__main__":
     import theano
 
@@ -1151,11 +1164,15 @@ if __name__ == "__main__":
     ##sub = {}#Need to include "fail" keys in the dict
     ##print elemwise_algo.c_code(inputs, outputs, nodename, inputs, outputs, sub)
 
-    for dtype in ["float32"]:
+    def rand(shape, dtype):
+        r = numpy.random.randn(*shape)*10
+        return r.astype(dtype)
 
+    for dtype in ["int16", "float32", "int8"]:
+        print "dtype", dtype
         for shape in [(500,),(50,5),(5,6,7)]:
             print "Test inside a wrapping python object 2 inputs", shape
-            input_vals = [numpy.random.randn(*shape).astype(dtype) for i in range(2)]
+            input_vals = [rand(shape, dtype) for i in range(2)]
             if pycuda_array:
                 gpu_vals = [gpuarray.to_gpu(i) for i in input_vals]
                 to_cpu = lambda a: a.get()
@@ -1170,15 +1187,15 @@ if __name__ == "__main__":
             out = gpu_vals[0]-gpu_vals[1]
             assert numpy.allclose(to_cpu(out), input_vals[0]-input_vals[1])
             out = gpu_vals[0]*gpu_vals[1]
-            assert numpy.allclose(to_cpu(out), input_vals[0]*input_vals[1])
-            out = gpu_vals[0]/gpu_vals[1]
-            assert numpy.allclose(to_cpu(out), input_vals[0]/input_vals[1])
+            assert all_close(to_cpu(out), input_vals[0]*input_vals[1])
+            if dtype.startswith("float"):
+                out = gpu_vals[0]/gpu_vals[1]
+                assert numpy.allclose(to_cpu(out), input_vals[0]/input_vals[1])
 
         nb_in = 4
         for shape in [(500,),(50,5),(5,6,7)]:
             print "Test inside a wrapping python object %d inputs"%nb_in, shape
-            input_vals = [numpy.random.randn(*shape).astype(dtype)
-                          for i in range(nb_in)]
+            input_vals = [rand(shape, dtype) for i in range(nb_in)]
             if pycuda_array:
                 gpu_vals = [gpuarray.to_gpu(i) for i in input_vals]
                 to_cpu = lambda a: a.get()
@@ -1195,7 +1212,6 @@ if __name__ == "__main__":
                                   reduce(numpy.add, input_vals))
 
             out = MyGpuNdArray.multiplys(*gpu_vals)
-            assert numpy.allclose(to_cpu(out),
-                                  reduce(numpy.multiply, input_vals))
+            assert all_close(to_cpu(out), reduce(numpy.multiply, input_vals))
 
     print "All test finished!"
