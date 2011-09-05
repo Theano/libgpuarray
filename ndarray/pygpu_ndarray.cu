@@ -762,7 +762,7 @@ PyGpuNdArray_get_dtype(PyArrayObject *self)
 static PyObject *
 PyGpuNdArray_get_itemsize(PyArrayObject *self)
 {
-    return (PyObject *)PyGpuNdArray_ITEMSIZE(self);
+    return (PyObject *)PyInt_FromLong(PyGpuNdArray_ITEMSIZE(self));
 }
 
 static PyGetSetDef PyGpuNdArray_getset[] = {
