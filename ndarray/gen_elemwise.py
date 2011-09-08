@@ -5,10 +5,16 @@ The elemwise fct are also used with scalar operation! So it can happen that ndim
 """
 
 
-import StringIO
 import numpy
+import StringIO
+
+import pycuda.autoinit
+import pycuda.driver as drv
+from pycuda.compiler import SourceModule
 from theano import Apply
 from theano import scalar
+from theano.tensor import TensorType
+import theano
 
 import logging
 _logger_name = 'compyte.ndarray'
@@ -21,6 +27,9 @@ def info(*msg):
     _logger.info(_logger_name+'INFO: '+' '.join(str(m) for m in msg))
 def debug(*msg):
     _logger.debug(_logger_name+'DEBUG: '+' '.join(str(m) for m in msg))
+
+
+import pygpu_ndarray as gpu_ndarray
 
 
 cast_int = numpy.intc
@@ -1027,11 +1036,8 @@ def call_elemwise(fct, input_vals, block, grid=(1,1)):
         for s_i in range(len(inp.shape)):
             assert inp.shape[s_i] == i.shape[s_i] or inp.shape[s_i] == 1 or  i.shape[s_i] == 1
             out_shape[s_i] = max(out_shape[s_i],inp.shape[s_i],i.shape[s_i])
-    if pycuda_array:
-        o = gpuarray.zeros(out_shape, dtype=inp.dtype)
-    else:
-        o = gpu_ndarray.zeros(out_shape, dtype=inp.dtype)
-
+    o = gpu_ndarray.zeros(out_shape, dtype=inp.dtype)
+    assert elemwise_collapses(input_vals,[o], 3) == 0
     # nb element
     args = [cast_uint(o.size)]
     # output shape
@@ -1064,10 +1070,10 @@ class MyGpuNdArray():
         self.ctype = ctype_from_dtype(self.gpu_nd_array.dtype)
 
     @staticmethod
-    def gen_fct(op, nb_in, nd, nodename = "TestNodeName"):
+    def gen_fct(op, inputs, nd, nodename = "TestNodeName"):
         # Generate the gpu function
-        type = theano.tensor.TensorType(dtype, (False,)*nd)
-        out = op(*[type() for i in range(nb_in)])
+        nb_in = len(inputs)
+        out = op(*[TensorType(i.gpu_nd_array.dtype, (False,)*i.gpu_nd_array.ndim)() for i in inputs])
         node = out.owner
         elemwise_algo = ElemwiseAlgo(node.op.scalar_op)
         
@@ -1091,7 +1097,7 @@ class MyGpuNdArray():
         fct = self._compiled_fct.get(tag, None)
         if fct is None:
             print "compile", tag
-            fct = MyGpuNdArray.gen_fct(op, 2, nd)
+            fct = MyGpuNdArray.gen_fct(op, [self,other], nd)
             self._compiled_fct[tag] = fct
         return fct((self, other))
         
@@ -1107,7 +1113,7 @@ class MyGpuNdArray():
         fct = cls._compiled_fct.get(tag, None)
         if fct is None:
             print "compile", tag
-            fct = MyGpuNdArray.gen_fct(op, len(inputs), nd)
+            fct = MyGpuNdArray.gen_fct(op, inputs, nd)
             cls._compiled_fct[tag] = fct
         return fct(inputs)
         
@@ -1147,21 +1153,6 @@ def all_close(x,y):
             numpy.absolute(x-y).max() == 0)
 
 if __name__ == "__main__":
-    import theano
-
-    pycuda_array = False
-
-    if pycuda_array:
-        import pycuda.autoinit
-        import pycuda.driver as drv
-        from pycuda.compiler import SourceModule
-        from pycuda import gpuarray
-    else:
-        import pycuda.autoinit
-        import pycuda.driver as drv
-        from pycuda.compiler import SourceModule
-        import pygpu_ndarray as gpu_ndarray
-
 
     #nodename = "TestNodeName"
     #print elemwise_algo.c_src_kernel(inputs, outputs, nodename, nd)
