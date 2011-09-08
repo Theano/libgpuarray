@@ -1171,7 +1171,7 @@ if __name__ == "__main__":
     for dtype in ["int16", "float32", "int8"]:
         print "dtype", dtype
         for shape in [(500,),(50,5),(5,6,7)]:
-            print "Test inside a wrapping python object 2 inputs", shape
+            print "    Test inside a wrapping python object 2 inputs", shape
             input_vals = [rand(shape, dtype) for i in range(2)]
             gpu_vals = [gpu_ndarray.GpuNdArrayObject(i) for i in input_vals]
             assert all([numpy.allclose(to_cpu(ig), i) for ig,i in zip(gpu_vals,input_vals)])
@@ -1189,7 +1189,7 @@ if __name__ == "__main__":
 
         nb_in = 4
         for shape in [(500,),(50,5),(5,6,7)]:
-            print "Test inside a wrapping python object %d inputs"%nb_in, shape
+            print "    Test inside a wrapping python object %d inputs"%nb_in, shape
             input_vals = [rand(shape, dtype) for i in range(nb_in)]
             gpu_vals = [gpu_ndarray.GpuNdArrayObject(i)
                         for i in input_vals]
@@ -1208,7 +1208,7 @@ if __name__ == "__main__":
         for shapes in [((1,5),(4,5)), ((33,10),(33,1)),((33,1,5),(33,10,1)),
                               ((33,1,5),(33,10,1),((1,10,5))),
                               ]:
-            print "Test broadcasting", shapes
+            print "    Test broadcasting", shapes
             input_vals = [rand(shape, dtype) for shape in shapes]
             gpu_vals = [gpu_ndarray.GpuNdArrayObject(i)
                         for i in input_vals]
