@@ -1037,16 +1037,15 @@ def call_elemwise(fct, input_vals, block, grid=(1,1)):
             assert inp.shape[s_i] == i.shape[s_i] or inp.shape[s_i] == 1 or  i.shape[s_i] == 1
             out_shape[s_i] = max(out_shape[s_i],inp.shape[s_i],i.shape[s_i])
     o = gpu_ndarray.zeros(out_shape, dtype=inp.dtype)
-    assert elemwise_collapses(input_vals,[o], 3) == 0
-    # nb element
+
     args = [cast_uint(o.size)]
     # output shape
     for i in range(len(i.shape)):
-        args.append(cast_int(o.shape[i]))
+        args.append(cast_int(out_shape[i]))
     
     # for each input and the outputs
     # the ptr and there strides
-    nd = len(inp.shape)
+    nd = len(out_shape)
     for i in input_vals+[o]:
         itemsize = i.dtype.itemsize
         args.append(i)
@@ -1167,17 +1166,14 @@ if __name__ == "__main__":
         r = numpy.random.randn(*shape)*10
         return r.astype(dtype)
 
+    to_cpu = numpy.asarray
+
     for dtype in ["int16", "float32", "int8"]:
         print "dtype", dtype
         for shape in [(500,),(50,5),(5,6,7)]:
             print "Test inside a wrapping python object 2 inputs", shape
             input_vals = [rand(shape, dtype) for i in range(2)]
-            if pycuda_array:
-                gpu_vals = [gpuarray.to_gpu(i) for i in input_vals]
-                to_cpu = lambda a: a.get()
-            else:
-                gpu_vals = [gpu_ndarray.GpuNdArrayObject(i) for i in input_vals]
-                to_cpu = numpy.asarray
+            gpu_vals = [gpu_ndarray.GpuNdArrayObject(i) for i in input_vals]
             assert all([numpy.allclose(to_cpu(ig), i) for ig,i in zip(gpu_vals,input_vals)])
 
             gpu_vals = [MyGpuNdArray(x) for x in gpu_vals]
@@ -1195,13 +1191,8 @@ if __name__ == "__main__":
         for shape in [(500,),(50,5),(5,6,7)]:
             print "Test inside a wrapping python object %d inputs"%nb_in, shape
             input_vals = [rand(shape, dtype) for i in range(nb_in)]
-            if pycuda_array:
-                gpu_vals = [gpuarray.to_gpu(i) for i in input_vals]
-                to_cpu = lambda a: a.get()
-            else:
-                gpu_vals = [gpu_ndarray.GpuNdArrayObject(i)
-                            for i in input_vals]
-                to_cpu = numpy.asarray
+            gpu_vals = [gpu_ndarray.GpuNdArrayObject(i)
+                        for i in input_vals]
             assert all([numpy.allclose(to_cpu(ig), i)
                         for ig,i in zip(gpu_vals,input_vals)])
 
@@ -1219,13 +1210,8 @@ if __name__ == "__main__":
                               ]:
             print "Test broadcasting", shapes
             input_vals = [rand(shape, dtype) for shape in shapes]
-            if pycuda_array:
-                gpu_vals = [gpuarray.to_gpu(i) for i in input_vals]
-                to_cpu = lambda a: a.get()
-            else:
-                gpu_vals = [gpu_ndarray.GpuNdArrayObject(i)
-                            for i in input_vals]
-                to_cpu = numpy.asarray
+            gpu_vals = [gpu_ndarray.GpuNdArrayObject(i)
+                        for i in input_vals]
             assert all([numpy.allclose(to_cpu(ig), i)
                         for ig,i in zip(gpu_vals,input_vals)])
 
