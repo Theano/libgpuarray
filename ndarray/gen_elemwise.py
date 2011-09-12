@@ -1230,22 +1230,37 @@ class MyGpuNdArray():
             assert len(inputs) == nb_in
             # dtype checked by pycuda
             # TODO: assert nb dim?
-            return call_elemwise(fct, inputs, block=(inputs[0].shape[-1],1,1))
+            # Compute the output shape.
+            inp = inputs[0]
+
+            # Compute the output shape.
+            out_shape = list(inp.shape)
+            for i in inputs[1:]:
+                for s_i in range(len(inp.shape)):
+                    assert inp.shape[s_i] == i.shape[s_i] or inp.shape[s_i] == 1 or  i.shape[s_i] == 1
+                    out_shape[s_i] = max(out_shape[s_i],i.shape[s_i])
+            # Create the output object
+            out = gpu_ndarray.empty(out_shape, dtype=out_dtype)
+
+            return call_elemwise(fct, inputs, block=(inputs[0].shape[-1],1,1), out=out_shape)
 
         def call_fct2(inputs, test=False):
             " Do dimensions collapsing before call the gpu code "
             assert len(inputs) == nb_in
             # dtype checked by pycuda
             # TODO: assert nb dim?
+
             inp = inputs[0]
-            out_shape = list(inp.shape)
+
             # Compute the output shape.
+            out_shape = list(inp.shape)
             for i in inputs[1:]:
                 for s_i in range(len(inp.shape)):
                     assert inp.shape[s_i] == i.shape[s_i] or inp.shape[s_i] == 1 or  i.shape[s_i] == 1
                     out_shape[s_i] = max(out_shape[s_i],i.shape[s_i])
+            # Create the output object
+            out = gpu_ndarray.empty(out_shape, dtype=out_dtype)
 
-            out = gpu_ndarray.empty(out_shape, dtype=inp.dtype)
             nd_col, info = elemwise_collapses(list(inputs),[out])
             if nd_col == 0:
                 nd_col = 1
@@ -1266,7 +1281,7 @@ class MyGpuNdArray():
         tag += '_'+str(other.gpu_nd_array.dtype)+str(other.gpu_nd_array.ndim)
         fct = self._compiled_fct.get(tag, None)
         if fct is None:
-            print "compile", tag
+#            print "compile", tag
             fct = MyGpuNdArray.gen_fct(op, [self,other], nd)
             self._compiled_fct[tag] = fct
         return fct((self, other))
@@ -1282,7 +1297,7 @@ class MyGpuNdArray():
                              str(i.gpu_nd_array.ndim) for i in inputs])
         fct = cls._compiled_fct.get(tag, None)
         if fct is None:
-            print "compile", tag
+#            print "compile", tag
             fct = MyGpuNdArray.gen_fct(op, inputs, nd)
             cls._compiled_fct[tag] = fct
         return fct(inputs)
@@ -1330,83 +1345,3 @@ class MyGpuNdArray():
         """ multiply all inputs togethers element-wise """
         return cls.__elemwise__(inputs, "mul", theano.tensor.mul)
 
-# numpy.allclose seam to have problem with int8...
-def all_close(x,y):
-    return (numpy.allclose(x,y) or
-            numpy.absolute(x-y).max() == 0)
-
-if __name__ == "__main__":
-
-    #nodename = "TestNodeName"
-    #print elemwise_algo.c_src_kernel(inputs, outputs, nodename, nd)
-    #print elemwise_algo.c_src_kernel_Ccontiguous(inputs, outputs, nodename)
-    #print elemwise_algo.c_src_callkernel(inputs, outputs, nodename)
-    #print elemwise_algo.c_support_code_apply(inputs, outputs, nodename)
-    #print elemwise_algo.c_support_code()
-    ##sub = {}#Need to include "fail" keys in the dict
-    ##print elemwise_algo.c_code(inputs, outputs, nodename, inputs, outputs, sub)
-
-    def rand(shape, dtype):
-        r = numpy.random.randn(*shape)*10
-        return r.astype(dtype)
-
-    to_cpu = numpy.asarray
-
-    for dtype in ["int16", "float32", "int8"]:
-        print "dtype", dtype
-        for shape in [(500,),(50,5),(5,6,7)]:
-            print "    Test inside a wrapping python object 2 inputs", shape
-            input_vals = [rand(shape, dtype) for i in range(2)]
-            gpu_vals = [gpu_ndarray.GpuNdArrayObject(i) for i in input_vals]
-            assert all([numpy.allclose(to_cpu(ig), i) for ig,i in zip(gpu_vals,input_vals)])
-
-            gpu_vals = [MyGpuNdArray(x) for x in gpu_vals]
-            out = gpu_vals[0]+gpu_vals[1]
-            assert numpy.allclose(to_cpu(out), input_vals[0]+input_vals[1])
-            out = gpu_vals[0]-gpu_vals[1]
-            assert numpy.allclose(to_cpu(out), input_vals[0]-input_vals[1])
-            out = gpu_vals[0]*gpu_vals[1]
-            assert all_close(to_cpu(out), input_vals[0]*input_vals[1])
-            if dtype.startswith("float"):
-                out = gpu_vals[0]/gpu_vals[1]
-                assert numpy.allclose(to_cpu(out), input_vals[0]/input_vals[1])
-
-        nb_in = 4
-        for shape in [(500,),(50,5),(5,6,7)]:
-            print "    Test inside a wrapping python object %d inputs"%nb_in, shape
-            input_vals = [rand(shape, dtype) for i in range(nb_in)]
-            gpu_vals = [gpu_ndarray.GpuNdArrayObject(i)
-                        for i in input_vals]
-            assert all([numpy.allclose(to_cpu(ig), i)
-                        for ig,i in zip(gpu_vals,input_vals)])
-
-            gpu_vals = [MyGpuNdArray(x) for x in gpu_vals]
-            out = MyGpuNdArray.adds(*gpu_vals)
-            assert numpy.allclose(to_cpu(out),
-                                  reduce(numpy.add, input_vals))
-
-            out = MyGpuNdArray.multiplys(*gpu_vals)
-            assert all_close(to_cpu(out), reduce(numpy.multiply, input_vals))
-
-        nb_in = 2
-        for shapes in [((1,5),(4,5)), ((33,10),(33,1)),((33,1,5),(33,10,1)),
-                              ((33,1,5),(33,10,1),((1,10,5))),
-                              ]:
-            print "    Test broadcasting", shapes
-            input_vals = [rand(shape, dtype) for shape in shapes]
-            gpu_vals = [gpu_ndarray.GpuNdArrayObject(i)
-                        for i in input_vals]
-            assert all([numpy.allclose(to_cpu(ig), i)
-                        for ig,i in zip(gpu_vals,input_vals)])
-
-            gpu_vals = [MyGpuNdArray(x) for x in gpu_vals]
-            out = MyGpuNdArray.adds(*gpu_vals)
-            assert numpy.allclose(to_cpu(out),
-                                  reduce(numpy.add, input_vals))
-
-            out = MyGpuNdArray.multiplys(*gpu_vals)
-            assert all_close(to_cpu(out), reduce(numpy.multiply, input_vals))
-
-
-
-    print "All test finished!"
