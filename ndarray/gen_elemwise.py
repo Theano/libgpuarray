@@ -1048,18 +1048,6 @@ def elemwise_collapses(inputs, outputs, out_shape=None, verbose=0):
     nd_orig = len(local_dims)
     collapsable = [1]*nd_orig
 
-    def can_collapse(nd, dims, strides):
-        # Can we collapse dims[i] and dims[i-1]?
-        collapse = [1] * nd_orig
-        for i in range(nd-1,0,-1):
-            if strides[i]*dims[i] != strides[i-1]:
-                # The dims nd-1 are not strided again dimension nd
-                collapse[i]=0
-        return collapse
-
-    # Collapse dimension that are broadcast in all inputs.
-    # need to be done before contiguous collapse as it will break it.
-    # Update the dimensions and the strides
     local_str = [None]*len(in_out)
     nd_collapse = nd_orig
     for ipos in xrange(len(in_out)):
@@ -1080,6 +1068,9 @@ def elemwise_collapses(inputs, outputs, out_shape=None, verbose=0):
         for ipos in xrange(len(local_str)):
             print " local_str inputs", ipos, local_str[ipos]
 
+    # Collapse dimension that are broadcast in all inputs.
+    # need to be done before contiguous collapse as it will break it.
+    # Update the dimensions and the strides
     for id in range(nd_collapse):
         if local_dims[id] == 1:
             for j in range(id+1,nd_collapse):# remove dims i from the array
@@ -1099,13 +1090,15 @@ def elemwise_collapses(inputs, outputs, out_shape=None, verbose=0):
 
     nd_collapse_ = [1] * nd_orig
     for ipos in xrange(len(local_str)):
-        nd_collapse_ipos = can_collapse(nd_collapse, local_dims, local_str[ipos])
-        for i in range(1,nd_collapse):
-            if nd_collapse_ipos[i]==0:
+        # Can we collapse dims[i] and dims[i-1]?
+        strides = local_str[ipos]
+        for i in range(nd_collapse-1,0,-1):
+            if strides[i]*local_dims[i] != strides[i-1]:
+                # The dims nd-1 are not strided again dimension nd
                 nd_collapse_[i]=0
 
+
         if verbose>1:
-            print "nd_collapse_ipos", ipos, nd_collapse_ipos
             print "nd_collapse_", nd_collapse_
 
     # update the local stride.
