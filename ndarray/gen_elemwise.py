@@ -1177,7 +1177,8 @@ def call_elemwise(fct, input_vals, block=None, grid=None, out=None,
     # for each inputs and the output
     # add its ptr and strides
     nd = len(out_shape)
-    for idx,i in enumerate(list(input_vals)+[out]):
+    idx = 0
+    for i in list(input_vals)+[out]:
         itemsize = i.dtype.itemsize
         args.append(i)
         for j in range(nd):
@@ -1190,6 +1191,7 @@ def call_elemwise(fct, input_vals, block=None, grid=None, out=None,
                 args.append(cast_int(0))
             else:
                 args.append(cast_int(i.strides[j]/itemsize))
+        idx += 1
     out_size = out.size
     # First use at least a full warp
     if block is None:
