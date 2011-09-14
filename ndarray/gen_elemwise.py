@@ -1158,7 +1158,7 @@ def call_elemwise(fct, input_vals, block=None, grid=None, out=None,
     # Get the output and output shape to us
     if out_shape is None and out is None:
         out_shape = [0]*len(inp.shape)
-        for i in input_vals[1:]:
+        for i in input_vals:
         # dtype checked by pycuda before gpu call
             for s_i in range(len(inp.shape)):
                 assert inp.shape[s_i] == i.shape[s_i] or inp.shape[s_i] == 1 or  i.shape[s_i] == 1
