@@ -1135,15 +1135,15 @@ def elemwise_collapses(inputs, outputs, out_shape=None, verbose=0):
 
     return nd_collapse, (local_dims, local_str)
 
-def call_elemwise(fct, input_vals, block, grid=(1,1), out=None,
+def call_elemwise(fct, input_vals, block=None, grid=None, out=None,
                   out_shape=None,
                   strides=None):
     """ Call an elemwise gpu function with gived inputs and block size.
 
     :param fct: The gpu function to call
     :param input_vals: a list of inputs to pass to fct
-    :param block: tuple. the size of the block wanted
-    :param grid: tuple. the size of the grid wanted
+    :param block: int, the size of the block wanted
+    :param grid: int, the size of the grid wanted
     :param out: Optional, the preallocated output. Must have the right shape
                 and dtype.
 
@@ -1190,7 +1190,23 @@ def call_elemwise(fct, input_vals, block, grid=(1,1), out=None,
                 args.append(cast_int(0))
             else:
                 args.append(cast_int(i.strides[j]/itemsize))
-    d = {"block":block, "grid":grid}
+    out_size = out.size
+    # First use at least a full warp
+    if block is None:
+        block_ = min(32,out_size)
+    else:
+        block_ = block
+    # Next start adding multiprocessors
+    if grid is None:
+        grid_ = min(out_size/block_+(out_size%block_!=0),60)
+    else:
+        grid_ = grid
+    # Next start adding more warps per multiprocessor
+    if block is None:
+        if block_*grid_<out_size:
+            block_ = min(out_size/grid_, 512)
+
+    d = {"block":(block_,1,1), "grid":(grid_,1)}
     fct(*args, **d)
     return out
 
@@ -1202,7 +1218,8 @@ class MyGpuNdArray():
         self.ctype = ctype_from_dtype(self.gpu_nd_array.dtype)
 
     @staticmethod
-    def gen_fct(op, inputs, nd, nodename = "TestNodeName"):
+    def gen_fct(op, inputs, nd, nodename = "TestNodeName",
+                collapse = True):
         # Generate the gpu functions
         nb_in = len(inputs)
         fcts = [None]
@@ -1217,25 +1234,6 @@ class MyGpuNdArray():
                 elemwise_algo.c_src_kernel(node.inputs, node.outputs, nodename, nd, static=""))
             fct = mod.get_function("kernel_%s_%d"%(nodename, nd))
             fcts.append(fct)
-
-        def call_fct(inputs):
-            " Call it without dimensions collapsing "
-            assert len(inputs) == nb_in
-            # dtype checked by pycuda
-            # TODO: assert nb dim?
-            # Compute the output shape.
-            inp = inputs[0]
-
-            # Compute the output shape.
-            out_shape = list(inp.shape)
-            for i in inputs[1:]:
-                for s_i in range(len(inp.shape)):
-                    assert inp.shape[s_i] == i.shape[s_i] or inp.shape[s_i] == 1 or  i.shape[s_i] == 1
-                    out_shape[s_i] = max(out_shape[s_i],i.shape[s_i])
-            # Create the output object
-            out = gpu_ndarray.empty(out_shape, dtype=out_dtype)
-
-            return call_elemwise(fct, inputs, block=(inputs[0].shape[-1],1,1), out=out_shape)
 
         def call_fct2(inputs, test=False):
             " Do dimensions collapsing before call the gpu code "
@@ -1254,15 +1252,17 @@ class MyGpuNdArray():
             # Create the output object
             out = gpu_ndarray.empty(out_shape, dtype=out_dtype)
 
-            nd_col, info = elemwise_collapses(list(inputs),[out])
-            if nd_col == 0:
-                nd_col = 1
+            if collapse and inp.ndim>1:
+                # Do the collapsing.
+                nd_col, info = elemwise_collapses(list(inputs),[out])
+                if nd_col == 0:
+                    nd_col = 1
 
-            #inputs = [i.gpu_nd_array for i in inputs]
-            out = call_elemwise(fcts[nd_col], inputs,
-                                 block=(min(info[0][0],512),1,1),
-                                 out=out, out_shape=info[0][:nd_col],
-                                 strides=info[1])
+                    out = call_elemwise(fcts[nd_col], inputs,
+                                        out=out, out_shape=info[0][:nd_col],
+                                        strides=info[1])
+            else:
+                out = call_elemwise(fct, inputs, out_shape=out_shape)
             return out
         return call_fct2
 
