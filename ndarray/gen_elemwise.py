@@ -1237,6 +1237,11 @@ class MyGpuNdArray():
             fct = mod.get_function("kernel_%s_%d"%(nodename, nd))
             fcts.append(fct)
 
+        # All inputs/outputs C contiguous case
+        mod = SourceModule(elemwise_algo.c_src_kernel_Ccontiguous(
+                node.inputs, node.outputs, nodename, static=""))
+        fcts[0] = mod.get_function("kernel_%s_Ccontiguous"%nodename)
+
         def call_fct2(inputs, test=False):
             " Do dimensions collapsing before call the gpu code "
             assert len(inputs) == nb_in
@@ -1254,17 +1259,15 @@ class MyGpuNdArray():
             # Create the output object
             out = gpu_ndarray.empty(out_shape, dtype=out_dtype)
 
-            if collapse and inp.ndim>1:
+            if collapse:
                 # Do the collapsing.
                 nd_col, info = elemwise_collapses(list(inputs),[out])
-                if nd_col == 0:
-                    nd_col = 1
 
-                    out = call_elemwise(fcts[nd_col], inputs,
-                                        out=out, out_shape=info[0][:nd_col],
-                                        strides=info[1])
+                out = call_elemwise(fcts[nd_col], inputs,
+                                    out=out, out_shape=info[0][:nd_col],
+                                    strides=info[1])
             else:
-                out = call_elemwise(fct, inputs, out_shape=out_shape)
+                out = call_elemwise(fct, inputs, out=out, out_shape=out_shape)
             return out
         return call_fct2
 
