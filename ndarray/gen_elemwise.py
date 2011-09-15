@@ -1110,16 +1110,16 @@ def elemwise_collapses(inputs, outputs, out_shape=None, verbose=0):
                     local_str[ipos][j-1]=local_str[ipos][j]
 
     # update the local dims.
+    # update the new number of dim
+    nd_collapse2 = nd_collapse
     for i in range(nd_collapse-1,0,-1):
         if nd_collapse_[i] == 1:
             local_dims[i-1]*=local_dims[i]
             for j in range(i+1, nd_collapse):
                 local_dims[j-1]=local_dims[j]
+            nd_collapse2 -= 1
+    nd_collapse = nd_collapse2
 
-    # update the new number of dim
-    for i in range(1,nd_collapse):
-        if nd_collapse_[i]==1:
-            nd_collapse -= 1
     if nd_collapse == 1:
         l=[local_str[ipos][nd_collapse-1]==in_out[ipos].itemsize for ipos in range(len(local_str))]
         if all(l):
