@@ -125,8 +125,13 @@ def test_elemwise_collapse():
                     # 1.2 Check computation are still valid
                     f = MyGpuNdArray.gen_fct(theano.tensor.add, [a1, b1],
                                              len(shape1))
+                    out = f([a1,b1])
+                    out2 = f([a1,b1], out=out)
+                    assert out is out2
                     assert numpy.allclose(numpy.asarray(f([a1,b1])), a_cpu+b_cpu)
                     assert numpy.allclose(numpy.asarray(MyGpuNdArray.adds(a1,b1)), a_cpu+b_cpu)
+                    assert numpy.allclose(numpy.asarray(MyGpuNdArray.add(a1,b1)), a_cpu+b_cpu)
+                    assert MyGpuNdArray.add(a1,b1, out=out2) is out2
 
 
                     # 2.1 What if we add a scalar?

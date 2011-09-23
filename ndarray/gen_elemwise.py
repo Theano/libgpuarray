@@ -1242,7 +1242,7 @@ class MyGpuNdArray():
                 node.inputs, node.outputs, nodename, static=""))
         fcts[0] = mod.get_function("kernel_%s_Ccontiguous"%nodename)
 
-        def call_fct2(inputs, test=False):
+        def call_fct2(inputs, out=None):
             " Do dimensions collapsing before call the gpu code "
             assert len(inputs) == nb_in
             # dtype checked by pycuda
@@ -1257,7 +1257,8 @@ class MyGpuNdArray():
                     assert inp.shape[s_i] == i.shape[s_i] or inp.shape[s_i] == 1 or  i.shape[s_i] == 1
                     out_shape[s_i] = max(out_shape[s_i],i.shape[s_i])
             # Create the output object
-            out = gpu_ndarray.empty(out_shape, dtype=out_dtype)
+            if out is None or out.dtype != out_dtype or out.shape != tuple(out_shape):
+                out = gpu_ndarray.empty(out_shape, dtype=out_dtype)
 
             if collapse:
                 # Do the collapsing.
@@ -1285,7 +1286,7 @@ class MyGpuNdArray():
         return fct((self, other))
         
     @classmethod
-    def __elemwise__(cls, inputs, name, op):
+    def __elemwise__(cls, inputs, name, op, out=None):
         """ Call this code on this op with * inputs """
         nd = len(inputs[0].gpu_nd_array.shape)#self.gpu_nd_array.ndim
         for i in inputs[1:]:
@@ -1298,7 +1299,7 @@ class MyGpuNdArray():
 #            print "compile", tag
             fct = MyGpuNdArray.gen_fct(op, inputs, nd)
             cls._compiled_fct[tag] = fct
-        return fct(inputs)
+        return fct(inputs, out=out)
         
 
     ndim = property(lambda self: self.gpu_nd_array.ndim, doc = "number of dimensions")
@@ -1331,7 +1332,7 @@ class MyGpuNdArray():
     @classmethod
     def add(cls, x, y, out=None):
         """ add all inputs togethers element-wise """
-        return cls.__elemwise__(inputs, "add", theano.tensor.add)
+        return cls.__elemwise__([x,y], "add", theano.tensor.add, out=out)
 
     @classmethod
     def adds(cls, *inputs):
