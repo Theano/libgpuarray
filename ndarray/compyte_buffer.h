@@ -18,7 +18,7 @@ typedef void *gpubuf;
 typedef struct _compyte_buffer_ops {
   /* This allocates a buffer of size sz on the device */
   gpubuf (*buffer_alloc)(size_t sz);
-  int (*buffer_free)(gpubuf buf);
+  void (*buffer_free)(gpubuf buf);
   
   /* device to device copy, no overlap */
   int (*buffer_move)(gpubuf dst, size_t dst_offset, 
@@ -34,6 +34,9 @@ typedef struct _compyte_buffer_ops {
   /* Can be NULL, in which case inter-api transfers will not be allowed */
   GLuint (*buffer_to_opengl)(gpubuf b, size_t b_offset);
   gpubuf (*buffer_from_opengl)(GLuint b);
+
+  /* Get a string describing the last error that happened */
+  const char *(*buffer_error)(void);
 } compyte_buffer_ops;
 
 #ifdef WITH_CUDA

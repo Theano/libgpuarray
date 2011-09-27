@@ -2,25 +2,69 @@
 
 #include "compyte_buffer.h"
 
-typedef struct _pygpu_buffer_ops {
+static PyObject *BufferOpError;
+
+typedef struct _buffer_ops {
   PyObject_HEAD
   compyte_buffer_ops *ops;
-} pygpu_buffer_ops;
+} buffer_ops;
 
-static PyObject *Op_alloc(pygpu_buffer_ops *self,
-			  PyObject *args, PyObject *kwds)
+static PyTypeObject buffer_ops_Type;
+#define buffer_ops_Check(v)  ((v)->ob_type == &buffer_ops_Type)
+
+static PyObject *Op_alloc(PyObject *s, PyObject *args, PyObject *kwds)
 {
+  buffer_ops *self = (buffer_ops *)s;
   Py_ssize_t size;
-  gpubuf res;
+  gpubuf data;
   static const char *kwlist[] = {"size", NULL};
-  
+
+  if (!buffer_ops_Check(self)) {
+    PyErr_SetString(PyExc_TypeError, "wrong type for self");
+    return NULL;
+  }
+
   if (!PyArg_ParseTupleAndKeywords(args, kwds, "n", kwdlist, &size))
-    return -1;
-  res = self.ops->buffer_alloc(size);
-  
+    return NULL;
+  data = self->ops->buffer_alloc(size);
+  if (data == NULL) {
+    PyErr_SetString(PyExc_MemoryError, "Could not allocate device memory.");
+    return NULL;
+  }
+  return PyCObject_FromVoidPtr(data, self->ops->buffer_free);
+}
+
+static PyObject *Op_move(PyObject *s, PyObject *args, PyObject *kwds)
+{
+  buffer_ops *self = (buffer_ops *)s;
+  PyCObject *src, *dst;
+  Py_ssize_t src_offset, dst_offset, sz;
+  int err;
+  static const char *kwdlist[] = {"dst", "dst_offset", "src", "src_offset", "sz", NULL};
+
+  if (!buffer_ops_Check(self)) {
+    PyErr_SetString(PyExc_TypeError, "wrong type for self");
+    return NULL;
+  }
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "OnOnn", kwdlist,
+				   &dst, &dst_offset, &src, &src_offset, &sz))
+    return NULL;
+
+  err = self->ops->buffer_move(PyCObject_AsVoidPtr(dst), (size_t)dst_offset,
+			       PyCObject_AsVoidPtr(src), (size_t)src_offset,
+			       (size_t)sz);
+  if (err == -1) {
+    PyErr_SetString(BufferOpError, self->ops->buffer_error());
+    return NULL;
+  }
+  Py_INCREF(Py_None);
+  return Py_None;
 }
 
 static PyMethodDef ops_methods[] = {
+  {"alloc", Op_alloc},
+  {"move", Op_move},
   {NULL, NULL},
 };
 
@@ -66,7 +110,7 @@ static PyMethodDef mod_methods[] = {
 #ifndef PyMODINIT_FUNC/* declarations for DLL import/export */
 #define PyMODINIT_FUNC void
 #endif
-PyMODINTI_FUNC initpygpu_buffer()
+PyMODINIT_FUNC initpygpu_buffer()
 {
   PyObject *m;
   PyObject *ops;
@@ -75,6 +119,8 @@ PyMODINTI_FUNC initpygpu_buffer()
     return;
   
   m = Py_InitModule("pygpu.buffer", methods);
+  BufferOpError = PyErr_NewException("pygpu.buffer.op_error", NULL, NULL);
+  
 
 #ifdef WITH_CUDA
   ops = buffer_ops_NEW(cuda_ops);
