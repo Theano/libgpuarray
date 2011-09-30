@@ -1269,7 +1269,9 @@ class MyGpuNdArray():
             if collapse:
                 # Do the collapsing.
                 nd_col, info = elemwise_collapses(list(inputs),[out])
-
+                # The two next line are usefull to force a call to the c contiguous version
+                #nd_col = 0
+                #info = [[],[]]
                 out = call_elemwise(fcts[nd_col], inputs,
                                     out=out, out_shape=info[0][:nd_col],
                                     strides=info[1])
