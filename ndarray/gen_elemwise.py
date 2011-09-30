@@ -1101,22 +1101,21 @@ def elemwise_collapses(inputs, outputs, out_shape=None, verbose=0):
         if verbose>1:
             print "nd_collapse_", nd_collapse_
 
-    # update the local stride.
-    for ipos in xrange(len(local_str)):
-        for i in range(nd_collapse-1,0,-1):
-            if nd_collapse_[i]==1:
+    nd_collapse2 = nd_collapse
+    for i in range(nd_collapse-1,0,-1):
+        if nd_collapse_[i] == 1:
+            # update the local dims.
+            local_dims[i-1]*=local_dims[i]
+            for j in range(i+1, nd_collapse):
+                local_dims[j-1]=local_dims[j]
+
+            # update the local stride.
+            for ipos in xrange(len(local_str)):
                 local_str[ipos][i-1]=local_str[ipos][i]# set new strides
                 for j in range(i+1,nd_collapse): # remove stride i from the array
                     local_str[ipos][j-1]=local_str[ipos][j]
 
-    # update the local dims.
-    # update the new number of dim
-    nd_collapse2 = nd_collapse
-    for i in range(nd_collapse-1,0,-1):
-        if nd_collapse_[i] == 1:
-            local_dims[i-1]*=local_dims[i]
-            for j in range(i+1, nd_collapse):
-                local_dims[j-1]=local_dims[j]
+            # update the new number of dim
             nd_collapse2 -= 1
     nd_collapse = nd_collapse2
 
