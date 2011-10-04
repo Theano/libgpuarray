@@ -4,8 +4,9 @@
 
 static cudaError_t err;
 
-static void *cuda_malloc(size_t size)
+static void *cuda_malloc(void *ctx, size_t size)
 {
+    /* ctx is ignored since it is implied */
     void *rval=NULL;
     err = cudaMalloc(&rval, size);
     if (cudaSuccess != err) {
@@ -70,9 +71,7 @@ static const char *cuda_error(void)
     return cudaGetErrorString(err);
 }
 
-static compyte_buffer_ops _cuda_ops = {cuda_alloc, cuda_free, cuda_move, cuda_read, cuda_write, cuda_memset, NULL, NULL, cuda_error};
-
-compyte_buffer_ops *cuda_ops = &_cuda_ops;
+compyte_buffer_ops cuda_ops = {cuda_alloc, cuda_free, cuda_move, cuda_read, cuda_write, cuda_memset, cuda_error};
 
 /*
   Local Variables:

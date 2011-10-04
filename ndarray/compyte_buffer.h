@@ -16,8 +16,8 @@ extern "C" {
 typedef void *gpubuf;
 
 typedef struct _compyte_buffer_ops {
-  /* This allocates a buffer of size sz on the device */
-  gpubuf (*buffer_alloc)(size_t sz);
+  /* This allocates a buffer of size sz in context ctx */
+  gpubuf (*buffer_alloc)(void *ctx, size_t sz);
   void (*buffer_free)(gpubuf buf);
   
   /* device to device copy, no overlap */
@@ -30,21 +30,16 @@ typedef struct _compyte_buffer_ops {
   /* Set buffer to a single-byte pattern (like C memset) */
   int (*buffer_memset)(gpubuf dst, int data, size_t sz);
 
-  /* OpenGL interop to transfer data from one API to the other */
-  /* Can be NULL, in which case inter-api transfers will not be allowed */
-  GLuint (*buffer_to_opengl)(gpubuf b, size_t b_offset);
-  gpubuf (*buffer_from_opengl)(GLuint b);
-
   /* Get a string describing the last error that happened */
   const char *(*buffer_error)(void);
 } compyte_buffer_ops;
 
 #ifdef WITH_CUDA
-extern compyte_buffer_ops *cuda_ops;
+extern compyte_buffer_ops cuda_ops;
 #endif
 
 #ifdef WITH_OPENCL
-extern compyte_buffer_ops *opencl_ops;
+extern compyte_buffer_ops opencl_ops;
 #endif
 
 #ifdef __cplusplus
