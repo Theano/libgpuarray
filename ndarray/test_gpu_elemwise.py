@@ -133,6 +133,17 @@ def test_elemwise_collapse():
                     assert numpy.allclose(numpy.asarray(MyGpuNdArray.add(a1,b1)), a_cpu+b_cpu)
                     assert MyGpuNdArray.add(a1,b1, out=out2) is out2
 
+                    # 1.3 Check work without collaping
+                    f = MyGpuNdArray.gen_fct(theano.tensor.add, [a1, b1],
+                                             len(shape1), collapse=False)
+                    out = f([a1,b1])
+                    out2 = f([a1,b1], out=out)
+                    assert out is out2
+                    assert numpy.allclose(numpy.asarray(f([a1,b1])), a_cpu+b_cpu)
+                    assert numpy.allclose(numpy.asarray(MyGpuNdArray.adds(a1,b1)), a_cpu+b_cpu)
+                    assert numpy.allclose(numpy.asarray(MyGpuNdArray.add(a1,b1)), a_cpu+b_cpu)
+                    assert MyGpuNdArray.add(a1,b1, out=out2) is out2
+
 
                     # 2.1 What if we add a scalar?
                     nd_collaps, info = elemwise_collapses([a, b, scalar_gpu],[o])
