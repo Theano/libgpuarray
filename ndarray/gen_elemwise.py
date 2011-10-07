@@ -1276,7 +1276,7 @@ class MyGpuNdArray():
                                     out=out, out_shape=info[0][:nd_col],
                                     strides=info[1])
             else:
-                out = call_elemwise(fct, inputs, out=out, out_shape=out_shape)
+                out = call_elemwise(fcts[-1], inputs, out=out, out_shape=out_shape)
             return out
         return call_fct2
 
