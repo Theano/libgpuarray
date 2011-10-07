@@ -1039,13 +1039,24 @@ def elemwise_collapses(inputs, outputs, out_shape=None, verbose=0):
     in_out = inputs+outputs
     del inputs
     if out_shape is not None:
-        local_dims = list(out_shape)
+        local_dims = tuple(out_shape)
     else:
+        # TODO, use the right algo here or make the parameter not optional
         # We should always have the same shape for all outputs
         # If there is more then one outputs
-        local_dims = list(outputs[0].shape)
+        local_dims = tuple(outputs[0].shape)
     del outputs
     nd_orig = len(local_dims)
+    if nd_orig == 1:
+        # This have a lower overhead
+        all_c_contig = True
+        for inp in in_out:
+            if not inp.flags['C_CONTIGUOUS'] or inp.shape != local_dims:
+                all_c_contig = False
+                break
+        if all_c_contig:
+            return 0, (local_dims, [])
+
     collapsable = [1]*nd_orig
 
     local_str = [None]*len(in_out)
@@ -1061,13 +1072,20 @@ def elemwise_collapses(inputs, outputs, out_shape=None, verbose=0):
             if inp.shape[dim_pos]==1:
                 local_str[ipos][dim_pos]=0
 
+    if nd_orig == 1:
+        # We already covered the contiguous case before
+        # So we are sure it is not contiguous
+        # TODO: Add a test that f contiguous are also collapsed by the first case.
+        #       I think that for 1d array when the flags f contiguous is true, c contiguous is also true.
+        return 1, (local_dims, local_str)
+
     if verbose>2:
         print "before broadcast collapse"
         print " nd_collapse", nd_collapse
         print " local_dims", local_dims
         for ipos in xrange(len(local_str)):
             print " local_str inputs", ipos, local_str[ipos]
-
+    local_dims = list(local_dims)
     # Collapse dimension that are broadcast in all inputs.
     # need to be done before contiguous collapse as it will break it.
     # Update the dimensions and the strides
@@ -1245,8 +1263,7 @@ class MyGpuNdArray():
             fcts.append(fct)
 
         # All inputs/outputs C contiguous case
-        mod = SourceModule(npy_ty +
-                           elemwise_algo.c_src_kernel_Ccontiguous(
+        mod = SourceModule(npy_ty+elemwise_algo.c_src_kernel_Ccontiguous(
                 node.inputs, node.outputs, nodename, static=""))
         fcts[0] = mod.get_function("kernel_%s_Ccontiguous"%nodename)
 
@@ -1318,6 +1335,7 @@ class MyGpuNdArray():
     strides = property(lambda self: self.gpu_nd_array.strides)
     itemsize = property(lambda self: self.gpu_nd_array.itemsize)
     bytes = property(lambda self: self.gpu_nd_array.bytes)
+    flags = property(lambda self: self.gpu_nd_array.flags)
 
     # TODO: remove this when pycuda is updated to accept .bytes property!
     gpudata = property(lambda self: self.gpu_nd_array.gpudata)

@@ -70,10 +70,10 @@ def test_elemwise_collapse():
     for dtype1 in ["int16", "float32", "int8"]:
         for dtype2 in ["int16", "float32", "int8"]:
 
-            scalar_cpu = rand((1,1,1,1),dtype=dtype1)
-            scalar_gpu = gpu_ndarray.GpuNdArrayObject(scalar_cpu)
-            scalar_gpu1 = MyGpuNdArray(scalar_gpu)
             for shape1_, shape2_, expected in [
+                # 1d to test this special case
+                ((40,),(40,),0),
+                ((40,),(1,),1),
                 # No broadcastable dimensions
                 ((4,5,6,9),(4,5,6,9),0),
                 # All inputs have one(and the same) broadcastable dimension
@@ -103,6 +103,9 @@ def test_elemwise_collapse():
                 # One scalar, the other 1 broadcast dims
                 ((1,1,1,1),(4,5,6,1),1),
                 ]:
+                scalar_cpu = rand((1,)*len(shape1_),dtype=dtype1)
+                scalar_gpu = gpu_ndarray.GpuNdArrayObject(scalar_cpu)
+                scalar_gpu1 = MyGpuNdArray(scalar_gpu)
                 for shape1, shape2 in [(shape1_,shape2_),(shape2_,shape1_)]:
                     a_cpu = rand(shape1, dtype=dtype1)
                     a = gpu_ndarray.GpuNdArrayObject(a_cpu)
@@ -160,6 +163,9 @@ def test_elemwise_collapse():
                         expected2 = 2
                     else: 
                         expected2 = expected
+
+                    if len(shape1_) != 4:
+                        continue
 
                     if a.shape[0] != 1:
                         shape = list(shape1)
