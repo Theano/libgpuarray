@@ -1228,6 +1228,7 @@ class MyGpuNdArray():
     @staticmethod
     def gen_fct(op, inputs, nd, nodename = "TestNodeName",
                 collapse = True):
+        npy_ty = "typedef double npy_float64;\n typedef float npy_float32;\n"
         # Generate the gpu functions
         nb_in = len(inputs)
         fcts = [None]
@@ -1238,13 +1239,14 @@ class MyGpuNdArray():
             elemwise_algo = ElemwiseAlgo(node.op.scalar_op)
 
             # Compile the gpu function with pycuda
-            mod = SourceModule(
-                elemwise_algo.c_src_kernel(node.inputs, node.outputs, nodename, nd, static=""))
+            mod = SourceModule(npy_ty+
+                               elemwise_algo.c_src_kernel(node.inputs, node.outputs, nodename, nd, static=""))
             fct = mod.get_function("kernel_%s_%d"%(nodename, nd))
             fcts.append(fct)
 
         # All inputs/outputs C contiguous case
-        mod = SourceModule(elemwise_algo.c_src_kernel_Ccontiguous(
+        mod = SourceModule(npy_ty +
+                           elemwise_algo.c_src_kernel_Ccontiguous(
                 node.inputs, node.outputs, nodename, static=""))
         fcts[0] = mod.get_function("kernel_%s_Ccontiguous"%nodename)
 
