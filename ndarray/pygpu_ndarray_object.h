@@ -9,7 +9,7 @@
 
 #include <Python.h>
 #include <numpy/arrayobject.h>
-#include "gpu_ndarray.cuh"
+#include "gpu_ndarray.h"
 
 typedef struct PyGpuNdArrayObject{
   PyObject_HEAD

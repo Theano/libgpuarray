@@ -4,11 +4,8 @@
 #include <numpy/arrayobject.h>
 #include <iostream>
 
-#include "pygpu_ndarray.cuh"
+#include "pygpu_ndarray.h"
 #include "pygpu_language.h"
-
-//#include "pygpu_ndarray_ctor.cu"//TODO correctly handle the compilation...
-
 
 /////////////////////////
 // Static helper methods
@@ -180,7 +177,6 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
                     PyArray_DATA(py_src),
                     PyArray_SIZE(py_src) * PyArray_ITEMSIZE(py_src),
                     PyGpuHostToDevice);
-    CNDA_THREAD_SYNC;
     if (err) {
         Py_DECREF(py_src);
         return -1;
@@ -343,7 +339,6 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
                           PyGpuNdArray_DATA(contiguous_self),
                           PyArray_SIZE(rval) * PyArray_ITEMSIZE(rval),
                           PyGpuDeviceToHost);
-    CNDA_THREAD_SYNC;
     if (err) {
         Py_DECREF(contiguous_self);
         Py_DECREF(rval);
