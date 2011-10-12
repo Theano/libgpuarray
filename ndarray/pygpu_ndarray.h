@@ -3,12 +3,12 @@
 
 //#include <Python.h>
 //#include <structmember.h>
-#include <numpy/arrayobject.h>
-#include <gpu_ndarray.cuh>
-#include <pygpu_ndarray_object.h>
 #include <stdio.h>
+#include <numpy/arrayobject.h>
 
-#include <pygpu_language.h>
+#include "pygpu_ndarray_object.h"
+#include "gpu_ndarray.h"
+#include "pygpu_language.h"
 
 /*
  * Return a PyGpuNdArray whose 'nd' dimensions are all 0.
