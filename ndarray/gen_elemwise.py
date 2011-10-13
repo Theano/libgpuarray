@@ -1283,7 +1283,7 @@ class MyGpuNdArray():
                     out_shape[s_i] = max(out_shape[s_i],i.shape[s_i])
             # Create the output object
             if out is None or out.dtype != out_dtype or out.shape != tuple(out_shape):
-                out = gpu_ndarray.empty(out_shape, dtype=out_dtype)
+                out = MyGpuNdArray(gpu_ndarray.empty(out_shape, dtype=out_dtype))
 
             if collapse:
                 # Do the collapsing.
@@ -1336,9 +1336,21 @@ class MyGpuNdArray():
     itemsize = property(lambda self: self.gpu_nd_array.itemsize)
     bytes = property(lambda self: self.gpu_nd_array.bytes)
     flags = property(lambda self: self.gpu_nd_array.flags)
+    size = property(lambda self: self.gpu_nd_array.size)
+
+    def __array__(self):
+        return numpy.asarray(self.gpu_nd_array)
+    def copy(self):
+        return MyGpuNdArray(self.gpu_nd_array.copy())
+    def view(self):
+        return MyGpuNdArray(self.gpu_nd_array.view())
+    def __copy__(self):
+        return MyGpuNdArray(self.gpu_nd_array.__copy__())
+    def __deepcopy__(self):
+        return MyGpuNdArray(self.gpu_nd_array.__deepcopy__())
 
     # TODO: remove this when pycuda is updated to accept .bytes property!
-    gpudata = property(lambda self: self.gpu_nd_array.gpudata)
+    gpudata = property(lambda self: self.gpu_nd_array.bytes)
 
     def __getitem__(self, *inputs):
         return MyGpuNdArray(self.gpu_nd_array.__getitem__(*inputs))
