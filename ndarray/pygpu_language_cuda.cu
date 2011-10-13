@@ -590,7 +590,7 @@ int PyGpuMemset(void * dst, int data, size_t bytes){
     cudaError_t err = cudaMemset(dst, data, bytes);
     CNDA_THREAD_SYNC;
     if (cudaSuccess != err) {
-        PyErr_Format(PyExc_MemoryError, "PyGpuMemset: Error memsetting %d bytes of device memory(%s). %p",
+        PyErr_Format(PyExc_MemoryError, "PyGpuMemset: Error memsetting %ld bytes of device memory(%s). %p",
                      bytes, cudaGetErrorString(err), PyGpuNdArray_DATA(dst));
         return -1;
     }
