@@ -1349,8 +1349,16 @@ class MyGpuNdArray():
     def __deepcopy__(self):
         return MyGpuNdArray(self.gpu_nd_array.__deepcopy__())
 
-    # TODO: remove this when pycuda is updated to accept .bytes property!
-    gpudata = property(lambda self: self.gpu_nd_array.bytes)
+    @property
+    def gpudata(self):
+        # TODO: Add this assert when PyCUDA/PyOpenCL can use the bytes
+        # attributes. Without this assert old code that don't support
+        # strides can receive as input object that are strided and no
+        # error will be gived
+
+        #assert (self.gpu_nd_array.flags['C_CONTIGUOUS'] or
+        #         self.gpu_nd_array.flags['F_CONTIGUOUS'])
+        return self.bytes
 
     def __getitem__(self, *inputs):
         return MyGpuNdArray(self.gpu_nd_array.__getitem__(*inputs))
