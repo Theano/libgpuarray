@@ -406,7 +406,7 @@ PyGpuNdArray_Zeros(int nd, npy_intp* dims, PyArray_Descr* dtype, int fortran)
 static PyObject * 
 PyGpuNdArray_zeros(PyObject* dummy, PyObject* args, PyObject *kargs)
 {
-    static char *kwlist[] = {"shape","dtype","order",NULL}; /* XXX ? */
+    static const char *kwlist[] = {"shape","dtype","order",NULL}; /* XXX ? */
     PyArray_Descr *typecode = NULL;
     PyObject * shape = NULL;
     NPY_ORDER order = PyArray_CORDER;
@@ -414,7 +414,7 @@ PyGpuNdArray_zeros(PyObject* dummy, PyObject* args, PyObject *kargs)
     PyObject *ret = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kargs, "O|O&O&",
-                                     kwlist,
+                                     (char**)kwlist,
 	                             &shape,
                                      PyArray_DescrConverter,
                                      &typecode,
@@ -493,7 +493,7 @@ PyGpuNdArray_zeros(PyObject* dummy, PyObject* args, PyObject *kargs)
 static PyObject * 
 PyGpuNdArray_empty(PyObject* dummy, PyObject* args, PyObject *kargs)
 {
-    static char *kwlist[] = {"shape","dtype","order",NULL}; /* XXX ? */
+    static const char *kwlist[] = {"shape","dtype","order",NULL}; /* XXX ? */
     PyArray_Descr *typecode = NULL;
     PyObject * shape = NULL;
     NPY_ORDER order = PyArray_CORDER;
@@ -501,7 +501,7 @@ PyGpuNdArray_empty(PyObject* dummy, PyObject* args, PyObject *kargs)
     PyObject *ret = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kargs, "O|O&O&",
-                                     kwlist,
+                                     (char **)kwlist,
 	                             &shape,
                                      PyArray_DescrConverter,
                                      &typecode,
@@ -761,60 +761,60 @@ PyGpuNdArray_get_itemsize(PyArrayObject *self)
 }
 
 static PyGetSetDef PyGpuNdArray_getset[] = {
-    {"base",
+    {(char*)"base",
         (getter)PyGpuNdArray_get_base,
         NULL,
-        "Return the object stored in the base attribute",
+        (char*)"Return the object stored in the base attribute",
         NULL},
-    {"bytes",
+    {(char*)"bytes",
         (getter)PyGpuNdArray_get_data,
         NULL,
-        "device data pointer",
+        (char*)"device data pointer",
         NULL},
-    {"shape",
+    {(char*)"shape",
         (getter)PyGpuNdArray_get_shape,
         (setter)PyGpuNdArray_set_shape,
-        "shape of this ndarray (tuple)",
+        (char*)"shape of this ndarray (tuple)",
         NULL},
-    {"strides",
+    {(char*)"strides",
         (getter)PyGpuNdArray_get_strides,
         NULL,//(setter)PyGpuNdArray_set_strides,
-        "data pointer strides (in elements)",
+        (char*)"data pointer strides (in elements)",
         NULL},
-    {"ndim",
+    {(char*)"ndim",
         (getter)PyGpuNdArray_get_ndim,
         NULL,
-        "The number of dimensions in this object",
+        (char*)"The number of dimensions in this object",
         NULL},
-    {"offset",
+    {(char*)"offset",
         (getter)PyGpuNdArray_get_offset,
         NULL,
-        "Return the offset value",
+        (char*)"Return the offset value",
         NULL},
-    {"size",
+    {(char*)"size",
         (getter)PyGpuNdArray_get_size,
         NULL,
-        "The number of elements in this object.",
+        (char*)"The number of elements in this object.",
         NULL},
-    {"data_allocated",
+    {(char*)"data_allocated",
         (getter)PyGpuNdArray_get_data_allocated,
         NULL,
-        "The size of the allocated memory on the device.",
+        (char*)"The size of the allocated memory on the device.",
         NULL},
-    {"itemsize",
+    {(char*)"itemsize",
         (getter)PyGpuNdArray_get_itemsize,
         NULL,
-        "The size of the base element.",
+        (char*)"The size of the base element.",
         NULL},
-    {"dtype",
+    {(char*)"dtype",
 	(getter)PyGpuNdArray_get_dtype,
 	NULL,
-	"The dtype of the element",
+        (char*)"The dtype of the element",
 	NULL},
-    {"flags",
+    {(char*)"flags",
         (getter)PyGpuNdArray_get_flags,
         NULL,
-        "Return the flags as a dictionary",
+        (char*)"Return the flags as a dictionary",
         NULL},
     {NULL, NULL, NULL, NULL}  /* Sentinel */
 };
