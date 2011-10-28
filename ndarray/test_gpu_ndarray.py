@@ -12,7 +12,7 @@ dtypes_all = ["float32",
               "complex64",
               ]
 
-dtypes_no_complex = ["float32", "float64",
+dtypes_no_complex = ["float32",
                      "int8", "int16", "int32", "int64",
                      "uint8", "uint16", "uint32", "uint64",
                      ]
@@ -89,20 +89,37 @@ def test_transfer_fortran():
             assert numpy.allclose(c,a)
 
 def test_zeros():
-    for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
+    for shp in [(), (5,),(6,7),(4,8,9),(1,8,9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
                 x = numpy.zeros(shp, dtype, order)
                 y = gpu_ndarray.zeros(shp, dtype, order)
                 check_all(x, y)
+    x = gpu_ndarray.zeros(())# no dtype and order param
+    y = numpy.zeros(())
+    check_meta(x, y)
+
+    try:
+        gpu_ndarray.zeros()
+        assert False
+    except TypeError:
+        pass
 
 def test_empty():
-    for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
+    for shp in [(), (5,),(6,7),(4,8,9),(1,8,9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
                 x = numpy.zeros(shp, dtype, order)
                 y = gpu_ndarray.empty(shp, dtype, order)
                 check_meta(x, y)
+    x = gpu_ndarray.zeros(())# no dtype and order param
+    y = numpy.zeros(())
+    check_meta(x, y)
+    try:
+        gpu_ndarray.empty()
+        assert False
+    except TypeError:
+        pass
 
 
 

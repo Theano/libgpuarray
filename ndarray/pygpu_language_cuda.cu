@@ -3,6 +3,27 @@
 
 #include <cublas.h>
 
+char *
+cublasGetErrorString(cublasStatus err)
+{
+    if (err == CUBLAS_STATUS_NOT_INITIALIZED) {
+        return "CUBLAS_STATUS_NOT_INITIALIZED";
+    } else if (err == CUBLAS_STATUS_ALLOC_FAILED){
+        return "CUBLAS_STATUS_ALLOC_FAILED";
+    } else if (err == CUBLAS_STATUS_INVALID_VALUE){
+        return "CUBLAS_STATUS_INVALID_VALUE";
+    } else if (err == CUBLAS_STATUS_MAPPING_ERROR){
+        return "CUBLAS_STATUS_MAPPING_ERROR";
+    } else if (err == CUBLAS_STATUS_EXECUTION_FAILED){
+        return "CUBLAS_STATUS_EXECUTION_FAILED";
+    } else if (err == CUBLAS_STATUS_INTERNAL_ERROR){
+        return "CUBLAS_STATUS_INTERNAL_ERROR";
+    } else {
+        return "UNKNOW ERROR";
+    }
+
+}
+
 /////////////////////////
 // Alloc and Free
 /////////////////////////
@@ -363,7 +384,7 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
                 }
                 if (verbose>1) {
                     for(int i=0;i<3*ndim;i++)
-                        printf(" %d", ((ssize_t *)strides_host)[i]);
+                        printf(" %ld", ((ssize_t *)strides_host)[i]);
                     printf("\n");
                 }
                 CNDA_THREAD_SYNC;
@@ -520,6 +541,38 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
     }
 
     if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromPyGpuNdArray end\n");
+    return 0;
+}
+
+int PyGpuMemcpy(void * dst, const void * src, size_t bytes, PyGpuTransfert direction){
+    cudaMemcpyKind dir;
+    if (direction == PyGpuDeviceToHost){
+        dir = cudaMemcpyDeviceToHost;
+    } else if (direction == PyGpuHostToDevice) {
+        dir = cudaMemcpyHostToDevice;
+    } else {
+        PyErr_Format(PyExc_ValueError,
+                        "GpuMemcpy: Received wrong direction %d!\n", direction);
+        return -1;
+    }
+    cudaError_t err = cudaMemcpy(dst, src, bytes, dir);
+    CNDA_THREAD_SYNC;
+    if (cudaSuccess != err) {
+        PyErr_Format(PyExc_RuntimeError, "cudaMemcpy: error copying data to host (%s)",
+                     cudaGetErrorString(err));
+        return -1;
+    }
+    return 0;
+}
+
+int PyGpuMemset(void * dst, int data, size_t bytes){
+    cudaError_t err = cudaMemset(dst, data, bytes);
+    CNDA_THREAD_SYNC;
+    if (cudaSuccess != err) {
+        PyErr_Format(PyExc_MemoryError, "PyGpuMemset: Error memsetting %d bytes of device memory(%s). %p",
+                     bytes, cudaGetErrorString(err), PyGpuNdArray_DATA(dst));
+        return -1;
+    }
     return 0;
 }
 

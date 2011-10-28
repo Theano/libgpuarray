@@ -73,6 +73,7 @@ void PyGpuNdArray_fprint(FILE * fd, const PyGpuNdArrayObject *self)
 {
     fprintf(fd, "PyGpuNdArrayObject <%p, %p> nd=%i data_allocated=%d\n",
 	    self, PyGpuNdArray_DATA(self), PyGpuNdArray_NDIM(self), self->data_allocated);
+    fprintf(fd, "\tITEMSIZE: %d\n", PyGpuNdArray_ITEMSIZE(self));
     fprintf(fd, "\tRefcount: %ld\n", (long int)self->ob_refcnt);
     fprintf(fd, "\tBASE: %p\n", PyGpuNdArray_BASE(self));
     fprintf(fd, "\tHOST_DIMS:      ");
@@ -89,7 +90,6 @@ void PyGpuNdArray_fprint(FILE * fd, const PyGpuNdArrayObject *self)
     fprintf(fd, "\n\t\tC_CONTIGUOUS: %d", PyGpuNdArray_ISCONTIGUOUS(self));
     fprintf(fd, "\n\t\tPyGpuNdArray_ISFORTRAN: %d PyGpuNdArray_FORTRAN_IF:%d F_CONTIGUOUS: %d",
             PyGpuNdArray_ISFORTRAN(self), PyGpuNdArray_FORTRAN_IF(self), PyGpuNdArray_CHKFLAGS(self, NPY_FORTRAN));
-    fprintf(fd, "\n\t\tF_CONTIGUOUS: %d", PyGpuNdArray_ISFORTRAN(self));
     fprintf(fd, "\n\t\tOWNDATA: %d", PyGpuNdArray_CHKFLAGS(self, NPY_OWNDATA));
     fprintf(fd, "\n\t\tWRITEABLE: %d", PyGpuNdArray_ISWRITEABLE(self));
     fprintf(fd, "\n\t\tALIGNED: %d", PyGpuNdArray_ISALIGNED(self));
@@ -102,6 +102,7 @@ void PyArray_fprint(FILE * fd, const PyArrayObject *self)
 {
     fprintf(fd, "PyArrayObject <%p, %p> nd=%i\n",
 	    self, PyArray_DATA(self), PyArray_NDIM(self));
+    fprintf(fd, "\tITEMSIZE: %d\n", PyArray_ITEMSIZE(self));
     fprintf(fd, "\tHOST_DIMS:      ");
     for (int i = 0; i < PyArray_NDIM(self); ++i)
     {
@@ -159,6 +160,55 @@ PyGpuNdArray_is_f_contiguous(const PyGpuNdArrayObject * self)
         size = size * PyGpuNdArray_DIM(self, i);
     }
     return f_contiguous;
+}
+
+/**
+ * [Re]allocate a PyGpuNdArrayObject with access to 'nd' dimensions.
+ *
+ * Note: This does not allocate storage for data.
+ */
+static
+int PyGpuNdArray_set_nd(PyGpuNdArrayObject * self, const int nd)
+{
+    if (nd != PyGpuNdArray_NDIM(self))
+    {
+        if(0) fprintf(stderr, "PyGpuNdArray_set_nd: modif nd=%i to nd=%i\n", PyGpuNdArray_NDIM(self), nd);
+    
+        if (PyGpuNdArray_DIMS(self)){
+            free(PyGpuNdArray_DIMS(self));
+            PyGpuNdArray_DIMS(self) = NULL;
+            PyGpuNdArray_NDIM(self) = -1;
+        }
+        if (PyGpuNdArray_STRIDES(self)){
+            free(PyGpuNdArray_STRIDES(self));
+            PyGpuNdArray_STRIDES(self) = NULL;
+            PyGpuNdArray_NDIM(self) = -1;
+        }
+        if (nd == -1) return 0;
+
+        PyGpuNdArray_DIMS(self) = (npy_intp*)malloc(nd*sizeof(npy_intp));
+        if (NULL == PyGpuNdArray_DIMS(self))
+        {
+            PyErr_SetString(PyExc_MemoryError, "PyGpuNdArray_set_nd: Failed to allocate dimensions");
+            return -1;
+        }
+        PyGpuNdArray_STRIDES(self) = (npy_intp*)malloc(nd*sizeof(npy_intp));
+        if (NULL == PyGpuNdArray_STRIDES(self))
+        {
+            PyErr_SetString(PyExc_MemoryError, "PyGpuNdArray_set_nd: Failed to allocate str");
+            return -1;
+        }
+        //initialize all dimensions and strides to 0
+        for (int i = 0; i < nd; ++i)
+        {
+            PyGpuNdArray_DIM(self, i) = 0;
+            PyGpuNdArray_STRIDES(self)[i] = 0;
+        }
+
+        PyGpuNdArray_NDIM(self) = nd;
+	if(0) fprintf(stderr, "PyGpuNdArray_set_nd: end\n");
+    }
+    return 0;
 }
 
 #endif

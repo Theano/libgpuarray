@@ -89,7 +89,8 @@ PyGpuNdArrayObject_dealloc(PyGpuNdArrayObject* self)
 static PyObject *
 PyGpuNdArray_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    if(0) fprintf(stderr, "PyGpuNdArray_new\n");
+    int verbose = 0;
+    if(verbose) fprintf(stderr, "PyGpuNdArray_new\n");
     PyGpuNdArrayObject *self;
 
     self = (PyGpuNdArrayObject *)type->tp_alloc(type, 0);
@@ -97,14 +98,15 @@ PyGpuNdArray_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         PyGpuNdArray_null_init(self);
         ++_outstanding_mallocs[1];
     }
-    if(0) fprintf(stderr, "PyGpuNdArray_new end %p\n", self);
+    if(verbose) fprintf(stderr, "PyGpuNdArray_new end %p\n", self);
     return (PyObject *)self;
 }
 
 static int
 PyGpuNdArray_init(PyGpuNdArrayObject *self, PyObject *args, PyObject *kwds)
 {
-    if(0) fprintf(stderr, "PyGpuNdArray_init\n");
+    int verbose = 0;
+    if(verbose) fprintf(stderr, "PyGpuNdArray_init\n");
     PyObject *arr=NULL;
 
     if (! PyArg_ParseTuple(args, "O", &arr))
@@ -119,7 +121,7 @@ PyGpuNdArray_init(PyGpuNdArrayObject *self, PyObject *args, PyObject *kwds)
     self->descr = type;
     Py_XINCREF(self->descr);//TODO: How to handle the refcont on this object?
     int rval = PyGpuNdArray_CopyFromArray(self, (PyArrayObject*)arr);
-    if(0) fprintf(stderr, "PyGpuNdArray_init: end %p type=%p\n", self, self->descr);
+    if(verbose) fprintf(stderr, "PyGpuNdArray_init: end %p type=%p\n", self, self->descr);
     return rval;
 }
 
@@ -174,28 +176,14 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
     // New memory, so it should be writable
     assert(PyGpuNdArray_ISWRITEABLE(self));
 
-    if (0) {
-        cublasSetVector(PyArray_SIZE(py_src),
-                        PyArray_ITEMSIZE(py_src),
-                        PyArray_DATA(py_src), 1,
-                        PyGpuNdArray_DATA(self), 1);
-        CNDA_THREAD_SYNC;
-        if (CUBLAS_STATUS_SUCCESS != cublasGetError()) {
-                PyErr_SetString(PyExc_RuntimeError, "error copying data to device memory");
-                Py_DECREF(py_src);
-                return -1;
-        }
-    } else {
-        cudaError_t err = cudaMemcpy(PyGpuNdArray_DATA(self),
-                                 PyArray_DATA(py_src),
-                                 PyArray_SIZE(py_src) * PyArray_ITEMSIZE(py_src),
-                                 cudaMemcpyHostToDevice);
-        CNDA_THREAD_SYNC;
-        if (cudaSuccess != err) {
-            PyErr_SetString(PyExc_RuntimeError, "cudaMemcpy: error copying data to device memory");
-            Py_DECREF(py_src);
-            return -1;
-        }
+    err = PyGpuMemcpy(PyGpuNdArray_DATA(self),
+                    PyArray_DATA(py_src),
+                    PyArray_SIZE(py_src) * PyArray_ITEMSIZE(py_src),
+                    PyGpuHostToDevice);
+    CNDA_THREAD_SYNC;
+    if (err) {
+        Py_DECREF(py_src);
+        return -1;
     }
     Py_DECREF(py_src);
     if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromArray: end\n");
@@ -282,26 +270,6 @@ PyObject * PyGpuNdArray_View(PyGpuNdArrayObject * self)
 
     return (PyObject*)rval;
 }
-char *
-cublasGetErrorString(cublasStatus err)
-{
-    if (err == CUBLAS_STATUS_NOT_INITIALIZED) {
-        return "CUBLAS_STATUS_NOT_INITIALIZED";
-    } else if (err == CUBLAS_STATUS_ALLOC_FAILED){
-        return "CUBLAS_STATUS_ALLOC_FAILED";
-    } else if (err == CUBLAS_STATUS_INVALID_VALUE){
-        return "CUBLAS_STATUS_INVALID_VALUE";
-    } else if (err == CUBLAS_STATUS_MAPPING_ERROR){
-        return "CUBLAS_STATUS_MAPPING_ERROR";
-    } else if (err == CUBLAS_STATUS_EXECUTION_FAILED){
-        return "CUBLAS_STATUS_EXECUTION_FAILED";
-    } else if (err == CUBLAS_STATUS_INTERNAL_ERROR){
-        return "CUBLAS_STATUS_INTERNAL_ERROR";
-    } else {
-        return "UNKNOW ERROR";
-    }
-
-}
 
 //updated for offset
 PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
@@ -370,33 +338,16 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
         Py_DECREF(contiguous_self);
         return NULL;
     }
-    if (0) {
-        cublasGetVector(PyArray_SIZE(rval), PyArray_ITEMSIZE(rval),
-                        PyGpuNdArray_DATA(contiguous_self), 1,
-                        PyArray_DATA(rval), 1);
-        CNDA_THREAD_SYNC;
-        cublasStatus err = cublasGetError();
 
-        if (CUBLAS_STATUS_SUCCESS != err) {
-            PyErr_Format(PyExc_RuntimeError, "error copying data to host %s",
-                         cublasGetErrorString(err));
-            Py_DECREF(contiguous_self);
-            Py_DECREF(rval);
-            rval = NULL;
-        }
-    } else {
-        cudaError_t err = cudaMemcpy(PyArray_DATA(rval),
-                                     PyGpuNdArray_DATA(contiguous_self),
-                                     PyArray_SIZE(rval) * PyArray_ITEMSIZE(rval),
-                                     cudaMemcpyDeviceToHost);
-        CNDA_THREAD_SYNC;
-        if (cudaSuccess != err) {
-            PyErr_Format(PyExc_RuntimeError, "cudaMemcpy: error copying data to host (%s)",
-                         cudaGetErrorString(err));
-            Py_DECREF(contiguous_self);
-            Py_DECREF(rval);
-            rval = NULL;
-        }
+    int err = PyGpuMemcpy(PyArray_DATA(rval),
+                          PyGpuNdArray_DATA(contiguous_self),
+                          PyArray_SIZE(rval) * PyArray_ITEMSIZE(rval),
+                          PyGpuDeviceToHost);
+    CNDA_THREAD_SYNC;
+    if (err) {
+        Py_DECREF(contiguous_self);
+        Py_DECREF(rval);
+        rval = NULL;
     }
     Py_DECREF(contiguous_self);
     return rval;
@@ -445,10 +396,8 @@ PyGpuNdArray_Zeros(int nd, npy_intp* dims, PyArray_Descr* dtype, int fortran)
     int total_size = total_elements * dtype->elsize;
     
     // Fill with zeros
-    cudaError_t err = cudaMemset(PyGpuNdArray_DATA(rval), 0, total_size);
-    if (cudaSuccess != err) {
-        PyErr_Format(PyExc_MemoryError, "PyGpuNdArray_Zeros: Error memsetting %d bytes of device memory(%s). %p",
-                     total_size, cudaGetErrorString(err), PyGpuNdArray_DATA(rval));
+    int err = PyGpuMemset(PyGpuNdArray_DATA(rval), 0, total_size);
+    if (err) {
         Py_DECREF(rval);
         return NULL;
     }
@@ -493,13 +442,14 @@ PyGpuNdArray_zeros(PyObject* dummy, PyObject* args, PyObject *kargs)
         return NULL;
     }
 
+    if (!typecode)
+        typecode = PyArray_DescrFromType(NPY_FLOAT64);
+
     int shplen = PySequence_Length(shape);
 
     if (shplen == 0)
     {
-        PyErr_SetString(PyExc_ValueError,
-            "PyGpuNdArray_Zeros: empty shape not allowed");
-        return NULL;
+        return PyGpuNdArray_Zeros(0, NULL, typecode, fortran);
     }
 
     npy_intp* newdims = (npy_intp *)malloc(sizeof(npy_intp) * shplen);
@@ -579,13 +529,14 @@ PyGpuNdArray_empty(PyObject* dummy, PyObject* args, PyObject *kargs)
         return NULL;
     }
 
+    if (!typecode)
+        typecode = PyArray_DescrFromType(NPY_FLOAT64);
+
     int shplen = PySequence_Length(shape);
 
     if (shplen == 0)
     {
-        PyErr_SetString(PyExc_ValueError,
-            "PyGpuNdArray_empty: empty shape not allowed");
-        return NULL;
+        return PyGpuNdArray_Empty(0, NULL, typecode, fortran);
     }
 
     npy_intp* newdims = (npy_intp *)malloc(sizeof(npy_intp) * shplen);
@@ -901,11 +852,22 @@ PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base)
             return -1;
         }
     }
+
+    // Get the original base object (base.base.base...)
+    // TODO: check that base is indeed a CudaNdarray?
+    PyObject * orig_base = base;
+    // base is not always a PyGpuNdArrayObject. It can be a GpuArray from pycuda, ...
+    while (orig_base && PyGpuNdArray_Check(orig_base) && ((PyGpuNdArrayObject*) orig_base)->base)
+    {
+        // base_base is itself a view
+        orig_base = ((PyGpuNdArrayObject*) orig_base)->base;
+    }
+
     //N.B. XDECREF and XINCREF are no-ops for NULL pointers
-    if (PyGpuNdArray_BASE(self) != base)
+    if (PyGpuNdArray_BASE(self) != orig_base)
     {
         Py_XDECREF(PyGpuNdArray_BASE(self));
-        PyGpuNdArray_BASE(self) = base;
+        PyGpuNdArray_BASE(self) = orig_base;
         Py_XINCREF(PyGpuNdArray_BASE(self));
     }
     self->data_allocated = 0;
@@ -1257,6 +1219,8 @@ static PyTypeObject PyGpuNdArrayType =
 PyObject *
 PyGpuNdArray_New(int nd)
 {
+    int verbose = 0;
+    if (verbose) fprintf(stderr,"PyGpuNdArray_New start\n");
     PyGpuNdArrayObject *self = (PyGpuNdArrayObject *)PyGpuNdArrayType.tp_alloc(&PyGpuNdArrayType, 0);
     if (self == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "PyGpuNdArray_New failed to allocate self");
@@ -1274,6 +1238,7 @@ PyGpuNdArray_New(int nd)
         }
     }
     ++_outstanding_mallocs[1];
+    if (verbose) fprintf(stderr,"PyGpuNdArray_New end\n");
     return (PyObject *)self;
 }
 
