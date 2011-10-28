@@ -3,12 +3,12 @@
 
 //#include <Python.h>
 //#include <structmember.h>
-#include <numpy/arrayobject.h>
-#include <gpu_ndarray.cuh>
-#include <pygpu_ndarray_object.h>
 #include <stdio.h>
+#include <numpy/arrayobject.h>
 
-#include <pygpu_language.h>
+#include "pygpu_ndarray_object.h"
+#include "gpu_ndarray.h"
+#include "pygpu_language.h"
 
 /*
  * Return a PyGpuNdArray whose 'nd' dimensions are all 0.
@@ -59,4 +59,4 @@ PyGpuNdArray_Empty(int nd, npy_intp* dims, PyArray_Descr* dtype, int fortran);
   fill-column:79
   End:
 */
-// vim: filetype=cpp:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:encoding=utf-8:textwidth=79 :
+// vim: filetype=cpp:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=79 :

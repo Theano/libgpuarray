@@ -3,6 +3,27 @@
 
 #include <cublas.h>
 
+#ifdef __DEVICE_EMULATION__
+#define NUM_VECTOR_OP_BLOCKS                4096
+#define NUM_VECTOR_OP_THREADS_PER_BLOCK     1  //This prevents printf from getting tangled up
+#else
+#define NUM_VECTOR_OP_BLOCKS                4096 //Max number of blocks to launch.  Should be read from device properties. (#10)
+#define NUM_VECTOR_OP_THREADS_PER_BLOCK     256  //Should be read from device properties. (#10)
+#endif
+
+#if 0
+// Do not wait after every kernel & transfer.
+#define CNDA_THREAD_SYNC
+#else
+// This is useful for using normal profiling tools
+#define CNDA_THREAD_SYNC cudaThreadSynchronize();
+#endif
+
+#ifndef SHARED_SIZE
+#define SHARED_SIZE (16*1024)
+#endif
+
+
 char *
 cublasGetErrorString(cublasStatus err)
 {
@@ -569,7 +590,7 @@ int PyGpuMemset(void * dst, int data, size_t bytes){
     cudaError_t err = cudaMemset(dst, data, bytes);
     CNDA_THREAD_SYNC;
     if (cudaSuccess != err) {
-        PyErr_Format(PyExc_MemoryError, "PyGpuMemset: Error memsetting %d bytes of device memory(%s). %p",
+        PyErr_Format(PyExc_MemoryError, "PyGpuMemset: Error memsetting %ld bytes of device memory(%s). %p",
                      bytes, cudaGetErrorString(err), PyGpuNdArray_DATA(dst));
         return -1;
     }
@@ -586,4 +607,4 @@ int PyGpuMemset(void * dst, int data, size_t bytes){
   fill-column:79
   End:
 */
-// vim: filetype=cpp:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:encoding=utf-8:textwidth=79 :
+// vim: filetype=cpp:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=79 :

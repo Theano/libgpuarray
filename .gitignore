@@ -12,3 +12,7 @@ distribute*egg
 distribute*tar.gz
 *.so
 *.o
+*.aux
+*.bbl
+*.blg
+*.log
