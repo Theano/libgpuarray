@@ -1,5 +1,6 @@
 #ifndef _PYGPU_NDARRAY_H
 #define _PYGPU_NDARRAY_H
+#define OFFSET 0
 
 //#include <Python.h>
 //#include <structmember.h>
@@ -36,7 +37,10 @@ PyGpuNdArray_CheckExact(const PyObject * ob);
 int PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj);
 
 static int 
-PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base);
+PyGpuNdArray_add_offset(PyGpuNdArrayObject * self, int offset);
+
+static int 
+PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base, int offset=0);
 
 static PyObject *
 PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key);

@@ -835,7 +835,18 @@ PyGpuNdArray_len(PyObject * py_self)
 }
 
 static int
-PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base)
+PyGpuNdArray_add_offset(PyGpuNdArrayObject * self, int offset)
+{
+#if OFFSET
+    PyGpuNdArray_OFFSET(self) += offset;
+#else
+    PyGpuNdArray_DATA(self) += offset;
+#endif
+}
+
+
+static int
+PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base, int offset)
 {
     if (self->data_allocated)
     {
@@ -866,7 +877,13 @@ PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base)
         Py_XINCREF(PyGpuNdArray_BASE(self));
     }
     self->data_allocated = 0;
+#if OFFSET
     PyGpuNdArray_DATA(self) = data;
+    PyGpuNdArray_OFFSET(self) = offset;
+#else
+    PyGpuNdArray_DATA(self) = data + offset;
+#endif
+
     return 0;
 }
 
