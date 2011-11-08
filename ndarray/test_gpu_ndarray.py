@@ -5,6 +5,7 @@ import numpy
 import pygpu_ndarray as gpu_ndarray
 
 enable_double = True
+enable_double = False
 
 dtypes_all = ["float32",
               "int8", "int16", "int32", "int64",
@@ -20,6 +21,7 @@ if enable_double:
     dtypes_all += ["float64", "complex128"]
     dtypes_no_complex += ["float64"]
 
+
 def check_flags(x, y):
     assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
     assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
@@ -28,11 +30,13 @@ def check_flags(x, y):
     assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
     assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
 
+
 def check_meta(x, y):
     assert x.shape == y.shape
     assert x.dtype == y.dtype
     assert x.strides == y.strides
     check_flags(x, y)
+
 
 def check_all(x, y):
     check_meta(x, y)
@@ -73,26 +77,27 @@ def test_transfer_not_contiguous():
     Test transfer when the input on the CPU is not contiguous
     TODO: test when the input on the gpu is not contiguous
     """
-    for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
+    for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             a = numpy.random.rand(*shp) * 10
             a = a[::-1]
             b = gpu_ndarray.GpuNdArrayObject(a)
             c = numpy.asarray(b)
 
-            assert numpy.allclose(c,a)
+            assert numpy.allclose(c, a)
             assert a.shape == b.shape == c.shape
             # We copy a to a c contiguous array before the transfer
-            assert (-a.strides[0],)+a.strides[1:] == b.strides == c.strides
+            assert (-a.strides[0],) + a.strides[1:] == b.strides == c.strides
             assert a.dtype == b.dtype == c.dtype
             assert c.flags.c_contiguous
 
+
 def test_transfer_fortran():
-    for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
+    for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             a = numpy.random.rand(*shp) * 10
             a_ = numpy.asfortranarray(a)
-            if len(shp)>1:
+            if len(shp) > 1:
                 assert a_.strides != a.strides
             a = a_
             b = gpu_ndarray.GpuNdArrayObject(a)
@@ -103,16 +108,17 @@ def test_transfer_fortran():
             assert a.flags.f_contiguous
             assert c.flags.f_contiguous
             assert a.strides == b.strides == c.strides
-            assert numpy.allclose(c,a)
+            assert numpy.allclose(c, a)
+
 
 def test_zeros():
-    for shp in [(), (5,),(6,7),(4,8,9),(1,8,9)]:
+    for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
                 x = numpy.zeros(shp, dtype, order)
                 y = gpu_ndarray.zeros(shp, dtype, order)
                 check_all(x, y)
-    x = gpu_ndarray.zeros(())# no dtype and order param
+    x = gpu_ndarray.zeros(())  # no dtype and order param
     y = numpy.zeros(())
     check_meta(x, y)
 
@@ -122,14 +128,15 @@ def test_zeros():
     except TypeError:
         pass
 
+
 def test_empty():
-    for shp in [(), (5,),(6,7),(4,8,9),(1,8,9)]:
+    for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
                 x = numpy.empty(shp, dtype, order)
                 y = gpu_ndarray.empty(shp, dtype, order)
                 check_meta(x, y)
-    x = gpu_ndarray.empty(())# no dtype and order param
+    x = gpu_ndarray.empty(())  # no dtype and order param
     y = numpy.empty(())
     check_meta(x, y)
     try:
@@ -139,9 +146,8 @@ def test_empty():
         pass
 
 
-
 def test_mapping_getitem_ellipsis():
-    for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
+    for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             for offseted in [True, False]:
                 a, a_gpu = gen_gpu_nd_array(shp, dtype, offseted)
@@ -153,8 +159,10 @@ def test_mapping_getitem_ellipsis():
                 b_cpu = numpy.asarray(b)
                 assert numpy.allclose(a, b_cpu)
 
+
 def test_copy_view():
     from ..array import may_share_memory
+
     def check_memory_region(a, a_op, b, b_op):
         assert numpy.may_share_memory(a, a_op) == may_share_memory(b, b_op)
 
@@ -169,7 +177,7 @@ def test_copy_view():
             else:
                 assert b_op.base is b
 
-    for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
+    for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             for offseted in [False, True]:
                 #TODO test copy unbroadcast!
@@ -205,14 +213,15 @@ def test_copy_view():
 
 
 def test_len():
-    for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
+    for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             for offseted in [True, False]:
                 a, a_gpu = gen_gpu_nd_array(shp, dtype, offseted)
                 assert len(a_gpu) == shp[0]
 
+
 def test_mapping_getitem_w_int():
-    def _cmp(x,y):
+    def _cmp(x, y):
         assert x.shape == y.shape
         assert x.dtype == y.dtype
         assert x.strides == y.strides
@@ -234,9 +243,9 @@ def test_mapping_getitem_w_int():
         if not numpy.all(x == y):
             print x
             print y
-        assert numpy.all(x == y),(x, y)
+        assert numpy.all(x == y), (x, y)
 
-    def _cmpNs(x,y):
+    def _cmpNs(x, y):
         """
         Don't compare the stride after the transfer
         There is a copy that have been made on the gpu before the transfer
@@ -256,9 +265,10 @@ def test_mapping_getitem_w_int():
         if not numpy.all(x_ == y):
             print x_
             print y
-        assert numpy.all(x_ == y),(x_, y)
+        assert numpy.all(x_ == y), (x_, y)
         pass
-    def _cmpf(x,*y):
+
+    def _cmpf(x, *y):
         try:
             x.__getitem__(y)
         except IndexError:
@@ -266,9 +276,9 @@ def test_mapping_getitem_w_int():
         else:
             raise Exception("Did not generate out or bound error")
 
-    def _cmpfV(x,*y):
+    def _cmpfV(x, *y):
         try:
-            if len(y)==1:
+            if len(y) == 1:
                 x.__getitem__(*y)
             else:
                 x.__getitem__(y)
