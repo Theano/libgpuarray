@@ -248,9 +248,10 @@ PyObject * PyGpuNdArray_DeepCopy(PyGpuNdArrayObject * self, PyObject * memo)
 PyObject * PyGpuNdArray_View(PyGpuNdArrayObject * self)
 {
     PyGpuNdArrayObject * rval = (PyGpuNdArrayObject*)PyGpuNdArray_New(PyGpuNdArray_NDIM(self));
-    if (!rval || PyGpuNdArray_set_data(rval, PyGpuNdArray_DATA(self), (PyObject *)self)) {
+    if (!rval || PyGpuNdArray_set_data(rval, PyGpuNdArray_DATA(self),
+                              (PyObject *)self, PyGpuNdArray_OFFSET(self))) {
         Py_XDECREF(rval);
-        rval = NULL;
+        return NULL;
     } else {
         for (int i = 0; i < PyGpuNdArray_NDIM(self); ++i) {
             PyGpuNdArray_DIM(rval, i) = PyGpuNdArray_DIMS(self)[i];
@@ -273,8 +274,6 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
     int verbose = 0;
 
     if(verbose) fprintf(stderr, "PyGpuNdArray_CreateArrayObj\n");
-
-    assert(PyGpuNdArray_OFFSET(self)==0);//TODO implement when offset is not 0!
 
     if(PyGpuNdArray_NDIM(self)>=0 && PyGpuNdArray_SIZE(self)==0){
       npy_intp * npydims = (npy_intp*)malloc(PyGpuNdArray_NDIM(self) * sizeof(npy_intp));
@@ -336,7 +335,7 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
     }
 
     int err = PyGpuMemcpy(PyArray_DATA(rval),
-                          PyGpuNdArray_DATA(contiguous_self),
+                          PyGpuNdArray_DATA(contiguous_self)+PyGpuNdArray_OFFSET(contiguous_self),
                           PyArray_SIZE(rval) * PyArray_ITEMSIZE(rval),
                           PyGpuDeviceToHost);
     if (err) {
@@ -900,8 +899,6 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
 
     //PyObject_Print(key, stderr, 0);
 
-    assert(PyGpuNdArray_OFFSET(self)==0);
-
     if (key == Py_Ellipsis)
     {
         if (verbose) fprintf(stderr, "Subscript with ellipse \n");
@@ -943,6 +940,9 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         }
         if (verbose) fprintf(stderr, "Subscript with int 3\n");
 
+        //Add the original offset
+        offset += PyGpuNdArray_OFFSET(self);
+
         //allocate our subtensor view
         py_rval = PyGpuNdArray_New(PyGpuNdArray_NDIM(self) - 1);
         rval = (PyGpuNdArrayObject*) py_rval;
@@ -954,7 +954,7 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         if (verbose) fprintf(stderr, "Subscript with int 4\n");
         //initialize the view's data pointer to our own.
         assert (0 == rval->data_allocated);
-        if (PyGpuNdArray_set_data(rval, PyGpuNdArray_DATA(self) + offset, (PyObject *) self)){
+        if (PyGpuNdArray_set_data(rval, PyGpuNdArray_DATA(self), (PyObject *) self, offset)){
             Py_DECREF(rval);
             return NULL;
         }
@@ -998,8 +998,10 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         PyGpuNdArray_DESCR(py_rval) = PyGpuNdArray_DESCR(self);
         assert (0 == rval->data_allocated);
         if (PyGpuNdArray_set_data(rval,
-                                  PyGpuNdArray_DATA(self) + start * PyGpuNdArray_STRIDE(self, 0),
-                                  py_self)) {
+                                  PyGpuNdArray_DATA(self),
+                                  py_self,
+                                  start * PyGpuNdArray_STRIDE(self, 0)
+                                  + PyGpuNdArray_OFFSET(self))) {
             Py_DECREF(rval);
             return NULL;
         }
@@ -1045,7 +1047,8 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         PyGpuNdArray_DESCR(py_rval) = PyGpuNdArray_DESCR(self);
 
         //initialize the view's data pointer to our own.
-        if (PyGpuNdArray_set_data(rval, PyGpuNdArray_DATA(self), py_self))
+        if (PyGpuNdArray_set_data(rval, PyGpuNdArray_DATA(self),
+                                  py_self, PyGpuNdArray_OFFSET(self)))
         {
             Py_DECREF(rval);
             return NULL;
@@ -1078,7 +1081,7 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
                         Py_DECREF(rval);
                         return NULL;
                     }
-                    PyGpuNdArray_DATA(rval) += start * PyGpuNdArray_STRIDES(self)[d];
+                    PyGpuNdArray_add_offset(rval, start * PyGpuNdArray_STRIDES(self)[d]);
                     PyGpuNdArray_STRIDE(rval, rval_d) = step * PyGpuNdArray_STRIDES(self)[d];
                     PyGpuNdArray_DIM(rval, rval_d) = slen;
                     if (0)
@@ -1101,12 +1104,12 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
                     if ((d_idx >= 0) && (d_idx < d_dim))
                     {
                         //normal indexing
-                        PyGpuNdArray_DATA(rval) += d_idx * PyGpuNdArray_STRIDES(self)[d];
+                        PyGpuNdArray_add_offset(rval, d_idx * PyGpuNdArray_STRIDES(self)[d]);
                     }
                     else if ((d_idx < 0) && (d_idx >= -d_dim))
                     {
                         //end-based indexing
-                        PyGpuNdArray_DATA(rval) += (d_dim + d_idx) * PyGpuNdArray_STRIDES(self)[d];
+                        PyGpuNdArray_add_offset(rval, (d_dim + d_idx) * PyGpuNdArray_STRIDES(self)[d]);
                     }
                     else
                     {
