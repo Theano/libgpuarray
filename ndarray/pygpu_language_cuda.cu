@@ -192,7 +192,6 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
 {
     int verbose = 0;
     if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromPyGpuNdArray start nd=%d\n", PyGpuNdArray_NDIM(self));
-    assert(PyGpuNdArray_OFFSET(self) == 0 && PyGpuNdArray_OFFSET(other) == 0);
     assert(PyGpuNdArray_TYPE(self) == PyGpuNdArray_TYPE(other));
     assert(PyGpuNdArray_ISWRITEABLE(self));
     //standard elemwise size checks
@@ -227,12 +226,15 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
         if (PyGpuNdArray_STRIDE(other,i)<0)
             pos_stride = false;
 
+    void * other_data = PyGpuNdArray_DATA(other) + PyGpuNdArray_OFFSET(other);
+    void * self_data = PyGpuNdArray_DATA(self) + PyGpuNdArray_OFFSET(self);
+
     //Try to transfer with cublas(we suppose it is faster)
     if (PyGpuNdArray_ISCONTIGUOUS(self) && PyGpuNdArray_ISCONTIGUOUS(other) &&
 	size == size_source && PyGpuNdArray_TYPE(self) == NPY_FLOAT32 &&
         pos_stride
         ) {
-        cublasScopy(size, (float*) PyGpuNdArray_DATA(other), 1, (float*) PyGpuNdArray_DATA(self), 1);
+        cublasScopy(size, (float*) other_data, 1, (float*) self_data, 1);
         CNDA_THREAD_SYNC;
         if (CUBLAS_STATUS_SUCCESS != cublasGetError()) {
             PyErr_SetString(PyExc_RuntimeError, "Error copying memory");
@@ -245,7 +247,7 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
     if (PyGpuNdArray_ISCONTIGUOUS(self) && PyGpuNdArray_ISCONTIGUOUS(other) &&
 	size == size_source && PyGpuNdArray_TYPE(self) == NPY_FLOAT64 &&
         pos_stride) {
-        cublasDcopy(size, (double*) PyGpuNdArray_DATA(other), 1, (double*) PyGpuNdArray_DATA(self), 1);
+        cublasDcopy(size, (double*) other_data, 1, (double*) self_data, 1);
         CNDA_THREAD_SYNC;
         if (CUBLAS_STATUS_SUCCESS != cublasGetError()) {
             PyErr_SetString(PyExc_RuntimeError, "Error copying memory");
@@ -274,86 +276,86 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
 		if (PyGpuNdArray_TYPE(self) == NPY_FLOAT32) {
                     const int elsize = sizeof(float);
                     k_copy_1d<<<n_blocks, n_threads>>>(size,
-                                                       (float*)PyGpuNdArray_DATA(other),
+                                                       (float*)other_data,
                                                        PyGpuNdArray_STRIDES(other)[0]/elsize,
-                                                       (float*)PyGpuNdArray_DATA(self),
+                                                       (float*)self_data,
                                                        PyGpuNdArray_STRIDES(self)[0]/elsize);
 		} else if (PyGpuNdArray_TYPE(self) == NPY_FLOAT64) {
                     const int elsize = sizeof(double);
                     k_copy_1d<<<n_blocks, n_threads>>>(size,
-                                                       (double*)PyGpuNdArray_DATA(other),
+                                                       (double*)other_data,
                                                        PyGpuNdArray_STRIDES(other)[0]/elsize,
-                                                       (double*)PyGpuNdArray_DATA(self),
+                                                       (double*)self_data,
                                                        PyGpuNdArray_STRIDES(self)[0]/elsize);
 		} else if (PyGpuNdArray_TYPE(self) == NPY_INT8) {
                     const int elsize = sizeof(int8_t);
                     k_copy_1d<<<n_blocks, n_threads>>>(size,
-                                                       (int8_t*)PyGpuNdArray_DATA(other),
+                                                       (int8_t*)other_data,
                                                        PyGpuNdArray_STRIDES(other)[0]/elsize,
-                                                       (int8_t*)PyGpuNdArray_DATA(self),
+                                                       (int8_t*)self_data,
                                                        PyGpuNdArray_STRIDES(self)[0]/elsize);
 		} else if (PyGpuNdArray_TYPE(self) == NPY_INT16) {
                     const int elsize = sizeof(int16_t);
                     k_copy_1d<<<n_blocks, n_threads>>>(size,
-                                                       (int16_t*)PyGpuNdArray_DATA(other),
+                                                       (int16_t*)other_data,
                                                        PyGpuNdArray_STRIDES(other)[0]/elsize,
-                                                       (int16_t*)PyGpuNdArray_DATA(self),
+                                                       (int16_t*)self_data,
                                                        PyGpuNdArray_STRIDES(self)[0]/elsize);
 		} else if (PyGpuNdArray_TYPE(self) == NPY_INT32) {
                     const int elsize = sizeof(int32_t);
                     k_copy_1d<<<n_blocks, n_threads>>>(size,
-                                                       (int32_t*)PyGpuNdArray_DATA(other),
+                                                       (int32_t*)other_data,
                                                        PyGpuNdArray_STRIDES(other)[0]/elsize,
-                                                       (int32_t*)PyGpuNdArray_DATA(self),
+                                                       (int32_t*)self_data,
                                                        PyGpuNdArray_STRIDES(self)[0]/elsize);
 		} else if (PyGpuNdArray_TYPE(self) == NPY_INT64) {
                     const int elsize = sizeof(int64_t);
                     k_copy_1d<<<n_blocks, n_threads>>>(size,
-                                                       (int64_t*)PyGpuNdArray_DATA(other),
+                                                       (int64_t*)other_data,
                                                        PyGpuNdArray_STRIDES(other)[0]/elsize,
-                                                       (int64_t*)PyGpuNdArray_DATA(self),
+                                                       (int64_t*)self_data,
                                                        PyGpuNdArray_STRIDES(self)[0]/elsize);
 		} else if (PyGpuNdArray_TYPE(self) == NPY_UINT8) {
                     const int elsize = sizeof(uint8_t);
                     k_copy_1d<<<n_blocks, n_threads>>>(size,
-                                                       (uint8_t*)PyGpuNdArray_DATA(other),
+                                                       (uint8_t*)other_data,
                                                        PyGpuNdArray_STRIDES(other)[0]/elsize,
-                                                       (uint8_t*)PyGpuNdArray_DATA(self),
+                                                       (uint8_t*)self_data,
                                                        PyGpuNdArray_STRIDES(self)[0]/elsize);
 		} else if (PyGpuNdArray_TYPE(self) == NPY_UINT16) {
                     const int elsize = sizeof(uint16_t);
                     k_copy_1d<<<n_blocks, n_threads>>>(size,
-                                                       (uint16_t*)PyGpuNdArray_DATA(other),
+                                                       (uint16_t*)other_data,
                                                        PyGpuNdArray_STRIDES(other)[0]/elsize,
-                                                       (uint16_t*)PyGpuNdArray_DATA(self),
+                                                       (uint16_t*)self_data,
                                                        PyGpuNdArray_STRIDES(self)[0]/elsize);
 		} else if (PyGpuNdArray_TYPE(self) == NPY_UINT32) {
                     const int elsize = sizeof(uint32_t);
                     k_copy_1d<<<n_blocks, n_threads>>>(size,
-                                                       (uint32_t*)PyGpuNdArray_DATA(other),
+                                                       (uint32_t*)other_data,
                                                        PyGpuNdArray_STRIDES(other)[0]/elsize,
-                                                       (uint32_t*)PyGpuNdArray_DATA(self),
+                                                       (uint32_t*)self_data,
                                                        PyGpuNdArray_STRIDES(self)[0]/elsize);
 		} else if (PyGpuNdArray_TYPE(self) == NPY_UINT64) {
                     const int elsize = sizeof(uint64_t);
                     k_copy_1d<<<n_blocks, n_threads>>>(size,
-                                                       (uint64_t*)PyGpuNdArray_DATA(other),
+                                                       (uint64_t*)other_data,
                                                        PyGpuNdArray_STRIDES(other)[0]/elsize,
-                                                       (uint64_t*)PyGpuNdArray_DATA(self),
+                                                       (uint64_t*)self_data,
                                                        PyGpuNdArray_STRIDES(self)[0]/elsize);
 		} else if (PyGpuNdArray_TYPE(self) == NPY_COMPLEX64) {
                     const int elsize = sizeof(npy_complex64);
                     k_copy_1d<<<n_blocks, n_threads>>>(size,
-                                                       (npy_complex64*)PyGpuNdArray_DATA(other),
+                                                       (npy_complex64*)other_data,
                                                        PyGpuNdArray_STRIDES(other)[0]/elsize,
-                                                       (npy_complex64*)PyGpuNdArray_DATA(self),
+                                                       (npy_complex64*)self_data,
                                                        PyGpuNdArray_STRIDES(self)[0]/elsize);
 		} else if (PyGpuNdArray_TYPE(self) == NPY_COMPLEX128) {
                     const int elsize = sizeof(npy_complex128);
                     k_copy_1d<<<n_blocks, n_threads>>>(size,
-                                                       (npy_complex128*)PyGpuNdArray_DATA(other),
+                                                       (npy_complex128*)other_data,
                                                        PyGpuNdArray_STRIDES(other)[0]/elsize,
-                                                       (npy_complex128*)PyGpuNdArray_DATA(self),
+                                                       (npy_complex128*)self_data,
                                                        PyGpuNdArray_STRIDES(self)[0]/elsize);
 		} else {
 		  PyErr_Format(PyExc_NotImplementedError, "PyGpuNdArray_CopyFromPyGpuNdArray: Don't implement copy for this dtype\n");
@@ -372,6 +374,7 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
                 assert (cudaSuccess == cudaGetLastError());
                 assert(PyGpuNdArray_ISALIGNED(self));
                 assert(PyGpuNdArray_ISALIGNED(other));
+
                 if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromPyGpuNdArray: Copying with default version unbroadcast=%d\n", unbroadcast);
                 // Identigy the dim of the output memory.
                 PyGpuNdArrayObject * cuda_dims = other;
@@ -423,108 +426,108 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
                         size,
                         (unsigned int)ndim,
                         strides_dev_p,
-                        (const float*)PyGpuNdArray_DATA(other),
+                        (const float*)other_data,
                         strides_dev_p+ndim,
-                        (float*) PyGpuNdArray_DATA(self),
+                        (float*) self_data,
                         strides_dev_p+(ndim*2));
 		} else if ( PyGpuNdArray_TYPE(self) == NPY_FLOAT64) {
                     k_elemwise_unary_rowmajor_copy_double<<<n_blocks, threads_per_block>>>(
                         size,
                         (unsigned int)ndim,
                         strides_dev_p,
-                        (const double*)PyGpuNdArray_DATA(other),
+                        (const double*)other_data,
                         strides_dev_p+ndim,
-                        (double*) PyGpuNdArray_DATA(self),
+                        (double*) self_data,
                         strides_dev_p+(ndim*2));
 		} else if ( PyGpuNdArray_TYPE(self) == NPY_INT8) {
                     k_elemwise_unary_rowmajor_copy_int8<<<n_blocks, threads_per_block>>>(
                         size,
                         (unsigned int)ndim,
                         strides_dev_p,
-                        (const int8_t*)PyGpuNdArray_DATA(other),
+                        (const int8_t*)other_data,
                         strides_dev_p+ndim,
-                        (int8_t*) PyGpuNdArray_DATA(self),
+                        (int8_t*) self_data,
                         strides_dev_p+(ndim*2));
 		} else if ( PyGpuNdArray_TYPE(self) == NPY_INT16) {
                     k_elemwise_unary_rowmajor_copy_int16<<<n_blocks, threads_per_block>>>(
                         size,
                         (unsigned int)ndim,
                         strides_dev_p,
-                        (const int16_t*)PyGpuNdArray_DATA(other),
+                        (const int16_t*)other_data,
                         strides_dev_p+ndim,
-                        (int16_t*) PyGpuNdArray_DATA(self),
+                        (int16_t*) self_data,
                         strides_dev_p+(ndim*2));
 		} else if ( PyGpuNdArray_TYPE(self) == NPY_INT32) {
                     k_elemwise_unary_rowmajor_copy_int32<<<n_blocks, threads_per_block>>>(
                         size,
                         (unsigned int)ndim,
                         strides_dev_p,
-                        (const int32_t*)PyGpuNdArray_DATA(other),
+                        (const int32_t*)other_data,
                         strides_dev_p+ndim,
-                        (int32_t*) PyGpuNdArray_DATA(self),
+                        (int32_t*) self_data,
                         strides_dev_p+(ndim*2));
 		} else if ( PyGpuNdArray_TYPE(self) == NPY_INT64) {
                     k_elemwise_unary_rowmajor_copy_int64<<<n_blocks, threads_per_block>>>(
                         size,
                         (unsigned int)ndim,
                         strides_dev_p,
-                        (const int64_t*)PyGpuNdArray_DATA(other),
+                        (const int64_t*)other_data,
                         strides_dev_p+ndim,
-                        (int64_t*) PyGpuNdArray_DATA(self),
+                        (int64_t*) self_data,
                         strides_dev_p+(ndim*2));
 		} else if ( PyGpuNdArray_TYPE(self) == NPY_UINT8) {
                     k_elemwise_unary_rowmajor_copy_uint8<<<n_blocks, threads_per_block>>>(
                         size,
                         (unsigned int)ndim,
                         strides_dev_p,
-                        (const uint8_t*)PyGpuNdArray_DATA(other),
+                        (const uint8_t*)other_data,
                         strides_dev_p+ndim,
-                        (uint8_t*) PyGpuNdArray_DATA(self),
+                        (uint8_t*) self_data,
                         strides_dev_p+(ndim*2));
 		} else if ( PyGpuNdArray_TYPE(self) == NPY_UINT16) {
                     k_elemwise_unary_rowmajor_copy_uint16<<<n_blocks, threads_per_block>>>(
                         size,
                         (unsigned int)ndim,
                         strides_dev_p,
-                        (const uint16_t*)PyGpuNdArray_DATA(other),
+                        (const uint16_t*)other_data,
                         strides_dev_p+ndim,
-                        (uint16_t*) PyGpuNdArray_DATA(self),
+                        (uint16_t*) self_data,
                         strides_dev_p+(ndim*2));
 		} else if ( PyGpuNdArray_TYPE(self) == NPY_UINT32) {
                     k_elemwise_unary_rowmajor_copy_uint32<<<n_blocks, threads_per_block>>>(
                         size,
                         (unsigned int)ndim,
                         strides_dev_p,
-                        (const uint32_t*)PyGpuNdArray_DATA(other),
+                        (const uint32_t*)other_data,
                         strides_dev_p+ndim,
-                        (uint32_t*) PyGpuNdArray_DATA(self),
+                        (uint32_t*) self_data,
                         strides_dev_p+(ndim*2));
 		} else if ( PyGpuNdArray_TYPE(self) == NPY_UINT64) {
                     k_elemwise_unary_rowmajor_copy_uint64<<<n_blocks, threads_per_block>>>(
                         size,
                         (unsigned int)ndim,
                         strides_dev_p,
-                        (const uint64_t*)PyGpuNdArray_DATA(other),
+                        (const uint64_t*)other_data,
                         strides_dev_p+ndim,
-                        (uint64_t*) PyGpuNdArray_DATA(self),
+                        (uint64_t*) self_data,
                         strides_dev_p+(ndim*2));
 		} else if ( PyGpuNdArray_TYPE(self) == NPY_COMPLEX64) {
                     k_elemwise_unary_rowmajor_copy_complex64<<<n_blocks, threads_per_block>>>(
                         size,
                         (unsigned int)ndim,
                         strides_dev_p,
-                        (const npy_complex64*)PyGpuNdArray_DATA(other),
+                        (const npy_complex64*)other_data,
                         strides_dev_p+ndim,
-                        (npy_complex64*) PyGpuNdArray_DATA(self),
+                        (npy_complex64*) self_data,
                         strides_dev_p+(ndim*2));
 		} else if ( PyGpuNdArray_TYPE(self) == NPY_COMPLEX128) {
                     k_elemwise_unary_rowmajor_copy_complex128<<<n_blocks, threads_per_block>>>(
                         size,
                         (unsigned int)ndim,
                         strides_dev_p,
-                        (const npy_complex128*)PyGpuNdArray_DATA(other),
+                        (const npy_complex128*)other_data,
                         strides_dev_p+ndim,
-                        (npy_complex128*) PyGpuNdArray_DATA(self),
+                        (npy_complex128*) self_data,
                         strides_dev_p+(ndim*2));
 		} else {
 		  PyErr_Format(PyExc_NotImplementedError, "PyGpuNdArray_CopyFromPyGpuNdArray: Don't implement copy for this dtype\n");
