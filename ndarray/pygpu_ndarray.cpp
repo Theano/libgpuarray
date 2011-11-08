@@ -247,10 +247,16 @@ PyObject * PyGpuNdArray_DeepCopy(PyGpuNdArrayObject * self, PyObject * memo)
 
 PyObject * PyGpuNdArray_View(PyGpuNdArrayObject * self)
 {
+    int verbose = 0;
     PyGpuNdArrayObject * rval = (PyGpuNdArrayObject*)PyGpuNdArray_New(PyGpuNdArray_NDIM(self));
     if (!rval || PyGpuNdArray_set_data(rval, PyGpuNdArray_DATA(self),
                               (PyObject *)self, PyGpuNdArray_OFFSET(self))) {
         Py_XDECREF(rval);
+        if(verbose)
+            fprintf(stderr,
+                    "PyGpuNdArray_View: no rval or PyGpuNdArray_set_data "
+                    "failed: self=%p, rval=%p rval_base=%p\n",
+                    self, rval, rval->base);
         return NULL;
     } else {
         for (int i = 0; i < PyGpuNdArray_NDIM(self); ++i) {
@@ -258,6 +264,10 @@ PyObject * PyGpuNdArray_View(PyGpuNdArrayObject * self)
             PyGpuNdArray_STRIDE(rval, i) = PyGpuNdArray_STRIDES(self)[i];
         }
     }
+    if(verbose>1) fprintf(stderr,
+                          "PyGpuNdArray_View: self=%p, self->base=%p"
+                          " rval=%p rval->base=%p\n",
+                          self, self->base, rval, rval->base);
     //TODO: find how to refcount on the descr!
     //Py_INCREF(PyGpuNdArray_DESCR(self));
     PyGpuNdArray_DESCR(rval) = PyGpuNdArray_DESCR(self);
@@ -836,6 +846,9 @@ PyGpuNdArray_len(PyObject * py_self)
 static int
 PyGpuNdArray_add_offset(PyGpuNdArrayObject * self, int offset)
 {
+    int verbose = 0;
+    if (verbose) printf("PyGpuNdArray_add_offset: %p %d\n", self, offset);
+
 #if OFFSET
     PyGpuNdArray_OFFSET(self) += offset;
 #else
@@ -847,6 +860,8 @@ PyGpuNdArray_add_offset(PyGpuNdArrayObject * self, int offset)
 static int
 PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base, int offset)
 {
+    int verbose = 0;
+    if (verbose) printf("PyGpuNdArray_set_data: %p %p %p %d\n", self, data, base, offset);
     if (self->data_allocated)
     {
         assert(PyGpuNdArray_DATA(self));
@@ -854,6 +869,8 @@ PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base, i
         {
             PyGpuNdArray_DATA(self) = NULL;
             self->data_allocated = 0;
+            if (verbose>1) printf("PyGpuNdArray_set_data: device_free failed!\n");
+            PyErr_SetString(PyExc_ValueError, "PyGpuNdArray_set_data: device_free failed");
             return -1;
         }
     }
