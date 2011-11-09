@@ -208,7 +208,7 @@ PyGpuMemcpy(void * dst, const void * src, size_t bytes,
 }
 
 int
-PyGpuMemSet(void * dst, int data, size_t bytes)
+PyGpuMemset(void * dst, int data, size_t bytes)
 { 
   /* This should be at least one byte over the formatted string below */
   char local_kern[92];
