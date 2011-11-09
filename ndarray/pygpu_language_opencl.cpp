@@ -5,7 +5,15 @@
 #include <pygpu_ndarray_object.h>
 #include <pygpu_language.h>
 
-#include <opencl.h>
+#ifdef __APPLE__
+
+#include <OpenCL/opencl.h>
+
+#else
+
+#include <CL/opencl.h>
+
+#endif
 
 cl_context ctx = NULL;
 cl_device_id dev;
