@@ -23,29 +23,74 @@ void
 init_context(void)
 {
   cl_int err;
-  cl_program prog;
+  cl_uint n;
+  cl_platform_id *plats;
+  cl_device_id *devs;
+  cl_context_properties props[3];
   size_t sz;
+  char info[1024];
 
   if (ctx != NULL) return;
 
-  ctx = clCreateContextFromType(NULL, CL_DEVICE_TYPE_GPU, NULL, NULL, &err);
+  err = clGetPlatformIDs(0, NULL, &n);
+  if (err != CL_SUCCESS) return;
+
+  plats = (cl_platform_id *)calloc(n, sizeof(cl_platform_id));
+  if (plats == NULL) return;
+
+  err = clGetPlatformIDs(n, plats, NULL);
+  if (err != CL_SUCCESS) goto fail_id;
+
+  fprintf(stderr, "n plats = %u; ", n);
+
+  err = clGetPlatformInfo(plats[0], CL_PLATFORM_NAME, sizeof(info), info, NULL);
+  if (err != CL_SUCCESS) goto fail_id;
+  fprintf(stderr, "name = %s\n", info);
+
+  props[0] = CL_CONTEXT_PLATFORM;
+  props[1] = (cl_context_properties)plats[0];
+  props[2] = 0;
+
+  ctx = clCreateContextFromType(props, CL_DEVICE_TYPE_GPU, NULL, NULL, &err);
   if (err != CL_SUCCESS) {
-    fprintf(stderr, "Could not create context, will fail later");
+    fprintf(stderr, "Could not create context, will fail later (%d)!\n", err);
     /* error - error - error */
     /* but we do nothing */
-    return;
+    goto fail_id;
   }
 
-  /* Maybe this will break with more than one device ... meh */
-  if (clGetContextInfo(ctx, CL_CONTEXT_DEVICES, 1, &dev, NULL) != CL_SUCCESS) goto fail;
-  
+  free(plats);
+
+  err = clGetContextInfo(ctx, CL_CONTEXT_DEVICES, 0, NULL, &sz);
+  if (err != CL_SUCCESS) {
+    fprintf(stderr, "clGetContextInfo = %d\n", err);
+    goto fail;
+  }
+
+  devs = (cl_device_id *)malloc(sz);
+  if (devs == NULL) goto fail;
+
+  err = clGetContextInfo(ctx, CL_CONTEXT_DEVICES, sz, devs, NULL);
+  if (err != CL_SUCCESS) goto fail_dev;
+
+  dev = devs[0];
+  free(devs);
+
   q = clCreateCommandQueue(ctx, dev, NULL, &err);
-  if (err != CL_SUCCESS) goto fail;
-  
+  if (err != CL_SUCCESS) {
+    fprintf(stderr, "clCreateCommandQueue = %d", err);
+    goto fail;
+  }
+
   return;
+ fail_dev:
+  free(devs);
  fail:
   clReleaseContext(ctx);
   ctx = NULL;
+  return;
+ fail_id:
+  free(plats);
 }
 
 void *
