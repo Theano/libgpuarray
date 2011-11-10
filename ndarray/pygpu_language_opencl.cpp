@@ -153,11 +153,12 @@ dArrayObject");
     size *= (unsigned int) PyGpuNdArray_DIMS(self)[i];
     size_source *= (unsigned int) PyGpuNdArray_DIMS(other)[i];
   }
-  
+
   if (0 == size) {
-    return 0; //nothing to copy, we're done.                                
+    return 0; //nothing to copy, we're done.
   }
-  
+  size *= PyGpuNdArray_ITEMSIZE(self);
+
   if (clEnqueueCopyBuffer(q, (cl_mem)PyGpuNdArray_DATA(self),
 			  (cl_mem)PyGpuNdArray_DATA(other),
 			  0, 0, size, 0, NULL, &ev) != CL_SUCCESS) {
