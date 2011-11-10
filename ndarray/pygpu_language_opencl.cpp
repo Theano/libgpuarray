@@ -98,6 +98,10 @@ device_malloc(size_t size)
 
   init_context();
 
+  /* OpenCL devices do not always support byte-addressable storage
+     therefore make sure we have at least 4 bytes in buffers */
+  if (size < 4) size = 4;
+
   res = clCreateBuffer(ctx, CL_MEM_READ_WRITE, size, NULL, &err);
   if (err != CL_SUCCESS) {
     PyErr_Format(PyExc_MemoryError, "Could not allocate device memory");
@@ -218,10 +222,7 @@ PyGpuMemset(void * dst, int data, size_t bytes)
   cl_program p;
   cl_kernel k;
 
-  /* OpenCL devices do not always support byte-addressable storage
-     and stuff will break when used in this way */
-  assert(bytes % 4 == 0);
-  bytes /= 4;
+  bytes = (bytes+3)/4;
 
   unsigned char val = (unsigned)data;
   unsigned int pattern = (unsigned int)val & (unsigned int)val >> 8 & (unsigned int)val >> 16 & (unsigned int)val >> 24;
