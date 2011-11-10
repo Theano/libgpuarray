@@ -85,7 +85,9 @@ setup(name='compyte',
       ext_modules=[Extension('pygpu_ndarray', 
                              sources = ['pygpu_language_opencl.cpp',
                                         'pygpu_ndarray.cpp'],
-                             libraries = ['OpenCL'])
-#                             extra_link_args = ['-framework', 'OpenCL'])
+                             libraries = ['OpenCL'],
+                             extra_compile_args = ['-DOFFSET'],
+#                             extra_link_args = ['-framework', 'OpenCL']
+                             )
                    ]
 )

@@ -1,6 +1,8 @@
 #ifndef _PYGPU_NDARRAY_H
 #define _PYGPU_NDARRAY_H
+#ifndef OFFSET
 #define OFFSET 0
+#endif
 
 //#include <Python.h>
 //#include <structmember.h>
