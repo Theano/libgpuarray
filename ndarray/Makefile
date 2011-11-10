@@ -23,6 +23,7 @@ pygpu_ndarray.so: pygpu_ndarray.cpp pygpu_ndarray.h pygpu_language_cuda.o pygpu_
 
 clean:
 	rm -f pygpu_ndarray.so core.* *.o *~
+	rm -rf build
 
 cleantmp:
 	rm -f core.* *.o *~

@@ -49,7 +49,7 @@ class build_ext_nvcc(build_ext):
                     ext.library_dirs.append(lib)
                     ext.extra_link_args.append('-Xlinker')
                     ext.extra_link_args.append('-rpath')
-                    ext.extra_link_args.append('-Xlinker')                    
+                    ext.extra_link_args.append('-Xlinker')
                     ext.extra_link_args.append(lib)
                 if os.path.isdir(lib64):
                     ext.library_dirs.append(lib64)
@@ -57,7 +57,18 @@ class build_ext_nvcc(build_ext):
 #                    ext.extra_link_args.append(lib64)
             if 'cudart' not in ext.libraries:
                 ext.libraries.append('cudart')
-    
+
+        if self.cuda_root:
+            include = os.path.join(self.cuda_root, 'include')
+            if os.path.isdir(include):
+                ext.extra_compile_args.append('-I' + include)
+        if os.path.isfile('/usr/lib/nvidia-current/libOpenCL.so'):
+            ext.extra_link_args.append('-L/usr/lib/nvidia-current')
+            ext.extra_link_args.append('-Xlinker')
+            ext.extra_link_args.append('-rpath')
+            ext.extra_link_args.append('-Xlinker')
+            ext.extra_link_args.append('/usr/lib/nvidia-current')
+
     def build_extensions(self):
         self.check_extensions_list(self.extensions)
 
