@@ -186,9 +186,11 @@ PyGpuMemcpy(void * dst, const void * src, int dev_offset, size_t bytes,
     case PyGpuHostToDevice:
       err = clEnqueueWriteBuffer(q, (cl_mem)dst, CL_FALSE, dev_offset, bytes,
 				 src, 0, NULL, &ev);
+      break;
     case PyGpuDeviceToHost:
       err = clEnqueueReadBuffer(q, (cl_mem)src, CL_FALSE, dev_offset, bytes,
 				dst, 0, NULL, &ev);
+      break;
     default:
       PyErr_Format(PyExc_ValueError, "Unknown direction %d", direction);
       return -1;
