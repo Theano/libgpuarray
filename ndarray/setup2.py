@@ -70,7 +70,7 @@ class build_ext_nvcc(build_ext):
 
 setup(name='compyte',
       cmdclass = {'build_ext': build_ext_nvcc},
-      include_dirs = [np.get_include(), '.']
+      include_dirs = [np.get_include(), '.'],
       ext_modules=[Extension('pygpu_ndarray', 
                              sources = ['pygpu_language_opencl.cpp',
                                         'pygpu_ndarray.cpp'],
