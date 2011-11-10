@@ -1,15 +1,16 @@
-import os, sys
+import os
 
 from distutils.core import setup, Extension
 from distutils.command.build_ext import build_ext
 from distutils.dep_util import newer
 import numpy as np
 
+
 class build_ext_nvcc(build_ext):
     user_options = build_ext.user_options
     user_options.extend([
             ('cuda-root=', None, "The cuda root directory")])
-    
+
     def initialize_options(self):
         build_ext.initialize_options(self)
         self.cuda_root = None
@@ -22,16 +23,17 @@ class build_ext_nvcc(build_ext):
             self._nvcc_bin = os.path.join(self.cuda_root, 'bin', 'nvcc')
         else:
             self._nvcc_bin = 'nvcc'
+
     def cuda_process(self, source, include_args):
-        target = source+'.cpp'
+        target = source + '.cpp'
         if newer(source, target):
             self.spawn([self._nvcc_bin, '--cuda', source, '-o', target] + \
                            include_args)
         return target
 
     def cuda_extension(self, ext):
-        includes = self.distribution.include_dirs+ext.include_dirs
-        include_args = ['-I'+i for i in includes]
+        includes = self.distribution.include_dirs + ext.include_dirs
+        include_args = ['-I' + i for i in includes]
         new_sources = []
         anycuda = False
         for src in ext.sources:
@@ -80,14 +82,14 @@ class build_ext_nvcc(build_ext):
             self.build_extension(ext)
 
 setup(name='compyte',
-      cmdclass = {'build_ext': build_ext_nvcc},
-      include_dirs = [np.get_include(), '.'],
-      ext_modules=[Extension('pygpu_ndarray', 
-                             sources = ['pygpu_language_opencl.cpp',
-                                        'pygpu_ndarray.cpp'],
-                             libraries = ['OpenCL'],
-                             extra_compile_args = ['-DOFFSET'],
-#                             extra_link_args = ['-framework', 'OpenCL']
+      cmdclass={'build_ext': build_ext_nvcc},
+      include_dirs=[np.get_include(), '.'],
+      ext_modules=[Extension('pygpu_ndarray',
+                             sources=['pygpu_language_opencl.cpp',
+                                      'pygpu_ndarray.cpp'],
+                             libraries=['OpenCL'],
+                             extra_compile_args=['-DOFFSET'],
+#                             extra_link_args=['-framework', 'OpenCL']
                              )
                    ]
 )
