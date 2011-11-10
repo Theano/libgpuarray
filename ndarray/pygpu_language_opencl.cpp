@@ -216,7 +216,8 @@ PyGpuMemset(void * dst, int data, size_t bytes)
 { 
   /* This should be at least one byte over the formatted string below */
   char local_kern[92];
-  size_t sz, local;
+  const char *rlk[1];
+  size_t sz;
   int r, res = -1;
 
   cl_int err;
@@ -234,8 +235,10 @@ PyGpuMemset(void * dst, int data, size_t bytes)
   /* If this assert fires, increase the size of local_kern above. */ 
   assert(r >= sizeof(local_kern));
 
+
   sz = strlen(local_kern);
-  p = clCreateProgramWithSource(ctx, 1, (const char **)&local_kern, &sz, &err);
+  rlk[0] = local_kern;
+  p = clCreateProgramWithSource(ctx, 1, rlk, &sz, &err);
   if (err != CL_SUCCESS) {
     PyErr_Format(PyExc_RuntimeError, "Could not create program");
     return -1;
@@ -252,18 +255,12 @@ PyGpuMemset(void * dst, int data, size_t bytes)
     goto fail_prog;
   }
 
-  if (clSetKernelArg(k, 0, sizeof(cl_mem), dst) != CL_SUCCESS) {
+  if (clSetKernelArg(k, 0, sizeof(cl_mem), &dst) != CL_SUCCESS) {
     PyErr_Format(PyExc_RuntimeError, "Could not set kernel arg");
     goto fail_kern;
   }
 
-  if (clGetKernelWorkGroupInfo(k, dev, CL_KERNEL_WORK_GROUP_SIZE,
-			       sizeof(local), &local, NULL) != CL_SUCCESS) {
-    PyErr_Format(PyExc_RuntimeError, "Could not get workgroup info");
-    goto fail_kern;
-  }
-  
-  if (clEnqueueNDRangeKernel(q, k, 1, NULL, &bytes, &local, 0, NULL, &ev) != CL_SUCCESS) {
+  if (clEnqueueNDRangeKernel(q, k, 1, NULL, &bytes, NULL, 0, NULL, &ev) != CL_SUCCESS) {
     PyErr_Format(PyExc_RuntimeError, "Could not enqueue kernel");
     goto fail_kern;
   }
