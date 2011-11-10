@@ -174,9 +174,10 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
     assert(PyGpuNdArray_ISWRITEABLE(self));
 
     err = PyGpuMemcpy(PyGpuNdArray_DATA(self),
-                    PyArray_DATA(py_src),
-                    PyArray_SIZE(py_src) * PyArray_ITEMSIZE(py_src),
-                    PyGpuHostToDevice);
+                      PyArray_DATA(py_src),
+                      PyGpuNdArray_OFFSET(self),
+                      PyArray_SIZE(py_src) * PyArray_ITEMSIZE(py_src),
+                      PyGpuHostToDevice);
     if (err) {
         Py_DECREF(py_src);
         return -1;
@@ -345,7 +346,8 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
     }
 
     int err = PyGpuMemcpy(PyArray_DATA(rval),
-                          PyGpuNdArray_DATA(contiguous_self)+PyGpuNdArray_OFFSET(contiguous_self),
+                          PyGpuNdArray_DATA(contiguous_self),
+                          PyGpuNdArray_OFFSET(contiguous_self),
                           PyArray_SIZE(rval) * PyArray_ITEMSIZE(rval),
                           PyGpuDeviceToHost);
     if (err) {

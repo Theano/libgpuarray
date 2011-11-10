@@ -568,12 +568,17 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
     return 0;
 }
 
-int PyGpuMemcpy(void * dst, const void * src, size_t bytes, PyGpuTransfert direction){
+int PyGpuMemcpy(void * dst, const void * src, int dev_offset, size_t bytes, 
+                PyGpuTransfert direction){
     cudaMemcpyKind dir;
+    void * ssrc;
     if (direction == PyGpuDeviceToHost){
         dir = cudaMemcpyDeviceToHost;
+        ssrc = src+dev_offset;
     } else if (direction == PyGpuHostToDevice) {
         dir = cudaMemcpyHostToDevice;
+        ssrc = src;
+        dst += dev_offset;
     } else {
         PyErr_Format(PyExc_ValueError,
                         "GpuMemcpy: Received wrong direction %d!\n", direction);

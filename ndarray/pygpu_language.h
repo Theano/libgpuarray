@@ -162,7 +162,7 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
 }
 
 enum PyGpuTransfert { PyGpuHostToDevice, PyGpuDeviceToHost };
-int PyGpuMemcpy(void * dst, const void * src, size_t bytes, PyGpuTransfert direction);
+int PyGpuMemcpy(void * dst, const void * src, int dev_offset, size_t bytes, PyGpuTransfert direction);
 
 int PyGpuMemset(void * dst, int data, size_t bytes);
 #endif

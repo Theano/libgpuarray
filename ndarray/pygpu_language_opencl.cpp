@@ -41,11 +41,8 @@ init_context(void)
   err = clGetPlatformIDs(n, plats, NULL);
   if (err != CL_SUCCESS) goto fail_id;
 
-  fprintf(stderr, "n plats = %u; ", n);
-
   err = clGetPlatformInfo(plats[0], CL_PLATFORM_NAME, sizeof(info), info, NULL);
   if (err != CL_SUCCESS) goto fail_id;
-  fprintf(stderr, "name = %s\n", info);
 
   props[0] = CL_CONTEXT_PLATFORM;
   props[1] = (cl_context_properties)plats[0];
@@ -106,6 +103,7 @@ device_malloc(size_t size)
     PyErr_Format(PyExc_MemoryError, "Could not allocate device memory");
     return NULL;
   }
+
   return res;
 }
 
@@ -173,7 +171,7 @@ dArrayObject");
 }
 
 int
-PyGpuMemcpy(void * dst, const void * src, size_t bytes,
+PyGpuMemcpy(void * dst, const void * src, int dev_offset, size_t bytes,
 	    PyGpuTransfert direction)
 {
   cl_int err;
@@ -182,11 +180,11 @@ PyGpuMemcpy(void * dst, const void * src, size_t bytes,
   switch (direction)
     {
     case PyGpuHostToDevice:
-      err = clEnqueueWriteBuffer(q, (cl_mem)dst, CL_FALSE, 0, bytes, src, 
-				 0, NULL, &ev);
+      err = clEnqueueWriteBuffer(q, (cl_mem)dst, CL_FALSE, dev_offset, bytes,
+				 src, 0, NULL, &ev);
     case PyGpuDeviceToHost:
-      err = clEnqueueReadBuffer(q, (cl_mem)src, CL_FALSE, 0, bytes, dst,
-			       0, NULL, &ev);
+      err = clEnqueueReadBuffer(q, (cl_mem)src, CL_FALSE, dev_offset, bytes,
+				dst, 0, NULL, &ev);
     default:
       PyErr_Format(PyExc_ValueError, "Unknown direction %d", direction);
       return -1;
