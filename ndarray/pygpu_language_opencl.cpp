@@ -98,6 +98,8 @@ device_malloc(size_t size)
 
   init_context();
 
+  DPRINTF("malloc size = %zu\n", size);
+
   /* OpenCL devices do not always support byte-addressable storage
      therefore make sure we have at least 4 bytes in buffers */
   if (size < 4) size = 4;
