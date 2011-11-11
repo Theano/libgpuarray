@@ -131,7 +131,6 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self,
   size_t size = 1;
   cl_event ev;
   
-  assert(PyGpuNdArray_OFFSET(self) == 0 && PyGpuNdArray_OFFSET(other) == 0);
   assert(PyGpuNdArray_TYPE(self) == PyGpuNdArray_TYPE(other));
   assert(PyGpuNdArray_ISWRITEABLE(self));
   if (PyGpuNdArray_NDIM(self) == -1) {
@@ -164,7 +163,7 @@ dArrayObject");
 			  PyGpuNdArray_OFFSET(other),
 			  PyGpuNdArray_OFFSET(self),
 			  size, 0, NULL, &ev) != CL_SUCCESS) {
-    PyErr_Format(PyExc_RuntimeError, "Could create copy command");
+    PyErr_Format(PyExc_RuntimeError, "Could not create copy command");
     return -1;
   }
   if (clWaitForEvents(1, &ev) != CL_SUCCESS) {
