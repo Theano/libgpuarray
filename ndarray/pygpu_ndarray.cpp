@@ -856,6 +856,7 @@ PyGpuNdArray_add_offset(PyGpuNdArrayObject * self, int offset)
 #else
     PyGpuNdArray_DATA(self) += offset;
 #endif
+    return 0;
 }
 
 
