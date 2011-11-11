@@ -127,7 +127,6 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self,
 				  bool unbroadcast)
 {
   size_t size = 1;
-  size_t size_source = 1;
   cl_event ev;
   
   assert(PyGpuNdArray_OFFSET(self) == 0 && PyGpuNdArray_OFFSET(other) == 0);
@@ -151,7 +150,6 @@ dArrayObject");
       return -1;
     }
     size *= (unsigned int) PyGpuNdArray_DIMS(self)[i];
-    size_source *= (unsigned int) PyGpuNdArray_DIMS(other)[i];
   }
 
   if (0 == size) {
