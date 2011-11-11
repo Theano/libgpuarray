@@ -159,9 +159,11 @@ dArrayObject");
   }
   size *= PyGpuNdArray_ITEMSIZE(self);
 
-  if (clEnqueueCopyBuffer(q, (cl_mem)PyGpuNdArray_DATA(self),
-			  (cl_mem)PyGpuNdArray_DATA(other),
-			  0, 0, size, 0, NULL, &ev) != CL_SUCCESS) {
+  if (clEnqueueCopyBuffer(q, (cl_mem)PyGpuNdArray_DATA(other),
+			  (cl_mem)PyGpuNdArray_DATA(self),
+			  PyGpuNdArray_OFFSET(other),
+			  PyGpuNdArray_OFFSET(self),
+			  size, 0, NULL, &ev) != CL_SUCCESS) {
     PyErr_Format(PyExc_RuntimeError, "Could create copy command");
     return -1;
   }
