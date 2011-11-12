@@ -74,13 +74,11 @@ void * device_malloc(size_t size)
       }
     }
     _allocated_size += size;
-    if(VERBOSE_ALLOC_FREE)
-      fprintf(stderr, "allocated %li bytes of device memory (%s). %d already allocated, ptr: %p\n",
-	      (long)size, cudaGetErrorString(err),_allocated_size,rval);
+    DPRINTF("allocated %li bytes of device memory (%s). %d already allocated, ptr: %p\n",
+            (long)size, cudaGetErrorString(err),_allocated_size,rval);
 #else
-    if(VERBOSE_ALLOC_FREE)
-      fprintf(stderr, "allocated %li bytes of device memory (%s). ptr: %p\n",
-	      (long)size, cudaGetErrorString(err),rval);
+    DPRINTF("allocated %li bytes of device memory (%s). ptr: %p\n",
+            (long)size, cudaGetErrorString(err),rval);
 
 #endif
 
@@ -126,8 +124,7 @@ int device_free(void *ptr)
       }
     if(i==TABLE_SIZE)
       printf("Unallocated unknow size!\n");
-    if(VERBOSE_ALLOC_FREE)
-      fprintf(stderr, "freed %li bytes of device memory (%s). %d already allocated, ptr=%p\n", (long)total_freed, cudaGetErrorString(err),_allocated_size,ptr);
+    DPRINTF("freed %li bytes of device memory (%s). %d already allocated, ptr=%p\n", (long)total_freed, cudaGetErrorString(err),_allocated_size,ptr);
 #endif
     return 0;
 }
@@ -190,8 +187,7 @@ static __global__ void k_copy_1d(const int N, const T * x, const ssize_t sx, T *
 int
 PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject * other, bool unbroadcast)
 {
-    int verbose = 0;
-    if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromPyGpuNdArray start nd=%d\n", PyGpuNdArray_NDIM(self));
+    DPRINTF("PyGpuNdArray_CopyFromPyGpuNdArray start nd=%d\n", PyGpuNdArray_NDIM(self));
     assert(PyGpuNdArray_TYPE(self) == PyGpuNdArray_TYPE(other));
     assert(PyGpuNdArray_ISWRITEABLE(self));
     //standard elemwise size checks
@@ -241,7 +237,7 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
             return -1;
         }
 
-	if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromPyGpuNdArray: cublasScopy end\n");
+	DPRINTF("PyGpuNdArray_CopyFromPyGpuNdArray: cublasScopy end\n");
         return 0;
     }
     if (PyGpuNdArray_ISCONTIGUOUS(self) && PyGpuNdArray_ISCONTIGUOUS(other) &&
@@ -253,7 +249,7 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
             PyErr_SetString(PyExc_RuntimeError, "Error copying memory");
             return -1;
         }
-	if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromPyGpuNdArray cublasDcopy end\n");
+	DPRINTF("PyGpuNdArray_CopyFromPyGpuNdArray cublasDcopy end\n");
         return 0;
     }
 
@@ -269,7 +265,7 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
             {
                 assert(PyGpuNdArray_ISALIGNED(self));
                 assert(PyGpuNdArray_ISALIGNED(other));
-                if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromPyGpuNdArray: Copying non-contiguous vector\n");
+                DPRINTF("PyGpuNdArray_CopyFromPyGpuNdArray: Copying non-contiguous vector\n");
                 unsigned int n_blocks = min(size, (unsigned int)NUM_VECTOR_OP_BLOCKS);
                 unsigned int n_threads = min(ceil_intdiv(size, n_blocks), (unsigned int)NUM_VECTOR_OP_THREADS_PER_BLOCK);
 
@@ -375,7 +371,7 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
                 assert(PyGpuNdArray_ISALIGNED(self));
                 assert(PyGpuNdArray_ISALIGNED(other));
 
-                if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromPyGpuNdArray: Copying with default version unbroadcast=%d\n", unbroadcast);
+                DPRINTF("PyGpuNdArray_CopyFromPyGpuNdArray: Copying with default version unbroadcast=%d\n", unbroadcast);
                 // Identigy the dim of the output memory.
                 PyGpuNdArrayObject * cuda_dims = other;
                 if(unbroadcast)
@@ -406,11 +402,11 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
                     PyErr_Format(PyExc_RuntimeError, "Cuda error when copying memory4: %s", cudaGetErrorString(err));
                     return -1;
                 }
-                if (verbose>1) {
-                    for(int i=0;i<3*ndim;i++)
-                        printf(" %ld", ((ssize_t *)strides_host)[i]);
-                    printf("\n");
-                }
+#ifdef DEBUG
+                for(int i=0;i<3*ndim;i++)
+                    DPRINTF(" %ld", ((ssize_t *)strides_host)[i]);
+                DPRINTF("\n");
+#endif
                 CNDA_THREAD_SYNC;
                 if(cudaSuccess != cudaGetLastError()){
                     PyErr_Format(PyExc_NotImplementedError, "PyGpuNdArray_CopyFromPyGpuNdArray: error before copy\n");
@@ -564,16 +560,21 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
         }
     }
 
-    if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromPyGpuNdArray end\n");
+    DPRINTF("PyGpuNdArray_CopyFromPyGpuNdArray end\n");
     return 0;
 }
 
-int PyGpuMemcpy(void * dst, const void * src, size_t bytes, PyGpuTransfert direction){
+int PyGpuMemcpy(void * dst, const void * src, int dev_offset, size_t bytes, 
+                PyGpuTransfert direction){
     cudaMemcpyKind dir;
+    void * ssrc;
     if (direction == PyGpuDeviceToHost){
         dir = cudaMemcpyDeviceToHost;
+        ssrc = src+dev_offset;
     } else if (direction == PyGpuHostToDevice) {
         dir = cudaMemcpyHostToDevice;
+        ssrc = src;
+        dst += dev_offset;
     } else {
         PyErr_Format(PyExc_ValueError,
                         "GpuMemcpy: Received wrong direction %d!\n", direction);

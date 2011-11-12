@@ -41,11 +41,8 @@ init_context(void)
   err = clGetPlatformIDs(n, plats, NULL);
   if (err != CL_SUCCESS) goto fail_id;
 
-  fprintf(stderr, "n plats = %u; ", n);
-
   err = clGetPlatformInfo(plats[0], CL_PLATFORM_NAME, sizeof(info), info, NULL);
   if (err != CL_SUCCESS) goto fail_id;
-  fprintf(stderr, "name = %s\n", info);
 
   props[0] = CL_CONTEXT_PLATFORM;
   props[1] = (cl_context_properties)plats[0];
@@ -101,11 +98,18 @@ device_malloc(size_t size)
 
   init_context();
 
+  DPRINTF("malloc size = %zu\n", size);
+
+  /* OpenCL devices do not always support byte-addressable storage
+     therefore make sure we have at least 4 bytes in buffers */
+  if (size < 4) size = 4;
+
   res = clCreateBuffer(ctx, CL_MEM_READ_WRITE, size, NULL, &err);
   if (err != CL_SUCCESS) {
     PyErr_Format(PyExc_MemoryError, "Could not allocate device memory");
     return NULL;
   }
+
   return res;
 }
 
@@ -125,10 +129,8 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self,
 				  bool unbroadcast)
 {
   size_t size = 1;
-  size_t size_source = 1;
   cl_event ev;
   
-  assert(PyGpuNdArray_OFFSET(self) == 0 && PyGpuNdArray_OFFSET(other) == 0);
   assert(PyGpuNdArray_TYPE(self) == PyGpuNdArray_TYPE(other));
   assert(PyGpuNdArray_ISWRITEABLE(self));
   if (PyGpuNdArray_NDIM(self) == -1) {
@@ -149,17 +151,19 @@ dArrayObject");
       return -1;
     }
     size *= (unsigned int) PyGpuNdArray_DIMS(self)[i];
-    size_source *= (unsigned int) PyGpuNdArray_DIMS(other)[i];
   }
-  
+
   if (0 == size) {
-    return 0; //nothing to copy, we're done.                                
+    return 0; //nothing to copy, we're done.
   }
-  
-  if (clEnqueueCopyBuffer(q, (cl_mem)PyGpuNdArray_DATA(self),
-			  (cl_mem)PyGpuNdArray_DATA(other),
-			  0, 0, size, 0, NULL, &ev) != CL_SUCCESS) {
-    PyErr_Format(PyExc_RuntimeError, "Could create copy command");
+  size *= PyGpuNdArray_ITEMSIZE(self);
+
+  if (clEnqueueCopyBuffer(q, (cl_mem)PyGpuNdArray_DATA(other),
+			  (cl_mem)PyGpuNdArray_DATA(self),
+			  PyGpuNdArray_OFFSET(other),
+			  PyGpuNdArray_OFFSET(self),
+			  size, 0, NULL, &ev) != CL_SUCCESS) {
+    PyErr_Format(PyExc_RuntimeError, "Could not create copy command");
     return -1;
   }
   if (clWaitForEvents(1, &ev) != CL_SUCCESS) {
@@ -173,7 +177,7 @@ dArrayObject");
 }
 
 int
-PyGpuMemcpy(void * dst, const void * src, size_t bytes,
+PyGpuMemcpy(void * dst, const void * src, int dev_offset, size_t bytes,
 	    PyGpuTransfert direction)
 {
   cl_int err;
@@ -182,11 +186,13 @@ PyGpuMemcpy(void * dst, const void * src, size_t bytes,
   switch (direction)
     {
     case PyGpuHostToDevice:
-      err = clEnqueueWriteBuffer(q, (cl_mem)dst, CL_FALSE, 0, bytes, src, 
-				 0, NULL, &ev);
+      err = clEnqueueWriteBuffer(q, (cl_mem)dst, CL_FALSE, dev_offset, bytes,
+				 src, 0, NULL, &ev);
+      break;
     case PyGpuDeviceToHost:
-      err = clEnqueueReadBuffer(q, (cl_mem)src, CL_FALSE, 0, bytes, dst,
-			       0, NULL, &ev);
+      err = clEnqueueReadBuffer(q, (cl_mem)src, CL_FALSE, dev_offset, bytes,
+				dst, 0, NULL, &ev);
+      break;
     default:
       PyErr_Format(PyExc_ValueError, "Unknown direction %d", direction);
       return -1;
@@ -212,7 +218,8 @@ PyGpuMemset(void * dst, int data, size_t bytes)
 { 
   /* This should be at least one byte over the formatted string below */
   char local_kern[92];
-  size_t sz, local;
+  const char *rlk[1];
+  size_t sz;
   int r, res = -1;
 
   cl_int err;
@@ -220,10 +227,7 @@ PyGpuMemset(void * dst, int data, size_t bytes)
   cl_program p;
   cl_kernel k;
 
-  /* OpenCL devices do not always support byte-addressable storage
-     and stuff will break when used in this way */
-  assert(bytes % 4 == 0);
-  bytes /= 4;
+  bytes = (bytes+3)/4;
 
   unsigned char val = (unsigned)data;
   unsigned int pattern = (unsigned int)val & (unsigned int)val >> 8 & (unsigned int)val >> 16 & (unsigned int)val >> 24;
@@ -233,8 +237,10 @@ PyGpuMemset(void * dst, int data, size_t bytes)
   /* If this assert fires, increase the size of local_kern above. */ 
   assert(r >= sizeof(local_kern));
 
+
   sz = strlen(local_kern);
-  p = clCreateProgramWithSource(ctx, 1, (const char **)&local_kern, &sz, &err);
+  rlk[0] = local_kern;
+  p = clCreateProgramWithSource(ctx, 1, rlk, &sz, &err);
   if (err != CL_SUCCESS) {
     PyErr_Format(PyExc_RuntimeError, "Could not create program");
     return -1;
@@ -251,18 +257,12 @@ PyGpuMemset(void * dst, int data, size_t bytes)
     goto fail_prog;
   }
 
-  if (clSetKernelArg(k, 0, sizeof(cl_mem), dst) != CL_SUCCESS) {
+  if (clSetKernelArg(k, 0, sizeof(cl_mem), &dst) != CL_SUCCESS) {
     PyErr_Format(PyExc_RuntimeError, "Could not set kernel arg");
     goto fail_kern;
   }
 
-  if (clGetKernelWorkGroupInfo(k, dev, CL_KERNEL_WORK_GROUP_SIZE,
-			       sizeof(local), &local, NULL) != CL_SUCCESS) {
-    PyErr_Format(PyExc_RuntimeError, "Could not get workgroup info");
-    goto fail_kern;
-  }
-  
-  if (clEnqueueNDRangeKernel(q, k, 1, NULL, &bytes, &local, 0, NULL, &ev) != CL_SUCCESS) {
+  if (clEnqueueNDRangeKernel(q, k, 1, NULL, &bytes, NULL, 0, NULL, &ev) != CL_SUCCESS) {
     PyErr_Format(PyExc_RuntimeError, "Could not enqueue kernel");
     goto fail_kern;
   }

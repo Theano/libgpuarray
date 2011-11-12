@@ -85,11 +85,11 @@ setup(name='compyte',
       cmdclass={'build_ext': build_ext_nvcc},
       include_dirs=[np.get_include(), '.'],
       ext_modules=[Extension('pygpu_ndarray',
+                             define_macros=[('OFFSET', '1')],
                              sources=['pygpu_language_opencl.cpp',
                                       'pygpu_ndarray.cpp'],
-                             libraries=['OpenCL'],
-                             extra_compile_args=['-DOFFSET'],
-#                             extra_link_args=['-framework', 'OpenCL']
+                             libraries=['OpenCL']
+#                             extra_link_args = ['-framework', 'OpenCL']
                              )
                    ]
 )
