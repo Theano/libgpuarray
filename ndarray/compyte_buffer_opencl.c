@@ -1,12 +1,30 @@
 #include "compyte_buffer.h"
 
-#include <opencl.h>
+#ifdef __APPLE__
 
-typedef struct _buffer_cl {
-  cl_mem mem;
+#include <OpenCL/opencl.h>
+
+#else
+
+#include <CL/opencl.h>
+
+#endif
+
+#include <errno.h>
+
+#include <stdlib.h>
+
+/* To work around the lack of byte addressing */
+#define MIN_SIZE_INCR 4
+
+static cl_int err;
+
+struct _gpudata {
+  cl_mem buf;
   cl_command_queue q;
-  cl_int err;
-} buffer_cl;
+  /* Use subbuffers in OpenCL 1.1 to work around the need for an offset */
+  size_t offset;
+};
 
 static const char *get_error_string(cl_int err) {
   switch (err) {
@@ -60,23 +78,179 @@ static const char *get_error_string(cl_int err) {
   }
 }
 
-static void *device_malloc(void *q, size_t size)
+static gpudata *cl_malloc(void *ctx, size_t size)
 {
   buffer_cl *res;
   cl_int err;
+  cl_device_id *ids;
+  size_t sz;
 
+  /* OpenCL do not always support byte addressing
+     so fudge size to work around that */
+  if (size % 4)
+    size += MIN_SIZE_INCR-(size % MIN_SIZE_INCR);
+
+  if ((err = clGetContextInfo((cl_context)ctx, CL_CONTEXT_DEVICES, 0, NULL, &sz)) != CL_SUCCESS)
+    return NULL;
+  
+  ids = malloc(sz);
+  if (ids == NULL)
+    return NULL;
+
+  if ((err = clGetContextInfo((cl_context)ctx, CL_CONTEXT_DEVICES, sz, &ids, NULL)) != CL_SUCCESS) {
+    free(ids);
+    return NULL;
+  }
+  
   res = malloc(sizeof(*res));
   if (res == NULL) {
     return NULL;
   }
 
-  res.buf = NULL;
-  res.q = (cl_command_queue)c;
-  res.err = CL_SUCCESS;
-
-  res.buf = clCreateBuffer(ctx, CL_MEM_READ_WRITE, size, NULL, &res.err);
-  if (res.err != CL_SUCCESS) {
+  res->q = clCreateCommandQueue((cl_context)ctx, ids[0], 0, &err);
+  free(ids);
+  if (err != CL_SUCCESS) {
+    free(res);
     return NULL;
   }
+  res->buf = clCreateBuffer((cl_context)ctx, CL_MEM_READ_WRITE, size, NULL, &err);
+  if (err != CL_SUCCESS) {
+    clReleaseCommandQueue(res->q);
+    free(res);
+    return NULL;
+  }
+  res->offset = 0;
+
   return res;
 }
+
+static void cl_free(gpudata *b) {
+  clReleaseCommandQueue(b->q);
+  clReleaseMemObject(b->buf);
+  free(b);
+}
+
+static int cl_move(gpudata *dst, gpudata *src, size_t sz) {
+  cl_event ev;
+
+  if ((err = clEnqueueCopyBuffer(dst->q, src->buf, dst->buf,
+				 src->offset, dst->offset,
+				 sz, 0, NULL, &ev)) != CL_SUCCESS) {
+    return -1;
+  }
+
+  if ((err = clWaitForEvents(1, &ev)) != CL_SUCCESS) {
+    clReleaseEvent(ev);
+    return -1;
+  }
+  clReleaseEvent(ev);
+
+  return 0;
+}
+
+static int cl_read(void *dst, gpudata *src, size_t sz) {
+  if ((err = clEnqueueReadBuffer(src->q, src->buf, CL_TRUE,
+				 src->offset, sz, dst,
+				 0, NULL, NULL)) != CL_SUCCESS) {
+    return -1;
+  }
+
+  return 0;
+}
+
+static int cl_write(gpudata *dst, void *src, size_t sz) {
+  if ((err = clEnqueueReadBuffer(dst->q, dst->buf, CL_TRUE,
+				 dst->offset, sz, src,
+				 0, NULL, NULL)) != CL_SUCCESS) {
+    return -1;
+  }
+
+  return 0;
+}
+
+static int cl_memset(gpudata *dst, int data, size_t bytes) {
+  char local_kern[92];
+  const char *rlk[1];
+  size_t sz;
+  int r, res = -1;
+
+  cl_event ev;
+  cl_program p;
+  cl_kernel k;
+
+  /* OpenCL devices do not always support byte-addressable storage
+     and stuff will break when used in this way */
+  bytes = (bytes+3) / 4;
+
+  unsigned char val = (unsigned)data;
+  unsigned int pattern = (unsigned int)val & (unsigned int)val >> 8 & (unsigned int)val >> 16 & (unsigned int)val >> 24;
+
+  r = snprintf(local_kern, sizeof(local_kern),
+	       "__kernel void memset(__global unsigned int *mem) { mem[get_global_id(0)] = %u; }", pattern);
+  /* If this assert fires, increase the size of local_kern above. */ 
+  assert(r >= sizeof(local_kern));
+
+  sz = strlen(local_kern);
+  rlk[0] = local_kern;
+  p = clCreateProgramWithSource(ctx, 1, rlk, &sz, &err);
+  if (err != CL_SUCCESS) {
+    return -1;
+  }
+
+  if (clBuildProgram(p, 1, &dev, NULL, NULL, NULL) != CL_SUCCESS) {
+    goto fail_prog;
+  }
+
+  k = clCreateKernel(p, "memset", &err);
+  if (err != CL_SUCCESS) {
+    goto fail_prog;
+  }
+
+  if (clSetKernelArg(k, 0, sizeof(cl_mem), &dst) != CL_SUCCESS) {
+    goto fail_kern;
+  }
+
+  if (clEnqueueNDRangeKernel(q, k, 1, NULL, &bytes, NULL, 0, NULL, &ev) != CL_SUCCESS) {
+    goto fail_kern;
+  }
+  
+  if (clWaitForEvents(1, &ev) == CL_SUCCESS) {
+    /* success! */
+    res = 0;
+  }
+  
+  clReleaseEvent(ev);
+ fail_kern:
+  clReleaseKernel(k);
+ fail_prog:
+  clReleaseProgram(p);
+  return res;
+}
+
+static int cl_offset(gpudata *b, int off) {
+  /* check for overflow (int and size_t) */
+  if (off < 0) {
+    /* negative */
+    if (((off == INT_MIN) && (b->offset <= INT_MAX)) || 
+	(-off > b->offset)) {
+      return -1;
+    }
+  } else {
+    /* positive */
+    if ((SIZE_MAX - off) < b->offset) {
+      return -1;
+    }
+  }
+  b->offset += off;
+  return 0;
+}
+
+static const char *cl_error(void) {
+  if (err == CL_SUCCESS) {
+    return strerror(errno);
+  } else {
+    return get_error_string(err);
+  }
+}
+
+compyte_buffer_ops opencl_ops = {cl_alloc, cl_free, cl_move, cl_read, cl_write, cl_memset, cl_offset, cl_error};
