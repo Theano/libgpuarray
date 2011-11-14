@@ -4,28 +4,34 @@
 
 #define CNDA_THREAD_SYNC cudaThreadSynchronize()
 
+struct _gpudata {
+    char *ptr;
+};
+
 static gpudata *cuda_malloc(void *ctx /* IGNORED */, size_t size)
 {
     /* ctx is ignored since it is implied from the context stack */
     cudaError_t err;
-    char *res;
-    err = cudaMalloc(&res, size);
+    gpudata *res;
+    res = malloc(sizeof(*res));
+    if (res == NULL) {
+        return NULL;
+    }
+    err = cudaMalloc(&res->ptr, size);
     if (cudaSuccess != err) {
         return NULL;
     }
-    return (gpudata *)res;
+    return res;
 }
 
 static void cuda_free(gpudata *d) {
-    cudaFree(d);
+    cudaFree(d->ptr);
+    free(d);
 }
 
-static int cuda_move(gpudata *d_dst, size_t dst_offset,
-                     gpudata *d_src, size_t src_offset, size_t sz)
+static int cuda_move(gpudata *dst, gpudata *src, size_t sz)
 {
-    void *dst = (char *)d_dst + dst_offset;
-    void *src = (char *)d_src + src_offset;
-    err = cudaMemcpy(dst, src, sz, cudaMemcpyDeviceToDevice);
+    err = cudaMemcpy(dst->ptr, src->ptr, sz, cudaMemcpyDeviceToDevice);
     CNDA_THREAD_SYNC;
     if (cudaSuccess != err) {
         return -1;
@@ -33,10 +39,9 @@ static int cuda_move(gpudata *d_dst, size_t dst_offset,
     return 0;
 }
 
-static int cuda_read(void *dst, gpudata *d_src, size_t src_offset, size_t sz)
+static int cuda_read(void *dst, gpudata *src, size_t sz)
 {
-    void *src = (char *)d_src + src_offset;
-    err = cudaMemcpy(dst, src, sz, cudaMemcpyDeviceToHost);
+    err = cudaMemcpy(dst, src->ptr, sz, cudaMemcpyDeviceToHost);
     CNDA_THREAD_SYNC;
     if (cudaSuccess != err) {
         return -1;
@@ -44,10 +49,9 @@ static int cuda_read(void *dst, gpudata *d_src, size_t src_offset, size_t sz)
     return 0;
 }
 
-static int cuda_write(gpudata *d_dst, size_t dst_offset, void *src, size_t sz)
+static int cuda_write(gpudata *dst, void *src, size_t sz)
 {
-    void *dst = (char *)d_dst + dst_offset;
-    err = cudaMemcpy(dst, src, sz, cudaMemcpyHostToDevice);
+    err = cudaMemcpy(dst->ptr, src, sz, cudaMemcpyHostToDevice);
     CNDA_THREAD_SYNC;
     if (cudaSuccess != err) {
         return -1;
@@ -55,24 +59,27 @@ static int cuda_write(gpudata *d_dst, size_t dst_offset, void *src, size_t sz)
     return 0;
 }
 
-static int cuda_memset(gpudata *d_dst, size_t dst_offset, int data, size_t bytes)
+static int cuda_memset(gpudata *dst, int data, size_t bytes)
 {
-    void *dst = (char *)d_dst + dst_offset;
-    err = cudaMemset(dst, data, bytes);
+    err = cudaMemset(dst->ptr, data, bytes);
     CNDA_THREAD_SYNC;
     if (cudaSuccess != err) {
         return -1;
     }
+    return 0;
+}
+
+static int cuda_offset(gpudata *buf, int off) {
+    buf->ptr += off;
     return 0;
 }
 
 static const char *cuda_error(void)
 {
-    /* Might want to use cudaPeekAtLastError() instead */
-    return cudaGetErrorString(cudaGetLastError());
+    return cudaGetErrorString(cudaPeekAtLastError());
 }
 
-compyte_buffer_ops cuda_ops = {cuda_alloc, cuda_free, cuda_move, cuda_read, cuda_write, cuda_memset, cuda_error};
+compyte_buffer_ops cuda_ops = {cuda_alloc, cuda_free, cuda_move, cuda_read, cuda_write, cuda_memset, cuda_offset, cuda_error};
 
 /*
   Local Variables:
