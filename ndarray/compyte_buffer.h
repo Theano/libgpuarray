@@ -23,14 +23,16 @@ typedef struct _compyte_buffer_ops {
   void (*buffer_free)(gpudata *);
   
   /* device to device copy, no overlap */
-  int (*buffer_move)(gpudata *dst, size_t dst_offset, 
-		     gpudata *src, size_t src_offset, size_t sz);
+  int (*buffer_move)(gpudata *dst, gpudata *src, size_t sz);
   /* device to host */
-  int (*buffer_read)(void *dst, gpudata *src, size_t src_offset, size_t sz);
+  int (*buffer_read)(void *dst, gpudata *src, size_t sz);
   /* host to device */
-  int (*buffer_write)(gpudata *dst, size_t dst_offset, void *src, size_t sz);
+  int (*buffer_write)(gpudata *dst, void *src, size_t sz);
   /* Set buffer to a single-byte pattern (like C memset) */
   int (*buffer_memset)(gpudata *dst, int data, size_t sz);
+  /* Add the specified offset into the buffer, 
+     must not go beyond the buffer limits */
+  int (*buffer_offset)(gpudata *buf, int offset);
 
   /* Get a string describing the last error that happened 
      (may change if you make other api calls) */
@@ -48,7 +50,6 @@ extern compyte_buffer_ops opencl_ops;
 typedef struct _GpuArray {
   gpudata *data;
   compyte_buffer_ops *ops;
-  int offset;
   int nd;
   
   size_t elsize;
@@ -61,7 +62,7 @@ typedef struct _GpuArray {
 #define GA_OWNDATA        0x0004
 #define GA_ALIGNED        0x0100
 #define GA_WRITEABLE      0x0400
-#define GA_BEHAVED        (GA_ALIGNED|GA_WRITABLE)
+#define GA_BEHAVED        (GA_ALIGNED|GA_WRITEABLE)
 #define GA_CARRAY         (GA_CONTIGUOUS|GA_BEHAVED)
 #define GA_DEFAULT        GA_CARRAY
   /* Numpy flags that will not be supported at this level (and why):
