@@ -162,6 +162,10 @@ PyGpuNdArray_is_f_contiguous(const PyGpuNdArrayObject * self)
     return f_contiguous;
 }
 
+static PyObject *
+PyGpuNdArray_as_c_contiguous(PyObject* dummy, PyObject* args, PyObject *kargs);
+//PyGpuNdArray_as_f_contiguous(const PyGpuNdArrayObject * self);
+
 /**
  * [Re]allocate a PyGpuNdArrayObject with access to 'nd' dimensions.
  *

@@ -43,7 +43,10 @@ def check_all(x, y):
     assert numpy.allclose(numpy.asarray(x), numpy.asarray(y))
 
 
-def gen_gpu_nd_array(shape, dtype='float32', offseted=False):
+def gen_gpu_nd_array(shape, dtype='float32', offseted=False, sliced=False):
+    if sliced and len(shape) > 0:
+        shape = numpy.asarray(shape)
+        shape[0] *= 2
     if offseted and len(shape) > 0:
         a = numpy.random.rand(shape[0] + 1, *shape[1:]) * 10
         a = numpy.asarray(a, dtype=dtype)
@@ -55,6 +58,10 @@ def gen_gpu_nd_array(shape, dtype='float32', offseted=False):
         a = numpy.random.rand(*shape) * 10
         a = numpy.asarray(a, dtype=dtype)
         b = gpu_ndarray.GpuNdArrayObject(a)
+    if sliced and len(shape) > 0:
+        a = a[::2]
+        b = b[::2]
+
     return a, b
 
 
@@ -109,6 +116,36 @@ def test_transfer_fortran():
             assert c.flags.f_contiguous
             assert a.strides == b.strides == c.strides
             assert numpy.allclose(c, a)
+
+
+def test_ascontiguousarray():
+    from ..array import may_share_memory
+
+    for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
+        for dtype in dtypes_all:
+            for offseted in [True, False]:
+                for sliced in [True, False]:
+                    print shp, dtype, offseted, sliced
+                    cpu, gpu = gen_gpu_nd_array(shp, dtype, offseted, sliced)
+
+                    a = numpy.ascontiguousarray(cpu)
+                    b = gpu_ndarray.ascontiguousarray(gpu)
+
+                    # numpy upcast with a view to 1d scalar.
+                    if sliced or shp == ():
+                        assert b is not gpu
+                        if not sliced:
+                            assert ((a.data is cpu.data) ==
+                                    (b.bytes is gpu.bytes))
+                    else:
+                        assert b is gpu
+
+                    assert a.shape == b.shape
+                    assert a.dtype == b.dtype
+                    assert a.flags.c_contiguous
+                    assert b.flags['C_CONTIGUOUS']
+                    assert a.strides == b.strides
+                    assert numpy.allclose(cpu, a)
 
 
 def test_zeros():
