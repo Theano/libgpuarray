@@ -1,12 +1,15 @@
 #include "compyte_buffer.h"
 
+#include <stdint.h>
+#include <stdlib.h>
 #include <strings.h>
 
+
 void GpuArray_free(GpuArray *a) {
-  if (res->data && GpuArray_OWNSDATA(a))
-    res->ops->buffer_free(res->data);
-  free(res->dimensions);
-  free(res->strides);
+  if (a->data && GpuArray_OWNSDATA(a))
+    a->ops->buffer_free(a->data);
+  free(a->dimensions);
+  free(a->strides);
   free(a);
 }
 
@@ -15,7 +18,6 @@ void GpuArray_free(GpuArray *a) {
 GpuArray *GpuArray_empty(compyte_buffer_ops *ops, void *ctx, int flags,
 			 size_t elsize, int nd, size_t *dims) {
   size_t size = elsize;
-  a->elsize = elsize;
   int i;
 
   for (i = 0; i < nd; i++) {
@@ -31,7 +33,6 @@ GpuArray *GpuArray_empty(compyte_buffer_ops *ops, void *ctx, int flags,
     return NULL;
   res->ops = ops;
   res->data = res->ops->buffer_alloc(ctx, size);
-  res->offset = 0;
   res->nd = nd;
   res->elsize = elsize;
   res->dimensions = calloc(nd, sizeof(size_t));
