@@ -4,7 +4,10 @@ PYTHONVERSION ?= 2.5
 CUDA_ROOT ?= /opt/lisa/os/cuda
 THEANO_ROOT ?= /u/bastienf/repos/Theano
 
-CFLAGS=-g
+
+CFLAGS=-g -DDEBUG -DOFFSET
+# By default enable the OFFSET usage. Otherwise some test fail.
+CFLAGS=-g -DOFFSET
 #BINDIR=--compiler-bindir ${HOME}/.theano.nvcc-bindir
 
 #NPY_PATH!=python -c "import numpy;print numpy.__path__"
