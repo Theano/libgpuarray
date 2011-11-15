@@ -92,7 +92,7 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
       }
     }else if (nd>0){
       DPRINTF("PyGpuNdArray_alloc_contiguous: NPY_FORTRANORDER\n");
-      size = dim[nd-1];
+      size = dim[0];
       PyGpuNdArray_STRIDE(self, 0) = elsize;
       PyGpuNdArray_DIM(self, nd-1) = dim[nd-1];
       for (int i = 1; i < nd; ++i){
