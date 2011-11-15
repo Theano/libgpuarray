@@ -184,7 +184,36 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
     return 0;
 }
 
-static PyObject * PyGpuNdArray_Copy(PyGpuNdArrayObject * self)
+static PyObject * PyGpuNdArray_copy(PyObject * self, PyObject *args,
+                                    PyObject *kargs)
+{
+    DPRINTF("PyGpuNdArray_copy start\n");
+    static const char *kwlist[] = {"order", NULL};
+    NPY_ORDER order = PyArray_CORDER;
+    bool fortran = false;
+
+    if(!PyGpuNdArray_Check(self)){
+        PyErr_SetString(PyExc_ValueError, "PyGpuNdArray_copy: expected a PyGpuNdArrayObject.");
+        return NULL;
+    }
+
+    DPRINTF("PyGpuNdArray_copy before parse inputs\n");
+    if (!PyArg_ParseTupleAndKeywords(args, kargs, "|O&",
+                                     (char**)kwlist,
+                                     PyArray_OrderConverter,
+                                     &order)) {
+        DPRINTF("PyGpuNdArray_copy start1.2\n");
+        return NULL;
+    }
+    DPRINTF("PyGpuNdArray_copy after parse inputs\n");
+
+    DPRINTF("PyGpuNdArray_copy before copy\n");
+    PyObject *ret = PyGpuNdArray_Copy((PyGpuNdArrayObject*)self, order);
+    DPRINTF("PyGpuNdArray_copy end\n");
+    return ret;
+}
+
+static PyObject * PyGpuNdArray_Copy(PyGpuNdArrayObject * self, NPY_ORDER order)
 {
     DPRINTF("PyGpuNdArray_Copy start\n");
     PyObject * rval = PyGpuNdArray_New();
@@ -193,7 +222,10 @@ static PyObject * PyGpuNdArray_Copy(PyGpuNdArrayObject * self)
     if ((!rval) || (-1 == PyGpuNdArray_NDIM(self))) {
         return rval;
     }
-    if (PyGpuNdArray_alloc_contiguous((PyGpuNdArrayObject*)rval, PyGpuNdArray_NDIM(self), PyGpuNdArray_DIMS(self))) {
+    if (PyGpuNdArray_alloc_contiguous((PyGpuNdArrayObject*)rval,
+                                      PyGpuNdArray_NDIM(self),
+                                      PyGpuNdArray_DIMS(self),
+                                      order)) {
         Py_DECREF(rval);
         return NULL;
     }
@@ -202,6 +234,9 @@ static PyObject * PyGpuNdArray_Copy(PyGpuNdArrayObject * self)
         Py_DECREF(rval);
         return NULL;
     }
+    if (order == NPY_F_CONTIGUOUS)
+        PyGpuNdArray_FLAGS(self) |= NPY_F_CONTIGUOUS;
+
 #ifdef DEBUG
     PyGpuNdArray_fprint(stderr, self);
     PyGpuNdArray_fprint(stderr, (PyGpuNdArrayObject *)rval);
@@ -579,7 +614,7 @@ static PyMethodDef PyGpuNdArray_methods[] =
         (PyCFunction)PyGpuNdArray_CreateArrayObj, METH_NOARGS,
         "Copy from the device to a numpy ndarray"},
     {"copy",
-        (PyCFunction)PyGpuNdArray_Copy, METH_NOARGS,
+     (PyCFunction)PyGpuNdArray_copy, METH_VARARGS|METH_KEYWORDS,
         "Create a deep copy of this object."},
     {"view",
         (PyCFunction)PyGpuNdArray_View, METH_NOARGS,

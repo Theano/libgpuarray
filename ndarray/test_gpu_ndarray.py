@@ -43,24 +43,43 @@ def check_all(x, y):
     assert numpy.allclose(numpy.asarray(x), numpy.asarray(y))
 
 
-def gen_gpu_nd_array(shape, dtype='float32', offseted=False, sliced=False):
+def gen_gpu_nd_array(shape_orig, dtype='float32', offseted_outer=False,
+                     offseted_inner=False, sliced=False, order='c'):
+    shape = numpy.asarray(shape_orig).copy()
     if sliced and len(shape) > 0:
-        shape = numpy.asarray(shape)
         shape[0] *= 2
-    if offseted and len(shape) > 0:
-        a = numpy.random.rand(shape[0] + 1, *shape[1:]) * 10
-        a = numpy.asarray(a, dtype=dtype)
-        b = gpu_ndarray.GpuNdArrayObject(a)
+    if offseted_outer and len(shape) > 0:
+        shape[0] += 1
+    if offseted_inner and len(shape) > 0:
+        shape[-1] += 1
+
+    a = numpy.random.rand(*shape) * 10
+    a = numpy.asarray(a, dtype=dtype)
+    assert order in ['c', 'f']
+    if order == 'f' and len(shape) > 0:
+        a = numpy.asfortranarray(a)
+    b = gpu_ndarray.GpuNdArrayObject(a)
+    if order == 'f' and len(shape) > 0:
+        assert b.flags['F_CONTIGUOUS']
+
+    if offseted_outer and len(shape) > 0:
         b = b[1:]
         a = a[1:]
         assert b.offset != 0
-    else:
-        a = numpy.random.rand(*shape) * 10
-        a = numpy.asarray(a, dtype=dtype)
-        b = gpu_ndarray.GpuNdArrayObject(a)
+    if offseted_inner and len(shape) > 0:
+        b = b[..., 1:]  # TODO: not implemented
+        a = a[..., 1:]
+        assert b.offset != 0
     if sliced and len(shape) > 0:
         a = a[::2]
         b = b[::2]
+
+    if False and shape_orig == ():
+        assert a.shape == (1,)
+        assert b.shape == (1,)
+    else:
+        assert a.shape == shape_orig, (a.shape, shape_orig)
+        assert b.shape == shape_orig, (b.shape, shape_orig)
 
     return a, b
 
@@ -217,36 +236,42 @@ def test_copy_view():
     for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             for offseted in [False, True]:
-                #TODO test copy unbroadcast!
-                a, b = gen_gpu_nd_array(shp, dtype, offseted)
+                # order1 is the order of the original data
+                for order1 in ['c', 'f']:
+                    # order2 is the order wanted after copy
+                    for order2 in ['c', 'f']:
+                        print shp, dtype, offseted, order1, order2
+                        #TODO test copy unbroadcast!
+                        a, b = gen_gpu_nd_array(shp, dtype, offseted,
+                                                order=order1)
 
-                assert numpy.allclose(a, numpy.asarray(b))
-                check_flags(a, b)
+                        assert numpy.allclose(a, numpy.asarray(b))
+                        check_flags(a, b)
 
-                c = b.copy()
-                assert numpy.allclose(a, numpy.asarray(c))
-                check_flags(c, a.copy())
-                check_memory_region(a, a.copy(), b, c)
+                        c = b.copy(order2)
+                        assert numpy.allclose(a, numpy.asarray(c))
+                        check_flags(c, a.copy(order2))
+                        check_memory_region(a, a.copy(order2), b, c)
 
-                d = copy.copy(b)
-                assert numpy.allclose(a, numpy.asarray(d))
-                check_flags(d, copy.copy(a))
-                check_memory_region(a, copy.copy(a), b, d)
+                        d = copy.copy(b)
+                        assert numpy.allclose(a, numpy.asarray(d))
+                        check_flags(d, copy.copy(a))
+                        check_memory_region(a, copy.copy(a), b, d)
 
-                e = b.view()
-                assert numpy.allclose(a, numpy.asarray(e))
-                check_flags(e, a.view())
-                check_memory_region(a, a.view(), b, e)
+                        e = b.view()
+                        assert numpy.allclose(a, numpy.asarray(e))
+                        check_flags(e, a.view())
+                        check_memory_region(a, a.view(), b, e)
 
-                f = copy.deepcopy(b)
-                assert numpy.allclose(a, numpy.asarray(f))
-                check_flags(f, copy.deepcopy(a))
-                check_memory_region(a, copy.deepcopy(a), b, f)
+                        f = copy.deepcopy(b)
+                        assert numpy.allclose(a, numpy.asarray(f))
+                        check_flags(f, copy.deepcopy(a))
+                        check_memory_region(a, copy.deepcopy(a), b, f)
 
-                g = copy.copy(b.view())
-                assert numpy.allclose(a, numpy.asarray(g))
-                check_memory_region(a, copy.copy(a.view()), b, g)
-                check_flags(g, copy.copy(a.view()))
+                        g = copy.copy(b.view())
+                        assert numpy.allclose(a, numpy.asarray(g))
+                        check_memory_region(a, copy.copy(a.view()), b, g)
+                        check_flags(g, copy.copy(a.view()))
 
 
 def test_len():
