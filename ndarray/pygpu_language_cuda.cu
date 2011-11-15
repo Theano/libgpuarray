@@ -566,6 +566,7 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self, PyGpuNdArrayObject 
 
 int PyGpuMemcpy(void * dst, const void * src, int dev_offset, size_t bytes, 
                 PyGpuTransfert direction){
+    DPRINTF("PyGpuMemcpy: start\n");
     cudaMemcpyKind dir;
     const char * ssrc;
     const char * ddst;
@@ -579,27 +580,32 @@ int PyGpuMemcpy(void * dst, const void * src, int dev_offset, size_t bytes,
         ddst = (char*)dst + dev_offset;
     } else {
         PyErr_Format(PyExc_ValueError,
-                        "GpuMemcpy: Received wrong direction %d!\n", direction);
+                     "PyGpuMemcpy: Received wrong direction %d!\n",
+                     direction);
         return -1;
     }
     cudaError_t err = cudaMemcpy((void*)ddst, (void*)ssrc, bytes, dir);
     CNDA_THREAD_SYNC;
     if (cudaSuccess != err) {
-        PyErr_Format(PyExc_RuntimeError, "cudaMemcpy: error copying data to host (%s)",
+        PyErr_Format(PyExc_RuntimeError, "PyGpuMemcpy: cudaMemcpy: error copying data to host (%s)",
                      cudaGetErrorString(err));
         return -1;
     }
+    DPRINTF("PyGpuMemcpy: end\n");
     return 0;
 }
 
 int PyGpuMemset(void * dst, int data, size_t bytes){
+    DPRINTF("PyGpuMemset: start\n");
     cudaError_t err = cudaMemset(dst, data, bytes);
     CNDA_THREAD_SYNC;
     if (cudaSuccess != err) {
         PyErr_Format(PyExc_MemoryError, "PyGpuMemset: Error memsetting %ld bytes of device memory(%s). %p",
                      bytes, cudaGetErrorString(err), PyGpuNdArray_DATA(dst));
+    DPRINTF("PyGpuMemset: end error\n");
         return -1;
     }
+    DPRINTF("PyGpuMemset: end\n");
     return 0;
 }
 

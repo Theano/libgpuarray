@@ -48,6 +48,9 @@ static PyObject *
 PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key);
 
 static PyObject *
+PyGpuNdArray_Copy(PyGpuNdArrayObject * self, NPY_ORDER order=NPY_CORDER);
+
+static PyObject *
 PyGpuNdArray_Zeros(int nd, npy_intp* dims, PyArray_Descr* dtype, int fortran);
 
 static PyObject *

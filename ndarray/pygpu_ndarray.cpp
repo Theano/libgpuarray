@@ -133,7 +133,9 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
         Py_INCREF(obj);
         py_src = (PyObject *) obj;
     }else{
-        py_src = PyArray_ContiguousFromAny((PyObject*)obj, typenum, PyArray_NDIM(obj), PyArray_NDIM(obj));
+        py_src = PyArray_ContiguousFromAny((PyObject*)obj, typenum,
+                                           PyArray_NDIM(obj),
+                                           PyArray_NDIM(obj));
     }
     DPRINTF("PyGpuNdArray_CopyFromArray: contiguous!\n");
     if (!py_src) {
@@ -143,7 +145,8 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
     int err;
     if(PyArray_ISFORTRAN(obj) && ! PyArray_ISCONTIGUOUS(obj)){
         DPRINTF("PyGpuNdArray_CopyFromArray: fortran!\n");
-        err = PyGpuNdArray_alloc_contiguous(self, obj->nd, obj->dimensions, NPY_FORTRANORDER);
+        err = PyGpuNdArray_alloc_contiguous(self, obj->nd, obj->dimensions,
+                                            NPY_FORTRANORDER);
     }else{
         err = PyGpuNdArray_alloc_contiguous(self, obj->nd, obj->dimensions);
     }
