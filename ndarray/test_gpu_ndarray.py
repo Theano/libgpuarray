@@ -67,7 +67,8 @@ def gen_gpu_nd_array(shape_orig, dtype='float32', offseted_outer=False,
         a = a[1:]
         assert b.offset != 0
     if offseted_inner and len(shape) > 0:
-        b = b[..., 1:]  # TODO: not implemented
+        # The b[..., 1:] act as the test for this subtensor case.
+        b = b[..., 1:]
         a = a[..., 1:]
         assert b.offset != 0
     if sliced and len(shape) > 0:
@@ -140,30 +141,36 @@ def test_transfer_fortran():
 def test_ascontiguousarray():
     for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
-            for offseted in [True, False]:
-                for sliced in [True, False]:
-                    print shp, dtype, offseted, sliced
-                    cpu, gpu = gen_gpu_nd_array(shp, dtype, offseted,
-                                                sliced=sliced)
+            for offseted_o in [True, False]:
+                for offseted_i in [True, True]:
+                    for sliced in [True, False]:
+                        for order in ['f', 'c']:
+                            #print shp, dtype, offseted_o, offseted_i,
+                            #print sliced, order
+                            cpu, gpu = gen_gpu_nd_array(shp, dtype, offseted_o,
+                                                        offseted_i,
+                                                        sliced, order)
 
-                    a = numpy.ascontiguousarray(cpu)
-                    b = gpu_ndarray.ascontiguousarray(gpu)
+                            a = numpy.ascontiguousarray(cpu)
+                            b = gpu_ndarray.ascontiguousarray(gpu)
 
-                    # numpy upcast with a view to 1d scalar.
-                    if sliced or shp == ():
-                        assert b is not gpu
-                        if not sliced:
-                            assert ((a.data is cpu.data) ==
-                                    (b.bytes is gpu.bytes))
-                    else:
-                        assert b is gpu
+                            # numpy upcast with a view to 1d scalar.
+                            if (sliced or shp == () or
+                                (offseted_i and len(shp) > 1)):
+                                assert b is not gpu
+                                if not sliced and not offseted_i:
+                                    assert ((a.data is cpu.data) ==
+                                            (b.bytes is gpu.bytes))
+                            else:
+                                assert b is gpu
 
-                    assert a.shape == b.shape
-                    assert a.dtype == b.dtype
-                    assert a.flags.c_contiguous
-                    assert b.flags['C_CONTIGUOUS']
-                    assert a.strides == b.strides
-                    assert numpy.allclose(cpu, a)
+                            assert a.shape == b.shape
+                            assert a.dtype == b.dtype
+                            assert a.flags.c_contiguous
+                            assert b.flags['C_CONTIGUOUS']
+                            assert a.strides == b.strides
+                            assert numpy.allclose(cpu, a)
+                            assert numpy.allclose(cpu, b)
 
 
 def test_asfortranarray():
@@ -173,10 +180,7 @@ def test_asfortranarray():
                 for offseted_inner in [True, False]:
                     for sliced in [True, False]:
                         for order in ['f', 'c']:
-                            offseted_inner = False
-
-                            print shp, dtype, offseted_outer,
-                            print offseted_inner, sliced, order
+#print shp, dtype, offseted_outer, offseted_inner, sliced, order
                             cpu, gpu = gen_gpu_nd_array(shp, dtype,
                                                         offseted_outer,
                                                         offseted_inner,
@@ -187,18 +191,16 @@ def test_asfortranarray():
                             b = gpu_ndarray.asfortranarray(gpu)
 
                             # numpy upcast with a view to 1d scalar.
-                            if (sliced or
-                                (offseted_outer and order == 'c' and
-                                 len(shp) > 1) or
-                                (offseted_inner and order == 'f' and
-                                 len(shp) > 1) or
-                                shp == ()):
+                            if (sliced or shp == () or
+                                (offseted_outer and len(shp) > 1) or
+                                (order != 'f' and len(shp) > 1)):
                                 assert b is not gpu
-                                if not sliced:
+                                if (not sliced and not offseted_outer and
+                                    order != 'c'):
                                     assert ((a.data is cpu.data) ==
                                             (b.bytes is gpu.bytes))
                             else:
-                                #assert b is gpu
+                                assert b is gpu
                                 pass
 
                             assert a.shape == b.shape
@@ -208,6 +210,7 @@ def test_asfortranarray():
                                 assert b.flags['F_CONTIGUOUS']
                             assert a.strides == b.strides
                             assert numpy.allclose(cpu, a)
+                            assert numpy.allclose(cpu, b)
 
 
 def test_zeros():

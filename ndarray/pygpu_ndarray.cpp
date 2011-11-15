@@ -930,7 +930,7 @@ PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base, i
 static PyObject *
 PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
 {
-    DPRINTF("Subscript .... \n");
+    DPRINTF("Subscript start\n");
     PyGpuNdArrayObject * self = (PyGpuNdArrayObject*) py_self;
     PyObject * py_rval = NULL;
     PyGpuNdArrayObject * rval = NULL;
@@ -1059,20 +1059,32 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         DPRINTF("Subscript with tuple \n");
         //elements of the tuple can be either integers or slices
         //the dimensionality of the view we will return is diminished for each slice in the tuple
-
+        int tuple_start_index = 0;
         if (PyTuple_Size(key) > PyGpuNdArray_NDIM(self))
         {
-            PyErr_SetString(PyExc_IndexError, "index error");
-            return NULL;
+            if (PyTuple_GetItem(key, 0) == Py_Ellipsis &&
+                PyTuple_Size(key) == PyGpuNdArray_NDIM(self) + 1)
+            {
+                tuple_start_index = 1;
+                DPRINTF("Subscript with tuple staring with an extra ellipse"
+                        " at the start.\n");
+            }
+            else{
+                PyErr_SetString(PyExc_IndexError,
+                                "index error, specified more dimensions then"
+                                " the number of existing dimensions");
+                return NULL;
+            }
         }
 
         //calculate the number of dimensions in the return value
         int rval_nd = PyGpuNdArray_NDIM(self);
-        for (int d = 0; d < PyTuple_Size(key); ++d)
+        for (int tuple_d = tuple_start_index; tuple_d < PyTuple_Size(key);
+             ++tuple_d)
         {
             //On some paltform PyInt_Check(<type 'numpy.int64'>) return true, other it return false.
             //So we use PyArray_IsAnyScalar that should covert everything.
-            rval_nd -= PyArray_IsAnyScalar(PyTuple_GetItem(key, d));
+            rval_nd -= PyArray_IsAnyScalar(PyTuple_GetItem(key, tuple_d));
         }
 
         //allocate our subtensor view
@@ -1097,34 +1109,42 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         // keys
         int rval_d = 0;
 
-        for (int d = 0; d < PyGpuNdArray_NDIM(self); ++d)
+        for (int self_d = 0, tuple_d = tuple_start_index;
+             self_d < PyGpuNdArray_NDIM(self); ++self_d, ++tuple_d)
         {
             // keys can be shorter than PyGpuNdArray_NDIM(self).
             // when that happens, it means that the remaining dimensions are "full slices"
-            if (d >=PyTuple_Size(key))
+            if (tuple_d >= PyTuple_Size(key))
             {
-                PyGpuNdArray_STRIDE(rval, rval_d) = PyGpuNdArray_STRIDES(self)[d];
-                PyGpuNdArray_DIM(rval, rval_d) = PyGpuNdArray_DIMS(self)[d];
+                PyGpuNdArray_STRIDE(rval, rval_d) =
+                    PyGpuNdArray_STRIDES(self)[tuple_d];
+                PyGpuNdArray_DIM(rval, rval_d) =
+                    PyGpuNdArray_DIMS(self)[tuple_d];
                 ++rval_d;
+                DPRINTF("Subscript extra dims to append %d %d\n",
+                        PyGpuNdArray_STRIDE(rval, rval_d),
+                        PyGpuNdArray_DIM(rval, rval_d));
             }
             else
             {
-                PyObject * key_d = PyTuple_GetItem(key, d);
+                PyObject * key_d = PyTuple_GetItem(key, tuple_d);
 
                 if (PySlice_Check(key_d))
                 {
                     Py_ssize_t start, stop, step, slen;
-                    if (PySlice_GetIndicesEx((PySliceObject*)key_d, PyGpuNdArray_DIMS(self)[d], &start, &stop, &step, &slen))
+                    if (PySlice_GetIndicesEx((PySliceObject*)key_d,
+                                             PyGpuNdArray_DIMS(self)[self_d],
+                                             &start, &stop, &step, &slen))
                     {
                         Py_DECREF(rval);
                         return NULL;
                     }
-                    PyGpuNdArray_add_offset(rval, start * PyGpuNdArray_STRIDES(self)[d]);
-                    PyGpuNdArray_STRIDE(rval, rval_d) = step * PyGpuNdArray_STRIDES(self)[d];
+                    PyGpuNdArray_add_offset(rval, start * PyGpuNdArray_STRIDES(self)[self_d]);
+                    PyGpuNdArray_STRIDE(rval, rval_d) = step * PyGpuNdArray_STRIDES(self)[self_d];
                     PyGpuNdArray_DIM(rval, rval_d) = slen;
 
-                    DPRINTF("start %zd\nstop %zd\n step %zd\n slen %zd\n",
-                            start, stop, step, slen);
+                    DPRINTF("rval_d %zd self_d %zd\n start %zd\nstop %zd\n step %zd\n slen %zd\n",
+                            rval_d, self_d, start, stop, step, slen);
                     ++rval_d;
                 }
                 else if ((intobj=PyNumber_Int(key_d)))
@@ -1133,17 +1153,17 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
                     int d_idx = PyInt_AsLong(intobj);
                     Py_DECREF(intobj);
                     intobj = NULL;
-                    int d_dim = PyGpuNdArray_DIMS(self)[d];
+                    int d_dim = PyGpuNdArray_DIMS(self)[self_d];
 
                     if ((d_idx >= 0) && (d_idx < d_dim))
                     {
                         //normal indexing
-                        PyGpuNdArray_add_offset(rval, d_idx * PyGpuNdArray_STRIDES(self)[d]);
+                        PyGpuNdArray_add_offset(rval, d_idx * PyGpuNdArray_STRIDES(self)[self_d]);
                     }
                     else if ((d_idx < 0) && (d_idx >= -d_dim))
                     {
                         //end-based indexing
-                        PyGpuNdArray_add_offset(rval, (d_dim + d_idx) * PyGpuNdArray_STRIDES(self)[d]);
+                        PyGpuNdArray_add_offset(rval, (d_dim + d_idx) * PyGpuNdArray_STRIDES(self)[self_d]);
                     }
                     else
                     {
@@ -1152,10 +1172,37 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
                         return NULL;
                     }
                 }
+                else if (key_d == Py_Ellipsis)
+                {
+                    if (self_d != 0){
+                        PyErr_Format(PyExc_IndexError,
+                                     "Ellipsis supported only at the start of"
+                                     " the tuple");
+                        Py_DECREF(rval);
+                        return NULL;
+                    }
+                    DPRINTF("Substript with tuple with the first element an ellipse\n");
+                    for( ; self_d < (rval_nd - PyTuple_Size(key) + 1); self_d++)
+                    {
+                        PyGpuNdArray_STRIDE(rval, rval_d) =
+                            PyGpuNdArray_STRIDES(self)[self_d];
+                        PyGpuNdArray_DIM(rval, rval_d) =
+                            PyGpuNdArray_DIMS(self)[self_d];
+                        DPRINTF("Ellipse append dimensions self_%d with %d %d\n",
+                                self_d,
+                                PyGpuNdArray_STRIDE(rval, rval_d),
+                                PyGpuNdArray_DIM(rval, rval_d));
+                        ++rval_d;
+                    }
+                    tuple_start_index = 1;
+                    self_d--;
+                }
                 else
                 {
                     PyErr_Clear(); // clear the error set by PyNumber_Int
-                    PyErr_SetString(PyExc_IndexError, "index must be either int or slice");
+                    PyErr_Format(PyExc_IndexError,
+                                 "index must be either int or slice. Got %s",
+                                 PyString_AsString(PyObject_Str(key_d)));
                     Py_DECREF(rval);
                     return NULL;
                 }
