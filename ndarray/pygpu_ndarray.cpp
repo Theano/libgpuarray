@@ -1353,6 +1353,53 @@ PyGpuNdArray_as_c_contiguous(PyObject* dummy, PyObject* args, PyObject *kargs)
     DPRINTF("PyGpuNdArray_as_c_contiguous: copy end\n");
     return ret;
 }
+static PyObject *
+PyGpuNdArray_as_f_contiguous(PyObject* dummy, PyObject* args, PyObject *kargs)
+{
+    DPRINTF("PyGpuNdArray_as_f_contiguous:start\n");
+    static const char *kwlist[] = {"a", "dtype", NULL};
+    PyArray_Descr *typecode = NULL;
+    PyObject *self_ = NULL;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kargs, "O|O&",
+                                     (char **)kwlist,
+                                     &self_,
+                                     PyArray_DescrConverter,
+                                     &typecode)) {
+        Py_XDECREF(typecode);
+        Py_XDECREF(self_);
+        return NULL;
+    }
+    assert(typecode == NULL);
+    if (!PyGpuNdArray_Check(self_)){
+        PyErr_SetString(PyExc_TypeError,
+                        "PyGpuNdArray_as_f_contiguous:"
+                        " PyGpuNdArrayObject required");
+        return NULL;
+    }
+
+    PyGpuNdArrayObject *self = (PyGpuNdArrayObject*)self_;
+    if (PyGpuNdArray_is_f_contiguous(self)){
+        Py_INCREF(self);
+        if (PyGpuNdArray_NDIM(self) == 0){
+            //numpy.ascontiguous() always return object with 1d.
+            PyObject * rval = PyGpuNdArray_View(self);
+            if (!rval)
+                return NULL;
+            PyGpuNdArray_set_nd((PyGpuNdArrayObject*)rval, 1);
+            PyGpuNdArray_DIM(rval, 0) = 1;
+            PyGpuNdArray_STRIDE(rval, 0) = PyGpuNdArray_ITEMSIZE(rval);
+            DPRINTF("PyGpuNdArray_as_f_contiguous: upcast to 1d tensor end\n");
+            return rval;
+        }
+        DPRINTF("PyGpuNdArray_as_f_contiguous: no copy end\n");
+        return (PyObject*)self;
+    }
+
+    PyObject * ret = PyGpuNdArray_Copy(self, NPY_FORTRANORDER);
+    DPRINTF("PyGpuNdArray_as_f_contiguous: copy end\n");
+    return ret;
+}
 
 static PyMethodDef module_methods[] = {
     //{"dimshuffle", PyGpuNdArray_Dimshuffle, METH_VARARGS, "Returns the dimshuffle of a PyGpuNdArray."},
@@ -1366,10 +1413,10 @@ static PyMethodDef module_methods[] = {
     {"ascontiguousarray",
        (PyCFunction)PyGpuNdArray_as_c_contiguous, METH_VARARGS|METH_KEYWORDS,
        "If the array is not c contiguous, copy it to a new c contiguous region."},
-/*    {"asfortranarray",
+    {"asfortranarray",
        (PyCFunction)PyGpuNdArray_as_f_contiguous, METH_VARARGS|METH_KEYWORDS,
        "If the array is not f contiguous, copy it to a new c contiguous region."},
-*/    {NULL, NULL, NULL, NULL}  /* Sentinel */
+    {NULL, NULL, NULL, NULL}  /* Sentinel */
 };
 
 #ifndef PyMODINIT_FUNC  /* declarations for DLL import/export */

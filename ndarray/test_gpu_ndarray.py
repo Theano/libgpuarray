@@ -167,6 +167,50 @@ def test_ascontiguousarray():
                     assert numpy.allclose(cpu, a)
 
 
+def test_asfortranarray():
+    for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
+        for dtype in dtypes_all:
+            for offseted_outer in [True, False]:
+                for offseted_inner in [True, False]:
+                    for sliced in [True, False]:
+                        for order in ['f', 'c']:
+                            offseted_inner = False
+
+                            print shp, dtype, offseted_outer,
+                            print offseted_inner, sliced, order
+                            cpu, gpu = gen_gpu_nd_array(shp, dtype,
+                                                        offseted_outer,
+                                                        offseted_inner,
+                                                        sliced,
+                                                        order)
+
+                            a = numpy.asfortranarray(cpu)
+                            b = gpu_ndarray.asfortranarray(gpu)
+
+                            # numpy upcast with a view to 1d scalar.
+                            if (sliced or
+                                (offseted_outer and order == 'c' and
+                                 len(shp) > 1) or
+                                (offseted_inner and order == 'f' and
+                                 len(shp) > 1) or
+                                shp == ()):
+                                assert b is not gpu
+                                if not sliced:
+                                    assert ((a.data is cpu.data) ==
+                                            (b.bytes is gpu.bytes))
+                            else:
+                                #assert b is gpu
+                                pass
+
+                            assert a.shape == b.shape
+                            assert a.dtype == b.dtype
+                            assert a.flags.f_contiguous
+                            if shp != ():
+                                assert b.flags['F_CONTIGUOUS']
+                            assert a.strides == b.strides
+                            assert numpy.allclose(cpu, a)
+
+
 def test_zeros():
     for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for order in ["C", "F"]:
