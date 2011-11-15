@@ -138,14 +138,13 @@ def test_transfer_fortran():
 
 
 def test_ascontiguousarray():
-    from ..array import may_share_memory
-
     for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             for offseted in [True, False]:
                 for sliced in [True, False]:
                     print shp, dtype, offseted, sliced
-                    cpu, gpu = gen_gpu_nd_array(shp, dtype, offseted, sliced)
+                    cpu, gpu = gen_gpu_nd_array(shp, dtype, offseted,
+                                                sliced=sliced)
 
                     a = numpy.ascontiguousarray(cpu)
                     b = gpu_ndarray.ascontiguousarray(gpu)
