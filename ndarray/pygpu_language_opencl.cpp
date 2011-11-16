@@ -106,7 +106,7 @@ device_malloc(size_t size)
 
   res = clCreateBuffer(ctx, CL_MEM_READ_WRITE, size, NULL, &err);
   if (err != CL_SUCCESS) {
-    PyErr_Format(PyExc_MemoryError, "Could not allocate device memory");
+    PyErr_Format(PyExc_MemoryError, "Could not allocate device memory (%d)", err);
     return NULL;
   }
 
@@ -116,8 +116,10 @@ device_malloc(size_t size)
 int
 device_free(void * ptr)
 {
-  if (clReleaseMemObject((cl_mem)ptr) != CL_SUCCESS) {
-    PyErr_Format(PyExc_MemoryError, "Could not free device memory");
+  cl_int err;
+
+  if ((err = clReleaseMemObject((cl_mem)ptr)) != CL_SUCCESS) {
+    PyErr_Format(PyExc_MemoryError, "Could not free device memory (%d)", err);
     return -1;
   }
   return 0;
@@ -130,6 +132,7 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self,
 {
   size_t size = 1;
   cl_event ev;
+  cl_int err;
   
   assert(PyGpuNdArray_TYPE(self) == PyGpuNdArray_TYPE(other));
   assert(PyGpuNdArray_ISWRITEABLE(self));
@@ -138,6 +141,12 @@ PyGpuNdArray_CopyFromPyGpuNdArray(PyGpuNdArrayObject * self,
 dArrayObject");
     return -1;
   }
+
+  if (!(PyGpuNdArray_ISONESEGMENT(self) && PyGpuNdArray_ISONESEGMENT(other))) {
+    PyErr_Format(PyExc_NotImplementedError, "PyGpuNdArray_CopyFromPyGpuNdArray: only contiguous arrays are supported");
+    return -1;
+  }
+
   if (PyGpuNdArray_NDIM(self) != PyGpuNdArray_NDIM(other)) {
     PyErr_Format(PyExc_NotImplementedError, "PyGpuNdArray_CopyFromPyGpuNdArray: need same number of dims. destination nd=%d, source nd=%d. No broadcasting implemented.", PyGpuNdArray_NDIM(self), PyGpuNdArray_NDIM(other));
     return -1;
@@ -158,16 +167,16 @@ dArrayObject");
   }
   size *= PyGpuNdArray_ITEMSIZE(self);
 
-  if (clEnqueueCopyBuffer(q, (cl_mem)PyGpuNdArray_DATA(other),
-			  (cl_mem)PyGpuNdArray_DATA(self),
-			  PyGpuNdArray_OFFSET(other),
-			  PyGpuNdArray_OFFSET(self),
-			  size, 0, NULL, &ev) != CL_SUCCESS) {
-    PyErr_Format(PyExc_RuntimeError, "Could not create copy command");
+  if ((err = clEnqueueCopyBuffer(q, (cl_mem)PyGpuNdArray_DATA(other),
+				 (cl_mem)PyGpuNdArray_DATA(self),
+				 PyGpuNdArray_OFFSET(other),
+				 PyGpuNdArray_OFFSET(self),
+				 size, 0, NULL, &ev)) != CL_SUCCESS) {
+    PyErr_Format(PyExc_RuntimeError, "Could not create copy command (%d)", err);
     return -1;
   }
-  if (clWaitForEvents(1, &ev) != CL_SUCCESS) {
-    PyErr_Format(PyExc_RuntimeError, "Could not copy data");
+  if ((err = clWaitForEvents(1, &ev)) != CL_SUCCESS) {
+    PyErr_Format(PyExc_RuntimeError, "Could not copy data (%d)", err);
     clReleaseEvent(ev);
     return -1;
   }
@@ -199,12 +208,12 @@ PyGpuMemcpy(void * dst, const void * src, int dev_offset, size_t bytes,
     }
 
   if (err != CL_SUCCESS) {
-    PyErr_Format(PyExc_RuntimeError, "Could not create memcpy command");
+    PyErr_Format(PyExc_RuntimeError, "Could not create memcpy command (%d)", err);
     return -1;
   }
 
-  if (clWaitForEvents(1, &ev) != CL_SUCCESS) {
-    PyErr_Format(PyExc_RuntimeError, "Could not memcpy data");
+  if ((err = clWaitForEvents(1, &ev)) != CL_SUCCESS) {
+    PyErr_Format(PyExc_RuntimeError, "Could not memcpy data (%d)", err);
     clReleaseEvent(ev);
     return -1;
   }
@@ -242,33 +251,33 @@ PyGpuMemset(void * dst, int data, size_t bytes)
   rlk[0] = local_kern;
   p = clCreateProgramWithSource(ctx, 1, rlk, &sz, &err);
   if (err != CL_SUCCESS) {
-    PyErr_Format(PyExc_RuntimeError, "Could not create program");
+    PyErr_Format(PyExc_RuntimeError, "Could not create program (%d)", err);
     return -1;
   }
 
-  if (clBuildProgram(p, 1, &dev, NULL, NULL, NULL) != CL_SUCCESS) {
-    PyErr_Format(PyExc_RuntimeError, "Could not build program");
+  if ((err = clBuildProgram(p, 1, &dev, NULL, NULL, NULL)) != CL_SUCCESS) {
+    PyErr_Format(PyExc_RuntimeError, "Could not build program (%d)", err);
     goto fail_prog;
   }
 
   k = clCreateKernel(p, "memset", &err);
   if (err != CL_SUCCESS) {
-    PyErr_Format(PyExc_RuntimeError, "Could not create kernel");
+    PyErr_Format(PyExc_RuntimeError, "Could not create kernel (%d)", err);
     goto fail_prog;
   }
 
-  if (clSetKernelArg(k, 0, sizeof(cl_mem), &dst) != CL_SUCCESS) {
-    PyErr_Format(PyExc_RuntimeError, "Could not set kernel arg");
+  if ((err = clSetKernelArg(k, 0, sizeof(cl_mem), &dst)) != CL_SUCCESS) {
+    PyErr_Format(PyExc_RuntimeError, "Could not set kernel arg (%d)", err);
     goto fail_kern;
   }
 
-  if (clEnqueueNDRangeKernel(q, k, 1, NULL, &bytes, NULL, 0, NULL, &ev) != CL_SUCCESS) {
-    PyErr_Format(PyExc_RuntimeError, "Could not enqueue kernel");
+  if ((err = clEnqueueNDRangeKernel(q, k, 1, NULL, &bytes, NULL, 0, NULL, &ev)) != CL_SUCCESS) {
+    PyErr_Format(PyExc_RuntimeError, "Could not enqueue kernel (%d)", err);
     goto fail_kern;
   }
   
-  if (clWaitForEvents(1, &ev) != CL_SUCCESS) {
-    PyErr_Format(PyExc_RuntimeError, "Could not memset");
+  if ((err = clWaitForEvents(1, &ev)) != CL_SUCCESS) {
+    PyErr_Format(PyExc_RuntimeError, "Could not memset (%d)", err);
   }
   
   /* success! */
