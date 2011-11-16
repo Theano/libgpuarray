@@ -10,8 +10,6 @@
 
 #endif
 
-#include <errno.h>
-
 #include <stdlib.h>
 
 /* To work around the lack of byte addressing */
@@ -136,12 +134,12 @@ static int cl_move(gpudata *dst, gpudata *src, size_t sz) {
   if ((err = clEnqueueCopyBuffer(dst->q, src->buf, dst->buf,
 				 src->offset, dst->offset,
 				 sz, 0, NULL, &ev)) != CL_SUCCESS) {
-    return -1;
+    return GA_IMPL_ERROR;
   }
 
   if ((err = clWaitForEvents(1, &ev)) != CL_SUCCESS) {
     clReleaseEvent(ev);
-    return -1;
+    return GA_IMPL_ERROR;
   }
   clReleaseEvent(ev);
 
@@ -152,7 +150,7 @@ static int cl_read(void *dst, gpudata *src, size_t sz) {
   if ((err = clEnqueueReadBuffer(src->q, src->buf, CL_TRUE,
 				 src->offset, sz, dst,
 				 0, NULL, NULL)) != CL_SUCCESS) {
-    return -1;
+    return GA_IMPL_ERROR;
   }
 
   return 0;
@@ -162,7 +160,7 @@ static int cl_write(gpudata *dst, void *src, size_t sz) {
   if ((err = clEnqueueReadBuffer(dst->q, dst->buf, CL_TRUE,
 				 dst->offset, sz, src,
 				 0, NULL, NULL)) != CL_SUCCESS) {
-    return -1;
+    return GA_IMPL_ERROR;
   }
 
   return 0;
@@ -172,7 +170,7 @@ static int cl_memset(gpudata *dst, int data, size_t bytes) {
   char local_kern[92];
   const char *rlk[1];
   size_t sz;
-  int r, res = -1;
+  int r, res = GA_IMPL_ERROR;
 
   cl_event ev;
   cl_program p;
@@ -194,7 +192,7 @@ static int cl_memset(gpudata *dst, int data, size_t bytes) {
   rlk[0] = local_kern;
   p = clCreateProgramWithSource(ctx, 1, rlk, &sz, &err);
   if (err != CL_SUCCESS) {
-    return -1;
+    return GA_IMPL_ERROR;
   }
 
   if (clBuildProgram(p, 1, &dev, NULL, NULL, NULL) != CL_SUCCESS) {
@@ -233,12 +231,12 @@ static int cl_offset(gpudata *b, int off) {
     /* negative */
     if (((off == INT_MIN) && (b->offset <= INT_MAX)) || 
 	(-off > b->offset)) {
-      return -1;
+      return GA_VALUE_ERROR;
     }
   } else {
     /* positive */
     if ((SIZE_MAX - off) < b->offset) {
-      return -1;
+      return GA_VALUE_ERROR;
     }
   }
   b->offset += off;
@@ -246,11 +244,7 @@ static int cl_offset(gpudata *b, int off) {
 }
 
 static const char *cl_error(void) {
-  if (err == CL_SUCCESS) {
-    return strerror(errno);
-  } else {
-    return get_error_string(err);
-  }
+  return get_error_string(err);
 }
 
 compyte_buffer_ops opencl_ops = {cl_alloc, cl_free, cl_move, cl_read, cl_write, cl_memset, cl_offset, cl_error};

@@ -34,7 +34,7 @@ static int cuda_move(gpudata *dst, gpudata *src, size_t sz)
     err = cudaMemcpy(dst->ptr, src->ptr, sz, cudaMemcpyDeviceToDevice);
     CNDA_THREAD_SYNC;
     if (cudaSuccess != err) {
-        return -1;
+        return GA_IMPL_ERROR;
     }
     return 0;
 }
@@ -44,7 +44,7 @@ static int cuda_read(void *dst, gpudata *src, size_t sz)
     err = cudaMemcpy(dst, src->ptr, sz, cudaMemcpyDeviceToHost);
     CNDA_THREAD_SYNC;
     if (cudaSuccess != err) {
-        return -1;
+        return GA_IMPL_ERROR;
     }
     return 0;
 }
@@ -54,7 +54,7 @@ static int cuda_write(gpudata *dst, void *src, size_t sz)
     err = cudaMemcpy(dst->ptr, src, sz, cudaMemcpyHostToDevice);
     CNDA_THREAD_SYNC;
     if (cudaSuccess != err) {
-        return -1;
+        return GA_IMPL_ERROR;
     }
     return 0;
 }
@@ -64,7 +64,7 @@ static int cuda_memset(gpudata *dst, int data, size_t bytes)
     err = cudaMemset(dst->ptr, data, bytes);
     CNDA_THREAD_SYNC;
     if (cudaSuccess != err) {
-        return -1;
+        return GA_IMPL_ERROR;
     }
     return 0;
 }

@@ -87,6 +87,7 @@ enum ga_error {
   GA_NO_ERROR = 0,
   GA_MEMORY_ERROR,
   GA_VALUE_ERROR,
+  GA_IMPL_ERROR,
   /* Add more error types if needed */
 };
 
