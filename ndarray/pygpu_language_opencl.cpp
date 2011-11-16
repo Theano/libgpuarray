@@ -147,6 +147,13 @@ dArrayObject");
     return -1;
   }
 
+  if ((PyGpuNdArray_ISCONTIGUOUS(self) != PyGpuNdArray_ISCONTIGUOUS(other)) ||
+      (PyGpuNdArray_ISFORTRAN(self) != PyGpuNdArray_ISFORTRAN(other))
+      ) {
+    PyErr_Format(PyExc_NotImplementedError, "PyGpuNdArray_CopyFromPyGpuNdArray: the input and output don't have the same c/f contiguous memory layout. This isnot supported now.");
+    return -1;
+  }
+
   if (PyGpuNdArray_NDIM(self) != PyGpuNdArray_NDIM(other)) {
     PyErr_Format(PyExc_NotImplementedError, "PyGpuNdArray_CopyFromPyGpuNdArray: need same number of dims. destination nd=%d, source nd=%d. No broadcasting implemented.", PyGpuNdArray_NDIM(self), PyGpuNdArray_NDIM(other));
     return -1;
