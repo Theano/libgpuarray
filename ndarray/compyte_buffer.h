@@ -53,6 +53,7 @@ typedef struct _GpuArray {
   int nd;
   int flags;
   
+  /* XXX: Replace this by a dtype code like numpy? */
   size_t elsize;
   size_t *dimensions;
   ssize_t *strides;
@@ -88,6 +89,8 @@ enum ga_error {
   GA_MEMORY_ERROR,
   GA_VALUE_ERROR,
   GA_IMPL_ERROR,
+  GA_INVALID_ERROR,
+  GA_UNSUPPORTED_ERROR,
   /* Add more error types if needed */
 };
 
@@ -98,6 +101,9 @@ static inline int GpuArray_CHKFLAGS(GpuArray *a, int flags) {
 #define GpuArray_OWNSDATA(a) GpuArray_CHKFLAGS(a, GA_OWNDATA)
 #define GpuArray_ISWRITEABLE(a) GpuArray_CHKFLAGS(a, GA_WRITEABLE)
 #define GpuArray_ISALIGNED(a) GpuArray_CHKFLAGS(a, GA_ALIGNED)
+#define GpuArray_ISONESEGMENT(a) ((a)->flags & (GA_C_CONTIGUOUS|GA_F_CONTIGUOUS))
+#define GpuArray_ISFORTRAN(a) GpuArray_CHKFLAGS(a, GA_F_CONTIGUOUS)
+#define GpuArray_ITEMSIZE(a) ((a)->elsize) /* For now */
 
 int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx, int flags,
 		   size_t elsize, int nd, size_t *dims, ga_order ord);
@@ -109,8 +115,6 @@ void GpuArray_clear(GpuArray *a);
 int GpuArray_move(GpuArray *dst, GpuArray *src);
 int GpuArray_write(GpuArray *dst, void *src, size_t src_sz);
 int GpuArray_read(void *dst, size_t dst_sz, GpuArray *src);
-
-int GpuArray_view(GpuArray *dst, GpuArray *a, int nd, size_t dims);
 
 #ifdef __cplusplus
 }
