@@ -51,42 +51,59 @@ typedef struct _GpuArray {
   gpudata *data;
   compyte_buffer_ops *ops;
   int nd;
+  int flags;
   
   size_t elsize;
   size_t *dimensions;
-  size_t *strides;
-  int flags;
+  ssize_t *strides;
+  size_t total_size;
   /* Try to keep in sync with numpy values for now*/
-#define GA_CONTIGUOUS     0x0001
+#define GA_C_CONTIGUOUS   0x0001
 #define GA_F_CONTIGUOUS   0x0002
 #define GA_OWNDATA        0x0004
+#define GA_ENSURECOPY     0x0020
 #define GA_ALIGNED        0x0100
 #define GA_WRITEABLE      0x0400
 #define GA_BEHAVED        (GA_ALIGNED|GA_WRITEABLE)
-#define GA_CARRAY         (GA_CONTIGUOUS|GA_BEHAVED)
-#define GA_DEFAULT        GA_CARRAY
+#define GA_CARRAY         (GA_C_CONTIGUOUS|GA_BEHAVED)
+#define GA_FARRAY         (GA_F_CONTIGUOUS|GA_BEHAVED)
   /* Numpy flags that will not be supported at this level (and why):
 
      NPY_NOTSWAPPED: data is alway native endian
      NPY_FORCECAST: no casts
-     NPY_ENSUREARRAY: no view functions or the like
-     NPY_ENSURECOPY: no view functions or the like
-     NPY_UPDATEIFCOPY: cannot support without refcount
+     NPY_ENSUREARRAY: no inherited classes
+     NPY_UPDATEIFCOPY: cannot support without refcount (or somesuch)
 
      Maybe will define other flags later */
 } GpuArray;
+
+typedef enum _ga_order {
+  GA_ANY_ORDER=-1,
+  GA_C_ORDER=0,
+  GA_F_ORDER=1
+} ga_order;
+
+enum ga_error {
+  GA_NO_ERROR = 0,
+  GA_MEMORY_ERROR,
+  GA_VALUE_ERROR,
+  /* Add more error types if needed */
+};
 
 static inline int GpuArray_CHKFLAGS(GpuArray *a, int flags) {
   return a->flags & flags == flags;
 }
 /* Add tests here when you need them */
-#define GpuArray_OWNSDATA(a) GpuArray_CHKFLAGS((a), GA_OWNDATA)
+#define GpuArray_OWNSDATA(a) GpuArray_CHKFLAGS(a, GA_OWNDATA)
+#define GpuArray_ISWRITEABLE(a) GpuArray_CHKFLAGS(a, GA_WRITEABLE)
+#define GpuArray_ISALIGNED(a) GpuArray_CHKFLAGS(a, GA_ALIGNED)
 
-GpuArray *GpuArray_empty(compyte_buffer_ops *ops, void *ctx, int flags,
-			 size_t elsize, int nd, size_t *dims);
-GpuArray *GpuArray_zeros(void *ctx, int flags, size_t elsize, int nd, size_t *dims);
+int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx, int flags,
+		   size_t elsize, int nd, size_t *dims, ga_order ord);
+int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx, int flags,
+		   size_t elsize, int nd, size_t *dims, ga_order ord);
 
-void GpuArray_free(GpuArray *a);
+void GpuArray_clear(GpuArray *a);
 
 int GpuArray_move(GpuArray *dst, GpuArray *src);
 int GpuArray_write(GpuArray *dst, void *src, size_t src_sz);

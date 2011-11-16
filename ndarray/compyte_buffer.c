@@ -4,47 +4,86 @@
 #include <stdlib.h>
 #include <strings.h>
 
-
-void GpuArray_free(GpuArray *a) {
-  if (a->data && GpuArray_OWNSDATA(a))
-    a->ops->buffer_free(a->data);
-  free(a->dimensions);
-  free(a->strides);
-  free(a);
-}
-
 #define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
 
-GpuArray *GpuArray_empty(compyte_buffer_ops *ops, void *ctx, int flags,
-			 size_t elsize, int nd, size_t *dims) {
+int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx, int flags,
+		   size_t elsize, int nd, size_t *dims, ga_order ord) {
   size_t size = elsize;
   int i;
+
+  if (ord == GA_ANY_ORDER)
+    ord = GA_C_ORDER;
+
+  if (ord != GA_C_ORDER && ord != GA_F_ORDER)
+    return GA_VALUE_ERROR;
 
   for (i = 0; i < nd; i++) {
     size_t d = dims[i];
     if ((d >= MUL_NO_OVERFLOW || size >= MUL_NO_OVERFLOW) &&
 	d > 0 && SIZE_MAX / d < size)
-      return NULL;
+      return GA_VALUE_ERROR;
     size *= d;
   }
-  GpuArray *res;
-  res = malloc(sizeof(*res));
-  if (res == NULL)
-    return NULL;
-  res->ops = ops;
-  res->data = res->ops->buffer_alloc(ctx, size);
-  res->nd = nd;
-  res->elsize = elsize;
-  res->dimensions = calloc(nd, sizeof(size_t));
-  res->strides = calloc(nd, sizeof(size_t));
-  res->flags = GA_DEFAULT|GA_OWNDATA;
-  if (res->dimensions == NULL || res->strides == NULL || res->data == NULL) {
-    GpuArray_free(res);
-    return NULL;
+  a->ops = ops;
+  a->data = a->ops->buffer_alloc(ctx, size);
+  a->total_size = size;
+  a->nd = nd;
+  a->elsize = elsize;
+  a->dimensions = calloc(nd, sizeof(size_t));
+  a->strides = calloc(nd, sizeof(ssize_t));
+  /* F/C distinction comes later */
+  a->flags = GA_OWNDATA|GA_BEHAVED;
+  if (a->dimensions == NULL || a->strides == NULL || a->data == NULL) {
+    GpuArray_clear(res);
+    return GA_MEMORY_ERROR;
   }
   /* Mult will not overflow since calloc succeded */
   bcopy(dims, res->dimensions, sizeof(size_t)*nd);
-  for (i = 0; i < nd; i++) {
-    /* XXX: do strides here */
+
+  size = elsize;
+  /* mults will not overflow, checked on entry */
+  switch (ord) {
+  case GA_C_ORDER:
+    for (i = nd-1; i >= 0; i--) {
+      a->strides[i] = size;
+      size *= a->dimensions[i];
+    }
+    a->flags |= GA_C_CONTIGUOUS;
+    break;
+  case GA_F_ORDER:
+    for (i = 0; i < nd; i++) {
+      a->strides[i] = size;
+      size *= a->dimensions[i];
+    }
+    a->flags |= GA_F_CONTIGUOUS;
+    break;
+  default:
+    assert(0); /* cannot be reached */
   }
+  
+  if (a->nd <= 1)
+    a->flags |= GA_F_CONTIGUOUS|GA_C_CONTIGUOUS;
+
+  return GA_NO_ERROR;
+}
+
+int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx, int flags,
+                   size_t elsize, int nd, size_t *dims, ga_order ord) {
+  int err;
+  err = GpuArray_empty(a, ops, ctx, flags, elsize, nd, dims, ord);
+  if (err != GA_NO_ERROR)
+    return err;
+  err = a->ops->buffer_memset(a->data, 0, a->total_size);
+  if (err != GA_NO_ERROR) {
+    GpuArray_clear(a);
+  }
+  return err;
+}
+
+void GpuArray_clear(GpuArray *a) {
+  if (a->data && GpuArray_OWNSDATA(a))
+    a->ops->buffer_free(a->data);
+  free(a->dimensions);
+  free(a->strides);
+  bzero(a, sizeof(*a));
 }
