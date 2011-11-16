@@ -9,9 +9,48 @@ that ndim is 0 as with all scalar type.
 import numpy
 import StringIO
 
-import pycuda.autoinit
-import pycuda.driver as drv
-from pycuda.compiler import SourceModule
+
+_CL_MODE = False  # "pyopencl" in __name__
+
+
+if _CL_MODE:
+    # THIS IS NOT FINISHED
+    import pyopencl as cl
+    import pyopencl.array as cl_array
+    from pyopencl.tools import dtype_to_ctype
+#    import pyopencl._mymako as mako
+    from pyopencl._cluda import CLUDA_PREAMBLE
+    # TODO: use mako to get rid of the %if
+    CLUDA_PREAMBLE = CLUDA_PREAMBLE[:455]
+    CLUDA_PREAMBLE += """
+#define LDIM_0 get_local_id(0)
+#define LDIM_1 get_local_id(1)
+#define LDIM_2 get_local_id(2)
+
+#define GDIM_0 get_global_id(0)
+#define GDIM_1 get_global_id(1)
+#define GDIM_2 get_global_id(2)
+ """
+    # TODO, reuse the same context as the use used to create the memory.
+    ctx = cl.create_some_context()
+    queue = cl.CommandQueue(ctx)
+else:
+    import pycuda.autoinit
+    import pycuda.driver as driver
+    from pycuda.compiler import SourceModule
+    from pycuda.tools import dtype_to_ctype
+#    import pycuda._mymako as mako
+    from pycuda._cluda import CLUDA_PREAMBLE
+    CLUDA_PREAMBLE += """
+#define LDIM_0 blockDim.x
+#define LDIM_1 blockDim.y
+#define LDIM_2 blockDim.z
+
+#define GDIM_0 gridDim.x
+#define GDIM_1 gridDim.y
+#define GDIM_2 gridDim.z
+ """
+
 from theano import Apply
 from theano import scalar
 from theano.tensor import TensorType
@@ -58,12 +97,39 @@ def get_str_list_logical_scalar(inputs, value_str='ii_i%i_value',
     return l
 
 
-def ctype_from_dtype(dtype):
-    if dtype == "float32":
-        return "float"
-    if dtype == "float64":
-        return "double"
-    return str(dtype) + "_t"
+class WrapOpenCLFunction(object):
+    def __init__(self, fct):
+        self.fct = fct
+
+    def set_block_shape(self, *shape):
+        self.shape = shape
+
+    def param_set(self, *param):
+        self.param = param
+
+    def launch_grid(self, *shape):
+        # TODO: For now we ignore the grid shape
+        # TODO: confirm the order of grid and block shape
+        # TODO: find how to pass the memory used...
+        print queue, shape, self.shape, self.param
+
+        return self.fct(queue, shape, self.shape, *self.param)
+
+
+def compile_gpu_code(code, fct_name):
+    if _CL_MODE:
+        # Compile the gpu function with pyopencl
+        prg = cl.Program(ctx, code).build()
+        fct2 = getattr(prg, fct_name)
+
+        fct = lambda *args: fct2(queue, *args)
+        fct.fct = fct2
+        fct = WrapOpenCLFunction(fct2)
+    else:
+        # Compile the gpu function with pycuda
+        mod = SourceModule(code)
+        fct = mod.get_function(fct_name)
+    return fct
 
 
 class ElemwiseAlgo(object):
@@ -103,35 +169,35 @@ class ElemwiseAlgo(object):
             print >> sio, "//    Input  ", ipos, str(i.type)
         for ipos, i in enumerate(outputs):
             print >> sio, "//    Output ", ipos, str(i.type)
-        print >> sio, static, "__global__ void kernel_%s_%s(unsigned int numEls" % (nodename, nd)
+        print >> sio, static, "KERNEL void kernel_%s_%s(unsigned int numEls" % (nodename, nd)
         if (nd):
             print >> sio, "\t,", ", ".join("const int dim%i" % i
                                            for i in xrange(nd))
         #declare inputs
         for ipos, i in enumerate(inputs):
-            s = ", ".join(["const %s * i%i_data" % (ctype_from_dtype(i.dtype),
+            s = ", ".join(["GLOBAL_MEM const %s * i%i_data" % (dtype_to_ctype(i.dtype),
                                                     ipos)] +
                           list("int i%i_str_%i" % (ipos, d)
                                for d in xrange(nd)))
             print >> sio, "\t,", s
         #declare outputs
         for ipos, i in enumerate(outputs):
-            s = ", ".join(["%s * o%i_data" % (ctype_from_dtype(i.dtype), ipos)]
+            s = ", ".join(["GLOBAL_MEM %s * o%i_data" % (dtype_to_ctype(i.dtype), ipos)]
                           + list("int o%i_str_%i" % (ipos, d)
                                  for d in xrange(nd)))
             print >> sio, "\t,", s
             #print >> sio, "\t,", ", ".join("int o%i_str_%i" % (ipos, d) for d in xrange(nd))
             #print >> sio, "\t,", "float * o%i_data" % ipos
         print >> sio, "\t)\n{"
-        print >> sio, "    const int idx = blockIdx.x * blockDim.x + threadIdx.x;"
-        print >> sio, "    const int numThreads = blockDim.x * gridDim.x;"
+        print >> sio, "    const int idx = GID_0 * LDIM_0 + LID_0;"
+        print >> sio, "    const int numThreads = LDIM_0 * GDIM_0;"
 
         # For each input that is a scalar which has been broadcasted
         #     to a tensor, load it into a local variable
         for ipos, i in enumerate(inputs):
             if _logical_scalar(i):
                 print >> sio, "    const %s ii_i%i_value = i%i_data[0];" % (
-                    ctype_from_dtype(i.dtype), ipos, ipos)
+                    dtype_to_ctype(i.dtype), ipos, ipos)
 
         #loop over the elements to be treated by this kernel call
         print >> sio, "    for (int i = idx; i < numEls; i += numThreads) {"
@@ -139,11 +205,11 @@ class ElemwiseAlgo(object):
         print >> sio, "        int ii = i;"
         for ipos, i in enumerate(inputs):
             if not _logical_scalar(i):
-                print >> sio, "        const %s * ii_i%i_data = i%i_data;" % (
-                    ctype_from_dtype(i.dtype), ipos, ipos)
+                print >> sio, "        GLOBAL_MEM const %s * ii_i%i_data = i%i_data;" % (
+                    dtype_to_ctype(i.dtype), ipos, ipos)
         for ipos, i in enumerate(outputs):
-            print >> sio, "        %s * ii_o%i_data = o%i_data;" % (
-                ctype_from_dtype(i.dtype), ipos, ipos)
+            print >> sio, "        GLOBAL_MEM %s * ii_o%i_data = o%i_data;" % (
+                dtype_to_ctype(i.dtype), ipos, ipos)
         for d in xrange(nd - 1, -1, -1):
             if d > 0:
                 print >> sio, "        int pos%i = ii %% dim%i;" % (d, d)
@@ -181,25 +247,25 @@ class ElemwiseAlgo(object):
             print >> sio, "//    Input  ", ipos, str(i.type)
         for ipos, i in enumerate(outputs):
             print >> sio, "//    Output ", ipos, str(i.type)
-        print >> sio, static, "__global__ void kernel_%s_Ccontiguous (unsigned int numEls" %(nodename)
+        print >> sio, static, "KERNEL void kernel_%s_Ccontiguous (unsigned int numEls" %(nodename)
         #declare inputs
         for ipos, i in enumerate(inputs):
-            print >> sio, "\t,", "const %s * i%i_data" % (
-                ctype_from_dtype(i.dtype), ipos)
+            print >> sio, "\t,", "GLOBAL_MEM const %s * i%i_data" % (
+                dtype_to_ctype(i.dtype), ipos)
         #declare outputs
         for ipos, i in enumerate(outputs):
-            print >> sio, "\t,", "%s * o%i_data" % (
-                ctype_from_dtype(i.dtype), ipos)
+            print >> sio, "\t,", "GLOBAL_MEM %s * o%i_data" % (
+                dtype_to_ctype(i.dtype), ipos)
         print >> sio, "\t)\n{"
-        print >> sio, "    const int idx = blockIdx.x * blockDim.x + threadIdx.x;"
-        print >> sio, "    const int numThreads = blockDim.x * gridDim.x;"
+        print >> sio, "    const int idx = GID_0 * LDIM_0 + LID_0;"
+        print >> sio, "    const int numThreads = LDIM_0 * GDIM_0;"
 
         # For each input that is a scalar which has been broadcasted
         #     to a tensor, load it into a local variable
         for ipos, i in enumerate(inputs):
             if _logical_scalar(i):
                 print >> sio, "    const %s ii_i%i_value = i%i_data[0];" % (
-                    ctype_from_dtype(i.dtype), ipos, ipos)
+                    dtype_to_ctype(i.dtype), ipos, ipos)
 
         #loop over the elements to be treated by this kernel call
         print >> sio, "    for (int i = idx; i < numEls; i += numThreads) {"
@@ -242,10 +308,10 @@ class ElemwiseAlgo(object):
         d = dict()
         #input_params and output_params go into the function declaration/definition
         input_params = ", ".join("const %s * i%i_data, const int * i%i_str" %
-                                (ctype_from_dtype(inputs[i].dtype), ipos, ipos)
+                                (dtype_to_ctype(inputs[i].dtype), ipos, ipos)
                                  for ipos in xrange(len(inputs)))
         output_params = ", ".join("%s * o%i_data, const int * o%i_str" %
-                                  (ctype_from_dtype(outputs[i].dtype),
+                                  (dtype_to_ctype(outputs[i].dtype),
                                    ipos, ipos)
                                   for ipos in xrange(len(outputs)))
 
@@ -594,6 +660,7 @@ nd_collapse_[i]=0;
     def c_support_code_apply(self, inputs, outputs, nodename):
         nd = outputs[0].type.ndim
         return "".join(
+            CLUDA_PREAMBLE,
             [self.c_src_kernel(inputs, outputs, nodename, x)
              for x in range(1, nd + 1)] +
             [self.c_src_kernel_Ccontiguous(inputs, outputs, nodename),
@@ -1315,12 +1382,16 @@ class MyGpuNdArray():
     def __init__(self, gpu_nd_array):
         #assert isinstance(gpu_nd_array, gpu_ndarray.GpuNdArrayObject)
         self.gpu_nd_array = gpu_nd_array
-        self.ctype = ctype_from_dtype(self.gpu_nd_array.dtype)
+        self.ctype = dtype_to_ctype(self.gpu_nd_array.dtype)
 
     @staticmethod
     def gen_fct(op, inputs, nd, nodename="TestNodeName",
                 collapse=True):
-        npy_ty = "typedef double npy_float64;\n typedef float npy_float32;\n"
+        if _CL_MODE:
+            npy_ty = "typedef float npy_float32;\n"
+        else:
+            npy_ty = "typedef double npy_float64;\n typedef float npy_float32;\n"
+
         # Generate the gpu functions
         nb_in = len(inputs)
         fcts = [None]
@@ -1331,19 +1402,23 @@ class MyGpuNdArray():
             node = out.owner
             elemwise_algo = ElemwiseAlgo(node.op.scalar_op)
 
-            # Compile the gpu function with pycuda
-            mod = SourceModule(npy_ty +
-                               elemwise_algo.c_src_kernel(node.inputs,
-                                                          node.outputs,
-                                                          nodename, nd,
-                                                          static=""))
-            fct = mod.get_function("kernel_%s_%d" % (nodename, nd))
+            code = (CLUDA_PREAMBLE +
+                    npy_ty +
+                    elemwise_algo.c_src_kernel(node.inputs,
+                                               node.outputs,
+                                               nodename, nd,
+                                               static=""))
+            fct_name = "kernel_%s_%d" % (nodename, nd)
+            fct = compile_gpu_code(code, fct_name)
             fcts.append(fct)
 
         # All inputs/outputs C contiguous case
-        mod = SourceModule(npy_ty + elemwise_algo.c_src_kernel_Ccontiguous(
+        code = (npy_ty +
+                CLUDA_PREAMBLE +
+                elemwise_algo.c_src_kernel_Ccontiguous(
                 node.inputs, node.outputs, nodename, static=""))
-        fcts[0] = mod.get_function("kernel_%s_Ccontiguous" % nodename)
+        fct_name = "kernel_%s_Ccontiguous" % nodename
+        fcts[0] = compile_gpu_code(code, fct_name)
 
         def call_fct2(inputs, out=None):
             " Do dimensions collapsing before call the gpu code "
