@@ -1,12 +1,13 @@
 #include "compyte_buffer.h"
 
+#include <assert.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <strings.h>
 
 #define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
 
-int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx, int flags,
+int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 		   size_t elsize, int nd, size_t *dims, ga_order ord) {
   size_t size = elsize;
   int i;
@@ -34,11 +35,11 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx, int flags,
   /* F/C distinction comes later */
   a->flags = GA_OWNDATA|GA_BEHAVED;
   if (a->dimensions == NULL || a->strides == NULL || a->data == NULL) {
-    GpuArray_clear(res);
+    GpuArray_clear(a);
     return GA_MEMORY_ERROR;
   }
   /* Mult will not overflow since calloc succeded */
-  bcopy(dims, res->dimensions, sizeof(size_t)*nd);
+  bcopy(dims, a->dimensions, sizeof(size_t)*nd);
 
   size = elsize;
   /* mults will not overflow, checked on entry */
@@ -67,10 +68,10 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx, int flags,
   return GA_NO_ERROR;
 }
 
-int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx, int flags,
+int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
                    size_t elsize, int nd, size_t *dims, ga_order ord) {
   int err;
-  err = GpuArray_empty(a, ops, ctx, flags, elsize, nd, dims, ord);
+  err = GpuArray_empty(a, ops, ctx, elsize, nd, dims, ord);
   if (err != GA_NO_ERROR)
     return err;
   err = a->ops->buffer_memset(a->data, 0, a->total_size);
@@ -122,15 +123,17 @@ int GpuArray_read(void *dst, size_t dst_sz, GpuArray *src) {
 }
 
 void GpuArray_fprintf(FILE *fd, const GpuArray *a) {
+  int i;
+
   fprintf(fd, "GpuNdArray <%p, %p> nd=%d\n", a, a->data, a->nd);
-  fprintf(fd, "\tITEMSIZE: %zd\n", a->elsize);
+  fprintf(fd, "\tITEMSIZE: %zd\n", GpuArray_ITEMSIZE(a));
   fprintf(fd, "\tHOST_DIMS:      ");
-  for (int i = 0; i < a->nd; ++i)
+  for (i = 0; i < a->nd; ++i)
     {
       fprintf(fd, "%zd\t", a->dimensions[i]);
     }
   fprintf(fd, "\n\tHOST_STRIDES: ");
-  for (int i = 0; i < a->nd; ++i)
+  for (i = 0; i < a->nd; ++i)
     {
       fprintf(fd, "%zd\t", a->strides[i]);
     }
@@ -151,8 +154,10 @@ void GpuArray_fprintf(FILE *fd, const GpuArray *a) {
 }
 
 int GpuArray_is_c_contiguous(const GpuArray *a) {
-  size_t size = a->itemsize;
-  for (int i = a->nd - 1; i >= 0; i--) {
+  size_t size = GpuArray_ITEMSIZE(a);
+  int i;
+  
+  for (i = a->nd - 1; i >= 0; i--) {
     if (a->strides[i] != size) return 0;
     // We suppose that overflow will not happen since data has to fit in memory
     size *= a->dimensions[i];
@@ -161,8 +166,10 @@ int GpuArray_is_c_contiguous(const GpuArray *a) {
 }
 
 int GpuArray_is_f_contiguous(const GpuArray *a) {
-  size_t size = a->itemsize;
-  for (int i = 0; i < a->nd; i++) {
+  size_t size = GpuArray_ITEMSIZE(a);
+  int i;
+
+  for (i = 0; i < a->nd; i++) {
     if (a->strides[i] != size) return 0;
     // We suppose that overflow will not happen since data has to fit in memory
     size *= a->dimensions[i];

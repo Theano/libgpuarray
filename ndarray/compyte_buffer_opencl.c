@@ -10,7 +10,10 @@
 
 #endif
 
+#include <assert.h>
 #include <stdlib.h>
+#include <string.h>
+#include <limits.h>
 
 /* To work around the lack of byte addressing */
 #define MIN_SIZE_INCR 4
@@ -76,9 +79,9 @@ static const char *get_error_string(cl_int err) {
   }
 }
 
-static gpudata *cl_malloc(void *ctx, size_t size)
+static gpudata *cl_alloc(void *ctx, size_t size)
 {
-  buffer_cl *res;
+  gpudata *res;
   cl_int err;
   cl_device_id *ids;
   size_t sz;
@@ -95,13 +98,14 @@ static gpudata *cl_malloc(void *ctx, size_t size)
   if (ids == NULL)
     return NULL;
 
-  if ((err = clGetContextInfo((cl_context)ctx, CL_CONTEXT_DEVICES, sz, &ids, NULL)) != CL_SUCCESS) {
+  if ((err = clGetContextInfo((cl_context)ctx, CL_CONTEXT_DEVICES, sz, ids, NULL)) != CL_SUCCESS) {
     free(ids);
     return NULL;
   }
-  
+
   res = malloc(sizeof(*res));
   if (res == NULL) {
+    free(ids);
     return NULL;
   }
 
@@ -175,6 +179,8 @@ static int cl_memset(gpudata *dst, int data, size_t bytes) {
   cl_event ev;
   cl_program p;
   cl_kernel k;
+  cl_context ctx;
+  cl_device_id dev;
 
   /* OpenCL devices do not always support byte-addressable storage
      and stuff will break when used in this way */
@@ -183,10 +189,18 @@ static int cl_memset(gpudata *dst, int data, size_t bytes) {
   unsigned char val = (unsigned)data;
   unsigned int pattern = (unsigned int)val & (unsigned int)val >> 8 & (unsigned int)val >> 16 & (unsigned int)val >> 24;
 
+  err = clGetCommandQueueInfo(dst->q, CL_QUEUE_CONTEXT, sizeof(ctx), &ctx, NULL);
+  if (err != CL_SUCCESS)
+    return GA_IMPL_ERROR;
+
+  err = clGetCommandQueueInfo(dst->q, CL_QUEUE_DEVICE, sizeof(dev), &dev, NULL);
+  if (err != CL_SUCCESS)
+    return GA_IMPL_ERROR;
+
   r = snprintf(local_kern, sizeof(local_kern),
 	       "__kernel void memset(__global unsigned int *mem) { mem[get_global_id(0)] = %u; }", pattern);
   /* If this assert fires, increase the size of local_kern above. */ 
-  assert(r >= sizeof(local_kern));
+  assert(r <= sizeof(local_kern));
 
   sz = strlen(local_kern);
   rlk[0] = local_kern;
@@ -204,11 +218,11 @@ static int cl_memset(gpudata *dst, int data, size_t bytes) {
     goto fail_prog;
   }
 
-  if (clSetKernelArg(k, 0, sizeof(cl_mem), &dst) != CL_SUCCESS) {
+  if (clSetKernelArg(k, 0, sizeof(cl_mem), &dst->buf) != CL_SUCCESS) {
     goto fail_kern;
   }
 
-  if (clEnqueueNDRangeKernel(q, k, 1, NULL, &bytes, NULL, 0, NULL, &ev) != CL_SUCCESS) {
+  if (clEnqueueNDRangeKernel(dst->q, k, 1, NULL, &bytes, NULL, 0, NULL, &ev) != CL_SUCCESS) {
     goto fail_kern;
   }
   

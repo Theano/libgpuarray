@@ -5,7 +5,7 @@
 #define COMPYTE_BUFFER_H
 
 #include <sys/types.h>
-#include <stdarg.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -105,9 +105,9 @@ static inline int GpuArray_CHKFLAGS(GpuArray *a, int flags) {
 #define GpuArray_ISFORTRAN(a) GpuArray_CHKFLAGS(a, GA_F_CONTIGUOUS)
 #define GpuArray_ITEMSIZE(a) ((a)->elsize) /* For now */
 
-int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx, int flags,
+int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 		   size_t elsize, int nd, size_t *dims, ga_order ord);
-int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx, int flags,
+int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 		   size_t elsize, int nd, size_t *dims, ga_order ord);
 
 void GpuArray_clear(GpuArray *a);
