@@ -1,0 +1,26 @@
+#include "compyte_types.h"
+
+compyte_type builtin_types[] = {
+  {"char", 1},
+  {"unsigned char", 1},
+  {"short", 2},
+  {"unsigned short", 2},
+  {"int", 4},
+  {"unsigned int", 4},
+  {"long", 8},
+  {"unsigned long", 8},
+  {"float", 4},
+  {"double", 8},
+  {"char2", 2},
+  {"uchar2", 2},
+  {"char3", 3},
+  {"uchar3", 3},
+  {"char4", 4},
+  {"uchar4", 4},
+  {"short2", 4},
+  {"ushort2", 4},
+  {"short3", 6},
+  {"ushort3", 6},
+  {"short4", 8},
+  {"ushort4", 8},
+};
