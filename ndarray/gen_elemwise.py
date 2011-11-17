@@ -57,7 +57,7 @@ from theano.tensor import TensorType
 import theano
 
 import logging
-_logger_name = 'compyte.ndarray'
+_logger_name = 'compyte.gen_elemwise'
 _logger = logging.getLogger(_logger_name)
 _logger.setLevel(logging.INFO)
 _logger.addHandler(logging.StreamHandler())  # TO REMOVE
