@@ -19,16 +19,16 @@ cl_context ctx = NULL;
 cl_device_id dev;
 cl_command_queue q;
 
-void
+void setup_context(cl_context c);
+
+static void
 init_context(void)
 {
   cl_int err;
   cl_uint n;
   cl_platform_id *plats;
-  cl_device_id *devs;
   cl_context_properties props[3];
-  size_t sz;
-  char info[1024];
+  cl_context c;
 
   if (ctx != NULL) return;
 
@@ -41,14 +41,11 @@ init_context(void)
   err = clGetPlatformIDs(n, plats, NULL);
   if (err != CL_SUCCESS) goto fail_id;
 
-  err = clGetPlatformInfo(plats[0], CL_PLATFORM_NAME, sizeof(info), info, NULL);
-  if (err != CL_SUCCESS) goto fail_id;
-
   props[0] = CL_CONTEXT_PLATFORM;
   props[1] = (cl_context_properties)plats[0];
   props[2] = 0;
 
-  ctx = clCreateContextFromType(props, CL_DEVICE_TYPE_GPU, NULL, NULL, &err);
+  c = clCreateContextFromType(props, CL_DEVICE_TYPE_GPU, NULL, NULL, &err);
   if (err != CL_SUCCESS) {
     fprintf(stderr, "Could not create context, will fail later (%d)!\n", err);
     /* error - error - error */
@@ -57,6 +54,27 @@ init_context(void)
   }
 
   free(plats);
+
+  setup_context(c);
+  clReleaseContext(c);
+
+  return;
+ fail_id:
+  free(plats);
+}
+
+void
+setup_context(cl_context c) {
+  cl_int err;
+  cl_device_id *devs;
+  size_t sz;
+
+  if (ctx != NULL) {
+    clReleaseContext(ctx);
+    clReleaseCommandQueue(q);
+  }
+  ctx = c;
+  clRetainContext(ctx);
 
   err = clGetContextInfo(ctx, CL_CONTEXT_DEVICES, 0, NULL, &sz);
   if (err != CL_SUCCESS) {
@@ -85,9 +103,6 @@ init_context(void)
  fail:
   clReleaseContext(ctx);
   ctx = NULL;
-  return;
- fail_id:
-  free(plats);
 }
 
 void *

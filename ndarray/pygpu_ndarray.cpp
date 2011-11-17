@@ -1268,6 +1268,28 @@ PyGpuNdArray_CheckExact(const PyObject * ob)
     return ((ob->ob_type == &PyGpuNdArrayType) ? 1 : 0);
 }
 
+#ifdef WITH_OPENCL
+#ifdef __APPLE__
+#include <OpenCL/opencl.h>
+#else
+#include <CL/opencl.h>
+#endif
+extern void setup_context(cl_context c);
+
+PyObject *
+PyGpuNdArray_set_opencl_context(PyObject *mod, PyObject *ctx) {
+    Py_ssize_t v;
+
+    v = PyInt_AsSsize_t(ctx);
+    if (v == -1 && PyErr_Occurred())
+        return NULL;
+
+    setup_context((cl_context)v);
+    
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+#endif
 
 static PyMethodDef module_methods[] = {
     //{"dimshuffle", PyGpuNdArray_Dimshuffle, METH_VARARGS, "Returns the dimshuffle of a PyGpuNdArray."},
@@ -1278,6 +1300,11 @@ static PyMethodDef module_methods[] = {
     {"empty",
        (PyCFunction)PyGpuNdArray_empty, METH_VARARGS|METH_KEYWORDS,
        "Create a new PyGpuNdArray with specified shape, filled with zeros."},
+#ifdef WITH_OPENCL
+    {"set_opencl_context",
+     PyGpuNdArray_set_opencl_context, METH_O,
+     "Set the OpenCL context to use for allocations and work."},
+#endif
     {NULL, NULL, NULL, NULL}  /* Sentinel */
 };
 
