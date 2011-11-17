@@ -293,3 +293,22 @@ def test_elemwise_mixed_dtype():
                 out = MyGpuNdArray.multiplys(*gpu_vals)
                 assert all_close(to_cpu(out), reduce(numpy.multiply, input_vals))
 
+
+def tes_sum():
+    to_cpu = numpy.asarray
+    for dtype in [#"int16",
+                  "float32",
+                  #"int8"
+                  ]:
+        for shape in [(500,),
+                      #(50, 5), (5, 6, 7)
+                      ]:
+            cpu_val = rand(shape, dtype)
+            del dtype
+            gpu_val = gpu_ndarray.GpuNdArrayObject(cpu_val)
+            assert numpy.allclose(to_cpu(gpu_val), cpu_val)
+
+            gpu_val = MyGpuNdArray(gpu_val)
+            cpu_sum = cpu_val.sum()
+            gpu_sum = to_cpu(gpu_val.sum())
+            assert numpy.allclose(cpu_sum, gpu_sum), (cpu_sum, gpu_sum)

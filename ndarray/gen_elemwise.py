@@ -169,24 +169,27 @@ class ElemwiseAlgo(object):
             print >> sio, "//    Input  ", ipos, str(i.type)
         for ipos, i in enumerate(outputs):
             print >> sio, "//    Output ", ipos, str(i.type)
-        print >> sio, static, "KERNEL void kernel_%s_%s(unsigned int numEls" % (nodename, nd)
+        print >> sio, static, (
+            "KERNEL void kernel_%s_%s(unsigned int numEls" % (nodename, nd))
         if (nd):
             print >> sio, "\t,", ", ".join("const int dim%i" % i
                                            for i in xrange(nd))
         #declare inputs
         for ipos, i in enumerate(inputs):
-            s = ", ".join(["GLOBAL_MEM const %s * i%i_data" % (dtype_to_ctype(i.dtype),
-                                                    ipos)] +
+            s = ", ".join(["GLOBAL_MEM const %s * i%i_data" % (
+                        dtype_to_ctype(i.dtype), ipos)] +
                           list("int i%i_str_%i" % (ipos, d)
                                for d in xrange(nd)))
             print >> sio, "\t,", s
         #declare outputs
         for ipos, i in enumerate(outputs):
-            s = ", ".join(["GLOBAL_MEM %s * o%i_data" % (dtype_to_ctype(i.dtype), ipos)]
+            s = ", ".join(["GLOBAL_MEM %s * o%i_data" % (
+                        dtype_to_ctype(i.dtype), ipos)]
                           + list("int o%i_str_%i" % (ipos, d)
                                  for d in xrange(nd)))
             print >> sio, "\t,", s
-            #print >> sio, "\t,", ", ".join("int o%i_str_%i" % (ipos, d) for d in xrange(nd))
+            #print >> sio, "\t,", ", ".join("int o%i_str_%i" % (ipos, d)
+            #                               for d in xrange(nd))
             #print >> sio, "\t,", "float * o%i_data" % ipos
         print >> sio, "\t)\n{"
         print >> sio, "    const int idx = GID_0 * LDIM_0 + LID_0;"
@@ -205,8 +208,9 @@ class ElemwiseAlgo(object):
         print >> sio, "        int ii = i;"
         for ipos, i in enumerate(inputs):
             if not _logical_scalar(i):
-                print >> sio, "        GLOBAL_MEM const %s * ii_i%i_data = i%i_data;" % (
-                    dtype_to_ctype(i.dtype), ipos, ipos)
+                print >> sio, ("        GLOBAL_MEM const "
+                               "%s * ii_i%i_data = i%i_data;" % (
+                    dtype_to_ctype(i.dtype), ipos, ipos))
         for ipos, i in enumerate(outputs):
             print >> sio, "        GLOBAL_MEM %s * ii_o%i_data = o%i_data;" % (
                 dtype_to_ctype(i.dtype), ipos, ipos)
@@ -219,7 +223,8 @@ class ElemwiseAlgo(object):
 
             for ipos, i in enumerate(inputs):
                 if not _logical_scalar(i):
-                    print >> sio, "        ii_i%i_data += pos%i * i%i_str_%i;" % (ipos, d, ipos, d)
+                    print >> sio, ("        ii_i"
+                                   "%i_data += pos%i * i%i_str_%i;" % (ipos, d, ipos, d))
             for ipos, i in enumerate(outputs):
                 print >> sio, "        ii_o%i_data += pos%i * o%i_str_%i;" % (
                     ipos, d, ipos, d)
@@ -247,7 +252,8 @@ class ElemwiseAlgo(object):
             print >> sio, "//    Input  ", ipos, str(i.type)
         for ipos, i in enumerate(outputs):
             print >> sio, "//    Output ", ipos, str(i.type)
-        print >> sio, static, "KERNEL void kernel_%s_Ccontiguous (unsigned int numEls" %(nodename)
+        print >> sio, static, ("KERNEL void kernel_%s_Ccontiguous"
+                               " (unsigned int numEls" % (nodename))
         #declare inputs
         for ipos, i in enumerate(inputs):
             print >> sio, "\t,", "GLOBAL_MEM const %s * i%i_data" % (
@@ -289,30 +295,34 @@ class ElemwiseAlgo(object):
         # The first is stride unpacking:
         # it accepts input and output arguments as
         #    float * , int*
-        # pairs, and it constructs a kernel function call where inputs and arguments are named
-        # like
+        # pairs, and it constructs a kernel function call where inputs
+        # and arguments are named like
         #    float *, int, int, int ...
         #
         # The second is to recognize when any dimensions can be collapsed as
-        # being contiguous. That mean that we can merge that dimensions with another
-        # one for all inputs/outputs and have the same retusuls (confusing... read code)
+        # being contiguous. That mean that we can merge that dimensions with
+        # another one for all inputs/outputs and have the same retusuls
+        # (confusing... read code)
         #
-        # The thrid is to make a special case for scalar element. We allow the collapsing of them.
-        # In the ccontiguous and not contiguous case, we use registers to lower the number of memory access.
+        # The thrid is to make a special case for scalar element. We allow
+        # the collapsing of them.  In the ccontiguous and not contiguous case,
+        # we use registers to lower the number of memory access.
 
-        #TODO: make a special case for broadcasting, to store the data in shared memory.
+        # TODO: make a special case for broadcasting, to store the
+        # data in shared memory.
 
         nd = outputs[0].type.ndim
         nb_inputs = len(inputs)
         nb_outputs = len(outputs)
         d = dict()
-        #input_params and output_params go into the function declaration/definition
-        input_params = ", ".join("const %s * i%i_data, const int * i%i_str" %
-                                (dtype_to_ctype(inputs[i].dtype), ipos, ipos)
+        # input_params and output_params go into the function
+        # declaration/definition
+        input_params = ", ".join("const %s * i%i_data, const int * i%i_str" % (
+                dtype_to_ctype(inputs[i].dtype), ipos, ipos)
                                  for ipos in xrange(len(inputs)))
-        output_params = ", ".join("%s * o%i_data, const int * o%i_str" %
-                                  (dtype_to_ctype(outputs[i].dtype),
-                                   ipos, ipos)
+        output_params = ", ".join("%s * o%i_data, const int * o%i_str" % (
+                dtype_to_ctype(outputs[i].dtype),
+                ipos, ipos)
                                   for ipos in xrange(len(outputs)))
 
         #input_args and output_args go into the recursive call.
@@ -321,7 +331,7 @@ class ElemwiseAlgo(object):
         output_args = ", ".join("o%i_data, o%i_str" % (ipos, ipos)
                 for ipos in xrange(len(outputs)))
 
-        prod_dims = '*'.join(["dims[%i]" % di for di in xrange(nd)]+['1'])
+        prod_dims = '*'.join(["dims[%i]" % di for di in xrange(nd)] + ['1'])
 
         sio = StringIO.StringIO()
         print >> sio, """
@@ -1557,3 +1567,47 @@ class MyGpuNdArray():
     def multiplys(cls, *inputs):
         """ multiply all inputs togethers element-wise """
         return cls.__elemwise__(inputs, "mul", theano.tensor.mul)
+
+    def sum(self, axis=None):
+        import gen_reduction
+        if axis is None and self.ndim == 1:
+            pattern = [1] * self.ndim
+            str_pattern = [str(i) for i in pattern]
+            sum_op = gen_reduction.GpuSum(pattern)
+            c_code = sum_op.c_support_code_apply("nodename")
+            fctname = "kernel_reduce_sum_" + "".join(str_pattern) + "_nodename"
+            fct = compile_gpu_code(c_code, fctname)
+            # We bypass the pycuda wrapper gpu function call.
+            # by calling directly the gpu function.
+            # This is faster and lower the overhead.
+            # Here is code that allow you to use the pycuda fct call.
+            block_ = min(self.shape[0], 256)
+            block_ = 1
+            grid_ = 1
+            out = gpu_ndarray.empty((1,), self.dtype)
+            out = MyGpuNdArray(out)
+            to_cpu = numpy.asarray
+            if True:
+                d = {"block": (block_, 1, 1),
+                     "shared": self.dtype.itemsize * block_,
+                      "grid": (grid_, 1)}
+                pycuda._driver.Context.synchronize()
+                fct(cast_uint(self.shape[0]),
+                    self,
+                    cast_int(self.strides[0]) / self.dtype.itemsize,
+                    out, **d)
+            else:
+                fct.set_block_shape(block_, 1, 1)
+                fct.param_set(cast_uint(self.shape[0]),
+                              self,
+                              cast_int(self.strides[0]) / self.dtype.itemsize,
+                              out)
+                print numpy.asarray(out)
+                fct.launch_grid(grid_, 1)
+                print numpy.asarray(out)
+            #ret = fct(self.gpu_nd_array)
+            return out
+
+            raise Exception("Not finished implementation")
+        else:
+            raise Exception("Not implemented")
