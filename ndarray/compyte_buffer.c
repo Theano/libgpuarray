@@ -106,3 +106,66 @@ int GpuArray_move(GpuArray *dst, GpuArray *src) {
     return GA_UNSUPPORTED_ERROR;
   return dst->ops->buffer_move(dst->data, src->data, dst->total_size);
 }
+
+int GpuArray_write(GpuArray *dst, void *src, size_t src_sz) {
+  if (!GpuArray_ISWRITEABLE(dst))
+    return GA_VALUE_ERROR;
+  if (!GpuArray_ISONESEGMENT(dst))
+    return GA_UNSUPPORTED_ERROR;
+  return dst->ops->buffer_write(dst->data, src, src_sz);
+}
+
+int GpuArray_read(void *dst, size_t dst_sz, GpuArray *src) {
+  if (!GpuArray_ISONESEGMENT(src))
+    return GA_UNSUPPORTED_ERROR;
+  return src->ops->buffer_read(dst, src->data, dst_sz);
+}
+
+void GpuArray_fprintf(FILE *fd, const GpuArray *a) {
+  fprintf(fd, "GpuNdArray <%p, %p> nd=%d\n", a, a->data, a->nd);
+  fprintf(fd, "\tITEMSIZE: %zd\n", a->elsize);
+  fprintf(fd, "\tHOST_DIMS:      ");
+  for (int i = 0; i < a->nd; ++i)
+    {
+      fprintf(fd, "%zd\t", a->dimensions[i]);
+    }
+  fprintf(fd, "\n\tHOST_STRIDES: ");
+  for (int i = 0; i < a->nd; ++i)
+    {
+      fprintf(fd, "%zd\t", a->strides[i]);
+    }
+  fprintf(fd, "\nFLAGS:");
+  int comma = 0;
+#define PRINTFLAG(flag) if (a->flags & flag) { \
+    if (comma) fputc(',', fd);                \
+    fprintf(fd, " " #flag);                   \
+    comma = 1;                                \
+  }
+  PRINTFLAG(GA_C_CONTIGUOUS);
+  PRINTFLAG(GA_F_CONTIGUOUS);
+  PRINTFLAG(GA_OWNDATA);
+  PRINTFLAG(GA_ALIGNED);
+  PRINTFLAG(GA_WRITEABLE);
+#undef PRINTFLAG
+  fputc('\n', fd);
+}
+
+int GpuArray_is_c_contiguous(const GpuArray *a) {
+  size_t size = a->itemsize;
+  for (int i = a->nd - 1; i >= 0; i--) {
+    if (a->strides[i] != size) return 0;
+    // We suppose that overflow will not happen since data has to fit in memory
+    size *= a->dimensions[i];
+  }
+  return 1;
+}
+
+int GpuArray_is_f_contiguous(const GpuArray *a) {
+  size_t size = a->itemsize;
+  for (int i = 0; i < a->nd; i++) {
+    if (a->strides[i] != size) return 0;
+    // We suppose that overflow will not happen since data has to fit in memory
+    size *= a->dimensions[i];
+  }
+  return 1;
+}
