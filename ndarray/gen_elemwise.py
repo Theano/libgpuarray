@@ -1577,18 +1577,15 @@ class MyGpuNdArray():
             c_code = sum_op.c_support_code_apply("nodename")
             fctname = "kernel_reduce_sum_" + "".join(str_pattern) + "_nodename"
             fct = compile_gpu_code(c_code, fctname)
-            # We bypass the pycuda wrapper gpu function call.
-            # by calling directly the gpu function.
-            # This is faster and lower the overhead.
-            # Here is code that allow you to use the pycuda fct call.
             block_ = min(self.shape[0], 256)
             grid_ = 1
+            shared_ = self.dtype.itemsize * block_
             out = gpu_ndarray.empty((1,), self.dtype)
             out = MyGpuNdArray(out)
             to_cpu = numpy.asarray
-            if True:
+            if False:
                 d = {"block": (block_, 1, 1),
-                     "shared": self.dtype.itemsize * block_,
+                     "shared": shared_,
                       "grid": (grid_, 1)}
                 pycuda._driver.Context.synchronize()
                 fct(cast_uint(self.shape[0]),
@@ -1596,15 +1593,16 @@ class MyGpuNdArray():
                     cast_int(self.strides[0]) / self.dtype.itemsize,
                     out, **d)
             else:
+                # We bypass the pycuda wrapper gpu function call.
+                # by calling directly the gpu function.
+                # This is faster and lower the overhead.
                 fct.set_block_shape(block_, 1, 1)
+                fct.set_shared_size(shared_)
                 fct.param_set(cast_uint(self.shape[0]),
                               self,
                               cast_int(self.strides[0]) / self.dtype.itemsize,
                               out)
-                print numpy.asarray(out)
                 fct.launch_grid(grid_, 1)
-                print numpy.asarray(out)
-            #ret = fct(self.gpu_nd_array)
             return out
 
             raise Exception("Not finished implementation")
