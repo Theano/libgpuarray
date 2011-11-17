@@ -1582,7 +1582,6 @@ class MyGpuNdArray():
             # This is faster and lower the overhead.
             # Here is code that allow you to use the pycuda fct call.
             block_ = min(self.shape[0], 256)
-            block_ = 1
             grid_ = 1
             out = gpu_ndarray.empty((1,), self.dtype)
             out = MyGpuNdArray(out)
