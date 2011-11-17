@@ -1573,7 +1573,7 @@ class MyGpuNdArray():
         if axis is None and self.ndim == 1:
             pattern = [1] * self.ndim
             str_pattern = [str(i) for i in pattern]
-            sum_op = gen_reduction.GpuSum(pattern)
+            sum_op = gen_reduction.GpuSum(pattern, self.dtype)
             c_code = sum_op.c_support_code_apply("nodename")
             fctname = "kernel_reduce_sum_" + "".join(str_pattern) + "_nodename"
             fct = compile_gpu_code(c_code, fctname)

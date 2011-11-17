@@ -94,8 +94,10 @@ class GpuSum(object):
            be removed during graph optimization
 
     """
-    def __init__(self, reduce_mask):
+    def __init__(self, reduce_mask, dtype):
         self.reduce_mask = tuple(reduce_mask)
+        # input, output and accumulator dtype
+        self.dtype = dtype_to_ctype(dtype)
 
     def __eq__(self, other):
         return (type(self) == type(other) and
@@ -230,7 +232,7 @@ class GpuSum(object):
 
                 if (verbose)
                     printf("running kernel_reduce_sum_10_%(name)s\\n");
-                int n_shared = sizeof(float) * n_threads.x;
+                int n_shared = sizeof(%(dtype)s) * n_threads.x;
                 kernel_reduce_sum_10_%(name)s<<<n_blocks,
                                                 n_threads, n_shared>>>(
                         CudaNdarray_HOST_DIMS(%(x)s)[0],
@@ -256,7 +258,7 @@ class GpuSum(object):
         print >> sio, """
             if (verbose)
                 printf("running kernel_reduce_sum_%(pattern)s_%(name)s\\n");
-            int n_shared = sizeof(float) * n_threads.x *
+            int n_shared = sizeof(%(dtype)s) * n_threads.x *
                            n_threads.y * n_threads.z;
             if (verbose>1)
                 printf("n_threads.x=%%d, n_threads.y=%%d, n_threads.z=%%d,"
@@ -317,11 +319,11 @@ class GpuSum(object):
                     const int d0,
                     const int d1,
                     const int d2,
-                    const float *A,
+                    const %(dtype)s *A,
                     const int sA0,
                     const int sA1,
                     const int sA2,
-                    float * Z,
+                    %(dtype)s * Z,
                     const int sZ0)
 
         """ % locals()
@@ -341,14 +343,14 @@ class GpuSum(object):
                     const int d%(i)s,
         """ % locals()
         print >> sio, """
-                    const float *A,
+                    const %(dtype)s *A,
         """ % locals()
         for i in xrange(ndim):
             print >> sio, """
                     const int sA%(i)s,
         """ % locals()
         print >> sio, """
-                    float * Z
+                    %(dtype)s * Z
         """ % locals()
         for i in xrange(ndim - sum(reduce_mask)):
             print >> sio, """
@@ -362,8 +364,8 @@ class GpuSum(object):
                 const int threadCount = blockDim.x * blockDim.y * blockDim.z;
                 const int threadNum = threadIdx.z * blockDim.x * blockDim.y
                                       + threadIdx.y * blockDim.x + threadIdx.x;
-                extern __shared__ float buf[];
-                float mysum = 0.0f;
+                extern __shared__ %(dtype)s buf[];
+                %(dtype)s mysum = 0.0f;
 
                 if (warpSize != 32)
                 {
@@ -484,7 +486,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
         print >> sio, """
         {
           if(CudaNdarray_SIZE(%(x)s)==0){
-            cudaMemset(CudaNdarray_DEV_DATA(%(z)s),0,sizeof(float));
+            cudaMemset(CudaNdarray_DEV_DATA(%(z)s),0,sizeof(%(dtype)s));
           }else{
             int verbose = 0;
             dim3 n_threads(
@@ -495,7 +497,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
                 printf("running kernel_reduce_sum_ccontig_%(name)s"
                        " n_threads.x=%%d, size=%%d, ndim=%%d\\n",
                                 n_threads.x,CudaNdarray_SIZE(%(x)s),%(x)s->nd);
-            int n_shared = sizeof(float) * n_threads.x;
+            int n_shared = sizeof(%(dtype)s) * n_threads.x;
             kernel_reduce_sum_ccontig_%(name)s<<<n_blocks,
                                                  n_threads, n_shared>>>(
                     CudaNdarray_SIZE(%(x)s),
@@ -635,7 +637,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
             }
             assert(CudaNdarray_HOST_DIMS(%(x)s)[1] ==
                    CudaNdarray_HOST_DIMS(%(z)s)[0]);
-            int n_shared = sizeof(float) * n_threads.x;
+            int n_shared = sizeof(%(dtype)s) * n_threads.x;
             kernel_reduce_sum_010_%(name)s<<<n_blocks, n_threads, n_shared>>>(
                     1,
                     CudaNdarray_HOST_DIMS(%(x)s)[0],
@@ -938,7 +940,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
                             NUM_VECTOR_OP_THREADS_PER_BLOCK));
             while (n_threads.x * n_threads.y <= NUM_VECTOR_OP_THREADS_PER_BLOCK
                    && n_threads.y < CudaNdarray_HOST_DIMS(%(x)s)[2]
-                   && n_threads.x * n_threads.y * sizeof(float) <=
+                   && n_threads.x * n_threads.y * sizeof(%(dtype)s) <=
                       (15 * 1024 - 200))
             {
                 n_threads.y += 1;
@@ -1016,6 +1018,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
     def c_support_code_apply(self, nodename, contig=False):
         sio = StringIO.StringIO()
         nd_in = len(self.reduce_mask)
+        dtype = self.dtype
         if contig:  # all(i == 1 for i in self.reduce_mask):
             #this kernel is ok for up to a few thousand elements, but
             # it only runs on ONE multiprocessor
@@ -1023,13 +1026,13 @@ TODO: find why it don't work or put the GPU compute capability into the version
             print >> sio, """
             static __global__ void kernel_reduce_sum_ccontig_%(nodename)s(
                     const unsigned int d0,
-                    const float *A,
-                    float * Z)
+                    const %(dtype)s *A,
+                    %(dtype)s * Z)
             {
                 const int threadCount = blockDim.x;
                 const int threadNum = threadIdx.x;
-                extern __shared__ float buf[];
-                float mysum = 0.0f;
+                extern __shared__ %(dtype)s buf[];
+                %(dtype)s mysum = 0.0f;
 
                 if (warpSize != 32)
                 {
@@ -1050,13 +1053,13 @@ TODO: find why it don't work or put the GPU compute capability into the version
             print >> sio, """
             __global__ void kernel_reduce_sum_1_%(nodename)s(
                     const unsigned int d0,
-                    const float *A, const int sA0,
-                    float * Z)
+                    const %(dtype)s *A, const int sA0,
+                    %(dtype)s * Z)
             {
                 const int threadCount = blockDim.x;
                 const int threadNum = threadIdx.x;
-                extern __shared__ float buf[];
-                float mysum = 0.0f;
+                extern __shared__ %(dtype)s buf[];
+                %(dtype)s mysum = 0.0f;
 
                 if (warpSize != 32)
                 {
@@ -1065,7 +1068,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
 
                 for (int i0 = threadIdx.x; i0 < d0; i0 += blockDim.x)
                 {
-                    float Ai = A[i0 * sA0];
+                    %(dtype)s Ai = A[i0 * sA0];
                     mysum += Ai;
                 }
                 %(reducebuf)s
@@ -1076,16 +1079,16 @@ TODO: find why it don't work or put the GPU compute capability into the version
             # it only runs on ONE multiprocessor
             reducebuf = self._k_reduce_buf('Z[0]')
             print >> sio, """
-            static __global__ void kernel_reduce_sum_11_%(nodename)s(
+            __global__ void kernel_reduce_sum_11_%(nodename)s(
                     const int d0,
                     const int d1,
-                    const float *A, const int sA0, const int sA1,
-                    float * Z)
+                    const %(dtype)s *A, const int sA0, const int sA1,
+                    %(dtype)s * Z)
             {
                 const int threadCount = blockDim.x * blockDim.y;
                 const int threadNum = threadIdx.y*blockDim.x + threadIdx.x;
-                extern __shared__ float buf[];
-                float mysum = 0.0f;
+                extern __shared__ %(dtype)s buf[];
+                %(dtype)s mysum = 0.0f;
 
                 if (warpSize != 32)
                 {
@@ -1096,7 +1099,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
                 {
                     for (int i1 = threadIdx.x; i1 < d1; i1 += blockDim.x)
                     {
-                        float Ai = A[i0 * sA0 + i1 * sA1];
+                        %(dtype)s Ai = A[i0 * sA0 + i1 * sA1];
                         mysum += Ai;
                     }
                 }
@@ -1138,7 +1141,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
                   %(for_i1)s{
                     %(for_i2)s{
                       %(for_i3)s{
-                        float Ai = A[i3 * sA3 + i2 * sA2 +
+                        %(dtype)s Ai = A[i3 * sA3 + i2 * sA2 +
                                      i1 * sA1 + i0 * sA0];
                         mysum += Ai;
                       }
@@ -1158,17 +1161,17 @@ TODO: find why it don't work or put the GPU compute capability into the version
             #      memory (a segment of a column).
             reducebuf = self._k_reduce_buf('Z[i0 * sZ0 + i2*sZ1]')
             print >> sio, """
-            static __global__ void kernel_reduce_sum_010_%(nodename)s(
+            __global__ void kernel_reduce_sum_010_%(nodename)s(
                     const int d0,
                     const int d1,
                     const int d2,
-                    const float *A, const int sA0,
+                    const %(dtype)s *A, const int sA0,
                     const int sA1, const int sA2,
-                    float * Z, const int sZ0, const int sZ1)
+                    %(dtype)s * Z, const int sZ0, const int sZ1)
             {
                 const int threadCount = blockDim.x;
                 const int threadNum = threadIdx.x;
-                extern __shared__ float buf[];
+                extern __shared__ %(dtype)s buf[];
 
                 if (warpSize != 32)
                 {
@@ -1180,7 +1183,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
                 {
                     for (int i2 = blockIdx.y; i2 < d2; i2 += gridDim.y)
                     {
-                        float mysum = 0.0f;
+                        %(dtype)s mysum = 0.0f;
                         for (int i1 = threadIdx.x; i1 < d1; i1 += blockDim.x)
                         {
                             mysum += A[i0 * sA0 + i1 * sA1 + i2 * sA2];
@@ -1193,19 +1196,19 @@ TODO: find why it don't work or put the GPU compute capability into the version
             """ % locals()
         if self.reduce_mask == (0, 1, 0):
             print >> sio, """
-            static __global__ void kernel_reduce_sum_010_AD_%(nodename)s(
+            __global__ void kernel_reduce_sum_010_AD_%(nodename)s(
                     const int A,
                     const int B,
                     const int C,
                     const int D,
                     //const int E, // THIS is 32
-                    const float *X, const int sX0,
+                    const %(dtype)s *X, const int sX0,
                     const int sX1, const int sX2,
-                    float * Z, const int sZ0, const int sZ1)
+                    %(dtype)s * Z, const int sZ0, const int sZ1)
             {
                 const int threadCount = blockDim.x;
                 const int threadNum = threadIdx.x;
-                float mysum = 0.0f;
+                %(dtype)s mysum = 0.0f;
 
                 if (warpSize != 32)
                 {
@@ -1283,18 +1286,18 @@ TODO: find why it don't work or put the GPU compute capability into the version
             #      memory (a segment of a column).
             reducebuf = self._k_reduce_buf('Z[blockIdx.x * sZ0]')
             print >> sio, """
-            static __global__ void kernel_reduce_sum_110_%(nodename)s(
+            __global__ void kernel_reduce_sum_110_%(nodename)s(
                     const int d0,
                     const int d1,
                     const int d2,
-                    const float *A, const int sA0,
+                    const %(dtype)s *A, const int sA0,
                     const int sA1, const int sA2,
-                    float * Z, const int sZ0)
+                    %(dtype)s * Z, const int sZ0)
             {
                 const int threadCount = blockDim.x * blockDim.y;
                 const int threadNum = threadIdx.y * blockDim.x + threadIdx.x;
-                extern __shared__ float buf[];
-                float mysum = 0.0f;
+                extern __shared__ %(dtype)s buf[];
+                %(dtype)s mysum = 0.0f;
 
                 if (warpSize != 32)
                 {
@@ -1307,7 +1310,8 @@ TODO: find why it don't work or put the GPU compute capability into the version
                 {
                     for (int i1 = threadIdx.x; i1 < d1; i1 += blockDim.x)
                     {
-                        float Ai = A[i0 * sA0 + i1 * sA1 + blockIdx.x * sA2];
+                        %(dtype)s Ai = A[i0 * sA0 + i1 * sA1 +
+                                         blockIdx.x * sA2];
                         mysum += Ai;
                     }
                 }
@@ -1364,17 +1368,17 @@ TODO: find why it don't work or put the GPU compute capability into the version
             # threads per block for each element per row.
             reducebuf = self._k_reduce_buf('Z[i0 * sZ0 + i1 * sZ1]')
             print >> sio, """
-            static __global__ void kernel_reduce_sum_001_%(nodename)s(
+            __global__ void kernel_reduce_sum_001_%(nodename)s(
                     const int d0,
                     const int d1,
                     const int d2,
-                    const float *A, const int sA0,
+                    const %(dtype)s *A, const int sA0,
                     const int sA1, const int sA2,
-                    float * Z, const int sZ0, const int sZ1)
+                    %(dtype)s * Z, const int sZ0, const int sZ1)
             {
                 const int threadCount = blockDim.x;
                 const int threadNum = threadIdx.x;
-                extern __shared__ float buf[];
+                extern __shared__ %(dtype)s buf[];
 
                 if (warpSize != 32)
                 {
@@ -1385,7 +1389,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
                 {
                     for (int i1 = blockIdx.y; i1 < d1; i1 += gridDim.y)
                     {
-                        float mysum = 0.0f;
+                        %(dtype)s mysum = 0.0f;
                         for (int i2 = threadIdx.x; i2 < d2; i2 += blockDim.x)
                         {
                             mysum += A[i0 * sA0 + i1 * sA1 + i2 * sA2];
@@ -1410,7 +1414,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
                 {
                     for (int i1 = blockIdx.y; i1 < d1; i1 += gridDim.y)
                     {
-                        float mysum = 0.0f;
+                        %(dtype)s mysum = 0.0f;
                     for (int i2 = threadIdx.y; i2 < d2; i2 += blockDim.y)
                     {
                         for (int i3 = threadIdx.x; i3 < d3; i3 += blockDim.x)
@@ -1439,7 +1443,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
                 {
                     for (int i2 = blockIdx.y; i2 < d2; i2 += gridDim.y)
                     {
-                        float mysum = 0.0f;
+                        %(dtype)s mysum = 0.0f;
                     for (int i1 = threadIdx.y; i1 < d1; i1 += blockDim.y)
                     {
                         for (int i3 = threadIdx.x; i3 < d3; i3 += blockDim.x)
@@ -1480,20 +1484,20 @@ TODO: find why it don't work or put the GPU compute capability into the version
         if self.reduce_mask == (1, 0, 1, 1):
             reducebuf = self._k_reduce_buf('Z[blockIdx.x*sZ0]')
             print >> sio, """
-            static __global__ void kernel_reduce_sum_1011_%(nodename)s(
+            __global__ void kernel_reduce_sum_1011_%(nodename)s(
                     const unsigned int d0,
                     const unsigned int d1,
                     const unsigned int d2,
                     const unsigned int d3,
-                    const float *A, const int sA0,
+                    const %(dtype)s *A, const int sA0,
                     const int sA1, const int sA2, const int sA3,
-                    float * Z, const int sZ0)
+                    %(dtype)s * Z, const int sZ0)
             {
                 const int threadCount = blockDim.x * blockDim.y * blockDim.z;
                 const int threadNum = threadIdx.z * blockDim.x * blockDim.y +
                                       threadIdx.y * blockDim.x + threadIdx.x;
-                extern __shared__ float buf[];
-                float mysum = 0.0f;
+                extern __shared__ %(dtype)s buf[];
+                %(dtype)s mysum = 0.0f;
 
                 if (warpSize != 32)
                 {
@@ -1506,7 +1510,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
                     {
                         for (int i3 = threadIdx.x; i3 < d3; i3 += blockDim.x)
                         {
-                            float Ai = A[i0 * sA0 + blockIdx.x * sA1 +
+                            %(dtype)sy Ai = A[i0 * sA0 + blockIdx.x * sA1 +
                                          i2 * sA2 + i3 * sA3];
                             mysum += Ai;
                         }
