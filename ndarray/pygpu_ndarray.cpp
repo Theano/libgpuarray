@@ -4,11 +4,8 @@
 #include <numpy/arrayobject.h>
 #include <iostream>
 
-#include "pygpu_ndarray.cuh"
+#include "pygpu_ndarray.h"
 #include "pygpu_language.h"
-
-//#include "pygpu_ndarray_ctor.cu"//TODO correctly handle the compilation...
-
 
 /////////////////////////
 // Static helper methods
@@ -17,7 +14,7 @@
 static void
 PyGpuNdArray_null_init(PyGpuNdArrayObject *self)
 {
-    if(0) fprintf(stderr, "PyGpuNdArrayObject_null_init\n");
+    DPRINTF("PyGpuNdArrayObject_null_init\n");
 
     PyGpuNdArray_DATA(self) = NULL;
     PyGpuNdArray_OFFSET(self) = 0;
@@ -41,9 +38,8 @@ PyGpuNdArray_null_init(PyGpuNdArrayObject *self)
 static void
 PyGpuNdArrayObject_dealloc(PyGpuNdArrayObject* self)
 {
-    if(0) fprintf(stderr, "PyGpuNdArrayObject_dealloc\n");
-    if (0) std::cerr << "PyGpuNdArrayObject dealloc " << self << " "<<self->data_allocated<<'\n';
-    if (0) std::cerr << "PyGpuNdArrayObject dealloc " << self << " " << PyGpuNdArray_DATA(self) << '\n';
+    DPRINTF("PyGpuNdArrayObject_dealloc\n");
+    DPRINTF("PyGpuNdArrayObject dealloc %p %d %p\n", self, self->data_allocated, PyGpuNdArray_DATA(self));
 
     if(self->ob_refcnt>1)
       printf("WARNING:PyGpuNdArrayObject_dealloc called when their is still active reference to it.\n");
@@ -78,18 +74,16 @@ PyGpuNdArrayObject_dealloc(PyGpuNdArrayObject* self)
 
     self->ob_type->tp_free((PyObject*)self);
     --_outstanding_mallocs[1];
-    if(0){
-        fprintf(stderr, "device_malloc_counts: (device) %i (obj) %i\n",
-                _outstanding_mallocs[0],
-                _outstanding_mallocs[1]);
-    }
-    if(0) fprintf(stderr, "PyGpuNdArrayObject_dealloc end\n");
+    DPRINTF("device_malloc_counts: (device) %i (obj) %i\n",
+            _outstanding_mallocs[0],
+            _outstanding_mallocs[1]);
+    DPRINTF("PyGpuNdArrayObject_dealloc end\n");
 }
 
 static PyObject *
 PyGpuNdArray_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    if(0) fprintf(stderr, "PyGpuNdArray_new\n");
+    DPRINTF("PyGpuNdArray_new\n");
     PyGpuNdArrayObject *self;
 
     self = (PyGpuNdArrayObject *)type->tp_alloc(type, 0);
@@ -97,14 +91,14 @@ PyGpuNdArray_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         PyGpuNdArray_null_init(self);
         ++_outstanding_mallocs[1];
     }
-    if(0) fprintf(stderr, "PyGpuNdArray_new end %p\n", self);
+    DPRINTF("PyGpuNdArray_new end %p\n", self);
     return (PyObject *)self;
 }
 
 static int
 PyGpuNdArray_init(PyGpuNdArrayObject *self, PyObject *args, PyObject *kwds)
 {
-    if(0) fprintf(stderr, "PyGpuNdArray_init\n");
+    DPRINTF("PyGpuNdArray_init\n");
     PyObject *arr=NULL;
 
     if (! PyArg_ParseTuple(args, "O", &arr))
@@ -119,7 +113,7 @@ PyGpuNdArray_init(PyGpuNdArrayObject *self, PyObject *args, PyObject *kwds)
     self->descr = type;
     Py_XINCREF(self->descr);//TODO: How to handle the refcont on this object?
     int rval = PyGpuNdArray_CopyFromArray(self, (PyArrayObject*)arr);
-    if(0) fprintf(stderr, "PyGpuNdArray_init: end %p type=%p\n", self, self->descr);
+    DPRINTF("PyGpuNdArray_init: end %p type=%p\n", self, self->descr);
     return rval;
 }
 
@@ -127,8 +121,7 @@ PyGpuNdArray_init(PyGpuNdArrayObject *self, PyObject *args, PyObject *kwds)
 int
 PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
 {
-    int verbose = 0;
-    if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromArray: start descr=%p\n", self->descr);
+    DPRINTF("PyGpuNdArray_CopyFromArray: start descr=%p\n", self->descr);
     //modif done to the new array won't be updated!
     assert(!PyGpuNdArray_CHKFLAGS(self, NPY_UPDATEIFCOPY));
     //Aligned are not tested, so don't allow it for now
@@ -140,17 +133,20 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
         Py_INCREF(obj);
         py_src = (PyObject *) obj;
     }else{
-        py_src = PyArray_ContiguousFromAny((PyObject*)obj, typenum, PyArray_NDIM(obj), PyArray_NDIM(obj));
+        py_src = PyArray_ContiguousFromAny((PyObject*)obj, typenum,
+                                           PyArray_NDIM(obj),
+                                           PyArray_NDIM(obj));
     }
-    if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromArray: contiguous!\n");
+    DPRINTF("PyGpuNdArray_CopyFromArray: contiguous!\n");
     if (!py_src) {
         return -1;
     }
 
     int err;
     if(PyArray_ISFORTRAN(obj) && ! PyArray_ISCONTIGUOUS(obj)){
-        if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromArray: fortran!\n");
-        err = PyGpuNdArray_alloc_contiguous(self, obj->nd, obj->dimensions, NPY_FORTRANORDER);
+        DPRINTF("PyGpuNdArray_CopyFromArray: fortran!\n");
+        err = PyGpuNdArray_alloc_contiguous(self, obj->nd, obj->dimensions,
+                                            NPY_FORTRANORDER);
     }else{
         err = PyGpuNdArray_alloc_contiguous(self, obj->nd, obj->dimensions);
     }
@@ -174,45 +170,62 @@ PyGpuNdArray_CopyFromArray(PyGpuNdArrayObject * self, PyArrayObject*obj)
     // New memory, so it should be writable
     assert(PyGpuNdArray_ISWRITEABLE(self));
 
-    if (0) {
-        cublasSetVector(PyArray_SIZE(py_src),
-                        PyArray_ITEMSIZE(py_src),
-                        PyArray_DATA(py_src), 1,
-                        PyGpuNdArray_DATA(self), 1);
-        CNDA_THREAD_SYNC;
-        if (CUBLAS_STATUS_SUCCESS != cublasGetError()) {
-                PyErr_SetString(PyExc_RuntimeError, "error copying data to device memory");
-                Py_DECREF(py_src);
-                return -1;
-        }
-    } else {
-        cudaError_t err = cudaMemcpy(PyGpuNdArray_DATA(self),
-                                 PyArray_DATA(py_src),
-                                 PyArray_SIZE(py_src) * PyArray_ITEMSIZE(py_src),
-                                 cudaMemcpyHostToDevice);
-        CNDA_THREAD_SYNC;
-        if (cudaSuccess != err) {
-            PyErr_SetString(PyExc_RuntimeError, "cudaMemcpy: error copying data to device memory");
-            Py_DECREF(py_src);
-            return -1;
-        }
+    err = PyGpuMemcpy(PyGpuNdArray_DATA(self),
+                      PyArray_DATA(py_src),
+                      PyGpuNdArray_OFFSET(self),
+                      PyArray_SIZE(py_src) * PyArray_ITEMSIZE(py_src),
+                      PyGpuHostToDevice);
+    if (err) {
+        Py_DECREF(py_src);
+        return -1;
     }
     Py_DECREF(py_src);
-    if (verbose) fprintf(stderr, "PyGpuNdArray_CopyFromArray: end\n");
+    DPRINTF("PyGpuNdArray_CopyFromArray: end\n");
     return 0;
 }
 
-static PyObject * PyGpuNdArray_Copy(PyGpuNdArrayObject * self)
+static PyObject * PyGpuNdArray_copy(PyObject * self, PyObject *args,
+                                    PyObject *kargs)
 {
-    int verbose = 0;
-    if (verbose) fprintf(stderr, "PyGpuNdArray_Copy start\n");
+    DPRINTF("PyGpuNdArray_copy start\n");
+    static const char *kwlist[] = {"order", NULL};
+    NPY_ORDER order = PyArray_CORDER;
+    bool fortran = false;
+
+    if(!PyGpuNdArray_Check(self)){
+        PyErr_SetString(PyExc_ValueError, "PyGpuNdArray_copy: expected a PyGpuNdArrayObject.");
+        return NULL;
+    }
+
+    DPRINTF("PyGpuNdArray_copy before parse inputs\n");
+    if (!PyArg_ParseTupleAndKeywords(args, kargs, "|O&",
+                                     (char**)kwlist,
+                                     PyArray_OrderConverter,
+                                     &order)) {
+        DPRINTF("PyGpuNdArray_copy start1.2\n");
+        return NULL;
+    }
+    DPRINTF("PyGpuNdArray_copy after parse inputs\n");
+
+    DPRINTF("PyGpuNdArray_copy before copy\n");
+    PyObject *ret = PyGpuNdArray_Copy((PyGpuNdArrayObject*)self, order);
+    DPRINTF("PyGpuNdArray_copy end\n");
+    return ret;
+}
+
+static PyObject * PyGpuNdArray_Copy(PyGpuNdArrayObject * self, NPY_ORDER order)
+{
+    DPRINTF("PyGpuNdArray_Copy start\n");
     PyObject * rval = PyGpuNdArray_New();
     //TODO find how to refcount descr.
     PyGpuNdArray_DESCR(rval) = PyGpuNdArray_DESCR(self);
     if ((!rval) || (-1 == PyGpuNdArray_NDIM(self))) {
         return rval;
     }
-    if (PyGpuNdArray_alloc_contiguous((PyGpuNdArrayObject*)rval, PyGpuNdArray_NDIM(self), PyGpuNdArray_DIMS(self))) {
+    if (PyGpuNdArray_alloc_contiguous((PyGpuNdArrayObject*)rval,
+                                      PyGpuNdArray_NDIM(self),
+                                      PyGpuNdArray_DIMS(self),
+                                      order)) {
         Py_DECREF(rval);
         return NULL;
     }
@@ -221,16 +234,19 @@ static PyObject * PyGpuNdArray_Copy(PyGpuNdArrayObject * self)
         Py_DECREF(rval);
         return NULL;
     }
-    if (verbose>1) PyGpuNdArray_fprint(stderr, self);
-    if (verbose>1) PyGpuNdArray_fprint(stderr, (PyGpuNdArrayObject *)rval);
-    if (verbose) fprintf(stderr, "PyGpuNdArray_Copy end\n");
+    if (order == NPY_F_CONTIGUOUS)
+        PyGpuNdArray_FLAGS(self) |= NPY_F_CONTIGUOUS;
+
+#ifdef DEBUG
+    PyGpuNdArray_fprint(stderr, self);
+    PyGpuNdArray_fprint(stderr, (PyGpuNdArrayObject *)rval);
+#endif
+    DPRINTF("PyGpuNdArray_Copy end\n");
     return rval;
 }
 
 PyObject * PyGpuNdArray_DeepCopy(PyGpuNdArrayObject * self, PyObject * memo)
 {
-    int verbose = 0;
-
     assert(PyDict_Check(memo));
     PyObject * selfkey = PyInt_FromLong((long)self);
     assert(selfkey);
@@ -241,22 +257,22 @@ PyObject * PyGpuNdArray_DeepCopy(PyGpuNdArrayObject * self, PyObject * memo)
         Py_XINCREF(rval);
         return rval;
     } else {
-        if (verbose) fprintf(stderr, "PyGpuNdArray_DeepCopy: startd deepcopy\n");
+        DPRINTF("PyGpuNdArray_DeepCopy: startd deepcopy\n");
         PyObject * rval = PyGpuNdArray_Copy(self);
         if (NULL == rval) {
             Py_DECREF(selfkey);
             return NULL;
         }
 
-        if (verbose) fprintf(stderr, "DeepCopy created %p\n", rval);
-        if (verbose) fprintf(stderr, "DeepCopy created %p %p\n", PyGpuNdArray_DESCR(rval), PyGpuNdArray_DATA(rval));
+        DPRINTF("DeepCopy created %p\n", rval);
+        DPRINTF("DeepCopy created %p %p\n", PyGpuNdArray_DESCR(rval), PyGpuNdArray_DATA(rval));
         if (PyDict_SetItem(memo, selfkey, rval)) {
             Py_DECREF(rval);
             Py_DECREF(selfkey);
             return NULL;
         }
         Py_DECREF(selfkey);
-        if (verbose) fprintf(stderr, "PyGpuNdArray_DeepCopy: startd end\n");
+        DPRINTF("PyGpuNdArray_DeepCopy: startd end\n");
         return rval;
     }
 }
@@ -264,15 +280,22 @@ PyObject * PyGpuNdArray_DeepCopy(PyGpuNdArrayObject * self, PyObject * memo)
 PyObject * PyGpuNdArray_View(PyGpuNdArrayObject * self)
 {
     PyGpuNdArrayObject * rval = (PyGpuNdArrayObject*)PyGpuNdArray_New(PyGpuNdArray_NDIM(self));
-    if (!rval || PyGpuNdArray_set_data(rval, PyGpuNdArray_DATA(self), (PyObject *)self)) {
+    if (!rval || PyGpuNdArray_set_data(rval, PyGpuNdArray_DATA(self),
+                              (PyObject *)self, PyGpuNdArray_OFFSET(self))) {
         Py_XDECREF(rval);
-        rval = NULL;
+        DPRINTF("PyGpuNdArray_View: no rval or PyGpuNdArray_set_data "
+                "failed: self=%p, rval=%p rval_base=%p\n",
+                self, rval, rval->base);
+        return NULL;
     } else {
         for (int i = 0; i < PyGpuNdArray_NDIM(self); ++i) {
             PyGpuNdArray_DIM(rval, i) = PyGpuNdArray_DIMS(self)[i];
             PyGpuNdArray_STRIDE(rval, i) = PyGpuNdArray_STRIDES(self)[i];
         }
     }
+    DPRINTF("PyGpuNdArray_View: self=%p, self->base=%p"
+            " rval=%p rval->base=%p\n",
+            self, self->base, rval, rval->base);
     //TODO: find how to refcount on the descr!
     //Py_INCREF(PyGpuNdArray_DESCR(self));
     PyGpuNdArray_DESCR(rval) = PyGpuNdArray_DESCR(self);
@@ -282,35 +305,11 @@ PyObject * PyGpuNdArray_View(PyGpuNdArrayObject * self)
 
     return (PyObject*)rval;
 }
-char *
-cublasGetErrorString(cublasStatus err)
-{
-    if (err == CUBLAS_STATUS_NOT_INITIALIZED) {
-        return "CUBLAS_STATUS_NOT_INITIALIZED";
-    } else if (err == CUBLAS_STATUS_ALLOC_FAILED){
-        return "CUBLAS_STATUS_ALLOC_FAILED";
-    } else if (err == CUBLAS_STATUS_INVALID_VALUE){
-        return "CUBLAS_STATUS_INVALID_VALUE";
-    } else if (err == CUBLAS_STATUS_MAPPING_ERROR){
-        return "CUBLAS_STATUS_MAPPING_ERROR";
-    } else if (err == CUBLAS_STATUS_EXECUTION_FAILED){
-        return "CUBLAS_STATUS_EXECUTION_FAILED";
-    } else if (err == CUBLAS_STATUS_INTERNAL_ERROR){
-        return "CUBLAS_STATUS_INTERNAL_ERROR";
-    } else {
-        return "UNKNOW ERROR";
-    }
-
-}
 
 //updated for offset
 PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
 {
-    int verbose = 0;
-
-    if(verbose) fprintf(stderr, "PyGpuNdArray_CreateArrayObj\n");
-
-    assert(PyGpuNdArray_OFFSET(self)==0);//TODO implement when offset is not 0!
+    DPRINTF("PyGpuNdArray_CreateArrayObj\n");
 
     if(PyGpuNdArray_NDIM(self)>=0 && PyGpuNdArray_SIZE(self)==0){
       npy_intp * npydims = (npy_intp*)malloc(PyGpuNdArray_NDIM(self) * sizeof(npy_intp));
@@ -342,16 +341,15 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
     if (PyGpuNdArray_ISONESEGMENT(self) && pos_stride) {
         contiguous_self = self;
         Py_INCREF(contiguous_self);
-        if (verbose) std::cerr << "PyGpuNdArray_CreateArrayObj: gpu array already contiguous" <<
-		       contiguous_self << '\n';
+        DPRINTF("PyGpuNdArray_CreateArrayObj: gpu array already contiguous %p\n", contiguous_self);
         //}else if(PyGpuNdArray_ISONESEGMENT(self)){
         //TODO implement special object handling to speed up transfer
-        //  if (verbose) std::cerr << "CreateArrayObj one segment, with special handling" << contiguous_self << '\n';
+        //  DPRINTF("CreateArrayObj one segment, with special handling %p\n", contiguous_self);
         //PyErr_SetString(PyExc_ValueError, "PyGpuNdArray_CreateArrayObj: Need PyGpuNdArray_Copy or some other nd array mandling to transfer contiguous bloc with negative stride.");
         //return NULL;
     } else {
         contiguous_self = (PyGpuNdArrayObject*)PyGpuNdArray_Copy(self);
-        if (verbose) std::cerr << "CreateArrayObj created contiguous" << contiguous_self << '\n';
+        DPRINTF("CreateArrayObj created contiguous %p\n", contiguous_self);
     }
     if (!contiguous_self) {
         return NULL;
@@ -370,33 +368,16 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
         Py_DECREF(contiguous_self);
         return NULL;
     }
-    if (0) {
-        cublasGetVector(PyArray_SIZE(rval), PyArray_ITEMSIZE(rval),
-                        PyGpuNdArray_DATA(contiguous_self), 1,
-                        PyArray_DATA(rval), 1);
-        CNDA_THREAD_SYNC;
-        cublasStatus err = cublasGetError();
 
-        if (CUBLAS_STATUS_SUCCESS != err) {
-            PyErr_Format(PyExc_RuntimeError, "error copying data to host %s",
-                         cublasGetErrorString(err));
-            Py_DECREF(contiguous_self);
-            Py_DECREF(rval);
-            rval = NULL;
-        }
-    } else {
-        cudaError_t err = cudaMemcpy(PyArray_DATA(rval),
-                                     PyGpuNdArray_DATA(contiguous_self),
-                                     PyArray_SIZE(rval) * PyArray_ITEMSIZE(rval),
-                                     cudaMemcpyDeviceToHost);
-        CNDA_THREAD_SYNC;
-        if (cudaSuccess != err) {
-            PyErr_Format(PyExc_RuntimeError, "cudaMemcpy: error copying data to host (%s)",
-                         cudaGetErrorString(err));
-            Py_DECREF(contiguous_self);
-            Py_DECREF(rval);
-            rval = NULL;
-        }
+    int err = PyGpuMemcpy(PyArray_DATA(rval),
+                          PyGpuNdArray_DATA(contiguous_self),
+                          PyGpuNdArray_OFFSET(contiguous_self),
+                          PyArray_SIZE(rval) * PyArray_ITEMSIZE(rval),
+                          PyGpuDeviceToHost);
+    if (err) {
+        Py_DECREF(contiguous_self);
+        Py_DECREF(rval);
+        rval = NULL;
     }
     Py_DECREF(contiguous_self);
     return rval;
@@ -405,12 +386,11 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
 static PyObject *
 PyGpuNdArray_Empty(int nd, npy_intp* dims, PyArray_Descr* dtype, int fortran)
 {
-    int verbose = 0;
-    if (verbose) fprintf(stderr, "PyGpuNdArray_Empty: start!\n");
+    DPRINTF("PyGpuNdArray_Empty: start!\n");
     PyGpuNdArrayObject* rval = (PyGpuNdArrayObject*)PyGpuNdArray_New();
     PyGpuNdArray_DESCR(rval) = dtype;
     if (!rval) {
-        if (verbose) fprintf(stderr, "PyGpuNdArray_Empty: fail!\n");
+        DPRINTF("PyGpuNdArray_Empty: fail!\n");
         return NULL;
     }
     NPY_ORDER order = NPY_CORDER;
@@ -422,7 +402,7 @@ PyGpuNdArray_Empty(int nd, npy_intp* dims, PyArray_Descr* dtype, int fortran)
         return NULL;
     }
 
-    if (verbose) fprintf(stderr, "PyGpuNdArray_Empty: end!\n");
+    DPRINTF("PyGpuNdArray_Empty: end!\n");
     return (PyObject*) rval;
 }
 
@@ -430,8 +410,7 @@ PyGpuNdArray_Empty(int nd, npy_intp* dims, PyArray_Descr* dtype, int fortran)
 static PyObject * 
 PyGpuNdArray_Zeros(int nd, npy_intp* dims, PyArray_Descr* dtype, int fortran)
 {
-    int verbose = 0;
-    if (verbose) fprintf(stderr, "PyGpuNdArray_Zeros: start!\n");
+    DPRINTF("PyGpuNdArray_Zeros: start!\n");
     PyObject * rval = PyGpuNdArray_Empty(nd, dims, dtype, fortran);
     if (!rval) {
         return rval;
@@ -445,15 +424,13 @@ PyGpuNdArray_Zeros(int nd, npy_intp* dims, PyArray_Descr* dtype, int fortran)
     int total_size = total_elements * dtype->elsize;
     
     // Fill with zeros
-    cudaError_t err = cudaMemset(PyGpuNdArray_DATA(rval), 0, total_size);
-    if (cudaSuccess != err) {
-        PyErr_Format(PyExc_MemoryError, "PyGpuNdArray_Zeros: Error memsetting %d bytes of device memory(%s). %p",
-                     total_size, cudaGetErrorString(err), PyGpuNdArray_DATA(rval));
+    int err = PyGpuMemset(PyGpuNdArray_DATA(rval), 0, total_size);
+    if (err) {
         Py_DECREF(rval);
         return NULL;
     }
 
-    if (verbose) fprintf(stderr, "PyGpuNdArray_Zeros: end!\n");
+    DPRINTF("PyGpuNdArray_Zeros: end!\n");
     return (PyObject*) rval;
 }
 
@@ -462,7 +439,7 @@ PyGpuNdArray_Zeros(int nd, npy_intp* dims, PyArray_Descr* dtype, int fortran)
 static PyObject * 
 PyGpuNdArray_zeros(PyObject* dummy, PyObject* args, PyObject *kargs)
 {
-    static char *kwlist[] = {"shape","dtype","order",NULL}; /* XXX ? */
+    static const char *kwlist[] = {"shape","dtype","order",NULL}; /* XXX ? */
     PyArray_Descr *typecode = NULL;
     PyObject * shape = NULL;
     NPY_ORDER order = PyArray_CORDER;
@@ -470,7 +447,7 @@ PyGpuNdArray_zeros(PyObject* dummy, PyObject* args, PyObject *kargs)
     PyObject *ret = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kargs, "O|O&O&",
-                                     kwlist,
+                                     (char**)kwlist,
 	                             &shape,
                                      PyArray_DescrConverter,
                                      &typecode,
@@ -493,13 +470,14 @@ PyGpuNdArray_zeros(PyObject* dummy, PyObject* args, PyObject *kargs)
         return NULL;
     }
 
+    if (!typecode)
+        typecode = PyArray_DescrFromType(NPY_FLOAT64);
+
     int shplen = PySequence_Length(shape);
 
     if (shplen == 0)
     {
-        PyErr_SetString(PyExc_ValueError,
-            "PyGpuNdArray_Zeros: empty shape not allowed");
-        return NULL;
+        return PyGpuNdArray_Zeros(0, NULL, typecode, fortran);
     }
 
     npy_intp* newdims = (npy_intp *)malloc(sizeof(npy_intp) * shplen);
@@ -548,7 +526,7 @@ PyGpuNdArray_zeros(PyObject* dummy, PyObject* args, PyObject *kargs)
 static PyObject * 
 PyGpuNdArray_empty(PyObject* dummy, PyObject* args, PyObject *kargs)
 {
-    static char *kwlist[] = {"shape","dtype","order",NULL}; /* XXX ? */
+    static const char *kwlist[] = {"shape","dtype","order",NULL}; /* XXX ? */
     PyArray_Descr *typecode = NULL;
     PyObject * shape = NULL;
     NPY_ORDER order = PyArray_CORDER;
@@ -556,7 +534,7 @@ PyGpuNdArray_empty(PyObject* dummy, PyObject* args, PyObject *kargs)
     PyObject *ret = NULL;
 
     if (!PyArg_ParseTupleAndKeywords(args, kargs, "O|O&O&",
-                                     kwlist,
+                                     (char **)kwlist,
 	                             &shape,
                                      PyArray_DescrConverter,
                                      &typecode,
@@ -579,13 +557,14 @@ PyGpuNdArray_empty(PyObject* dummy, PyObject* args, PyObject *kargs)
         return NULL;
     }
 
+    if (!typecode)
+        typecode = PyArray_DescrFromType(NPY_FLOAT64);
+
     int shplen = PySequence_Length(shape);
 
     if (shplen == 0)
     {
-        PyErr_SetString(PyExc_ValueError,
-            "PyGpuNdArray_empty: empty shape not allowed");
-        return NULL;
+        return PyGpuNdArray_Empty(0, NULL, typecode, fortran);
     }
 
     npy_intp* newdims = (npy_intp *)malloc(sizeof(npy_intp) * shplen);
@@ -635,7 +614,7 @@ static PyMethodDef PyGpuNdArray_methods[] =
         (PyCFunction)PyGpuNdArray_CreateArrayObj, METH_NOARGS,
         "Copy from the device to a numpy ndarray"},
     {"copy",
-        (PyCFunction)PyGpuNdArray_Copy, METH_NOARGS,
+     (PyCFunction)PyGpuNdArray_copy, METH_VARARGS|METH_KEYWORDS,
         "Create a deep copy of this object."},
     {"view",
         (PyCFunction)PyGpuNdArray_View, METH_NOARGS,
@@ -674,7 +653,7 @@ static PyMethodDef PyGpuNdArray_methods[] =
 static PyObject *
 PyGpuNdArray_get_shape(PyGpuNdArrayObject *self, void *closure)
 {
-    if(0) fprintf(stderr, "PyGpuNdArray_get_shape\n");
+    DPRINTF("PyGpuNdArray_get_shape\n");
 
     if (PyGpuNdArray_NDIM(self) < 0)
     {
@@ -811,64 +790,64 @@ PyGpuNdArray_get_dtype(PyArrayObject *self)
 static PyObject *
 PyGpuNdArray_get_itemsize(PyArrayObject *self)
 {
-    return (PyObject *)PyGpuNdArray_ITEMSIZE(self);
+    return (PyObject *)PyInt_FromLong(PyGpuNdArray_ITEMSIZE(self));
 }
 
 static PyGetSetDef PyGpuNdArray_getset[] = {
-    {"base",
+    {(char*)"base",
         (getter)PyGpuNdArray_get_base,
         NULL,
-        "Return the object stored in the base attribute",
+        (char*)"Return the object stored in the base attribute",
         NULL},
-    {"bytes",
+    {(char*)"bytes",
         (getter)PyGpuNdArray_get_data,
         NULL,
-        "device data pointer",
+        (char*)"device data pointer",
         NULL},
-    {"shape",
+    {(char*)"shape",
         (getter)PyGpuNdArray_get_shape,
         (setter)PyGpuNdArray_set_shape,
-        "shape of this ndarray (tuple)",
+        (char*)"shape of this ndarray (tuple)",
         NULL},
-    {"strides",
+    {(char*)"strides",
         (getter)PyGpuNdArray_get_strides,
         NULL,//(setter)PyGpuNdArray_set_strides,
-        "data pointer strides (in elements)",
+        (char*)"data pointer strides (in elements)",
         NULL},
-    {"ndim",
+    {(char*)"ndim",
         (getter)PyGpuNdArray_get_ndim,
         NULL,
-        "The number of dimensions in this object",
+        (char*)"The number of dimensions in this object",
         NULL},
-    {"offset",
+    {(char*)"offset",
         (getter)PyGpuNdArray_get_offset,
         NULL,
-        "Return the offset value",
+        (char*)"Return the offset value",
         NULL},
-    {"size",
+    {(char*)"size",
         (getter)PyGpuNdArray_get_size,
         NULL,
-        "The number of elements in this object.",
+        (char*)"The number of elements in this object.",
         NULL},
-    {"data_allocated",
+    {(char*)"data_allocated",
         (getter)PyGpuNdArray_get_data_allocated,
         NULL,
-        "The size of the allocated memory on the device.",
+        (char*)"The size of the allocated memory on the device.",
         NULL},
-    {"itemsize",
+    {(char*)"itemsize",
         (getter)PyGpuNdArray_get_itemsize,
         NULL,
-        "The size of the base element.",
+        (char*)"The size of the base element.",
         NULL},
-    {"dtype",
+    {(char*)"dtype",
 	(getter)PyGpuNdArray_get_dtype,
 	NULL,
-	"The dtype of the element",
+        (char*)"The dtype of the element",
 	NULL},
-    {"flags",
+    {(char*)"flags",
         (getter)PyGpuNdArray_get_flags,
         NULL,
-        "Return the flags as a dictionary",
+        (char*)"Return the flags as a dictionary",
         NULL},
     {NULL, NULL, NULL, NULL}  /* Sentinel */
 };
@@ -889,8 +868,23 @@ PyGpuNdArray_len(PyObject * py_self)
 }
 
 static int
-PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base)
+PyGpuNdArray_add_offset(PyGpuNdArrayObject * self, int offset)
 {
+    DPRINTF("PyGpuNdArray_add_offset: %p %d\n", self, offset);
+
+#if OFFSET
+    PyGpuNdArray_OFFSET(self) += offset;
+#else
+    PyGpuNdArray_DATA(self) += offset;
+#endif
+    return 0;
+}
+
+
+static int
+PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base, int offset)
+{
+    DPRINTF("PyGpuNdArray_set_data: %p %p %p %d\n", self, data, base, offset);
     if (self->data_allocated)
     {
         assert(PyGpuNdArray_DATA(self));
@@ -898,18 +892,37 @@ PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base)
         {
             PyGpuNdArray_DATA(self) = NULL;
             self->data_allocated = 0;
+            DPRINTF("PyGpuNdArray_set_data: device_free failed!\n");
+            PyErr_SetString(PyExc_ValueError, "PyGpuNdArray_set_data: device_free failed");
             return -1;
         }
     }
+
+    // Get the original base object (base.base.base...)
+    // TODO: check that base is indeed a CudaNdarray?
+    PyObject * orig_base = base;
+    // base is not always a PyGpuNdArrayObject. It can be a GpuArray from pycuda, ...
+    while (orig_base && PyGpuNdArray_Check(orig_base) && ((PyGpuNdArrayObject*) orig_base)->base)
+    {
+        // base_base is itself a view
+        orig_base = ((PyGpuNdArrayObject*) orig_base)->base;
+    }
+
     //N.B. XDECREF and XINCREF are no-ops for NULL pointers
-    if (PyGpuNdArray_BASE(self) != base)
+    if (PyGpuNdArray_BASE(self) != orig_base)
     {
         Py_XDECREF(PyGpuNdArray_BASE(self));
-        PyGpuNdArray_BASE(self) = base;
+        PyGpuNdArray_BASE(self) = orig_base;
         Py_XINCREF(PyGpuNdArray_BASE(self));
     }
     self->data_allocated = 0;
+#if OFFSET
     PyGpuNdArray_DATA(self) = data;
+    PyGpuNdArray_OFFSET(self) = offset;
+#else
+    PyGpuNdArray_DATA(self) = data + offset;
+#endif
+
     return 0;
 }
 
@@ -917,8 +930,7 @@ PyGpuNdArray_set_data(PyGpuNdArrayObject * self, char * data, PyObject * base)
 static PyObject *
 PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
 {
-    int verbose = 0;
-    if (verbose) fprintf(stderr, "Subscript .... \n");
+    DPRINTF("Subscript start\n");
     PyGpuNdArrayObject * self = (PyGpuNdArrayObject*) py_self;
     PyObject * py_rval = NULL;
     PyGpuNdArrayObject * rval = NULL;
@@ -926,24 +938,24 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
 
     //PyObject_Print(key, stderr, 0);
 
-    assert(PyGpuNdArray_OFFSET(self)==0);
-
     if (key == Py_Ellipsis)
     {
-        if (verbose) fprintf(stderr, "Subscript with ellipse \n");
+        DPRINTF("Subscript with ellipse \n");
         Py_INCREF(py_self);
-        if (verbose) fprintf(stderr, "Subscript with ellipse end\n");
+        DPRINTF("Subscript with ellipse end\n");
         return py_self;
     }
     if ((intobj=PyNumber_Int(key))) //INDEXING BY INTEGER
     {
-        if (verbose>1) PyGpuNdArray_fprint(stderr, self);
-        if (verbose) fprintf(stderr, "Subscript with int \n");
+#ifdef DEBUG
+        PyGpuNdArray_fprint(stderr, self);
+#endif
+        DPRINTF("Subscript with int \n");
 
         int d_idx = PyInt_AsLong(intobj);
         Py_DECREF(intobj); intobj=NULL;
 
-        if (verbose) fprintf(stderr, "Subscript with int 1\n");
+        DPRINTF("Subscript with int 1\n");
         if (PyGpuNdArray_NDIM(self) == 0) {
             PyErr_SetString(PyExc_IndexError, "0-d arrays can't be indexed");
             return NULL;
@@ -953,7 +965,7 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         }
         int d_dim = PyGpuNdArray_DIMS(self)[0];
         int offset = 0;
-        if (verbose) fprintf(stderr, "Subscript with int 2\n");
+        DPRINTF("Subscript with int 2\n");
 
         if ((d_idx >= 0) && (d_idx < d_dim)) {
             //normal indexing
@@ -967,7 +979,10 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
             PyErr_SetString(PyExc_IndexError, "index out of bounds");
             return NULL;
         }
-        if (verbose) fprintf(stderr, "Subscript with int 3\n");
+        DPRINTF("Subscript with int 3\n");
+
+        //Add the original offset
+        offset += PyGpuNdArray_OFFSET(self);
 
         //allocate our subtensor view
         py_rval = PyGpuNdArray_New(PyGpuNdArray_NDIM(self) - 1);
@@ -977,14 +992,14 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         //TODO: find how to refcount on the descr!
         PyGpuNdArray_DESCR(py_rval) = PyGpuNdArray_DESCR(self);
 
-        if (verbose) fprintf(stderr, "Subscript with int 4\n");
+        DPRINTF("Subscript with int 4\n");
         //initialize the view's data pointer to our own.
         assert (0 == rval->data_allocated);
-        if (PyGpuNdArray_set_data(rval, PyGpuNdArray_DATA(self) + offset, (PyObject *) self)){
+        if (PyGpuNdArray_set_data(rval, PyGpuNdArray_DATA(self), (PyObject *) self, offset)){
             Py_DECREF(rval);
             return NULL;
         }
-        if (verbose) fprintf(stderr, "Subscript with int 5\n");
+        DPRINTF("Subscript with int 5\n");
 
         for (int d = 1; d < PyGpuNdArray_NDIM(self); ++d) {
             PyGpuNdArray_STRIDE(rval, d-1) = PyGpuNdArray_STRIDES(self)[d];
@@ -996,7 +1011,7 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
     }
     if (PySlice_Check(key)) //INDEXING BY SLICE
     {
-        if (verbose) fprintf(stderr, "Subscript with slice \n");
+        DPRINTF("Subscript with slice \n");
         if (PyGpuNdArray_NDIM(self) == 0)
         {
             PyErr_SetString(PyExc_ValueError, "cannot slice a 0-d array");
@@ -1008,12 +1023,9 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         if (PySlice_GetIndicesEx((PySliceObject*)key, d_dim, &start, &stop, &step, &slen)) {
             return NULL;
         }
-        if (verbose>2) {
-            std::cerr << "start " << start << "\n";
-            std::cerr << "stop " << stop << "\n";
-            std::cerr << "step " << step << "\n";
-            std::cerr << "slen " << slen << "\n";
-        }
+
+        DPRINTF("start %zd\nstop %zd\n step %zd\n slen %zd\n",
+                start, stop, step, slen);
 
         //allocate our subtensor view
         py_rval = PyGpuNdArray_New(PyGpuNdArray_NDIM(self));
@@ -1024,8 +1036,10 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         PyGpuNdArray_DESCR(py_rval) = PyGpuNdArray_DESCR(self);
         assert (0 == rval->data_allocated);
         if (PyGpuNdArray_set_data(rval,
-                                  PyGpuNdArray_DATA(self) + start * PyGpuNdArray_STRIDE(self, 0),
-                                  py_self)) {
+                                  PyGpuNdArray_DATA(self),
+                                  py_self,
+                                  start * PyGpuNdArray_STRIDE(self, 0)
+                                  + PyGpuNdArray_OFFSET(self))) {
             Py_DECREF(rval);
             return NULL;
         }
@@ -1033,7 +1047,7 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         //initialize dimension 0 of rval
         PyGpuNdArray_STRIDE(rval, 0) = step * PyGpuNdArray_STRIDES(self)[0];
         PyGpuNdArray_DIM(rval, 0) = slen;
-        if (verbose) std::cerr << "rval stride " << PyGpuNdArray_STRIDES(rval)[0] << "\n";
+        DPRINTF("rval stride %d\n", PyGpuNdArray_STRIDES(rval)[0]);
         // initialize dimensions > 0 of rval
         for (int d = 1; d < PyGpuNdArray_NDIM(self); ++d) {
             PyGpuNdArray_STRIDE(rval, d) = PyGpuNdArray_STRIDES(self)[d];
@@ -1042,23 +1056,35 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
     }
     if (PyTuple_Check(key)) //INDEXING BY TUPLE
     {
-        if (verbose) fprintf(stderr, "Subscript with tuple \n");
+        DPRINTF("Subscript with tuple \n");
         //elements of the tuple can be either integers or slices
         //the dimensionality of the view we will return is diminished for each slice in the tuple
-
+        int tuple_start_index = 0;
         if (PyTuple_Size(key) > PyGpuNdArray_NDIM(self))
         {
-            PyErr_SetString(PyExc_IndexError, "index error");
-            return NULL;
+            if (PyTuple_GetItem(key, 0) == Py_Ellipsis &&
+                PyTuple_Size(key) == PyGpuNdArray_NDIM(self) + 1)
+            {
+                tuple_start_index = 1;
+                DPRINTF("Subscript with tuple staring with an extra ellipse"
+                        " at the start.\n");
+            }
+            else{
+                PyErr_SetString(PyExc_IndexError,
+                                "index error, specified more dimensions then"
+                                " the number of existing dimensions");
+                return NULL;
+            }
         }
 
         //calculate the number of dimensions in the return value
         int rval_nd = PyGpuNdArray_NDIM(self);
-        for (int d = 0; d < PyTuple_Size(key); ++d)
+        for (int tuple_d = tuple_start_index; tuple_d < PyTuple_Size(key);
+             ++tuple_d)
         {
             //On some paltform PyInt_Check(<type 'numpy.int64'>) return true, other it return false.
             //So we use PyArray_IsAnyScalar that should covert everything.
-            rval_nd -= PyArray_IsAnyScalar(PyTuple_GetItem(key, d));
+            rval_nd -= PyArray_IsAnyScalar(PyTuple_GetItem(key, tuple_d));
         }
 
         //allocate our subtensor view
@@ -1071,7 +1097,8 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         PyGpuNdArray_DESCR(py_rval) = PyGpuNdArray_DESCR(self);
 
         //initialize the view's data pointer to our own.
-        if (PyGpuNdArray_set_data(rval, PyGpuNdArray_DATA(self), py_self))
+        if (PyGpuNdArray_set_data(rval, PyGpuNdArray_DATA(self),
+                                  py_self, PyGpuNdArray_OFFSET(self)))
         {
             Py_DECREF(rval);
             return NULL;
@@ -1082,38 +1109,42 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         // keys
         int rval_d = 0;
 
-        for (int d = 0; d < PyGpuNdArray_NDIM(self); ++d)
+        for (int self_d = 0, tuple_d = tuple_start_index;
+             self_d < PyGpuNdArray_NDIM(self); ++self_d, ++tuple_d)
         {
             // keys can be shorter than PyGpuNdArray_NDIM(self).
             // when that happens, it means that the remaining dimensions are "full slices"
-            if (d >=PyTuple_Size(key))
+            if (tuple_d >= PyTuple_Size(key))
             {
-                PyGpuNdArray_STRIDE(rval, rval_d) = PyGpuNdArray_STRIDES(self)[d];
-                PyGpuNdArray_DIM(rval, rval_d) = PyGpuNdArray_DIMS(self)[d];
+                PyGpuNdArray_STRIDE(rval, rval_d) =
+                    PyGpuNdArray_STRIDES(self)[tuple_d];
+                PyGpuNdArray_DIM(rval, rval_d) =
+                    PyGpuNdArray_DIMS(self)[tuple_d];
                 ++rval_d;
+                DPRINTF("Subscript extra dims to append %d %d\n",
+                        PyGpuNdArray_STRIDE(rval, rval_d),
+                        PyGpuNdArray_DIM(rval, rval_d));
             }
             else
             {
-                PyObject * key_d = PyTuple_GetItem(key, d);
+                PyObject * key_d = PyTuple_GetItem(key, tuple_d);
 
                 if (PySlice_Check(key_d))
                 {
                     Py_ssize_t start, stop, step, slen;
-                    if (PySlice_GetIndicesEx((PySliceObject*)key_d, PyGpuNdArray_DIMS(self)[d], &start, &stop, &step, &slen))
+                    if (PySlice_GetIndicesEx((PySliceObject*)key_d,
+                                             PyGpuNdArray_DIMS(self)[self_d],
+                                             &start, &stop, &step, &slen))
                     {
                         Py_DECREF(rval);
                         return NULL;
                     }
-                    PyGpuNdArray_DATA(rval) += start * PyGpuNdArray_STRIDES(self)[d];
-                    PyGpuNdArray_STRIDE(rval, rval_d) = step * PyGpuNdArray_STRIDES(self)[d];
+                    PyGpuNdArray_add_offset(rval, start * PyGpuNdArray_STRIDES(self)[self_d]);
+                    PyGpuNdArray_STRIDE(rval, rval_d) = step * PyGpuNdArray_STRIDES(self)[self_d];
                     PyGpuNdArray_DIM(rval, rval_d) = slen;
-                    if (0)
-                    {
-                        std::cerr << "start " << start << "\n";
-                        std::cerr << "stop " << stop << "\n";
-                        std::cerr << "step " << step << "\n";
-                        std::cerr << "slen " << slen << "\n";
-                    }
+
+                    DPRINTF("rval_d %zd self_d %zd\n start %zd\nstop %zd\n step %zd\n slen %zd\n",
+                            rval_d, self_d, start, stop, step, slen);
                     ++rval_d;
                 }
                 else if ((intobj=PyNumber_Int(key_d)))
@@ -1122,17 +1153,17 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
                     int d_idx = PyInt_AsLong(intobj);
                     Py_DECREF(intobj);
                     intobj = NULL;
-                    int d_dim = PyGpuNdArray_DIMS(self)[d];
+                    int d_dim = PyGpuNdArray_DIMS(self)[self_d];
 
                     if ((d_idx >= 0) && (d_idx < d_dim))
                     {
                         //normal indexing
-                        PyGpuNdArray_DATA(rval) += d_idx * PyGpuNdArray_STRIDES(self)[d];
+                        PyGpuNdArray_add_offset(rval, d_idx * PyGpuNdArray_STRIDES(self)[self_d]);
                     }
                     else if ((d_idx < 0) && (d_idx >= -d_dim))
                     {
                         //end-based indexing
-                        PyGpuNdArray_DATA(rval) += (d_dim + d_idx) * PyGpuNdArray_STRIDES(self)[d];
+                        PyGpuNdArray_add_offset(rval, (d_dim + d_idx) * PyGpuNdArray_STRIDES(self)[self_d]);
                     }
                     else
                     {
@@ -1141,10 +1172,37 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
                         return NULL;
                     }
                 }
+                else if (key_d == Py_Ellipsis)
+                {
+                    if (self_d != 0){
+                        PyErr_Format(PyExc_IndexError,
+                                     "Ellipsis supported only at the start of"
+                                     " the tuple");
+                        Py_DECREF(rval);
+                        return NULL;
+                    }
+                    DPRINTF("Substript with tuple with the first element an ellipse\n");
+                    for( ; self_d < (rval_nd - PyTuple_Size(key) + 1); self_d++)
+                    {
+                        PyGpuNdArray_STRIDE(rval, rval_d) =
+                            PyGpuNdArray_STRIDES(self)[self_d];
+                        PyGpuNdArray_DIM(rval, rval_d) =
+                            PyGpuNdArray_DIMS(self)[self_d];
+                        DPRINTF("Ellipse append dimensions self_%d with %d %d\n",
+                                self_d,
+                                PyGpuNdArray_STRIDE(rval, rval_d),
+                                PyGpuNdArray_DIM(rval, rval_d));
+                        ++rval_d;
+                    }
+                    tuple_start_index = 1;
+                    self_d--;
+                }
                 else
                 {
                     PyErr_Clear(); // clear the error set by PyNumber_Int
-                    PyErr_SetString(PyExc_IndexError, "index must be either int or slice");
+                    PyErr_Format(PyExc_IndexError,
+                                 "index must be either int or slice. Got %s",
+                                 PyString_AsString(PyObject_Str(key_d)));
                     Py_DECREF(rval);
                     return NULL;
                 }
@@ -1153,8 +1211,10 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
     }
     if (py_rval)
     {
-        if (verbose>1) PyGpuNdArray_fprint(stderr, self);
-        if (verbose>1) PyGpuNdArray_fprint(stderr, rval);
+#ifdef DEBUG
+        PyGpuNdArray_fprint(stderr, self);
+        PyGpuNdArray_fprint(stderr, rval);
+#endif
     }
     else
     {
@@ -1196,7 +1256,7 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         }
     }
 
-    if (verbose) fprintf(stderr, "Subscript end\n");
+    DPRINTF("Subscript end\n");
     return py_rval;
 }
 
@@ -1257,6 +1317,7 @@ static PyTypeObject PyGpuNdArrayType =
 PyObject *
 PyGpuNdArray_New(int nd)
 {
+    DPRINTF("PyGpuNdArray_New start\n");
     PyGpuNdArrayObject *self = (PyGpuNdArrayObject *)PyGpuNdArrayType.tp_alloc(&PyGpuNdArrayType, 0);
     if (self == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "PyGpuNdArray_New failed to allocate self");
@@ -1274,23 +1335,118 @@ PyGpuNdArray_New(int nd)
         }
     }
     ++_outstanding_mallocs[1];
+    DPRINTF("PyGpuNdArray_New end\n");
     return (PyObject *)self;
 }
 
 int
 PyGpuNdArray_Check(const PyObject * ob)
 {
-    if(0) fprintf(stderr, "PyGpuNdArray_Check\n");
+    DPRINTF("PyGpuNdArray_Check\n");
     //TODO: doesn't work with inheritance
     return PyGpuNdArray_CheckExact(ob);
 }
 int
 PyGpuNdArray_CheckExact(const PyObject * ob)
 {
-    if(0) fprintf(stderr, "PyGpuNdArray_CheckExact\n");
+    DPRINTF("PyGpuNdArray_CheckExact\n");
     return ((ob->ob_type == &PyGpuNdArrayType) ? 1 : 0);
 }
 
+static PyObject *
+PyGpuNdArray_as_c_contiguous(PyObject* dummy, PyObject* args, PyObject *kargs)
+{
+    DPRINTF("PyGpuNdArray_as_c_contiguous:start\n");
+    static const char *kwlist[] = {"a", "dtype", NULL};
+    PyArray_Descr *typecode = NULL;
+    PyObject *self_ = NULL;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kargs, "O|O&",
+                                     (char **)kwlist,
+                                     &self_,
+                                     PyArray_DescrConverter,
+                                     &typecode)) {
+        Py_XDECREF(typecode);
+        Py_XDECREF(self_);
+        return NULL;
+    }
+    assert(typecode == NULL);
+    if (!PyGpuNdArray_Check(self_)){
+        PyErr_SetString(PyExc_TypeError,
+                        "PyGpuNdArray_as_c_contiguous:"
+                        " PyGpuNdArrayObject required");
+        return NULL;
+    }
+
+    PyGpuNdArrayObject *self = (PyGpuNdArrayObject*)self_;
+    if (PyGpuNdArray_is_c_contiguous(self)){
+        Py_INCREF(self);
+        if (PyGpuNdArray_NDIM(self) == 0){
+            //numpy.ascontiguous() always return object with 1d.
+            DPRINTF("PyGpuNdArray_as_c_contiguous: upcast to 1d tensor end\n");
+            PyObject * rval = PyGpuNdArray_View(self);
+            if (!rval)
+                return NULL;
+            PyGpuNdArray_set_nd((PyGpuNdArrayObject*)rval, 1);
+            PyGpuNdArray_DIM(rval, 0) = 1;
+            PyGpuNdArray_STRIDE(rval, 0) = PyGpuNdArray_ITEMSIZE(rval);
+            return rval;
+        }
+        DPRINTF("PyGpuNdArray_as_c_contiguous: no copy end\n");
+        return (PyObject*)self;
+    }
+
+    PyObject * ret = PyGpuNdArray_Copy(self);
+    DPRINTF("PyGpuNdArray_as_c_contiguous: copy end\n");
+    return ret;
+}
+static PyObject *
+PyGpuNdArray_as_f_contiguous(PyObject* dummy, PyObject* args, PyObject *kargs)
+{
+    DPRINTF("PyGpuNdArray_as_f_contiguous:start\n");
+    static const char *kwlist[] = {"a", "dtype", NULL};
+    PyArray_Descr *typecode = NULL;
+    PyObject *self_ = NULL;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kargs, "O|O&",
+                                     (char **)kwlist,
+                                     &self_,
+                                     PyArray_DescrConverter,
+                                     &typecode)) {
+        Py_XDECREF(typecode);
+        Py_XDECREF(self_);
+        return NULL;
+    }
+    assert(typecode == NULL);
+    if (!PyGpuNdArray_Check(self_)){
+        PyErr_SetString(PyExc_TypeError,
+                        "PyGpuNdArray_as_f_contiguous:"
+                        " PyGpuNdArrayObject required");
+        return NULL;
+    }
+
+    PyGpuNdArrayObject *self = (PyGpuNdArrayObject*)self_;
+    if (PyGpuNdArray_is_f_contiguous(self)){
+        Py_INCREF(self);
+        if (PyGpuNdArray_NDIM(self) == 0){
+            //numpy.ascontiguous() always return object with 1d.
+            PyObject * rval = PyGpuNdArray_View(self);
+            if (!rval)
+                return NULL;
+            PyGpuNdArray_set_nd((PyGpuNdArrayObject*)rval, 1);
+            PyGpuNdArray_DIM(rval, 0) = 1;
+            PyGpuNdArray_STRIDE(rval, 0) = PyGpuNdArray_ITEMSIZE(rval);
+            DPRINTF("PyGpuNdArray_as_f_contiguous: upcast to 1d tensor end\n");
+            return rval;
+        }
+        DPRINTF("PyGpuNdArray_as_f_contiguous: no copy end\n");
+        return (PyObject*)self;
+    }
+
+    PyObject * ret = PyGpuNdArray_Copy(self, NPY_FORTRANORDER);
+    DPRINTF("PyGpuNdArray_as_f_contiguous: copy end\n");
+    return ret;
+}
 
 static PyMethodDef module_methods[] = {
     //{"dimshuffle", PyGpuNdArray_Dimshuffle, METH_VARARGS, "Returns the dimshuffle of a PyGpuNdArray."},
@@ -1301,6 +1457,12 @@ static PyMethodDef module_methods[] = {
     {"empty",
        (PyCFunction)PyGpuNdArray_empty, METH_VARARGS|METH_KEYWORDS,
        "Create a new PyGpuNdArray with specified shape, filled with zeros."},
+    {"ascontiguousarray",
+       (PyCFunction)PyGpuNdArray_as_c_contiguous, METH_VARARGS|METH_KEYWORDS,
+       "If the array is not c contiguous, copy it to a new c contiguous region."},
+    {"asfortranarray",
+       (PyCFunction)PyGpuNdArray_as_f_contiguous, METH_VARARGS|METH_KEYWORDS,
+       "If the array is not f contiguous, copy it to a new c contiguous region."},
     {NULL, NULL, NULL, NULL}  /* Sentinel */
 };
 
@@ -1360,4 +1522,4 @@ initpygpu_ndarray(void)
   fill-column:79
   End:
 */
-// vim: filetype=cpp:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:encoding=utf-8:textwidth=79 :
+// vim: filetype=cpp:expandtab:shiftwidth=4:tabstop=8:softtabstop=4:textwidth=79 :

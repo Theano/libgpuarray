@@ -379,39 +379,54 @@ if _CL_MODE:
 
             max_wg_size = min(dev.max_work_group_size for dev in self.devices)
 
-            # Thrust says these are good for GT200
-            self.scan_wg_size = min(max_wg_size, 128)
-            self.update_wg_size = min(max_wg_size, 256)
+            # loop to find suitable workgrouop size
+            trip_count = 0
+            while True:
+                # Thrust says these are good for GT200
+                self.scan_wg_size = min(max_wg_size, 128)
+                self.update_wg_size = min(max_wg_size, 256)
 
-            if self.scan_wg_size < 16:
-                # Hello, Apple CPU. Nice to see you.
-                self.scan_wg_seq_batches = 128 # FIXME: guesswork
-            else:
-                self.scan_wg_seq_batches = 6
+                if self.scan_wg_size < 16:
+                    # Hello, Apple CPU. Nice to see you.
+                    self.scan_wg_seq_batches = 128 # FIXME: guesswork
+                else:
+                    self.scan_wg_seq_batches = 6
 
-            from pytools import all
-            from pyopencl.characterize import has_double_support
+                from pytools import all
+                from pyopencl.characterize import has_double_support
 
-            kw_values = dict(
-                preamble=preamble,
-                name_prefix=name_prefix,
-                scan_type=dtype_to_ctype(dtype),
-                scan_expr=scan_expr,
-                neutral=neutral,
-                double_support=all(
-                    has_double_support(dev) for dev in devices)
-                )
+                kw_values = dict(
+                    preamble=preamble,
+                    name_prefix=name_prefix,
+                    scan_type=dtype_to_ctype(dtype),
+                    scan_expr=scan_expr,
+                    neutral=neutral,
+                    double_support=all(
+                        has_double_support(dev) for dev in devices)
+                    )
 
-            scan_intervals_src = str(SCAN_INTERVALS_SOURCE.render(
-                wg_size=self.scan_wg_size,
-                wg_seq_batches=self.scan_wg_seq_batches,
-                **kw_values))
-            scan_intervals_prg = cl.Program(ctx, scan_intervals_src).build(options)
-            self.scan_intervals_knl = getattr(
-                    scan_intervals_prg,
-                    name_prefix+"_scan_intervals")
-            self.scan_intervals_knl.set_scalar_arg_dtypes(
-                    (None, np.uint32, np.uint32, None, None))
+                scan_intervals_src = str(SCAN_INTERVALS_SOURCE.render(
+                    wg_size=self.scan_wg_size,
+                    wg_seq_batches=self.scan_wg_seq_batches,
+                    **kw_values))
+                scan_intervals_prg = cl.Program(ctx, scan_intervals_src).build(options)
+                self.scan_intervals_knl = getattr(
+                        scan_intervals_prg,
+                        name_prefix+"_scan_intervals")
+                self.scan_intervals_knl.set_scalar_arg_dtypes(
+                        (None, np.uint32, np.uint32, None, None))
+
+                kernel_max_wg_size = self.scan_intervals_knl.get_work_group_info(
+                        cl.kernel_work_group_info.WORK_GROUP_SIZE,
+                        ctx.devices[0])
+
+                if self.scan_wg_size <= kernel_max_wg_size:
+                    break
+                else:
+                    max_wg_size = kernel_max_wg_size
+
+                trip_count += 1
+                assert trip_count <= 2
 
             final_update_src = str(self.final_update_tp.render(
                 wg_size=self.update_wg_size,
