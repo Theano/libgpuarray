@@ -6,6 +6,7 @@ import theano
 
 import pygpu_ndarray as gpu_ndarray
 from gen_elemwise import MyGpuNdArray, elemwise_collapses
+from test_gpu_ndarray import gen_gpu_nd_array, dtypes_all, enable_double
 
 def rand(shape, dtype):
     r = numpy.random.randn(*shape)*10
@@ -296,21 +297,28 @@ def test_elemwise_mixed_dtype():
                 assert all_close(to_cpu(out), reduce(numpy.multiply, input_vals))
 
 
-def tes_sum():
+def test_sum():
     to_cpu = numpy.asarray
-    for dtype in ["int16",
-                  "float32",
-                  "uint16",
-                  ]:
-        for shape in [(500,), (50, 5),
+    dtypes = list(dtypes_all)
+    # I remove *int8 as currently the output have the same dtype
+    # And this cause overflow
+    dtypes.remove("int8")
+    dtypes.remove("uint8")
+    # I need to find how pycuda handle complexe in c.
+    # I probably just need to add an header.
+    dtypes.remove("complex64")
+    if  enable_double:
+        dtypes.remove("complex128")
+    for dtype in dtypes:
+        for shape in [(5,), (10, 5),
                       (5, 6, 7)
                       ]:
-            cpu_val = rand(shape, dtype)
-            gpu_val = gpu_ndarray.GpuNdArrayObject(cpu_val)
-            assert numpy.allclose(to_cpu(gpu_val), cpu_val)
+            cpu_val, gpu_val = gen_gpu_nd_array(shape, dtype)
 
             gpu_val = MyGpuNdArray(gpu_val)
             cpu_sum = cpu_val.sum()
+            print dtype, shape
+#            import pdb;pdb.set_Trace()
             gpu_sum = to_cpu(gpu_val.sum())
             assert (numpy.allclose(cpu_sum, gpu_sum, rtol=5e-6) or
                     cpu_sum == gpu_sum), (

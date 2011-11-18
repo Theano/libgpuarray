@@ -367,7 +367,7 @@ class GpuSum(object):
                 %(dtype)s mysum = 0.0f;
 
                 if (warpSize != 32){ //TODO: set error code
-                    Z[0] = -666;
+                    Z[0] = 666;
                     return;
                 }
 
@@ -1288,7 +1288,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
                 if (warpSize != 32)
                 {
                     //TODO: set error code
-                    Z[blockIdx.x * sZ0] = -666;
+                    Z[blockIdx.x * sZ0] = 666;
                     return;
                 }
 

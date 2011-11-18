@@ -54,6 +54,8 @@ def gen_gpu_nd_array(shape_orig, dtype='float32', offseted_outer=False,
         shape[-1] += 1
 
     a = numpy.random.rand(*shape) * 10
+    if dtype.startswith("u"):
+        a = numpy.absolute(a)
     a = numpy.asarray(a, dtype=dtype)
     assert order in ['c', 'f']
     if order == 'f' and len(shape) > 0:
