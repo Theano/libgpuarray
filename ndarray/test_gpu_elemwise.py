@@ -9,6 +9,8 @@ from gen_elemwise import MyGpuNdArray, elemwise_collapses
 
 def rand(shape, dtype):
     r = numpy.random.randn(*shape)*10
+    if dtype.startswith("u"):
+        r = numpy.absolute(r)
     return r.astype(dtype)
 
 # numpy.allclose seam to have problem with int8...
@@ -300,7 +302,8 @@ def tes_sum():
                   "float32",
                   "uint16",
                   ]:
-        for shape in [(500,),# (50, 5), (5, 6, 7)
+        for shape in [(500,), (50, 5),
+                      (5, 6, 7)
                       ]:
             cpu_val = rand(shape, dtype)
             gpu_val = gpu_ndarray.GpuNdArrayObject(cpu_val)

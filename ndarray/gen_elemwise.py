@@ -1570,7 +1570,7 @@ class MyGpuNdArray():
 
     def sum(self, axis=None):
         import gen_reduction
-        if axis is None and self.ndim == 1:
+        if axis is None:
             pattern = [1] * self.ndim
             str_pattern = [str(i) for i in pattern]
             sum_op = gen_reduction.GpuSum(pattern, self.dtype)
@@ -1578,33 +1578,31 @@ class MyGpuNdArray():
             fctname = "kernel_reduce_sum_" + "".join(str_pattern) + "_nodename"
             fct = compile_gpu_code(c_code, fctname)
             block_ = min(self.shape[0], 256)
+
             grid_ = 1
             shared_ = self.dtype.itemsize * block_
-            out = gpu_ndarray.empty((1,), self.dtype)
+            out = gpu_ndarray.empty((), self.dtype)
             out = MyGpuNdArray(out)
             to_cpu = numpy.asarray
+            args = [cast_int(i) for i in self.shape]
+            args.append(self)
+            args += [cast_int(i / self.dtype.itemsize) for i in self.strides]
+            args.append(out)
+
             if False:
                 d = {"block": (block_, 1, 1),
                      "shared": shared_,
-                      "grid": (grid_, 1)}
-                pycuda._driver.Context.synchronize()
-                fct(cast_uint(self.shape[0]),
-                    self,
-                    cast_int(self.strides[0]) / self.dtype.itemsize,
-                    out, **d)
+                     "grid": (grid_, 1)}
+                fct(*args, **d)
             else:
                 # We bypass the pycuda wrapper gpu function call.
                 # by calling directly the gpu function.
                 # This is faster and lower the overhead.
                 fct.set_block_shape(block_, 1, 1)
                 fct.set_shared_size(shared_)
-                fct.param_set(cast_uint(self.shape[0]),
-                              self,
-                              cast_int(self.strides[0]) / self.dtype.itemsize,
-                              out)
+                fct.param_set(*args)
                 fct.launch_grid(grid_, 1)
             return out
 
-            raise Exception("Not finished implementation")
         else:
             raise Exception("Not implemented")

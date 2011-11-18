@@ -326,7 +326,8 @@ class GpuSum(object):
                     %(dtype)s * Z,
                     const int sZ0)
 
-        """ % locals()
+        """
+        dtype = self.dtype
         if reduce_mask is None:
             reduce_mask = self.reduce_mask
         if ndim is None:
@@ -336,30 +337,28 @@ class GpuSum(object):
         sio = StringIO.StringIO()
 
         print >> sio, """
-            static __global__ void kernel_reduce_sum_%(pattern)s_%(nodename)s(
+            __global__ void kernel_reduce_sum_%(pattern)s_%(nodename)s(
         """ % locals()
+
         for i in xrange(ndim):
-            print >> sio, """
-                    const int d%(i)s,
-        """ % locals()
-        print >> sio, """
-                    const %(dtype)s *A,
-        """ % locals()
+            print >> sio, """const int d%(i)s,""" % locals()
+
+        print >> sio, """const %(dtype)s *A,""" % locals()
+
         for i in xrange(ndim):
-            print >> sio, """
-                    const int sA%(i)s,
-        """ % locals()
-        print >> sio, """
-                    %(dtype)s * Z
-        """ % locals()
+            print >> sio, """const int sA%(i)s,""" % locals()
+
+        print >> sio, """%(dtype)s * Z""" % locals()
+
         for i in xrange(ndim - sum(reduce_mask)):
-            print >> sio, """
-                    , const int sZ%(i)s
-        """ % locals()
+            print >> sio, """, const int sZ%(i)s""" % locals()
+
         print >> sio, ")"
+
         return sio.getvalue()
 
     def _k_init(self, *args):
+        dtype = self.dtype
         return """
                 const int threadCount = blockDim.x * blockDim.y * blockDim.z;
                 const int threadNum = threadIdx.z * blockDim.x * blockDim.y
@@ -367,14 +366,12 @@ class GpuSum(object):
                 extern __shared__ %(dtype)s buf[];
                 %(dtype)s mysum = 0.0f;
 
-                if (warpSize != 32)
-                {
-                    //TODO: set error code
+                if (warpSize != 32){ //TODO: set error code
                     Z[0] = -666;
                     return;
                 }
 
-        """
+        """ % locals()
 
     def _k_reduce_buf(self, z_pos):
         return """
