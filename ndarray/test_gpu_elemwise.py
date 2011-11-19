@@ -1,6 +1,4 @@
 # TODO: test other dtype
-import time
-
 import numpy
 import theano
 
@@ -11,63 +9,17 @@ from test_gpu_ndarray import (dtypes_all, enable_double,
 
 
 def rand(shape, dtype):
-    r = numpy.random.randn(*shape)*10
+    r = numpy.random.randn(*shape) * 10
     if dtype.startswith("u"):
         r = numpy.absolute(r)
     return r.astype(dtype)
 
+
 # numpy.allclose seam to have problem with int8...
-def all_close(x,y):
-    return (numpy.allclose(x,y) or
-            numpy.absolute(x-y).max() == 0)
+def all_close(x, y):
+    return (numpy.allclose(x, y) or
+            numpy.absolute(x - y).max() == 0)
 
-def speed_elemwise_collapse():
-    """ used to time if the collapse of ccontiguous dims are useful """
-
-    shape = (30,40,50,600)
-    a = gpu_ndarray.GpuNdArrayObject(numpy.asarray(numpy.random.rand(*shape),dtype='float32'))
-    a = numpy.asarray(numpy.random.rand(*shape),dtype='float32')
-    a2 = tcn.shared_constructor(a, 'a')
-    a3 = a2[:,::2,:,:]
-    b = tcn.CudaNdarrayType((False, False, False, False))()
-    c = a3+b * tensor.exp(1 + b**a3)
-    f = pfunc([b], [c])
-
-
-    v = numpy.asarray(numpy.random.rand(*shape),dtype='float32')
-    v = v[:,::2,:,:]
-    v=gpu_ndarray.GpuNdArrayObject(v)
-    for id,n in enumerate(f.maker.env.toposort()):
-        print id, n
-    t1=time.time()
-    for i in range(100):
-        #let debugmode catch errors
-        f(v)
-    t2=time.time()
-
-def speed_elemwise_collapse2():
-    """ used to test the speed up of the generalised collapse of ccontiguous dims"""
-
-    shape = (30,40,50,600)
-    a = gpu_ndarray.GpuNdArrayObject(numpy.asarray(numpy.random.rand(*shape),dtype='float32'))
-    a = numpy.asarray(numpy.random.rand(*shape),dtype='float32')
-    a2 = tcn.shared_constructor(a, 'a')
-    a3 = a2[:,:,:,::2]
-    b = tcn.CudaNdarrayType((False, False, False, False))()
-    c = a3+b * tensor.exp(1 + b**a3)
-    f = pfunc([b], [c])
-
-
-    v = numpy.asarray(numpy.random.rand(*shape),dtype='float32')
-    v = v[:,:,:,::2]
-    v=gpu_ndarray.GpuNdArrayObject(v)
-    for id,n in enumerate(f.maker.env.toposort()):
-        print id, n
-    t1=time.time()
-    for i in range(100):
-        #let debugmode catch errors
-        f(v)
-    t2=time.time()
 
 def test_elemwise_collapse():
     """ Test collapsing under many broadcast and strided pattern """
