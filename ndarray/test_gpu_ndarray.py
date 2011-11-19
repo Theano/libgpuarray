@@ -84,6 +84,8 @@ def gen_gpu_nd_array(shape_orig, dtype='float32', offseted_outer=False,
         assert a.shape == shape_orig, (a.shape, shape_orig)
         assert b.shape == shape_orig, (b.shape, shape_orig)
 
+    assert numpy.allclose(a, numpy.asarray(b))
+
     return a, b
 
 
