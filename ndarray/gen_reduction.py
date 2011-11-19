@@ -1021,7 +1021,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
             # it only runs on ONE multiprocessor
             reducebuf = self._k_reduce_buf('Z[0]')
             print >> sio, """
-            static __global__ void kernel_reduce_sum_ccontig_%(nodename)s(
+            __global__ void kernel_reduce_sum_ccontig_%(nodename)s(
                     const int d0,
                     const %(dtype)s *A,
                     %(dtype)s * Z)

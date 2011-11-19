@@ -6,7 +6,9 @@ import theano
 
 import pygpu_ndarray as gpu_ndarray
 from gen_elemwise import MyGpuNdArray, elemwise_collapses
-from test_gpu_ndarray import gen_gpu_nd_array, dtypes_all, enable_double
+from test_gpu_ndarray import (dtypes_all, enable_double,
+                              gen_gpu_nd_array, product)
+
 
 def rand(shape, dtype):
     r = numpy.random.randn(*shape)*10
@@ -309,17 +311,53 @@ def test_sum():
     dtypes.remove("complex64")
     if  enable_double:
         dtypes.remove("complex128")
-    for dtype in dtypes:
-        for shape in [(5,), (10, 5),
-                      (5, 6, 7)
-                      ]:
-            cpu_val, gpu_val = gen_gpu_nd_array(shape, dtype)
+    for shape in [(5,), (10, 5),
+                  (5, 6, 7), (5, 6, 7, 8),
+                  (5, 6, 7, 5, 6),  # 5d work only if c contiguous
+                  (1025, 31),  (1024, 31),  (1023, 31),
+                  (1025, 32),  (1024, 32),  (1023, 32),
+                  (1025, 33),  (1024, 33),  (1023, 33),
+                  ]:
+        for dtype, off_o, off_i, sliced, order in product(
+            *([dtypes] +
+              [[False]] + # TODO: WIth True, some tests fail!
+              [[False]] + # TODO: WIth True, some tests fail!
+              [[False, True]] +
+              [['f', 'c']])):
+
+            if len(shape) > 4 and not (gpu_val.flags["C_CONTIGUOUS"] or
+                                       gpu_val.flags["F_CONTIGUOUS"]):
+                continue
+            cpu_val, gpu_val = gen_gpu_nd_array(shape, dtype, off_o,
+                                                off_i, sliced, order)
 
             gpu_val = MyGpuNdArray(gpu_val)
             cpu_sum = cpu_val.sum()
-            print dtype, shape
-#            import pdb;pdb.set_Trace()
+            print dtype, shape, off_o, off_i, sliced, order
+#            print (cpu_val.strides,
+#                   cpu_val.flags["C_CONTIGUOUS"],
+#                   cpu_val.flags["F_CONTIGUOUS"])
+#            print (gpu_val.strides,
+#                   gpu_val.flags["C_CONTIGUOUS"],
+#                   gpu_val.flags["F_CONTIGUOUS"])
             gpu_sum = to_cpu(gpu_val.sum())
-            assert (numpy.allclose(cpu_sum, gpu_sum, rtol=5e-6) or
-                    cpu_sum == gpu_sum), (
-                dtype, shape, cpu_sum, gpu_sum)
+            rtols = {"float32": 1e-5}
+            if dtype in rtols:
+                rtol = rtols[dtype]
+            else:
+                rtol = 1e-8
+            if not (dtype.endswith("int16") and numpy.prod(shape)> 20000):
+                assert (numpy.allclose(cpu_sum, gpu_sum, rtol=rtol) or
+                        cpu_sum == gpu_sum), (
+                    dtype, shape, cpu_sum, gpu_sum)
+
+            # Test pattern 10 and 01
+            if len(shape) == 2:
+                gpu_sum = to_cpu(gpu_val.sum(axis=[0]))
+                cpu_sum = cpu_val.sum(axis=0)
+                assert numpy.allclose(cpu_sum, gpu_sum, rtol=rtol), (
+                    dtype, shape, cpu_sum, gpu_sum)
+                gpu_sum = to_cpu(gpu_val.sum(axis=[1]))
+                cpu_sum = cpu_val.sum(axis=1)
+                assert numpy.allclose(cpu_sum, gpu_sum, rtol=5e-6), (
+                    dtype, shape, cpu_sum, gpu_sum)
