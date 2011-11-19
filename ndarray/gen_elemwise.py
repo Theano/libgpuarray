@@ -1649,8 +1649,8 @@ class MyGpuNdArray():
                 # output
                 args.append(out)
                 # output strides
-                args.append(cast_int(out.strides[0] / out.dtype.itemsize))
                 args.append(cast_int(1))
+                args.append(cast_int(out.strides[0] / out.dtype.itemsize))
             elif axis == 1:
                 # pattern 01
                 out = gpu_ndarray.empty((self.shape[0],), self.dtype)
