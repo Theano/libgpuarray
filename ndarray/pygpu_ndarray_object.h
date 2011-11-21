@@ -74,6 +74,7 @@ void PyGpuNdArray_fprint(FILE * fd, const PyGpuNdArrayObject *self)
     fprintf(fd, "PyGpuNdArrayObject <%p, %p> nd=%i data_allocated=%d\n",
 	    self, PyGpuNdArray_DATA(self), PyGpuNdArray_NDIM(self), self->data_allocated);
     fprintf(fd, "\tITEMSIZE: %d\n", PyGpuNdArray_ITEMSIZE(self));
+    fprintf(fd, "\tTYPENUM: %d\n", PyGpuNdArray_TYPE(self));
     fprintf(fd, "\tRefcount: %ld\n", (long int)self->ob_refcnt);
     fprintf(fd, "\tBASE: %p\n", PyGpuNdArray_BASE(self));
     fprintf(fd, "\tHOST_DIMS:      ");
@@ -103,6 +104,7 @@ void PyArray_fprint(FILE * fd, const PyArrayObject *self)
     fprintf(fd, "PyArrayObject <%p, %p> nd=%i\n",
 	    self, PyArray_DATA(self), PyArray_NDIM(self));
     fprintf(fd, "\tITEMSIZE: %d\n", PyArray_ITEMSIZE(self));
+    fprintf(fd, "\tTYPENUM: %d\n", PyArray_TYPE(self));
     fprintf(fd, "\tHOST_DIMS:      ");
     for (int i = 0; i < PyArray_NDIM(self); ++i)
     {
