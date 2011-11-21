@@ -1536,7 +1536,10 @@ class MyGpuNdArray():
 
         #assert (self.gpu_nd_array.flags['C_CONTIGUOUS'] or
         #         self.gpu_nd_array.flags['F_CONTIGUOUS'])
-        return self.bytes
+
+        # TODO: find a way to pass to a pycuda/pyopencl function the
+        #       bytes + offset directly.
+        return self.bytes + self.offset
 
     def __getitem__(self, *inputs):
         return MyGpuNdArray(self.gpu_nd_array.__getitem__(*inputs))
