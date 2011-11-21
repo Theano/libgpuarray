@@ -1576,9 +1576,23 @@ class MyGpuNdArray():
     def sum(self, axis=None):
         import gen_reduction
         max_thread_per_block = 512
+        max_block = 4096
+        if isinstance(axis, (list, tuple)):
+            if len(axis) == 1:
+                axis = axis[0]
+            else:
+                assert len(axis) == self.ndim
+                axis.sort()
+                assert axis == range(self.ndim)
+                axis = None
+        if self.size == 0:
+            make_out = gpu_ndarray.zeros
+        else:
+            make_out = gpu_ndarray.empty
+
         if axis is None and (self.flags["C_CONTIGUOUS"] or
                              self.flags["F_CONTIGUOUS"]):
-            out = gpu_ndarray.empty((), self.dtype)
+            out = make_out((), self.dtype)
             out = MyGpuNdArray(out)
 
             sum_op = gen_reduction.GpuSum([1], self.dtype)
@@ -1592,8 +1606,10 @@ class MyGpuNdArray():
             shared_ = self.dtype.itemsize * block_
             args = [cast_int(self.size), self, out]
         elif axis is None:
-            out = gpu_ndarray.empty((), self.dtype)
+            out = make_out((), self.dtype)
             out = MyGpuNdArray(out)
+            if self.size == 0:
+                return out
             pattern = [1] * self.ndim
             str_pattern = [str(i) for i in pattern]
             sum_op = gen_reduction.GpuSum(pattern, self.dtype)
@@ -1635,8 +1651,10 @@ class MyGpuNdArray():
                 axis = axis[0]
             if axis == 0:
                 # pattern 10
-                out = gpu_ndarray.empty((self.shape[1],), self.dtype)
+                out = make_out((self.shape[1],), self.dtype)
                 out = MyGpuNdArray(out)
+                if self.size == 0:
+                    return out
                 sum_op = gen_reduction.GpuSum([1, 0], self.dtype)
                 fctname = "kernel_reduce_sum_010_nodename"
                 block_ = min(self.shape[1], max_thread_per_block)
@@ -1658,8 +1676,10 @@ class MyGpuNdArray():
                 args.append(cast_int(out.strides[0] / out.dtype.itemsize))
             elif axis == 1:
                 # pattern 01
-                out = gpu_ndarray.empty((self.shape[0],), self.dtype)
+                out = make_out((self.shape[0],), self.dtype)
                 out = MyGpuNdArray(out)
+                if self.size == 0:
+                    return out
                 sum_op = gen_reduction.GpuSum([0, 1], self.dtype)
                 fctname = "kernel_reduce_sum_01_nodename"
                 block_ = min(self.shape[1], max_thread_per_block)
@@ -1685,6 +1705,10 @@ class MyGpuNdArray():
         else:
             raise Exception("Not implemented")
 
+        #print block, grid, shared_, axis
+        pycuda._driver.Context.synchronize()
+        if self.size == 0:
+            return out
         if False:
             d = {"block": block,
                  "shared": shared_,
