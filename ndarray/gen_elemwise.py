@@ -76,6 +76,8 @@ def debug(*msg):
 
 
 import pygpu_ndarray as gpu_ndarray
+if _CL_MODE:
+    gpu_ndarray.set_opencl_context(ctx.obj_ptr)
 
 
 cast_int = numpy.intc
