@@ -81,6 +81,13 @@ class build_ext_nvcc(build_ext):
             #ext.sources = self.cython_sources(ext.sources, ext)
             self.build_extension(ext)
 
+import sys
+if sys.platform == 'darwin':
+    libcl_args = {'extra_link_args': ['-framework', 'OpenCL']}
+else:
+    libcl_args = {'libraries': ['OpenCL']}
+
+
 setup(name='compyte',
       cmdclass={'build_ext': build_ext_nvcc},
       include_dirs=[np.get_include(), '.'],
@@ -88,8 +95,6 @@ setup(name='compyte',
                              define_macros=[('OFFSET', '1'), ('WITH_OPENCL', '')],
                              sources=['pygpu_language_opencl.cpp',
                                       'pygpu_ndarray.cpp'],
-                             libraries=['OpenCL']
-#                             extra_link_args = ['-framework', 'OpenCL']
-                             )
+                             **libcl_args)
                    ]
 )
