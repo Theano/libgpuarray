@@ -1442,6 +1442,29 @@ PyGpuNdArray_as_f_contiguous(PyObject* dummy, PyObject* args, PyObject *kargs)
     return ret;
 }
 
+#ifdef WITH_OPENCL
+#ifdef __APPLE__
+#include <OpenCL/opencl.h>
+#else
+#include <CL/opencl.h>
+#endif
+extern void setup_context(cl_context c);
+
+PyObject *
+PyGpuNdArray_set_opencl_context(PyObject *mod, PyObject *ctx) {
+    Py_ssize_t v;
+
+    v = PyInt_AsSsize_t(ctx);
+    if (v == -1 && PyErr_Occurred())
+        return NULL;
+
+    setup_context((cl_context)v);
+    
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+#endif
+
 static PyMethodDef module_methods[] = {
     //{"dimshuffle", PyGpuNdArray_Dimshuffle, METH_VARARGS, "Returns the dimshuffle of a PyGpuNdArray."},
     {"outstanding_mallocs", outstanding_mallocs, METH_VARARGS, "how many more mallocs have been called than free's"},
@@ -1457,6 +1480,11 @@ static PyMethodDef module_methods[] = {
     {"asfortranarray",
        (PyCFunction)PyGpuNdArray_as_f_contiguous, METH_VARARGS|METH_KEYWORDS,
        "If the array is not f contiguous, copy it to a new c contiguous region."},
+#ifdef WITH_OPENCL
+    {"set_opencl_context",
+     PyGpuNdArray_set_opencl_context, METH_O,
+     "Set the OpenCL context to use for allocations and work."},
+#endif
     {NULL, NULL, NULL, NULL}  /* Sentinel */
 };
 
