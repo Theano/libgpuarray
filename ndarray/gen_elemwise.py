@@ -1500,15 +1500,17 @@ class MyGpuNdArray():
             cls._compiled_fct[tag] = fct
         return fct(inputs, out=out)
 
+    base = property(lambda self: self.gpu_nd_array.base)
+    bytes = property(lambda self: self.gpu_nd_array.bytes)
+    dtype = property(lambda self: self.gpu_nd_array.dtype)
+    flags = property(lambda self: self.gpu_nd_array.flags)
+    itemsize = property(lambda self: self.gpu_nd_array.itemsize)
     ndim = property(lambda self: self.gpu_nd_array.ndim,
                     doc="number of dimensions")
+    offset = property(lambda self: self.gpu_nd_array.offset)
     shape = property(lambda self: self.gpu_nd_array.shape)
-    dtype = property(lambda self: self.gpu_nd_array.dtype)
-    strides = property(lambda self: self.gpu_nd_array.strides)
-    itemsize = property(lambda self: self.gpu_nd_array.itemsize)
-    bytes = property(lambda self: self.gpu_nd_array.bytes)
-    flags = property(lambda self: self.gpu_nd_array.flags)
     size = property(lambda self: self.gpu_nd_array.size)
+    strides = property(lambda self: self.gpu_nd_array.strides)
 
     def __array__(self):
         return numpy.asarray(self.gpu_nd_array)
