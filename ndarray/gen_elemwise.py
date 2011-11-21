@@ -124,8 +124,6 @@ def compile_gpu_code(code, fct_name):
         prg = cl.Program(ctx, code).build()
         fct2 = getattr(prg, fct_name)
 
-        fct = lambda *args: fct2(queue, *args)
-        fct.fct = fct2
         fct = WrapOpenCLFunction(fct2)
     else:
         # Compile the gpu function with pycuda
