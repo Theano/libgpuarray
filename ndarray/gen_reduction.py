@@ -375,6 +375,7 @@ class GpuSum(object):
 
     def _k_reduce_buf(self, z_pos):
         return """
+        __syncthreads(); // some kernel do multiple reduction.
         buf[threadNum] = mysum;
         __syncthreads();
 
@@ -408,6 +409,7 @@ class GpuSum(object):
         }
         """ % locals()
         return """
+        __syncthreads(); // some kernel do multiple reduction.
         buf[threadNum] = mysum;
         __syncthreads();
 
@@ -463,6 +465,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
     # nb_reduce<=warpSize
     def _k_reduce_buf_multiple(self, z_pos, nb_reduce):
         return """
+        __syncthreads(); // some kernel do multiple reduction.
         buf[threadNum] = mysum;
         __syncthreads();
 
