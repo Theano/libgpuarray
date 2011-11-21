@@ -1637,7 +1637,7 @@ class MyGpuNdArray():
                 by = min(max_thread_per_block // bx, self.shape[1])
                 bz = min(max_thread_per_block // (bx * by), self.shape[0])
                 by = max(by, 1)
-                bz = max(bz, 1)
+                bz = min(max(bz, 1), 64)
                 block = (bx, by, bz)
                 block_ = bx * by * bz
             elif self.ndim == 4:
@@ -1645,7 +1645,7 @@ class MyGpuNdArray():
                 by = min(max_thread_per_block // bx, self.shape[2])
                 bz = min(max_thread_per_block // (bx * by), self.shape[1])
                 by = max(by, 1)
-                bz = max(bz, 1)
+                bz = min(max(bz, 1), 64)
                 block = (bx, by, bz)
                 block_ = bx * by * bz
             grid = (1, 1)
