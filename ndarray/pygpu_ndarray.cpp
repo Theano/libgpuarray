@@ -319,9 +319,17 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
 
       // Numpy will do a decref on the description.
       Py_INCREF(PyGpuNdArray_DESCR(self));
-      PyObject * rval = PyArray_Empty(PyGpuNdArray_NDIM(self),
-				      npydims, self->descr,
-				      PyGpuNdArray_ISFARRAY(self));
+
+      // We can't use PyArray_{Empty,EMPTY} as they segfault when size == 0
+      PyObject * rval = PyArray_NewFromDescr(&PyArray_Type,
+                                             PyGpuNdArray_DESCR(self),
+                                             PyGpuNdArray_NDIM(self),
+                                             npydims,
+                                             NULL,
+                                             NULL,
+                                             0,
+                                             NULL);
+
       free(npydims);
       if (!rval){
         return NULL;
@@ -504,13 +512,6 @@ PyGpuNdArray_zeros(PyObject* dummy, PyObject* args, PyObject *kargs)
         int shp_el = PyInt_AsLong(shp_el_obj);
         Py_DECREF(shp_el_obj);
 
-        if (shp_el <= 0)
-        {
-            PyErr_SetString(PyExc_ValueError, "PyGpuNdArray_Zeros: shape must not contain 0 (or negative value) for size of a dimension");
-            free(newdims);
-            return NULL;
-        }
-
         newdims[i] = shp_el;
     }
 
@@ -590,13 +591,6 @@ PyGpuNdArray_empty(PyObject* dummy, PyObject* args, PyObject *kargs)
 
         int shp_el = PyInt_AsLong(shp_el_obj);
         Py_DECREF(shp_el_obj);
-
-        if (shp_el <= 0)
-        {
-            PyErr_SetString(PyExc_ValueError, "PyGpuNdArray_empty: shape must not contain 0 (or negative value) for size of a dimension");
-            free(newdims);
-            return NULL;
-        }
 
         newdims[i] = shp_el;
     }

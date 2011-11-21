@@ -229,7 +229,10 @@ def test_asfortranarray():
 
 
 def test_zeros():
-    for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
+    for shp in [(), (0,), (5,),
+                (0, 0), (1, 0), (0, 1), (6, 7),
+                (0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1),
+                (4, 8, 9), (1, 8, 9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
                 x = numpy.zeros(shp, dtype, order)
@@ -247,7 +250,10 @@ def test_zeros():
 
 
 def test_empty():
-    for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
+    for shp in [(), (0,), (5,),
+                (0, 0), (1, 0), (0, 1), (6, 7),
+                (0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1),
+                (4, 8, 9), (1, 8, 9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
                 x = numpy.empty(shp, dtype, order)

@@ -86,7 +86,10 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
     if(order != NPY_FORTRANORDER){
       DPRINTF("PyGpuNdArray_alloc_contiguous: NPY_CORDER\n");
       for (int i = nd-1; i >= 0; --i){
-        PyGpuNdArray_STRIDE(self,i) = size * elsize;
+	if (size == 0)
+	  PyGpuNdArray_STRIDE(self, i) = elsize;
+	else
+	  PyGpuNdArray_STRIDE(self,i) = size * elsize;
         PyGpuNdArray_DIM(self,i) = dim[i];
         size = size * dim[i];
       }
@@ -96,7 +99,10 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
       PyGpuNdArray_STRIDE(self, 0) = elsize;
       PyGpuNdArray_DIM(self, nd-1) = dim[nd-1];
       for (int i = 1; i < nd; ++i){
-        PyGpuNdArray_STRIDE(self, i) = PyGpuNdArray_STRIDE(self, i-1) * dim[i-1];
+	if (size == 0)
+	  PyGpuNdArray_STRIDE(self, i) = elsize;
+	else
+	  PyGpuNdArray_STRIDE(self, i) = PyGpuNdArray_STRIDE(self, i-1) * dim[i-1];
         PyGpuNdArray_DIM(self, nd-i-1) = dim[nd-i-1];
         size = size * dim[i];
       }
@@ -144,7 +150,7 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
 
 	}else if(nd == 1){//set c and f contiguous
 	  PyGpuNdArray_FLAGS(self) |= NPY_F_CONTIGUOUS;
-	  PyGpuNdArray_FLAGS(self) |= NPY_C_CONTIGUOUS;	  
+	  PyGpuNdArray_FLAGS(self) |= NPY_C_CONTIGUOUS;
 	}else if(order != NPY_FORTRANORDER){//set c contiguous
 	  PyGpuNdArray_FLAGS(self) &= ~NPY_F_CONTIGUOUS;
 	  PyGpuNdArray_FLAGS(self) |= NPY_C_CONTIGUOUS;
@@ -153,8 +159,36 @@ int PyGpuNdArray_alloc_contiguous(PyGpuNdArrayObject *self, const int nd, const 
 	  PyGpuNdArray_FLAGS(self) &= ~NPY_C_CONTIGUOUS;
 	}
 	PyGpuNdArray_FLAGS(self) &= ~NPY_UPDATEIFCOPY;
+    }else if(size == 0){
+      PyGpuNdArray_FLAGS(self) |= NPY_F_CONTIGUOUS;
+      PyGpuNdArray_FLAGS(self) |= NPY_OWNDATA;
+	if (nd == 0) {
+	  PyGpuNdArray_FLAGS(self) |= NPY_C_CONTIGUOUS;
+	  if (order != NPY_FORTRANORDER) {
+	    PyGpuNdArray_FLAGS(self) &= ~NPY_F_CONTIGUOUS;
+	  } else {
+	    PyGpuNdArray_FLAGS(self) |= NPY_F_CONTIGUOUS;
+	  }
+
+	}else if(nd == 1){//set c and f contiguous
+	  PyGpuNdArray_FLAGS(self) |= NPY_F_CONTIGUOUS;
+	  PyGpuNdArray_FLAGS(self) |= NPY_C_CONTIGUOUS;
+	}else if(order != NPY_FORTRANORDER){//set c contiguous
+	  PyGpuNdArray_FLAGS(self) &= ~NPY_F_CONTIGUOUS;
+	  PyGpuNdArray_FLAGS(self) |= NPY_C_CONTIGUOUS;
+	}else{//set f contiguous
+	  PyGpuNdArray_FLAGS(self) |= NPY_F_CONTIGUOUS;
+	  PyGpuNdArray_FLAGS(self) &= ~NPY_C_CONTIGUOUS;
+	}
+	PyGpuNdArray_FLAGS(self) &= ~NPY_UPDATEIFCOPY;
+        return 0;
     }else{
-      assert(0);// How to check for the flags? Need to check if already contiguous.
+      // How to check for the flags? Need to check if already contiguous.
+      PyErr_Format(PyExc_RuntimeError,
+		   "PyGpuNdArray_alloc_contiguous: self->data_allocated=%d, size=%d, cmp=%d",
+		   self->data_allocated, size, self->data_allocated != size
+		   );
+      return -1;
     }
 
     if (order != NPY_FORTRANORDER) {
