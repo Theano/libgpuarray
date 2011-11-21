@@ -61,7 +61,7 @@ def gen_gpu_nd_array(shape_orig, dtype='float32', offseted_outer=False,
     if order == 'f' and len(shape) > 0:
         a = numpy.asfortranarray(a)
     b = gpu_ndarray.GpuNdArrayObject(a)
-    if order == 'f' and len(shape) > 0:
+    if order == 'f' and len(shape) > 0 and b.size > 1:
         assert b.flags['F_CONTIGUOUS']
 
     if offseted_outer and len(shape) > 0:

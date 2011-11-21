@@ -1590,6 +1590,8 @@ class MyGpuNdArray():
         else:
             make_out = gpu_ndarray.empty
 
+        args_set = False
+
         if axis is None and (self.flags["C_CONTIGUOUS"] or
                              self.flags["F_CONTIGUOUS"]):
             out = make_out((), self.dtype)
@@ -1605,6 +1607,7 @@ class MyGpuNdArray():
             grid = (1, 1)
             shared_ = self.dtype.itemsize * block_
             args = [cast_int(self.size), self, out]
+            args_set = True
         elif axis is None:
             out = make_out((), self.dtype)
             out = MyGpuNdArray(out)
@@ -1647,15 +1650,82 @@ class MyGpuNdArray():
                 block_ = bx * by * bz
             grid = (1, 1)
             shared_ = self.dtype.itemsize * block_
-            args = [cast_int(i) for i in self.shape]
-            args.append(self)
-            args += [cast_int(i / self.dtype.itemsize) for i in self.strides]
-            args.append(out)
-        elif self.ndim == 2:
-            if isinstance(axis, (list, tuple)):
-                assert len(axis) == 1
-                axis = axis[0]
-            if axis == 0:
+        elif self.ndim == 2 or self.ndim == 3:
+            if self.ndim == 3 and axis == 0:
+                # pattern 100
+                out = make_out((self.shape[1], self.shape[2]),
+                                        self.dtype)
+                out = MyGpuNdArray(out)
+                if self.size == 0:
+                    return out
+                sum_op = gen_reduction.GpuSum([1, 0, 0], self.dtype)
+                fctname = "kernel_reduce_sum_100_nodename"
+
+                gx = min(self.shape[1], max_block)
+                gy = min(max_block // (gx * self.shape[2]), self.shape[2])
+                gy = max(gy, 1)
+                grid = (gx, gy)
+
+                block_ = min(max_thread_per_block, self.shape[0])
+                block = (block_, 1, 1)
+            elif self.ndim == 3 and axis == 1:
+                # pattern 010
+                out = make_out((self.shape[0], self.shape[2]),
+                                        self.dtype)
+                out = MyGpuNdArray(out)
+                if self.size == 0:
+                    return out
+                sum_op = gen_reduction.GpuSum([0, 1, 0], self.dtype)
+                fctname = "kernel_reduce_sum_010_AD_nodename"
+
+                A = self.shape[0]
+                B = self.shape[1]
+                C = self.shape[2]
+                D = C / 32
+                if (32 * D < C):
+                    D += 1
+                assert ((C <= 32 * D) and (32 * D < C + 32))
+                shared_ = 0
+
+                gx = min(A, max_block)
+                gy = min(max_block // (D * A), D)
+                gy = max(gy, 1)
+                grid = (gx, gy)
+
+                block = (32, 1, 1)
+                block_ = 32
+
+                args_set = True
+                # input shape
+                args = [cast_int(A), cast_int(B),
+                        cast_int(C), cast_int(D)]
+                # input
+                args.append(self)
+                # input strides
+                args += [cast_int(i / self.dtype.itemsize)
+                         for i in self.strides]
+                # output
+                args.append(out)
+                # output strides
+                args.append(cast_int(out.strides[0] / out.dtype.itemsize))
+            elif self.ndim == 3 and axis == 2:
+                # pattern 001
+                out = make_out((self.shape[0], self.shape[1]),
+                                        self.dtype)
+                out = MyGpuNdArray(out)
+                if self.size == 0:
+                    return out
+                sum_op = gen_reduction.GpuSum([0, 0, 1], self.dtype)
+                fctname = "kernel_reduce_sum_001_nodename"
+
+                gx = min(self.shape[0], max_block)
+                gy = min(max_block // (gx * self.shape[1]), self.shape[1])
+                gy = max(gy, 1)
+                grid = (gx, gy)
+
+                block_ = min(max_thread_per_block, self.shape[2])
+                block = (block_, 1, 1)
+            elif axis == 0:
                 # pattern 10
                 out = make_out((self.shape[1],), self.dtype)
                 out = MyGpuNdArray(out)
@@ -1666,6 +1736,7 @@ class MyGpuNdArray():
                 block_ = min(self.shape[1], max_thread_per_block)
                 block = (block_, 1, 1)
                 grid = (1, self.shape[0])
+                args_set = True
                 # input shape
                 args = [cast_int(1)]
                 args += [cast_int(i) for i in self.shape]
@@ -1691,25 +1762,29 @@ class MyGpuNdArray():
                 block_ = min(self.shape[1], max_thread_per_block)
                 block = (block_, 1, 1)
                 grid = (1, self.shape[0])
-                # input shape
-                args = [cast_int(i) for i in self.shape]
-                # input
-                args.append(self)
-                # input strides
-                args += [cast_int(i / self.dtype.itemsize)
-                         for i in self.strides]
-                # output
-                args.append(out)
-                # output strides
-                args.append(cast_int(out.strides[0] / out.dtype.itemsize))
             else:
                 raise Exception("Bad axis")
+
             c_code = sum_op.c_support_code_apply("nodename")
             fct = compile_gpu_code(c_code, fctname)
 
             shared_ = self.dtype.itemsize * block_
         else:
             raise Exception("Not implemented")
+
+        if not args_set:
+            # input shape
+            args = [cast_int(i) for i in self.shape]
+            # input
+            args.append(self)
+            # input strides
+            args += [cast_int(i / self.dtype.itemsize)
+                     for i in self.strides]
+            # output
+            args.append(out)
+            # output strides
+            if out.strides:
+                args.append(cast_int(out.strides[0] / out.dtype.itemsize))
 
         #print block, grid, shared_, axis
         pycuda._driver.Context.synchronize()

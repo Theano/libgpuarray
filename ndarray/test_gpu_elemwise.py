@@ -301,26 +301,58 @@ def test_sum():
     dtypes.remove("complex64")
     if  enable_double:
         dtypes.remove("complex128")
-    for shape in [(5,), (10, 5),
-                  (5, 6, 7), (5, 6, 7, 8),
-                  (5, 6, 7, 5, 6),  # 5d work only if c contiguous
-                  (1025, 31),  (1024, 31),  (1023, 31),
-                  (1025, 32),  (1024, 32),  (1023, 32),
-                  (1025, 33),  (1024, 33),  (1023, 33),
-                  ]:
+    for shape in [
+        # need something bigger then 32, 1024 or 4096.
+        # Those are corner case.
+
+        # 1d
+        (0,), (5,), (31,), (32,), (33,),
+        (1023,), (1024,), (1025,),
+        (4095,), (4096,), (4097,),
+
+        # 2d
+        (0, 0), (1, 0), (0, 1,), (5, 4),
+        (31, 31), (31, 32), (31, 33),
+        (32, 31), (32, 32), (32, 33),
+        (33, 31), (33, 32), (33, 33),
+        (1023, 31), (1024, 31), (1025, 31),
+        (1023, 32), (1024, 32), (1025, 32),
+        (1023, 33), (1024, 33), (1025, 33),
+        (4095, 3), (3, 4095),
+        (4096, 3), (3, 4096),
+        (4097, 3), (3, 4097),
+
+        # 3d
+        (0, 0, 0), (0, 1, 0), (0, 0, 1),
+        (5, 4, 3), (5, 4, 3), (5, 4, 3),
+        (4100, 4, 3), (5, 4100, 3), (5, 4, 4100),
+
+        # 4d
+        (0, 0, 0, 0), (1, 0, 0, 0), (0, 1, 0, 0),
+        (0, 0, 1, 0), (0, 0, 0, 1),
+        (5, 4, 3, 2),
+        (1025, 33, 5, 4), (4, 1025, 33, 5), (5, 4, 1025, 33),
+        (1025, 5, 33, 4), (4, 1025, 5, 33), (1025, 4, 5, 33),
+        (4100, 4, 3, 2), (4, 4100, 3, 2),
+        (4, 3, 4100, 2), (4, 3, 2, 4100),
+
+        # 5d
+        (5, 4, 3, 10, 11),  # 5d work only if c contiguous
+        ]:
+
         for dtype, off_o, off_i, sliced, order in product(
             *([dtypes] +
-              [[False]] + # TODO: WIth True, some tests fail!
-              [[False]] + # TODO: WIth True, some tests fail!
+              [[False, True]] +
+              [[False, True]] +
               [[False, True]] +
               [['f', 'c']])):
+
+            cpu_val, gpu_val = gen_gpu_nd_array(shape, dtype, off_o,
+                                                off_i, sliced, order)
 
             if len(shape) > 4 and not (gpu_val.flags["C_CONTIGUOUS"] or
                                        gpu_val.flags["F_CONTIGUOUS"]):
                 continue
-            cpu_val, gpu_val = gen_gpu_nd_array(shape, dtype, off_o,
-                                                off_i, sliced, order)
-
             gpu_val = MyGpuNdArray(gpu_val)
             cpu_sum = cpu_val.sum()
             print dtype, shape, off_o, off_i, sliced, order
@@ -331,23 +363,32 @@ def test_sum():
 #                   gpu_val.flags["C_CONTIGUOUS"],
 #                   gpu_val.flags["F_CONTIGUOUS"])
             gpu_sum = to_cpu(gpu_val.sum())
-            rtols = {"float32": 1e-5}
+            if gpu_val.size // gpu_sum.size > 200000:
+                rtols = {"float32": 3e-5}
+            elif gpu_val.size // gpu_sum.size > 50000:
+                rtols = {"float32": 2e-5}
+            else:
+                rtols = {"float32": 1e-5}
             if dtype in rtols:
                 rtol = rtols[dtype]
             else:
                 rtol = 1e-8
-            if not (dtype.endswith("int16") and numpy.prod(shape)> 20000):
+            cpu_sum = cpu_sum.astype(dtype)
+            if not (dtype.endswith("int16") and numpy.prod(shape) > 20000):
                 assert (numpy.allclose(cpu_sum, gpu_sum, rtol=rtol) or
                         cpu_sum == gpu_sum), (
-                    dtype, shape, cpu_sum, gpu_sum)
+                    dtype, shape, cpu_sum, gpu_sum,
+                    (cpu_sum - gpu_sum) / cpu_sum)
 
             # Test pattern 10 and 01
-            if len(shape) == 2:
-                gpu_sum = to_cpu(gpu_val.sum(axis=[0]))
-                cpu_sum = cpu_val.sum(axis=0)
-                assert numpy.allclose(cpu_sum, gpu_sum, rtol=rtol), (
-                    dtype, shape, cpu_sum, gpu_sum)
-                gpu_sum = to_cpu(gpu_val.sum(axis=[1]))
-                cpu_sum = cpu_val.sum(axis=1)
-                assert numpy.allclose(cpu_sum, gpu_sum, rtol=5e-6), (
-                    dtype, shape, cpu_sum, gpu_sum)
+            # Test pattern 100, 010 and 001
+            if len(shape) in [2, 3]:
+                for axis in range(len(shape)):
+                    gpu_sum = to_cpu(gpu_val.sum(axis=[axis]))
+                    cpu_sum = cpu_val.sum(axis=axis)
+                    if cpu_sum.size > 0:
+                        argmax = numpy.absolute(cpu_sum - gpu_sum).argmax()
+                    assert numpy.allclose(cpu_sum, gpu_sum), (
+                        "axis=%d" % axis, dtype, shape, cpu_sum, gpu_sum,
+                        cpu_sum.flatten()[argmax], gpu_sum.flatten()[argmax])
+                    # Bug from time to time with axis 1 and shape (1025, 33)
