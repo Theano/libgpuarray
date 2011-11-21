@@ -1626,18 +1626,23 @@ class MyGpuNdArray():
             elif self.ndim == 2:
                 bx = min(max_thread_per_block, self.shape[1])
                 by = min(max_thread_per_block // self.shape[1], self.shape[0])
+                by = max(by, 1)
                 block = (bx, by, 1)
                 block_ = bx * by
             elif self.ndim == 3:
                 bx = min(max_thread_per_block, self.shape[2])
                 by = min(max_thread_per_block // bx, self.shape[1])
                 bz = min(max_thread_per_block // (bx * by), self.shape[0])
+                by = max(by, 1)
+                bz = max(bz, 1)
                 block = (bx, by, bz)
                 block_ = bx * by * bz
             elif self.ndim == 4:
                 bx = min(max_thread_per_block, self.shape[3])
                 by = min(max_thread_per_block // bx, self.shape[2])
                 bz = min(max_thread_per_block // (bx * by), self.shape[1])
+                by = max(by, 1)
+                bz = max(bz, 1)
                 block = (bx, by, bz)
                 block_ = bx * by * bz
             grid = (1, 1)
