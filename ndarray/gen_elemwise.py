@@ -103,11 +103,18 @@ class WrapOpenCLFunction(object):
     def __init__(self, fct):
         self.fct = fct
 
+    def _param_wrap(self, p):
+        if isinstance(p, MyGpuNdArray):
+            p = p.gpu_nd_array
+        if isinstance(p, gpu_ndarray.GpuNdArrayObject):
+            p = cl.MemoryObject.from_cl_mem_as_int(p.bytes)
+        return p
+
     def set_block_shape(self, *shape):
         self.shape = shape
 
     def param_set(self, *param):
-        self.param = param
+        self.param = [self._param_wrap(p) for p in param]
 
     def launch_grid(self, *shape):
         # TODO: For now we ignore the grid shape
