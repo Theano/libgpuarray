@@ -1,6 +1,6 @@
 all: pygpu_ndarray.so
 
-PYTHONVERSION ?= $(shell python -c "import sysconfig; print sysconfig.get_python_version()")
+PYTHONVERSION ?= $(shell python -c "import sys; print '%d.%d'%(sys.version_info[0], sys.version_info[1]"))
 CUDA_ROOT ?= /opt/lisa/os/cuda
 THEANO_ROOT ?= /u/bastienf/repos/Theano
 
@@ -13,7 +13,7 @@ CFLAGS=-g -DOFFSET
 #NPY_PATH!=python -c "import numpy;print numpy.__path__"
 #NPY_INCLUDE=-I${NPY_PATH}/core/include
 CUDA_INCLUDE=-I${CUDA_ROOT}/include
-PYTHON_INCLUDE=-I$(shell python -c "import sysconfig;print sysconfig.get_path('include')")
+PYTHON_INCLUDE=-I$(shell python -c "import distutils.sysconfig;print distutils.sysconfig.get_python_inc()")
 INCLUDES=${CUDA_INCLUDE} ${PYTHON_INCLUDE}
 CUDA_FLAGS=-Xlinker -rpath,${CUDA_ROOT}/lib64 -Xlinker -rpath,${CUDA_ROOT}/lib
 
