@@ -1615,7 +1615,8 @@ class MyGpuNdArray():
             sum_op = gen_reduction.GpuSum(pattern, self.dtype)
             c_code = sum_op.c_support_code_apply("nodename")
             if not c_code:
-                raise NotImplementedError("GpuNdArray sum case not implemented")
+                raise NotImplementedError(
+                    "GpuNdArray sum case not implemented")
             fctname = "kernel_reduce_sum_" + "".join(str_pattern) + "_nodename"
             fct = compile_gpu_code(c_code, fctname)
             if self.ndim == 1:

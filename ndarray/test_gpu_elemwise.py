@@ -111,7 +111,6 @@ def test_elemwise_collapse():
                                 a1, b1)), a_cpu + b_cpu)
                     assert MyGpuNdArray.add(a1, b1, out=out2) is out2
 
-
                     # 2.1 What if we add a scalar?
                     nd_collaps, info = elemwise_collapses(
                         [a, b, scalar_gpu], [o])
