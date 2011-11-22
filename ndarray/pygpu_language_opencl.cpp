@@ -260,6 +260,9 @@ PyGpuMemset(void * dst, int data, size_t bytes)
 
   bytes = (bytes+3)/4;
 
+  if (bytes == 0)
+    return 0;
+
   unsigned char val = (unsigned)data;
   unsigned int pattern = (unsigned int)val & (unsigned int)val >> 8 & (unsigned int)val >> 16 & (unsigned int)val >> 24;
 
