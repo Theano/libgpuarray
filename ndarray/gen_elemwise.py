@@ -110,18 +110,17 @@ class WrapOpenCLFunction(object):
         return p
 
     def set_block_shape(self, *shape):
-        self.shape = shape
+        self.local_size = shape
 
     def param_set(self, *param):
         self.param = [self._param_wrap(p) for p in param]
 
-    def launch_grid(self, *shape):
-        # TODO: For now we ignore the grid shape
-        # TODO: confirm the order of grid and block shape
-        # TODO: find how to pass the memory used...
-        print queue, shape, self.shape, self.param
+    def launch_grid(self, *global_shape):
+        global_size = global_shape + (1,)
 
-        return self.fct(queue, shape, self.shape, *self.param)
+        d = {"g_times_l": True}
+        return self.fct(queue, global_size, self.local_size,
+                        *self.param, **d)
 
 
 def compile_gpu_code(code, fct_name):
