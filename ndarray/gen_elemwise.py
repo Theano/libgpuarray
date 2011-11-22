@@ -9,8 +9,8 @@ that ndim is 0 as with all scalar type.
 import numpy
 import StringIO
 
-
-_CL_MODE = False  # "pyopencl" in __name__
+import pygpu_ndarray as gpu_ndarray
+_CL_MODE = hasattr(gpu_ndarray, "set_opencl_context")
 
 
 if _CL_MODE:
@@ -75,7 +75,6 @@ def debug(*msg):
     _logger.debug(_logger_name + 'DEBUG: ' + ' '.join(str(m) for m in msg))
 
 
-import pygpu_ndarray as gpu_ndarray
 if _CL_MODE:
     gpu_ndarray.set_opencl_context(ctx.obj_ptr)
 
