@@ -58,10 +58,14 @@ def register_dtype(dtype, c_names, alias_ok=False):
     if not dtype in DTYPE_TO_NAME:
         DTYPE_TO_NAME[dtype] = c_names[0]
 
+    if not str(dtype) in DTYPE_TO_NAME:
+        DTYPE_TO_NAME[str(dtype)] = c_names[0]
+
 def _fill_dtype_registry(respect_windows):
     from sys import platform
 
     register_dtype(np.bool, "bool")
+    register_dtype(np.int8, "char")
     register_dtype(np.uint8, "unsigned char")
     register_dtype(np.int16, ["short", "signed short", "signed short int", "short signed int"])
     register_dtype(np.uint16, ["unsigned short", "unsigned short int", "short unsigned int"])
