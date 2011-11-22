@@ -9,8 +9,8 @@ that ndim is 0 as with all scalar type.
 import numpy
 import StringIO
 
-
-_CL_MODE = False  # "pyopencl" in __name__
+import pygpu_ndarray as gpu_ndarray
+_CL_MODE = hasattr(gpu_ndarray, "set_opencl_context")
 
 
 if _CL_MODE:
@@ -23,13 +23,13 @@ if _CL_MODE:
     # TODO: use mako to get rid of the %if
     CLUDA_PREAMBLE = CLUDA_PREAMBLE[:455]
     CLUDA_PREAMBLE += """
-#define LDIM_0 get_local_id(0)
-#define LDIM_1 get_local_id(1)
-#define LDIM_2 get_local_id(2)
+#define LDIM_0 get_local_size(0)
+#define LDIM_1 get_local_size(1)
+#define LDIM_2 get_local_size(2)
 
-#define GDIM_0 get_global_id(0)
-#define GDIM_1 get_global_id(1)
-#define GDIM_2 get_global_id(2)
+#define GDIM_0 get_num_groups(0)
+#define GDIM_1 get_num_groups(1)
+#define GDIM_2 get_num_groups(2)
  """
     # TODO, reuse the same context as the use used to create the memory.
     ctx = cl.create_some_context()
@@ -75,7 +75,8 @@ def debug(*msg):
     _logger.debug(_logger_name + 'DEBUG: ' + ' '.join(str(m) for m in msg))
 
 
-import pygpu_ndarray as gpu_ndarray
+if _CL_MODE:
+    gpu_ndarray.set_opencl_context(ctx.obj_ptr)
 
 
 cast_int = numpy.intc
@@ -101,19 +102,25 @@ class WrapOpenCLFunction(object):
     def __init__(self, fct):
         self.fct = fct
 
+    def _param_wrap(self, p):
+        if isinstance(p, MyGpuNdArray):
+            p = p.gpu_nd_array
+        if isinstance(p, gpu_ndarray.GpuNdArrayObject):
+            p = cl.MemoryObject.from_cl_mem_as_int(p.bytes)
+        return p
+
     def set_block_shape(self, *shape):
-        self.shape = shape
+        self.local_size = shape
 
     def param_set(self, *param):
-        self.param = param
+        self.param = [self._param_wrap(p) for p in param]
 
-    def launch_grid(self, *shape):
-        # TODO: For now we ignore the grid shape
-        # TODO: confirm the order of grid and block shape
-        # TODO: find how to pass the memory used...
-        print queue, shape, self.shape, self.param
+    def launch_grid(self, *global_shape):
+        global_size = global_shape + (1,)
 
-        return self.fct(queue, shape, self.shape, *self.param)
+        d = {"g_times_l": True}
+        return self.fct(queue, global_size, self.local_size,
+                        *self.param, **d)
 
 
 def compile_gpu_code(code, fct_name):
@@ -122,8 +129,6 @@ def compile_gpu_code(code, fct_name):
         prg = cl.Program(ctx, code).build()
         fct2 = getattr(prg, fct_name)
 
-        fct = lambda *args: fct2(queue, *args)
-        fct.fct = fct2
         fct = WrapOpenCLFunction(fct2)
     else:
         # Compile the gpu function with pycuda
@@ -828,63 +833,6 @@ nd_collapse_[i]=0;
         #define INTDIV_POW2(a, b) (a >> b)
         #define INTMOD_POW2(a, b) (a & ((1<<b)-1))
         """
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 def dummy_holder_for_code_not_used():
 
