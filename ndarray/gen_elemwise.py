@@ -23,13 +23,13 @@ if _CL_MODE:
     # TODO: use mako to get rid of the %if
     CLUDA_PREAMBLE = CLUDA_PREAMBLE[:455]
     CLUDA_PREAMBLE += """
-#define LDIM_0 get_local_id(0)
-#define LDIM_1 get_local_id(1)
-#define LDIM_2 get_local_id(2)
+#define LDIM_0 get_local_size(0)
+#define LDIM_1 get_local_size(1)
+#define LDIM_2 get_local_size(2)
 
-#define GDIM_0 get_global_id(0)
-#define GDIM_1 get_global_id(1)
-#define GDIM_2 get_global_id(2)
+#define GDIM_0 get_num_groups(0)
+#define GDIM_1 get_num_groups(1)
+#define GDIM_2 get_num_groups(2)
  """
     # TODO, reuse the same context as the use used to create the memory.
     ctx = cl.create_some_context()
