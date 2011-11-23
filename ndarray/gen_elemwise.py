@@ -1656,6 +1656,7 @@ class MyGpuNdArray():
                 args.append(out)
                 # output strides
                 args.append(cast_int(out.strides[0] / out.dtype.itemsize))
+                args.append(cast_int(out.strides[1] / out.dtype.itemsize))
             elif self.ndim == 3 and axis == 2:
                 # pattern 001
                 out = make_out((self.shape[0], self.shape[1]),
@@ -1731,8 +1732,8 @@ class MyGpuNdArray():
             # output
             args.append(out)
             # output strides
-            if out.strides:
-                args.append(cast_int(out.strides[0] / out.dtype.itemsize))
+            args += [cast_int(i / self.dtype.itemsize)
+                     for i in out.strides]
 
         #print block, grid, shared_, axis
         pycuda._driver.Context.synchronize()
