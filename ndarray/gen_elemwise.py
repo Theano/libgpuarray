@@ -1533,6 +1533,8 @@ class MyGpuNdArray():
                 axis.sort()
                 assert axis == range(self.ndim)
                 axis = None
+
+        # TODO: Why this?
         if self.size == 0:
             make_out = gpu_ndarray.zeros
         else:

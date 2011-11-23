@@ -396,7 +396,9 @@ def test_sum():
                     cpu_sum = cpu_val.sum(axis=axis)
                     if cpu_sum.size > 0:
                         argmax = numpy.absolute(cpu_sum - gpu_sum).argmax()
+                        cpu_max = cpu_sum.flatten()[argmax]
+                        gpu_max = gpu_sum.flatten()[argmax]
                     assert numpy.allclose(cpu_sum, gpu_sum), (
-                        "axis=%d" % axis, dtype, shape, cpu_sum, gpu_sum,
-                        cpu_sum.flatten()[argmax], gpu_sum.flatten()[argmax])
-                    # Bug from time to time with axis 1 and shape (1025, 33)
+                        "axis=%d" % axis, dtype, shape, cpu_sum.shape,
+                        cpu_sum, gpu_sum,
+                        cpu_max, gpu_max, (cpu_max - gpu_max) / cpu_max)
