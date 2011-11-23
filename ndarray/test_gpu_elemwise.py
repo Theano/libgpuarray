@@ -369,18 +369,24 @@ def test_sum():
 #                   gpu_val.flags["C_CONTIGUOUS"],
 #                   gpu_val.flags["F_CONTIGUOUS"])
             gpu_sum = to_cpu(gpu_val.sum())
-            if gpu_val.size // gpu_sum.size > 500000:
-                rtols = {"float32": 4.3e-5}
-            elif gpu_val.size // gpu_sum.size > 100000:
-                rtols = {"float32": 3e-5}
-            elif gpu_val.size // gpu_sum.size > 50000:
-                rtols = {"float32": 2e-5}
-            else:
-                rtols = {"float32": 1e-5}
-            if dtype in rtols:
-                rtol = rtols[dtype]
-            else:
-                rtol = 1e-8
+
+            def get_rtol(orig, after_reduction):
+                if after_reduction.size == 0:
+                    return 0
+                if orig.size // after_reduction.size > 500000:
+                    rtols = {"float32": 4.3e-5}
+                elif orig.size // after_reduction.size > 100000:
+                    rtols = {"float32": 3e-5}
+                elif orig.size // after_reduction.size > 50000:
+                    rtols = {"float32": 2e-5}
+                else:
+                    rtols = {"float32": 1e-5}
+                if dtype in rtols:
+                    rtol = rtols[dtype]
+                else:
+                    rtol = 1e-8
+                return rtol
+            rtol = get_rtol(gpu_val, gpu_sum)
             cpu_sum = cpu_sum.astype(dtype)
             if not (dtype.endswith("int16") and numpy.prod(shape) > 20000):
                 assert (numpy.allclose(cpu_sum, gpu_sum, rtol=rtol) or
@@ -394,6 +400,7 @@ def test_sum():
                 for axis in range(len(shape)):
                     gpu_sum = to_cpu(gpu_val.sum(axis=[axis]))
                     cpu_sum = cpu_val.sum(axis=axis)
+                    rtol = get_rtol(gpu_val, gpu_sum)
                     if cpu_sum.size > 0:
                         argmax = numpy.absolute(cpu_sum - gpu_sum).argmax()
                         cpu_max = cpu_sum.flatten()[argmax]
