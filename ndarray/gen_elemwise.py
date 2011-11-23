@@ -1538,13 +1538,22 @@ class MyGpuNdArray():
         else:
             make_out = gpu_ndarray.empty
 
+        if axis is None:
+            out = make_out((), self.dtype)
+            out = MyGpuNdArray(out)
+        else:
+            out_shape = [self.shape[i] for i in range(self.ndim)
+                         if i != axis]
+            out = make_out(out_shape, self.dtype)
+            out = MyGpuNdArray(out)
+
+        if self.size == 0:
+            return out
+
         args_set = False
 
         if axis is None and (self.flags["C_CONTIGUOUS"] or
                              self.flags["F_CONTIGUOUS"]):
-            out = make_out((), self.dtype)
-            out = MyGpuNdArray(out)
-
             sum_op = gen_reduction.GpuSum([1], self.dtype)
             c_code = sum_op.c_support_code_apply("nodename", contig=True)
             fctname = "kernel_reduce_sum_ccontig_nodename"
@@ -1557,10 +1566,6 @@ class MyGpuNdArray():
             args = [cast_int(self.size), self, out]
             args_set = True
         elif axis is None:
-            out = make_out((), self.dtype)
-            out = MyGpuNdArray(out)
-            if self.size == 0:
-                return out
             pattern = [1] * self.ndim
             str_pattern = [str(i) for i in pattern]
             sum_op = gen_reduction.GpuSum(pattern, self.dtype)
@@ -1601,11 +1606,6 @@ class MyGpuNdArray():
         elif self.ndim == 2 or self.ndim == 3:
             if self.ndim == 3 and axis == 0:
                 # pattern 100
-                out = make_out((self.shape[1], self.shape[2]),
-                                        self.dtype)
-                out = MyGpuNdArray(out)
-                if self.size == 0:
-                    return out
                 sum_op = gen_reduction.GpuSum([1, 0, 0], self.dtype)
                 fctname = "kernel_reduce_sum_100_nodename"
 
@@ -1618,11 +1618,6 @@ class MyGpuNdArray():
                 block = (block_, 1, 1)
             elif self.ndim == 3 and axis == 1:
                 # pattern 010
-                out = make_out((self.shape[0], self.shape[2]),
-                                        self.dtype)
-                out = MyGpuNdArray(out)
-                if self.size == 0:
-                    return out
                 sum_op = gen_reduction.GpuSum([0, 1, 0], self.dtype)
                 fctname = "kernel_reduce_sum_010_AD_nodename"
 
@@ -1659,11 +1654,6 @@ class MyGpuNdArray():
                 args.append(cast_int(out.strides[1] / out.dtype.itemsize))
             elif self.ndim == 3 and axis == 2:
                 # pattern 001
-                out = make_out((self.shape[0], self.shape[1]),
-                                        self.dtype)
-                out = MyGpuNdArray(out)
-                if self.size == 0:
-                    return out
                 sum_op = gen_reduction.GpuSum([0, 0, 1], self.dtype)
                 fctname = "kernel_reduce_sum_001_nodename"
 
@@ -1676,10 +1666,6 @@ class MyGpuNdArray():
                 block = (block_, 1, 1)
             elif axis == 0:
                 # pattern 10
-                out = make_out((self.shape[1],), self.dtype)
-                out = MyGpuNdArray(out)
-                if self.size == 0:
-                    return out
                 sum_op = gen_reduction.GpuSum([1, 0], self.dtype)
                 fctname = "kernel_reduce_sum_010_nodename"
                 block_ = min(self.shape[1], max_thread_per_block)
@@ -1702,10 +1688,6 @@ class MyGpuNdArray():
                 args.append(cast_int(out.strides[0] / out.dtype.itemsize))
             elif axis == 1:
                 # pattern 01
-                out = make_out((self.shape[0],), self.dtype)
-                out = MyGpuNdArray(out)
-                if self.size == 0:
-                    return out
                 sum_op = gen_reduction.GpuSum([0, 1], self.dtype)
                 fctname = "kernel_reduce_sum_01_nodename"
                 block_ = min(self.shape[1], max_thread_per_block)
@@ -1737,8 +1719,6 @@ class MyGpuNdArray():
 
         #print block, grid, shared_, axis
         pycuda._driver.Context.synchronize()
-        if self.size == 0:
-            return out
         if False:
             d = {"block": block,
                  "shared": shared_,
