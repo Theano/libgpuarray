@@ -190,7 +190,6 @@ static PyObject * PyGpuNdArray_copy(PyObject * self, PyObject *args,
     DPRINTF("PyGpuNdArray_copy start\n");
     static const char *kwlist[] = {"order", NULL};
     NPY_ORDER order = PyArray_CORDER;
-    bool fortran = false;
 
     if(!PyGpuNdArray_Check(self)){
         PyErr_SetString(PyExc_ValueError, "PyGpuNdArray_copy: expected a PyGpuNdArrayObject.");
@@ -319,9 +318,17 @@ PyObject * PyGpuNdArray_CreateArrayObj(PyGpuNdArrayObject * self)
 
       // Numpy will do a decref on the description.
       Py_INCREF(PyGpuNdArray_DESCR(self));
-      PyObject * rval = PyArray_Empty(PyGpuNdArray_NDIM(self),
-				      npydims, self->descr,
-				      PyGpuNdArray_ISFARRAY(self));
+
+      // We can't use PyArray_{Empty,EMPTY} as they segfault when size == 0
+      PyObject * rval = PyArray_NewFromDescr(&PyArray_Type,
+                                             PyGpuNdArray_DESCR(self),
+                                             PyGpuNdArray_NDIM(self),
+                                             npydims,
+                                             NULL,
+                                             NULL,
+                                             0,
+                                             NULL);
+
       free(npydims);
       if (!rval){
         return NULL;
@@ -504,13 +511,6 @@ PyGpuNdArray_zeros(PyObject* dummy, PyObject* args, PyObject *kargs)
         int shp_el = PyInt_AsLong(shp_el_obj);
         Py_DECREF(shp_el_obj);
 
-        if (shp_el <= 0)
-        {
-            PyErr_SetString(PyExc_ValueError, "PyGpuNdArray_Zeros: shape must not contain 0 (or negative value) for size of a dimension");
-            free(newdims);
-            return NULL;
-        }
-
         newdims[i] = shp_el;
     }
 
@@ -590,13 +590,6 @@ PyGpuNdArray_empty(PyObject* dummy, PyObject* args, PyObject *kargs)
 
         int shp_el = PyInt_AsLong(shp_el_obj);
         Py_DECREF(shp_el_obj);
-
-        if (shp_el <= 0)
-        {
-            PyErr_SetString(PyExc_ValueError, "PyGpuNdArray_empty: shape must not contain 0 (or negative value) for size of a dimension");
-            free(newdims);
-            return NULL;
-        }
 
         newdims[i] = shp_el;
     }
@@ -1047,7 +1040,7 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
         //initialize dimension 0 of rval
         PyGpuNdArray_STRIDE(rval, 0) = step * PyGpuNdArray_STRIDES(self)[0];
         PyGpuNdArray_DIM(rval, 0) = slen;
-        DPRINTF("rval stride %d\n", PyGpuNdArray_STRIDES(rval)[0]);
+        DPRINTF("rval stride %zd\n", PyGpuNdArray_STRIDES(rval)[0]);
         // initialize dimensions > 0 of rval
         for (int d = 1; d < PyGpuNdArray_NDIM(self); ++d) {
             PyGpuNdArray_STRIDE(rval, d) = PyGpuNdArray_STRIDES(self)[d];
@@ -1121,7 +1114,7 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
                 PyGpuNdArray_DIM(rval, rval_d) =
                     PyGpuNdArray_DIMS(self)[tuple_d];
                 ++rval_d;
-                DPRINTF("Subscript extra dims to append %d %d\n",
+                DPRINTF("Subscript extra dims to append %zd %zd\n",
                         PyGpuNdArray_STRIDE(rval, rval_d),
                         PyGpuNdArray_DIM(rval, rval_d));
             }
@@ -1143,7 +1136,7 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
                     PyGpuNdArray_STRIDE(rval, rval_d) = step * PyGpuNdArray_STRIDES(self)[self_d];
                     PyGpuNdArray_DIM(rval, rval_d) = slen;
 
-                    DPRINTF("rval_d %zd self_d %zd\n start %zd\nstop %zd\n step %zd\n slen %zd\n",
+                    DPRINTF("rval_d %d self_d %d\n start %zd\nstop %zd\n step %zd\n slen %zd\n",
                             rval_d, self_d, start, stop, step, slen);
                     ++rval_d;
                 }
@@ -1188,7 +1181,7 @@ PyGpuNdArray_Subscript(PyObject * py_self, PyObject * key)
                             PyGpuNdArray_STRIDES(self)[self_d];
                         PyGpuNdArray_DIM(rval, rval_d) =
                             PyGpuNdArray_DIMS(self)[self_d];
-                        DPRINTF("Ellipse append dimensions self_%d with %d %d\n",
+                        DPRINTF("Ellipse append dimensions self_%d with %zd %zd\n",
                                 self_d,
                                 PyGpuNdArray_STRIDE(rval, rval_d),
                                 PyGpuNdArray_DIM(rval, rval_d));
@@ -1448,6 +1441,29 @@ PyGpuNdArray_as_f_contiguous(PyObject* dummy, PyObject* args, PyObject *kargs)
     return ret;
 }
 
+#ifdef WITH_OPENCL
+#ifdef __APPLE__
+#include <OpenCL/opencl.h>
+#else
+#include <CL/opencl.h>
+#endif
+extern void setup_context(cl_context c);
+
+PyObject *
+PyGpuNdArray_set_opencl_context(PyObject *mod, PyObject *ctx) {
+    Py_ssize_t v;
+
+    v = PyInt_AsSsize_t(ctx);
+    if (v == -1 && PyErr_Occurred())
+        return NULL;
+
+    setup_context((cl_context)v);
+    
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+#endif
+
 static PyMethodDef module_methods[] = {
     //{"dimshuffle", PyGpuNdArray_Dimshuffle, METH_VARARGS, "Returns the dimshuffle of a PyGpuNdArray."},
     {"outstanding_mallocs", outstanding_mallocs, METH_VARARGS, "how many more mallocs have been called than free's"},
@@ -1463,6 +1479,11 @@ static PyMethodDef module_methods[] = {
     {"asfortranarray",
        (PyCFunction)PyGpuNdArray_as_f_contiguous, METH_VARARGS|METH_KEYWORDS,
        "If the array is not f contiguous, copy it to a new c contiguous region."},
+#ifdef WITH_OPENCL
+    {"set_opencl_context",
+     PyGpuNdArray_set_opencl_context, METH_O,
+     "Set the OpenCL context to use for allocations and work."},
+#endif
     {NULL, NULL, NULL, NULL}  /* Sentinel */
 };
 

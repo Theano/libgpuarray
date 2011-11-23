@@ -54,12 +54,14 @@ def gen_gpu_nd_array(shape_orig, dtype='float32', offseted_outer=False,
         shape[-1] += 1
 
     a = numpy.random.rand(*shape) * 10
+    if dtype.startswith("u"):
+        a = numpy.absolute(a)
     a = numpy.asarray(a, dtype=dtype)
     assert order in ['c', 'f']
     if order == 'f' and len(shape) > 0:
         a = numpy.asfortranarray(a)
     b = gpu_ndarray.GpuNdArrayObject(a)
-    if order == 'f' and len(shape) > 0:
+    if order == 'f' and len(shape) > 0 and b.size > 1:
         assert b.flags['F_CONTIGUOUS']
 
     if offseted_outer and len(shape) > 0:
@@ -82,7 +84,20 @@ def gen_gpu_nd_array(shape_orig, dtype='float32', offseted_outer=False,
         assert a.shape == shape_orig, (a.shape, shape_orig)
         assert b.shape == shape_orig, (b.shape, shape_orig)
 
+    assert numpy.allclose(a, numpy.asarray(b))
+
     return a, b
+
+
+def product(*args, **kwds):
+    # product('ABCD', 'xy') --> Ax Ay Bx By Cx Cy Dx Dy
+    # product(range(2), repeat=3) --> 000 001 010 011 100 101 110 111
+    pools = map(tuple, args) * kwds.get('repeat', 1)
+    result = [[]]
+    for pool in pools:
+        result = [x + [y] for x in result for y in pool]
+    for prod in result:
+        yield tuple(prod)
 
 
 def test_transfer():
@@ -214,7 +229,10 @@ def test_asfortranarray():
 
 
 def test_zeros():
-    for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
+    for shp in [(), (0,), (5,),
+                (0, 0), (1, 0), (0, 1), (6, 7),
+                (0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1),
+                (4, 8, 9), (1, 8, 9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
                 x = numpy.zeros(shp, dtype, order)
@@ -232,7 +250,10 @@ def test_zeros():
 
 
 def test_empty():
-    for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
+    for shp in [(), (0,), (5,),
+                (0, 0), (1, 0), (0, 1), (6, 7),
+                (0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1),
+                (4, 8, 9), (1, 8, 9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
                 x = numpy.empty(shp, dtype, order)

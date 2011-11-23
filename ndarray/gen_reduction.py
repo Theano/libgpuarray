@@ -315,7 +315,7 @@ class GpuSum(object):
 
         .. code-block:: c
 
-            static __global__ void kernel_reduce_sum_110_%(nodename)s(
+            __global__ void kernel_reduce_sum_110_%(nodename)s(
                     const int d0,
                     const int d1,
                     const int d2,
@@ -326,7 +326,8 @@ class GpuSum(object):
                     %(dtype)s * Z,
                     const int sZ0)
 
-        """ % locals()
+        """
+        dtype = self.dtype
         if reduce_mask is None:
             reduce_mask = self.reduce_mask
         if ndim is None:
@@ -336,30 +337,28 @@ class GpuSum(object):
         sio = StringIO.StringIO()
 
         print >> sio, """
-            static __global__ void kernel_reduce_sum_%(pattern)s_%(nodename)s(
+            __global__ void kernel_reduce_sum_%(pattern)s_%(nodename)s(
         """ % locals()
+
         for i in xrange(ndim):
-            print >> sio, """
-                    const int d%(i)s,
-        """ % locals()
-        print >> sio, """
-                    const %(dtype)s *A,
-        """ % locals()
+            print >> sio, """const int d%(i)s,""" % locals()
+
+        print >> sio, """const %(dtype)s *A,""" % locals()
+
         for i in xrange(ndim):
-            print >> sio, """
-                    const int sA%(i)s,
-        """ % locals()
-        print >> sio, """
-                    %(dtype)s * Z
-        """ % locals()
+            print >> sio, """const int sA%(i)s,""" % locals()
+
+        print >> sio, """%(dtype)s * Z""" % locals()
+
         for i in xrange(ndim - sum(reduce_mask)):
-            print >> sio, """
-                    , const int sZ%(i)s
-        """ % locals()
+            print >> sio, """, const int sZ%(i)s""" % locals()
+
         print >> sio, ")"
+
         return sio.getvalue()
 
     def _k_init(self, *args):
+        dtype = self.dtype
         return """
                 const int threadCount = blockDim.x * blockDim.y * blockDim.z;
                 const int threadNum = threadIdx.z * blockDim.x * blockDim.y
@@ -367,17 +366,16 @@ class GpuSum(object):
                 extern __shared__ %(dtype)s buf[];
                 %(dtype)s mysum = 0.0f;
 
-                if (warpSize != 32)
-                {
-                    //TODO: set error code
-                    Z[0] = -666;
+                if (warpSize != 32){ //TODO: set error code
+                    Z[0] = 666;
                     return;
                 }
 
-        """
+        """ % locals()
 
     def _k_reduce_buf(self, z_pos):
         return """
+        __syncthreads(); // some kernel do multiple reduction.
         buf[threadNum] = mysum;
         __syncthreads();
 
@@ -411,6 +409,7 @@ class GpuSum(object):
         }
         """ % locals()
         return """
+        __syncthreads(); // some kernel do multiple reduction.
         buf[threadNum] = mysum;
         __syncthreads();
 
@@ -466,6 +465,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
     # nb_reduce<=warpSize
     def _k_reduce_buf_multiple(self, z_pos, nb_reduce):
         return """
+        __syncthreads(); // some kernel do multiple reduction.
         buf[threadNum] = mysum;
         __syncthreads();
 
@@ -1024,8 +1024,8 @@ TODO: find why it don't work or put the GPU compute capability into the version
             # it only runs on ONE multiprocessor
             reducebuf = self._k_reduce_buf('Z[0]')
             print >> sio, """
-            static __global__ void kernel_reduce_sum_ccontig_%(nodename)s(
-                    const unsigned int d0,
+            __global__ void kernel_reduce_sum_ccontig_%(nodename)s(
+                    const int d0,
                     const %(dtype)s *A,
                     %(dtype)s * Z)
             {
@@ -1050,11 +1050,9 @@ TODO: find why it don't work or put the GPU compute capability into the version
             #this kernel is ok for up to a few thousand elements, but
             # it only runs on ONE multiprocessor
             reducebuf = self._k_reduce_buf('Z[0]')
+            decl = self._k_decl(nodename)
             print >> sio, """
-            __global__ void kernel_reduce_sum_1_%(nodename)s(
-                    const unsigned int d0,
-                    const %(dtype)s *A, const int sA0,
-                    %(dtype)s * Z)
+            %(decl)s
             {
                 const int threadCount = blockDim.x;
                 const int threadNum = threadIdx.x;
@@ -1078,23 +1076,12 @@ TODO: find why it don't work or put the GPU compute capability into the version
             #this kernel is ok for up to a few thousand elements, but
             # it only runs on ONE multiprocessor
             reducebuf = self._k_reduce_buf('Z[0]')
+            decl = self._k_decl(nodename)
+            init = self._k_init(nodename)
+            print >> sio, decl
+            print >> sio, " { "
+            print >> sio, init
             print >> sio, """
-            __global__ void kernel_reduce_sum_11_%(nodename)s(
-                    const int d0,
-                    const int d1,
-                    const %(dtype)s *A, const int sA0, const int sA1,
-                    %(dtype)s * Z)
-            {
-                const int threadCount = blockDim.x * blockDim.y;
-                const int threadNum = threadIdx.y*blockDim.x + threadIdx.x;
-                extern __shared__ %(dtype)s buf[];
-                %(dtype)s mysum = 0.0f;
-
-                if (warpSize != 32)
-                {
-                    return;  //TODO: set error code
-                }
-
                 for (int i0 = threadIdx.y; i0 < d0; i0 += blockDim.y)
                 {
                     for (int i1 = threadIdx.x; i1 < d1; i1 += blockDim.x)
@@ -1103,9 +1090,10 @@ TODO: find why it don't work or put the GPU compute capability into the version
                         mysum += Ai;
                     }
                 }
-                %(reducebuf)s
-            }
             """ % locals()
+            print >> sio, reducebuf
+            print >> sio, " } "
+
         #01, 011, 0111
         if (0 == self.reduce_mask[0] and
             all(self.reduce_mask[1:]) and nd_in in[2, 3, 4]):
@@ -1257,7 +1245,8 @@ TODO: find why it don't work or put the GPU compute capability into the version
             {
              if(warpSize<blockDim.x){
                //TODO: set error code
-               Z[0] = -666;
+// need to be positive to work with unsigned
+               Z[0] = 666;
                return;
               }
 
@@ -1302,7 +1291,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
                 if (warpSize != 32)
                 {
                     //TODO: set error code
-                    Z[blockIdx.x * sZ0] = -666;
+                    Z[blockIdx.x * sZ0] = 666;
                     return;
                 }
 
@@ -1349,7 +1338,7 @@ TODO: find why it don't work or put the GPU compute capability into the version
             %(decl)s
             {
                 %(init)s
-                mysum = 0;
+
                 for (int i0 = threadIdx.z; i0 < d0; i0 += blockDim.z)
                 {
                     for (int i1 = threadIdx.y; i1 < d1; i1 += blockDim.y)
@@ -1360,9 +1349,9 @@ TODO: find why it don't work or put the GPU compute capability into the version
                         }
                     }
                 }
-                %(reducebuf)s
-            }
-            """ % locals()
+""" % locals()
+            print >> sio, reducebuf, "}"
+
         if self.reduce_mask == (0, 0, 1):
             # this kernel uses one block for each row,
             # threads per block for each element per row.
@@ -1485,10 +1474,10 @@ TODO: find why it don't work or put the GPU compute capability into the version
             reducebuf = self._k_reduce_buf('Z[blockIdx.x*sZ0]')
             print >> sio, """
             __global__ void kernel_reduce_sum_1011_%(nodename)s(
-                    const unsigned int d0,
-                    const unsigned int d1,
-                    const unsigned int d2,
-                    const unsigned int d3,
+                    const int d0,
+                    const int d1,
+                    const int d2,
+                    const int d3,
                     const %(dtype)s *A, const int sA0,
                     const int sA1, const int sA2, const int sA3,
                     %(dtype)s * Z, const int sZ0)

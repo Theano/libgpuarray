@@ -9,8 +9,8 @@ that ndim is 0 as with all scalar type.
 import numpy
 import StringIO
 
-
-_CL_MODE = False  # "pyopencl" in __name__
+import pygpu_ndarray as gpu_ndarray
+_CL_MODE = hasattr(gpu_ndarray, "set_opencl_context")
 
 
 if _CL_MODE:
@@ -23,13 +23,13 @@ if _CL_MODE:
     # TODO: use mako to get rid of the %if
     CLUDA_PREAMBLE = CLUDA_PREAMBLE[:455]
     CLUDA_PREAMBLE += """
-#define LDIM_0 get_local_id(0)
-#define LDIM_1 get_local_id(1)
-#define LDIM_2 get_local_id(2)
+#define LDIM_0 get_local_size(0)
+#define LDIM_1 get_local_size(1)
+#define LDIM_2 get_local_size(2)
 
-#define GDIM_0 get_global_id(0)
-#define GDIM_1 get_global_id(1)
-#define GDIM_2 get_global_id(2)
+#define GDIM_0 get_num_groups(0)
+#define GDIM_1 get_num_groups(1)
+#define GDIM_2 get_num_groups(2)
  """
     # TODO, reuse the same context as the use used to create the memory.
     ctx = cl.create_some_context()
@@ -75,7 +75,8 @@ def debug(*msg):
     _logger.debug(_logger_name + 'DEBUG: ' + ' '.join(str(m) for m in msg))
 
 
-import pygpu_ndarray as gpu_ndarray
+if _CL_MODE:
+    gpu_ndarray.set_opencl_context(ctx.obj_ptr)
 
 
 cast_int = numpy.intc
@@ -101,19 +102,25 @@ class WrapOpenCLFunction(object):
     def __init__(self, fct):
         self.fct = fct
 
+    def _param_wrap(self, p):
+        if isinstance(p, MyGpuNdArray):
+            p = p.gpu_nd_array
+        if isinstance(p, gpu_ndarray.GpuNdArrayObject):
+            p = cl.MemoryObject.from_cl_mem_as_int(p.bytes)
+        return p
+
     def set_block_shape(self, *shape):
-        self.shape = shape
+        self.local_size = shape
 
     def param_set(self, *param):
-        self.param = param
+        self.param = [self._param_wrap(p) for p in param]
 
-    def launch_grid(self, *shape):
-        # TODO: For now we ignore the grid shape
-        # TODO: confirm the order of grid and block shape
-        # TODO: find how to pass the memory used...
-        print queue, shape, self.shape, self.param
+    def launch_grid(self, *global_shape):
+        global_size = global_shape + (1,)
 
-        return self.fct(queue, shape, self.shape, *self.param)
+        d = {"g_times_l": True}
+        return self.fct(queue, global_size, self.local_size,
+                        *self.param, **d)
 
 
 def compile_gpu_code(code, fct_name):
@@ -122,8 +129,6 @@ def compile_gpu_code(code, fct_name):
         prg = cl.Program(ctx, code).build()
         fct2 = getattr(prg, fct_name)
 
-        fct = lambda *args: fct2(queue, *args)
-        fct.fct = fct2
         fct = WrapOpenCLFunction(fct2)
     else:
         # Compile the gpu function with pycuda
@@ -829,63 +834,6 @@ nd_collapse_[i]=0;
         #define INTMOD_POW2(a, b) (a & ((1<<b)-1))
         """
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def dummy_holder_for_code_not_used():
 
     def c_src_kernel_tiling(self, inputs, outputs, nodename):
@@ -1500,15 +1448,17 @@ class MyGpuNdArray():
             cls._compiled_fct[tag] = fct
         return fct(inputs, out=out)
 
+    base = property(lambda self: self.gpu_nd_array.base)
+    bytes = property(lambda self: self.gpu_nd_array.bytes)
+    dtype = property(lambda self: self.gpu_nd_array.dtype)
+    flags = property(lambda self: self.gpu_nd_array.flags)
+    itemsize = property(lambda self: self.gpu_nd_array.itemsize)
     ndim = property(lambda self: self.gpu_nd_array.ndim,
                     doc="number of dimensions")
+    offset = property(lambda self: self.gpu_nd_array.offset)
     shape = property(lambda self: self.gpu_nd_array.shape)
-    dtype = property(lambda self: self.gpu_nd_array.dtype)
-    strides = property(lambda self: self.gpu_nd_array.strides)
-    itemsize = property(lambda self: self.gpu_nd_array.itemsize)
-    bytes = property(lambda self: self.gpu_nd_array.bytes)
-    flags = property(lambda self: self.gpu_nd_array.flags)
     size = property(lambda self: self.gpu_nd_array.size)
+    strides = property(lambda self: self.gpu_nd_array.strides)
 
     def __array__(self):
         return numpy.asarray(self.gpu_nd_array)
@@ -1534,7 +1484,10 @@ class MyGpuNdArray():
 
         #assert (self.gpu_nd_array.flags['C_CONTIGUOUS'] or
         #         self.gpu_nd_array.flags['F_CONTIGUOUS'])
-        return self.bytes
+
+        # TODO: find a way to pass to a pycuda/pyopencl function the
+        #       bytes + offset directly.
+        return self.bytes + self.offset
 
     def __getitem__(self, *inputs):
         return MyGpuNdArray(self.gpu_nd_array.__getitem__(*inputs))
@@ -1570,41 +1523,215 @@ class MyGpuNdArray():
 
     def sum(self, axis=None):
         import gen_reduction
-        if axis is None and self.ndim == 1:
+        max_thread_per_block = 512
+        max_block = 4096
+        if isinstance(axis, (list, tuple)):
+            if len(axis) == 1:
+                axis = axis[0]
+            else:
+                assert len(axis) == self.ndim
+                axis.sort()
+                assert axis == range(self.ndim)
+                axis = None
+
+        # TODO: Why this?
+        if self.size == 0:
+            make_out = gpu_ndarray.zeros
+        else:
+            make_out = gpu_ndarray.empty
+
+        if axis is None:
+            out = make_out((), self.dtype)
+            out = MyGpuNdArray(out)
+        else:
+            out_shape = [self.shape[i] for i in range(self.ndim)
+                         if i != axis]
+            out = make_out(out_shape, self.dtype)
+            out = MyGpuNdArray(out)
+
+        if self.size == 0:
+            return out
+
+        args_set = False
+
+        if axis is None and (self.flags["C_CONTIGUOUS"] or
+                             self.flags["F_CONTIGUOUS"]):
+            sum_op = gen_reduction.GpuSum([1], self.dtype)
+            c_code = sum_op.c_support_code_apply("nodename", contig=True)
+            fctname = "kernel_reduce_sum_ccontig_nodename"
+            fct = compile_gpu_code(c_code, fctname)
+            block_ = min(self.size, max_thread_per_block)
+            block = (block_, 1, 1)
+
+            grid = (1, 1)
+            shared_ = self.dtype.itemsize * block_
+            args = [cast_int(self.size), self, out]
+            args_set = True
+        elif axis is None:
             pattern = [1] * self.ndim
             str_pattern = [str(i) for i in pattern]
             sum_op = gen_reduction.GpuSum(pattern, self.dtype)
             c_code = sum_op.c_support_code_apply("nodename")
+            if not c_code:
+                raise NotImplementedError(
+                    "GpuNdArray sum case not implemented")
             fctname = "kernel_reduce_sum_" + "".join(str_pattern) + "_nodename"
             fct = compile_gpu_code(c_code, fctname)
-            block_ = min(self.shape[0], 256)
-            grid_ = 1
+            if self.ndim == 1:
+                bx = min(max_thread_per_block, self.shape[0])
+                block = (bx, 1, 1)
+                block_ = bx
+            elif self.ndim == 2:
+                bx = min(max_thread_per_block, self.shape[1])
+                by = min(max_thread_per_block // self.shape[1], self.shape[0])
+                by = max(by, 1)
+                block = (bx, by, 1)
+                block_ = bx * by
+            elif self.ndim == 3:
+                bx = min(max_thread_per_block, self.shape[2])
+                by = min(max_thread_per_block // bx, self.shape[1])
+                bz = min(max_thread_per_block // (bx * by), self.shape[0])
+                by = max(by, 1)
+                bz = min(max(bz, 1), 64)
+                block = (bx, by, bz)
+                block_ = bx * by * bz
+            elif self.ndim == 4:
+                bx = min(max_thread_per_block, self.shape[3])
+                by = min(max_thread_per_block // bx, self.shape[2])
+                bz = min(max_thread_per_block // (bx * by), self.shape[1])
+                by = max(by, 1)
+                bz = min(max(bz, 1), 64)
+                block = (bx, by, bz)
+                block_ = bx * by * bz
+            grid = (1, 1)
             shared_ = self.dtype.itemsize * block_
-            out = gpu_ndarray.empty((1,), self.dtype)
-            out = MyGpuNdArray(out)
-            to_cpu = numpy.asarray
-            if False:
-                d = {"block": (block_, 1, 1),
-                     "shared": shared_,
-                      "grid": (grid_, 1)}
-                pycuda._driver.Context.synchronize()
-                fct(cast_uint(self.shape[0]),
-                    self,
-                    cast_int(self.strides[0]) / self.dtype.itemsize,
-                    out, **d)
-            else:
-                # We bypass the pycuda wrapper gpu function call.
-                # by calling directly the gpu function.
-                # This is faster and lower the overhead.
-                fct.set_block_shape(block_, 1, 1)
-                fct.set_shared_size(shared_)
-                fct.param_set(cast_uint(self.shape[0]),
-                              self,
-                              cast_int(self.strides[0]) / self.dtype.itemsize,
-                              out)
-                fct.launch_grid(grid_, 1)
-            return out
+        elif self.ndim == 2 or self.ndim == 3:
+            if self.ndim == 3 and axis == 0:
+                # pattern 100
+                sum_op = gen_reduction.GpuSum([1, 0, 0], self.dtype)
+                fctname = "kernel_reduce_sum_100_nodename"
 
-            raise Exception("Not finished implementation")
+                gx = min(self.shape[1], max_block)
+                gy = min(max_block // (gx * self.shape[2]), self.shape[2])
+                gy = max(gy, 1)
+                grid = (gx, gy)
+
+                block_ = min(max_thread_per_block, self.shape[0])
+                block = (block_, 1, 1)
+            elif self.ndim == 3 and axis == 1:
+                # pattern 010
+                sum_op = gen_reduction.GpuSum([0, 1, 0], self.dtype)
+                fctname = "kernel_reduce_sum_010_AD_nodename"
+
+                A = self.shape[0]
+                B = self.shape[1]
+                C = self.shape[2]
+                D = C / 32
+                if (32 * D < C):
+                    D += 1
+                assert ((C <= 32 * D) and (32 * D < C + 32))
+                shared_ = 0
+
+                gx = min(A, max_block)
+                gy = min(max_block // (D * A), D)
+                gy = max(gy, 1)
+                grid = (gx, gy)
+
+                block = (32, 1, 1)
+                block_ = 32
+
+                args_set = True
+                # input shape
+                args = [cast_int(A), cast_int(B),
+                        cast_int(C), cast_int(D)]
+                # input
+                args.append(self)
+                # input strides
+                args += [cast_int(i / self.dtype.itemsize)
+                         for i in self.strides]
+                # output
+                args.append(out)
+                # output strides
+                args.append(cast_int(out.strides[0] / out.dtype.itemsize))
+                args.append(cast_int(out.strides[1] / out.dtype.itemsize))
+            elif self.ndim == 3 and axis == 2:
+                # pattern 001
+                sum_op = gen_reduction.GpuSum([0, 0, 1], self.dtype)
+                fctname = "kernel_reduce_sum_001_nodename"
+
+                gx = min(self.shape[0], max_block)
+                gy = min(max_block // (gx * self.shape[1]), self.shape[1])
+                gy = max(gy, 1)
+                grid = (gx, gy)
+
+                block_ = min(max_thread_per_block, self.shape[2])
+                block = (block_, 1, 1)
+            elif axis == 0:
+                # pattern 10
+                sum_op = gen_reduction.GpuSum([1, 0], self.dtype)
+                fctname = "kernel_reduce_sum_010_nodename"
+                block_ = min(self.shape[1], max_thread_per_block)
+                block = (block_, 1, 1)
+                grid = (1, self.shape[0])
+                args_set = True
+                # input shape
+                args = [cast_int(1)]
+                args += [cast_int(i) for i in self.shape]
+                # input
+                args.append(self)
+                # input strides
+                args.append(cast_int(1))
+                args += [cast_int(i / self.dtype.itemsize)
+                         for i in self.strides]
+                # output
+                args.append(out)
+                # output strides
+                args.append(cast_int(1))
+                args.append(cast_int(out.strides[0] / out.dtype.itemsize))
+            elif axis == 1:
+                # pattern 01
+                sum_op = gen_reduction.GpuSum([0, 1], self.dtype)
+                fctname = "kernel_reduce_sum_01_nodename"
+                block_ = min(self.shape[1], max_thread_per_block)
+                block = (block_, 1, 1)
+                grid = (1, self.shape[0])
+            else:
+                raise Exception("Bad axis")
+
+            c_code = sum_op.c_support_code_apply("nodename")
+            fct = compile_gpu_code(c_code, fctname)
+
+            shared_ = self.dtype.itemsize * block_
         else:
             raise Exception("Not implemented")
+
+        if not args_set:
+            # input shape
+            args = [cast_int(i) for i in self.shape]
+            # input
+            args.append(self)
+            # input strides
+            args += [cast_int(i / self.dtype.itemsize)
+                     for i in self.strides]
+            # output
+            args.append(out)
+            # output strides
+            args += [cast_int(i / self.dtype.itemsize)
+                     for i in out.strides]
+
+        #print block, grid, shared_, axis
+        pycuda._driver.Context.synchronize()
+        if False:
+            d = {"block": block,
+                 "shared": shared_,
+                 "grid": grid}
+            fct(*args, **d)
+        else:
+            # We bypass the pycuda wrapper gpu function call.
+            # by calling directly the gpu function.
+            # This is faster and lower the overhead.
+            fct.set_block_shape(*block)
+            fct.set_shared_size(shared_)
+            fct.param_set(*args)
+            fct.launch_grid(*grid)
+        return out
