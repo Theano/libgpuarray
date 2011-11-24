@@ -49,7 +49,7 @@ def register_dtype(dtype, c_names, alias_ok=False):
         raise RuntimeError("dtype '%s' already registered (as '%s', new names '%s')" 
                 % (dtype, DTYPE_TO_NAME[dtype], ", ".join(c_names)))
     for nm in c_names:
-        if nm in NAME_TO_DTYPE:
+        if nm in NAME_TO_DTYPE and NAME_TO_DTYPE[nm] != dtype:
             raise RuntimeError("name '%s' already registered" % nm)
 
     for nm in c_names:
