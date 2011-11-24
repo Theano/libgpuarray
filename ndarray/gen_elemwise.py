@@ -1122,7 +1122,7 @@ def elemwise_collapses(inputs, outputs, out_shape=None, verbose=0):
 
     There is no special handling needed for broadcasted scalar at this level.
 
-    @return: tuple(ndim, strides) after collapsing.
+    @return: ndims, tuple(dims, strides) after collapsing.
     """
     in_out = inputs + outputs
     del inputs
@@ -1187,7 +1187,7 @@ def elemwise_collapses(inputs, outputs, out_shape=None, verbose=0):
                 for j in range(id + 1, nd_collapse):
                     local_str[input_id][j - 1] = local_str[input_id][j]
             nd_collapse -= 1
-            id -= 1
+            id -= 1  # TODO: what is this? How this work?
 
     if verbose > 2:
         print "after broadcast collapse"
@@ -1242,6 +1242,145 @@ def elemwise_collapses(inputs, outputs, out_shape=None, verbose=0):
             print " local_str inputs", ipos, local_str[ipos]
 
     return nd_collapse, (local_dims, local_str)
+
+
+def reduction_collapses(inout, axis, verbose=0):
+    """
+    This collapse dimensions that are not needed when computing
+    reduction.  This is usefull as it lower the indexing computation
+    that is heavier on gpu then on cpu.
+
+    This is a generic version. It collapse dimensions at any place in
+    the shape.
+    @param: inout: tuple(input, output)
+    @param: axis: None, interger, list of 1 interger
+                  The axis over witch we will do reduction.
+    @return: (ndims, (input dims, input strides, input pattern), out strides)
+             after collapsing.
+
+    :note: we suppose that we can always collapse the output dimensions.
+    """
+    input = inout[0]
+    out = inout[1]
+    # Some quick check. It is faster then the full version.
+    if axis is None:
+        # The output size is always 1, so we don't care about this strides
+        if (input.flags['C_CONTIGUOUS'] or input.flags['F_CONTIGUOUS']):
+            return 0, ((input.size,), (input.itemsize,), axis), (0,)
+    if input.ndim == 1:
+        assert axis == [0] or axis == 0 or axis is None
+        # not c contiguous as the first if should have catched it.
+        return 1, (input.shape, input.strides, axis), (0,)
+
+    if not isinstance(axis, (list, tuple)):
+        local_axis = [axis]
+    else:
+        local_axis = list(axis)
+
+    # This is needed for the computing of the output strides
+    assert axis is None or len(local_axis) == 1
+
+    local_dims = list(input.shape)
+    local_str = list(input.strides)
+    out_strides = list(out.strides)
+
+    nd_orig = len(local_dims)
+    collapsable = [1] * nd_orig
+    nd_collapse = nd_orig
+
+    if verbose > 2:
+        print "before broadcast collapse"
+        print " nd_collapse", nd_collapse
+        print " local_dims", local_dims
+        print " local_str inputs", local_str
+        print " local_axis", local_axis
+
+    # Collapse dimension that are broadcast in all inputs.
+    # need to be done before contiguous collapse as it will break it.
+    # Update the dimensions and the strides
+    for id in range(nd_collapse):
+        if local_dims[id] == 1:
+            for j in range(id + 1, nd_collapse):
+                # remove dims i from the array
+                local_dims[j - 1] = local_dims[j]
+                # remove strides i from the array
+                local_str[j - 1] = local_str[j]
+                # remove output strides i from the array
+                if axis is not None:
+                    out_strides[j - 2] = out_strides[j - 1]
+            if id in local_axis:
+                local_axis.remove(id)
+            for axis_pos in range(len(local_axis)):
+                if local_axis[axis_pos] > id:
+                    local_axis[axis_pos] -= 1
+
+            nd_collapse -= 1
+            id -= 1  # TODO: how this work?
+
+    if verbose > 2:
+        print "after broadcast collapse"
+        print " nd_collapse", nd_collapse
+        print " local_dims", local_dims
+        print " local_str inputs", local_str
+        print " local_axis", local_axis
+        print " out_strides", out_strides
+
+    nd_collapse_ = [1] * nd_orig
+    # Can we collapse dims[i] and dims[i-1]?
+    for i in range(nd_collapse - 1, 0, -1):
+        if ((local_str[i] * local_dims[i] != local_str[i - 1])):
+            # The dims nd-1 are not strided again dimension nd
+            nd_collapse_[i] = 0
+        elif (i in local_axis) != ((i - 1) in local_axis):
+            nd_collapse_[i] = 0
+
+    if verbose > 1:
+        print "nd_collapse_", nd_collapse_
+
+    nd_collapse2 = nd_collapse
+    for i in range(nd_collapse - 1, 0, -1):
+        if nd_collapse_[i] == 1:
+            # update the local dims.
+            local_dims[i - 1] *= local_dims[i]
+            # set new strides
+            local_str[i - 1] = local_str[i]
+            #remove the old dims and strides
+            for j in range(i + 1, nd_collapse):
+                local_dims[j - 1] = local_dims[j]
+                local_str[j - 1] = local_str[j]
+                if axis is not None:
+                    out_strides[j - 2] = out_strides[j - 1]
+
+            if i in local_axis:
+                local_axis.remove(i)
+            for axis_pos in range(len(local_axis)):
+                if local_axis[axis_pos] > i:
+                    local_axis[axis_pos] -= 1
+
+            # update the new number of dim
+            nd_collapse2 -= 1
+
+    nd_collapse = nd_collapse2
+
+    if nd_collapse == 1:
+        if local_str[nd_collapse - 1] == input.itemsize:
+            nd_collapse = 0
+
+    if verbose:
+        print "end collapsing"
+        print " nd_collapse", nd_collapse
+    if verbose > 1:
+        print " local_dims", local_dims
+        print " local_str inputs", local_str
+        print " local_axis", local_axis
+        print " out_strides", out_strides
+
+    #print input.shape, input.strides
+    #print nd_collapse, (local_dims, local_str, local_axis)
+    local_dims = local_dims[:nd_collapse]
+    local_str = local_str[:nd_collapse]
+    out_strides = out_strides[:nd_collapse]
+    return nd_collapse, (local_dims, local_str, local_axis), out_strides
 
 
 def call_elemwise(fct, input_vals, block=None, grid=None, out=None,
@@ -1521,7 +1660,7 @@ class MyGpuNdArray():
         """ multiply all inputs togethers element-wise """
         return cls.__elemwise__(inputs, "mul", theano.tensor.mul)
 
-    def sum(self, axis=None):
+    def sum(self, axis=None, collapse=True):
         import gen_reduction
         max_thread_per_block = 512
         max_block = 4096
@@ -1554,21 +1693,35 @@ class MyGpuNdArray():
 
         args_set = False
 
-        if axis is None and (self.flags["C_CONTIGUOUS"] or
-                             self.flags["F_CONTIGUOUS"]):
+        if collapse:
+            coll_ndim, (coll_shape, coll_strides, coll_axis), coll_out_str = (
+                reduction_collapses([self, out], axis))
+        else:
+            coll_ndim = self.ndim
+            coll_shape = self.shape
+            coll_strides = self.strides
+            coll_axis = [axis]
+            coll_out_str = out.strides
+
+        if axis is not None:
+            coll_axis = coll_axis[0]
+
+        args_set = False
+
+        if coll_ndim == 0:
             sum_op = gen_reduction.GpuSum([1], self.dtype)
             c_code = sum_op.c_support_code_apply("nodename", contig=True)
             fctname = "kernel_reduce_sum_ccontig_nodename"
             fct = compile_gpu_code(c_code, fctname)
-            block_ = min(self.size, max_thread_per_block)
+            block_ = min(coll_shape[0], max_thread_per_block)
             block = (block_, 1, 1)
 
             grid = (1, 1)
             shared_ = self.dtype.itemsize * block_
-            args = [cast_int(self.size), self, out]
+            args = [cast_int(coll_shape[0]), self, out]
             args_set = True
         elif axis is None:
-            pattern = [1] * self.ndim
+            pattern = [1] * coll_ndim
             str_pattern = [str(i) for i in pattern]
             sum_op = gen_reduction.GpuSum(pattern, self.dtype)
             c_code = sum_op.c_support_code_apply("nodename")
@@ -1577,55 +1730,65 @@ class MyGpuNdArray():
                     "GpuNdArray sum case not implemented")
             fctname = "kernel_reduce_sum_" + "".join(str_pattern) + "_nodename"
             fct = compile_gpu_code(c_code, fctname)
-            if self.ndim == 1:
-                bx = min(max_thread_per_block, self.shape[0])
+            if coll_ndim == 1:
+                bx = min(max_thread_per_block, coll_shape[0])
                 block = (bx, 1, 1)
                 block_ = bx
-            elif self.ndim == 2:
-                bx = min(max_thread_per_block, self.shape[1])
-                by = min(max_thread_per_block // self.shape[1], self.shape[0])
+            elif coll_ndim == 2:
+                bx = min(max_thread_per_block, coll_shape[1])
+                by = min(max_thread_per_block // coll_shape[1], coll_shape[0])
                 by = max(by, 1)
                 block = (bx, by, 1)
                 block_ = bx * by
-            elif self.ndim == 3:
-                bx = min(max_thread_per_block, self.shape[2])
-                by = min(max_thread_per_block // bx, self.shape[1])
-                bz = min(max_thread_per_block // (bx * by), self.shape[0])
+            elif coll_ndim == 3:
+                bx = min(max_thread_per_block, coll_shape[2])
+                by = min(max_thread_per_block // bx, coll_shape[1])
+                bz = min(max_thread_per_block // (bx * by), coll_shape[0])
                 by = max(by, 1)
                 bz = min(max(bz, 1), 64)
                 block = (bx, by, bz)
                 block_ = bx * by * bz
-            elif self.ndim == 4:
-                bx = min(max_thread_per_block, self.shape[3])
-                by = min(max_thread_per_block // bx, self.shape[2])
-                bz = min(max_thread_per_block // (bx * by), self.shape[1])
+            elif coll_ndim == 4:
+                bx = min(max_thread_per_block, coll_shape[3])
+                by = min(max_thread_per_block // bx, coll_shape[2])
+                bz = min(max_thread_per_block // (bx * by), coll_shape[1])
                 by = max(by, 1)
                 bz = min(max(bz, 1), 64)
                 block = (bx, by, bz)
                 block_ = bx * by * bz
             grid = (1, 1)
             shared_ = self.dtype.itemsize * block_
-        elif self.ndim == 2 or self.ndim == 3:
-            if self.ndim == 3 and axis == 0:
+        elif coll_ndim in [1, 2, 3]:
+            if coll_ndim == 1:
+                assert coll_axis == 0
+                # pattern 1
+                sum_op = gen_reduction.GpuSum([1], self.dtype)
+                fctname = "kernel_reduce_sum_1_nodename"
+
+                grid = (1, 1)
+
+                block_ = min(max_thread_per_block, coll_shape[0])
+                block = (block_, 1, 1)
+            elif coll_ndim == 3 and coll_axis == 0:
                 # pattern 100
                 sum_op = gen_reduction.GpuSum([1, 0, 0], self.dtype)
                 fctname = "kernel_reduce_sum_100_nodename"
 
-                gx = min(self.shape[1], max_block)
-                gy = min(max_block // (gx * self.shape[2]), self.shape[2])
+                gx = min(coll_shape[1], max_block)
+                gy = min(max_block // (gx * coll_shape[2]), coll_shape[2])
                 gy = max(gy, 1)
                 grid = (gx, gy)
 
-                block_ = min(max_thread_per_block, self.shape[0])
+                block_ = min(max_thread_per_block, coll_shape[0])
                 block = (block_, 1, 1)
-            elif self.ndim == 3 and axis == 1:
+            elif coll_ndim == 3 and coll_axis == 1:
                 # pattern 010
                 sum_op = gen_reduction.GpuSum([0, 1, 0], self.dtype)
                 fctname = "kernel_reduce_sum_010_AD_nodename"
 
-                A = self.shape[0]
-                B = self.shape[1]
-                C = self.shape[2]
+                A = coll_shape[0]
+                B = coll_shape[1]
+                C = coll_shape[2]
                 D = C / 32
                 if (32 * D < C):
                     D += 1
@@ -1648,53 +1811,55 @@ class MyGpuNdArray():
                 args.append(self)
                 # input strides
                 args += [cast_int(i / self.dtype.itemsize)
-                         for i in self.strides]
+                         for i in coll_strides]
                 # output
                 args.append(out)
                 # output strides
-                args.append(cast_int(out.strides[0] / out.dtype.itemsize))
-                args.append(cast_int(out.strides[1] / out.dtype.itemsize))
-            elif self.ndim == 3 and axis == 2:
+                args.append(cast_int(coll_out_str[0] / out.dtype.itemsize))
+                args.append(cast_int(coll_out_str[1] / out.dtype.itemsize))
+            elif coll_ndim == 3 and coll_axis == 2:
                 # pattern 001
                 sum_op = gen_reduction.GpuSum([0, 0, 1], self.dtype)
                 fctname = "kernel_reduce_sum_001_nodename"
 
-                gx = min(self.shape[0], max_block)
-                gy = min(max_block // (gx * self.shape[1]), self.shape[1])
+                gx = min(coll_shape[0], max_block)
+                gy = min(max_block // (gx * coll_shape[1]), coll_shape[1])
                 gy = max(gy, 1)
                 grid = (gx, gy)
 
-                block_ = min(max_thread_per_block, self.shape[2])
+                block_ = min(max_thread_per_block, coll_shape[2])
                 block = (block_, 1, 1)
-            elif axis == 0:
+            elif coll_axis == 0:
                 # pattern 10
                 sum_op = gen_reduction.GpuSum([1, 0], self.dtype)
                 fctname = "kernel_reduce_sum_010_nodename"
-                block_ = min(self.shape[1], max_thread_per_block)
+                block_ = min(coll_shape[1], max_thread_per_block)
                 block = (block_, 1, 1)
-                grid = (1, self.shape[0])
+                grid = (1, coll_shape[0])
                 args_set = True
                 # input shape
                 args = [cast_int(1)]
-                args += [cast_int(i) for i in self.shape]
+                args += [cast_int(i) for i in coll_shape]
                 # input
                 args.append(self)
                 # input strides
                 args.append(cast_int(1))
                 args += [cast_int(i / self.dtype.itemsize)
-                         for i in self.strides]
+                         for i in coll_strides]
                 # output
                 args.append(out)
                 # output strides
                 args.append(cast_int(1))
-                args.append(cast_int(out.strides[0] / out.dtype.itemsize))
-            elif axis == 1:
+                # We must take the last dimensions in the case of
+                # dimensions collapsing.
+                args.append(cast_int(coll_out_str[-1] / out.dtype.itemsize))
+            elif coll_axis == 1:
                 # pattern 01
                 sum_op = gen_reduction.GpuSum([0, 1], self.dtype)
                 fctname = "kernel_reduce_sum_01_nodename"
-                block_ = min(self.shape[1], max_thread_per_block)
+                block_ = min(coll_shape[1], max_thread_per_block)
                 block = (block_, 1, 1)
-                grid = (1, self.shape[0])
+                grid = (1, min(coll_shape[0], max_block))
             else:
                 raise Exception("Bad axis")
 
@@ -1707,20 +1872,24 @@ class MyGpuNdArray():
 
         if not args_set:
             # input shape
-            args = [cast_int(i) for i in self.shape]
+            args = [cast_int(i) for i in coll_shape]
             # input
             args.append(self)
             # input strides
             args += [cast_int(i / self.dtype.itemsize)
-                     for i in self.strides]
+                     for i in coll_strides]
             # output
             args.append(out)
             # output strides
             args += [cast_int(i / self.dtype.itemsize)
-                     for i in out.strides]
+                     for i in coll_out_str]
 
-        #print block, grid, shared_, axis
         pycuda._driver.Context.synchronize()
+        #print fctname, block, grid, shared_, axis
+        #print self.ndim, self.shape, self.strides, axis, out.strides
+        #print coll_ndim, coll_shape, coll_strides, coll_axis, coll_out_str
+        #print args
+
         if False:
             d = {"block": block,
                  "shared": shared_,
