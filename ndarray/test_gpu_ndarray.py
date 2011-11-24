@@ -44,10 +44,14 @@ def check_all(x, y):
 
 
 def gen_gpu_nd_array(shape_orig, dtype='float32', offseted_outer=False,
-                     offseted_inner=False, sliced=False, order='c'):
+                     offseted_inner=False, sliced=1, order='c'):
+    if sliced is True:
+        sliced = 2
+    elif sliced is False:
+        sliced = 1
     shape = numpy.asarray(shape_orig).copy()
-    if sliced and len(shape) > 0:
-        shape[0] *= 2
+    if sliced != 1 and len(shape) > 0:
+        shape[0] *= numpy.absolute(sliced)
     if offseted_outer and len(shape) > 0:
         shape[0] += 1
     if offseted_inner and len(shape) > 0:
@@ -73,9 +77,9 @@ def gen_gpu_nd_array(shape_orig, dtype='float32', offseted_outer=False,
         b = b[..., 1:]
         a = a[..., 1:]
         assert b.offset != 0
-    if sliced and len(shape) > 0:
-        a = a[::2]
-        b = b[::2]
+    if sliced != 1 and len(shape) > 0:
+        a = a[::sliced]
+        b = b[::sliced]
 
     if False and shape_orig == ():
         assert a.shape == (1,)
@@ -158,7 +162,7 @@ def test_ascontiguousarray():
         for dtype in dtypes_all:
             for offseted_o in [True, False]:
                 for offseted_i in [True, True]:
-                    for sliced in [True, False]:
+                    for sliced in [1, 2, -1, -2]:
                         for order in ['f', 'c']:
                             #print shp, dtype, offseted_o, offseted_i,
                             #print sliced, order
@@ -170,10 +174,10 @@ def test_ascontiguousarray():
                             b = gpu_ndarray.ascontiguousarray(gpu)
 
                             # numpy upcast with a view to 1d scalar.
-                            if (sliced or shp == () or
+                            if (sliced != 1 or shp == () or
                                 (offseted_i and len(shp) > 1)):
                                 assert b is not gpu
-                                if not sliced and not offseted_i:
+                                if sliced == 1 and not offseted_i:
                                     assert ((a.data is cpu.data) ==
                                             (b.bytes is gpu.bytes))
                             else:
@@ -193,7 +197,7 @@ def test_asfortranarray():
         for dtype in dtypes_all:
             for offseted_outer in [True, False]:
                 for offseted_inner in [True, False]:
-                    for sliced in [True, False]:
+                    for sliced in [1, 2, -1, -2]:
                         for order in ['f', 'c']:
 #print shp, dtype, offseted_outer, offseted_inner, sliced, order
                             cpu, gpu = gen_gpu_nd_array(shp, dtype,
@@ -206,11 +210,11 @@ def test_asfortranarray():
                             b = gpu_ndarray.asfortranarray(gpu)
 
                             # numpy upcast with a view to 1d scalar.
-                            if (sliced or shp == () or
+                            if (sliced != 1 or shp == () or
                                 (offseted_outer and len(shp) > 1) or
                                 (order != 'f' and len(shp) > 1)):
                                 assert b is not gpu
-                                if (not sliced and not offseted_outer and
+                                if (sliced == 1 and not offseted_outer and
                                     order != 'c'):
                                     assert ((a.data is cpu.data) ==
                                             (b.bytes is gpu.bytes))
