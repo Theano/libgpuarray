@@ -83,6 +83,9 @@ def _fill_dtype_registry(respect_windows):
         register_dtype(np.uint64, ["unsigned %s" % i64_name, "unsigned %s int" % i64_name,
             "%s unsigned int" % i64_name])
 
+    # http://projects.scipy.org/numpy/ticket/2017
+    register_dtype(np.uintp, ["uintptr_t"], alias_ok=True)
+
     register_dtype(np.float32, "float")
     register_dtype(np.float64, "double")
 
