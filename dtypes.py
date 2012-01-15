@@ -72,8 +72,9 @@ def _fill_dtype_registry(respect_windows):
     register_dtype(np.int32, ["int", "signed int"])
     register_dtype(np.uint32, ["unsigned", "unsigned int"])
 
-    if tuple.__itemsize__ * 8 == 64:
-        if 'win32' in platform:
+    is_64_bit = tuple.__itemsize__ * 8 == 64
+    if is_64_bit:
+        if 'win32' in platform and respect_windows:
             i64_name = "long long"
         else:
             i64_name = "long"
