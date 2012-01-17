@@ -27,6 +27,11 @@ struct _gpudata {
   size_t offset;
 };
 
+struct _gpukernel {
+  cl_program p;
+  cl_kernel k;
+}
+
 static const char *get_error_string(cl_int err) {
   switch (err) {
   case CL_SUCCESS:                        return "Success!";
@@ -257,8 +262,40 @@ static int cl_offset(gpudata *b, int off) {
   return 0;
 }
 
+static gpukernel *cl_newkernel(void *ctx, unsigned int count, 
+			       const char **strings, const size_t *lengths,
+			       const char *fname) {
+  gpukernel *res;
+
+  if (count == 0) return GA_INVALID_ERROR;
+
+  res = malloc(sizeof(*res));
+  if (res == NULL) return GA_MEMORY_ERROR;
+  
+  res->p = clCreateProgramWithSource((cl_context)ctx, count, strings, 
+				     lengths, &err);
+  if (err != CL_SUCCESS) {
+    free(res);
+    return GA_IMPL_ERROR;
+  }
+  
+  res->k = clCreateKernel(res->p, fname, &err);
+  if (err != CL_SUCCESS) {
+    clReleaseProgram(res->p);
+    free(res);
+    return GA_IMPL_ERROR;
+  }
+  return res;
+}
+
+static void cl_freekernel(gpukernel *k) {
+  clReleaseKernel(res->k);
+  clReleaseProgram(res->p);
+  free(res);
+}
+
 static const char *cl_error(void) {
   return get_error_string(err);
 }
 
-compyte_buffer_ops opencl_ops = {cl_alloc, cl_free, cl_move, cl_read, cl_write, cl_memset, cl_offset, cl_error};
+compyte_buffer_ops opencl_ops = {cl_alloc, cl_free, cl_move, cl_read, cl_write, cl_memset, cl_offset, cl_newkernel, cl_freekernel, cl_error};

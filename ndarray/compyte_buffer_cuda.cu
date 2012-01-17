@@ -1,4 +1,10 @@
+#include <sys/stat.h>
+#include <sys/uio.h>
+
+#include <fcntl.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
 
 #include "compyte_buffer.h"
 
@@ -6,6 +12,11 @@
 
 struct _gpudata {
     char *ptr;
+};
+
+struct _gpukernel {
+    CUmodule m;
+    CUfunction k;
 };
 
 static gpudata *cuda_alloc(void *ctx /* IGNORED */, size_t size)
@@ -78,12 +89,102 @@ static int cuda_offset(gpudata *buf, int off) {
     return 0;
 }
 
+/* This is a unix version, might need a windows one. */
+static int call_compiler(char *fname, char *oname) {
+    int err;
+    pid_t p;
+    
+    p = fork();
+    if (p == 0) {
+        /* Will need some way to specify arch (or detect it live) */
+        execlp("nvcc", "-xcu", "--cubin", fname, "-o", oname, NULL);
+        exit(1);
+    } else if (p == -1) {
+        return GA_SYS_ERROR;
+    }
+    if (waitpid(p, &err, 0) == -1)
+        return GA_SYS_ERROR;
+    if (WIFSIGNALED(err) || WEXITSTATUS(err) != 0) return GA_SYS_ERROR;
+}
+
+static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
+                                 const char **strings, const size_t *lengths,
+                                 const char *fname) {
+    char namebuf[MAXPATHLEN];
+    char outbuf[MAXPATHLEN];
+    char *tmpdir;
+    int fd, err;
+    ssize_t s;
+    struct iovec descr[count];
+    gpukernel *res;
+
+    if (count == 0) return GA_INVALID_ERROR;
+    
+    if (lengths == NULL) {
+        for (unsigned int i = 0; i < count; i++) {
+            descr[i].iov_base = strings[i];
+            descr[i].iov_len = strlen(strings[i]);
+        }
+    } else {
+        for (unsigned int i = 0; i < count; i++) {
+            descr[i].iov_base = strings[i];
+            descr[i].iov_len = lengths[i];
+        }
+    }
+    
+    tmpdir = getenv("TMPDIR");
+    if (tmpdir == NULL) tmpdir = "/tmp";
+    
+    strlcpy(namebuf, tmpdir, sizeof(namebuf));
+    strlcat(namebuf, "/compyte.cuda.XXXXXXXX", sizeof(namebuf));
+
+    fd = mkstemp(namebuf);
+    if (fd == -1) return GA_SYS_ERROR;
+    
+    strlcpy(outbuf, namebuf, sizeof(outbuf));
+    strlcat(outbuf, ".cubin", sizeof(outbuf));
+    
+    s = writev(fd, descr, count);
+    /* fd is not non-blocking so should have complete write */
+    if (s == -1) {
+        close(fd);
+        unlink(namebuf);
+        return GA_SYS_ERROR;
+    }
+    err = call_compiler(namebuf, outbuf);
+
+    close(fd);
+    unlink(namebuf);
+
+    if (err != GA_NO_ERROR) return err;
+        
+    res = malloc(sizeof(*res));
+    if (res == NULL) return GA_MEMORY_ERROR;
+    
+    if (cuModuleLoad(&res->m, outbuf) != CUDA_SUCCESS) {
+        free(res);
+        return GA_IMPL_ERROR;
+    }
+
+    if (cuModuleGetFunction(&res->k, res->m, fname) != CUDA_SUCCESS) {
+        cuModuleUnload(res->m);
+        free(res);
+        return GA_IMPL_ERROR;
+    }
+    return res;
+}
+
+static void cuda_freekernel(gpukernel *k) {
+    cuModuleUnload(k->m);
+    free(k);
+}
+
 static const char *cuda_error(void)
 {
     return cudaGetErrorString(cudaPeekAtLastError());
 }
 
-compyte_buffer_ops cuda_ops = {cuda_alloc, cuda_free, cuda_move, cuda_read, cuda_write, cuda_memset, cuda_offset, cuda_error};
+compyte_buffer_ops cuda_ops = {cuda_alloc, cuda_free, cuda_move, cuda_read, cuda_write, cuda_memset, cuda_offset, cuda_newkernel, cuda_freekernel, cuda_error};
 
 /*
   Local Variables:

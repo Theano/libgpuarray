@@ -17,6 +17,9 @@ extern "C" {
 struct _gpudata;
 typedef struct _gpudata gpudata;
 
+struct _gpukernel;
+typedef struct _gpukernel gpukernel;
+
 typedef struct _compyte_buffer_ops {
   /* This allocates a buffer of size sz in context ctx */
   gpudata *(*buffer_alloc)(void *ctx, size_t sz);
@@ -33,6 +36,13 @@ typedef struct _compyte_buffer_ops {
   /* Add the specified offset into the buffer, 
      must not go beyond the buffer limits */
   int (*buffer_offset)(gpudata *buf, int offset);
+  /* Compile the kernel composed of the concatenated strings and return
+     a callable kernel.  If lengths is NULL then all the strings must 
+     be NUL-terminated.  Otherwise, it doesn't matter. */
+  gpukernel *(*buffer_newkernel)(void *ctx, unsigned int count, 
+				 const char **strings, const size_t *lengths,
+				 const char *fname);
+  void (*buffer_freekernel)(gpukernel *k);
 
   /* Get a string describing the last error that happened 
      (may change if you make other api calls) */
@@ -88,9 +98,10 @@ enum ga_error {
   GA_NO_ERROR = 0,
   GA_MEMORY_ERROR,
   GA_VALUE_ERROR,
-  GA_IMPL_ERROR,
+  GA_IMPL_ERROR, /* call buffer_error() for more details */
   GA_INVALID_ERROR,
   GA_UNSUPPORTED_ERROR,
+  GA_SYS_ERROR, /* look at errno for more details */
   /* Add more error types if needed */
 };
 
