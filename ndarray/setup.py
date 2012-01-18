@@ -1,8 +1,8 @@
 import os, sys
 
 from distutils.core import setup, Extension
+from distutils.command.build_ext import build_ext
 from distutils.dep_util import newer
-from Cython.distutils import build_ext
 import numpy as np
 
 class build_ext_nvcc(build_ext):
@@ -22,6 +22,7 @@ class build_ext_nvcc(build_ext):
             self._nvcc_bin = os.path.join(self.cuda_root, 'bin', 'nvcc')
         else:
             self._nvcc_bin = 'nvcc'
+
     def cuda_process(self, source, include_args):
         target = source+'.cpp'
         if newer(source, target):
@@ -65,16 +66,15 @@ class build_ext_nvcc(build_ext):
 
         for ext in self.extensions:
             self.cuda_extension(ext)
-            ext.sources = self.cython_sources(ext.sources, ext)
             self.build_extension(ext)
 
 setup(name='compyte',
       cmdclass = {'build_ext': build_ext_nvcc},
       include_dirs = [np.get_include(), '.'],
       ext_modules=[Extension('compyte_buffer',
-                             define_macros = [('WITH_CUDA'), ('WITH_OPENCL')],
+                             define_macros = [('WITH_CUDA','1'), ('WITH_OPENCL','1')],
                              sources = ['compyte_buffer.c',
-                                        'compyte_buffer_cuda.cu'
+                                        'compyte_buffer_cuda.cu',
                                         'compyte_buffer_opencl.c']
                              )
                    ]
