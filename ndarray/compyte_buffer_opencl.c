@@ -30,7 +30,7 @@ struct _gpudata {
 struct _gpukernel {
   cl_program p;
   cl_kernel k;
-}
+};
 
 static const char *get_error_string(cl_int err) {
   switch (err) {
@@ -267,31 +267,31 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
 			       const char *fname) {
   gpukernel *res;
 
-  if (count == 0) return GA_INVALID_ERROR;
+  if (count == 0) return NULL;
 
   res = malloc(sizeof(*res));
-  if (res == NULL) return GA_MEMORY_ERROR;
+  if (res == NULL) return NULL;
   
   res->p = clCreateProgramWithSource((cl_context)ctx, count, strings, 
 				     lengths, &err);
   if (err != CL_SUCCESS) {
     free(res);
-    return GA_IMPL_ERROR;
+    return NULL;
   }
   
   res->k = clCreateKernel(res->p, fname, &err);
   if (err != CL_SUCCESS) {
     clReleaseProgram(res->p);
     free(res);
-    return GA_IMPL_ERROR;
+    return NULL;
   }
   return res;
 }
 
 static void cl_freekernel(gpukernel *k) {
-  clReleaseKernel(res->k);
-  clReleaseProgram(res->p);
-  free(res);
+  clReleaseKernel(k->k);
+  clReleaseProgram(k->p);
+  free(k);
 }
 
 static const char *cl_error(void) {

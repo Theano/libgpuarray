@@ -1,3 +1,4 @@
+#include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
 
@@ -5,6 +6,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+
+#include <cuda.h>
 
 #include "compyte_buffer.h"
 
@@ -105,6 +108,7 @@ static int call_compiler(char *fname, char *oname) {
     if (waitpid(p, &err, 0) == -1)
         return GA_SYS_ERROR;
     if (WIFSIGNALED(err) || WEXITSTATUS(err) != 0) return GA_SYS_ERROR;
+    return 0;
 }
 
 static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
@@ -118,16 +122,16 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     struct iovec descr[count];
     gpukernel *res;
 
-    if (count == 0) return GA_INVALID_ERROR;
+    if (count == 0) return NULL;
     
     if (lengths == NULL) {
         for (unsigned int i = 0; i < count; i++) {
-            descr[i].iov_base = strings[i];
+            descr[i].iov_base = (void *)strings[i];
             descr[i].iov_len = strlen(strings[i]);
         }
     } else {
         for (unsigned int i = 0; i < count; i++) {
-            descr[i].iov_base = strings[i];
+            descr[i].iov_base = (void *)strings[i];
             descr[i].iov_len = lengths[i];
         }
     }
@@ -139,7 +143,7 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     strlcat(namebuf, "/compyte.cuda.XXXXXXXX", sizeof(namebuf));
 
     fd = mkstemp(namebuf);
-    if (fd == -1) return GA_SYS_ERROR;
+    if (fd == -1) return NULL;
     
     strlcpy(outbuf, namebuf, sizeof(outbuf));
     strlcat(outbuf, ".cubin", sizeof(outbuf));
@@ -149,27 +153,27 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     if (s == -1) {
         close(fd);
         unlink(namebuf);
-        return GA_SYS_ERROR;
+        return NULL;
     }
     err = call_compiler(namebuf, outbuf);
 
     close(fd);
     unlink(namebuf);
 
-    if (err != GA_NO_ERROR) return err;
+    if (err != GA_NO_ERROR) return NULL;
         
-    res = malloc(sizeof(*res));
-    if (res == NULL) return GA_MEMORY_ERROR;
+    res = (gpukernel *)malloc(sizeof(*res));
+    if (res == NULL) return NULL;
     
     if (cuModuleLoad(&res->m, outbuf) != CUDA_SUCCESS) {
         free(res);
-        return GA_IMPL_ERROR;
+        return NULL;
     }
 
     if (cuModuleGetFunction(&res->k, res->m, fname) != CUDA_SUCCESS) {
         cuModuleUnload(res->m);
         free(res);
-        return GA_IMPL_ERROR;
+        return NULL;
     }
     return res;
 }
