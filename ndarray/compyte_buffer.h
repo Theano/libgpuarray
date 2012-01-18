@@ -106,7 +106,7 @@ enum ga_error {
 };
 
 static inline int GpuArray_CHKFLAGS(GpuArray *a, int flags) {
-  return a->flags & flags == flags;
+  return (a->flags & flags) == flags;
 }
 /* Add tests here when you need them */
 #define GpuArray_OWNSDATA(a) GpuArray_CHKFLAGS(a, GA_OWNDATA)
