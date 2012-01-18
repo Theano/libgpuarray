@@ -1,3 +1,4 @@
+#include <sys/types.h>
 
 typedef struct _compyte_type {
   const char *name;
