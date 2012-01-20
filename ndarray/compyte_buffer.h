@@ -42,7 +42,18 @@ typedef struct _compyte_buffer_ops {
   gpukernel *(*buffer_newkernel)(void *ctx, unsigned int count, 
 				 const char **strings, const size_t *lengths,
 				 const char *fname);
+  /* Free the kernel and all associated memory (including argument buffers) */
   void (*buffer_freekernel)(gpukernel *k);
+  
+  /* Copy the passed value to a kernel argument buffer */
+  int (*buffer_setkernelarg)(gpukernel *k, unsigned int index, 
+			     size_t sz, const void *val);
+  
+  /* Call the kernel with the previously specified arguments
+     (this is synchronous only for now, might make async later) */
+  int (*buffer_callkernel)(gpukernel *k, unsigned int gx, unsigned int gy,
+			   unsigned int gz, unsigned int lx, unsigned int ly,
+			   unsigned int lz);
 
   /* Get a string describing the last error that happened 
      (may change if you make other api calls) */

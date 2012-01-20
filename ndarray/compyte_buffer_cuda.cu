@@ -20,6 +20,8 @@ struct _gpudata {
 struct _gpukernel {
     CUmodule m;
     CUfunction k;
+    void **args;
+    unsigned int argcount;
 };
 
 static gpudata *cuda_alloc(void *ctx /* IGNORED */, size_t size)
@@ -164,6 +166,8 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
         
     res = (gpukernel *)malloc(sizeof(*res));
     if (res == NULL) return NULL;
+    res->args = NULL;
+    res->argcount = 0;
     
     if (cuModuleLoad(&res->m, outbuf) != CUDA_SUCCESS) {
         free(res);
@@ -175,12 +179,46 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
         free(res);
         return NULL;
     }
+
     return res;
 }
 
 static void cuda_freekernel(gpukernel *k) {
+    for (int i = 0; i < k->argcount; i++)
+        free(k->args[i]);
+    free(k->args);
     cuModuleUnload(k->m);
     free(k);
+}
+
+static int cuda_setkernelarg(gpukernel *k, unsigned int index, size_t sz,
+                             const void *val) {
+    void *tmp;
+    if (index > k->argcount) {
+        tmp = calloc(index+1, sizeof(void *));
+        if (tmp == NULL) return GA_MEMORY_ERROR;
+        bcopy(k->args, tmp, sizeof(void *)*k->argcount);
+        free(k->args);
+        k->args = (void **)tmp;
+        k->argcount = index+1;
+    }
+    tmp = malloc(sz);
+    if (tmp == NULL) return GA_MEMORY_ERROR;
+    bcopy(val, tmp, sz);
+    k->args[index] = tmp;
+    return GA_NO_ERROR;
+}
+
+static int cuda_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
+                           unsigned int gz, unsigned int bx, unsigned int by,
+                           unsigned int bz) {
+    /* Make sure this is synchronous */
+    CUresult err;
+    err = cuLaunchKernel(k->k, gx, gy, gz, bx, by, bz, 0, NULL, k->args, NULL);
+    if (err != CUDA_SUCCESS) {
+        return GA_IMPL_ERROR;
+    }
+    return GA_NO_ERROR;
 }
 
 static const char *cuda_error(void)
@@ -188,7 +226,7 @@ static const char *cuda_error(void)
     return cudaGetErrorString(cudaPeekAtLastError());
 }
 
-compyte_buffer_ops cuda_ops = {cuda_alloc, cuda_free, cuda_move, cuda_read, cuda_write, cuda_memset, cuda_offset, cuda_newkernel, cuda_freekernel, cuda_error};
+compyte_buffer_ops cuda_ops = {cuda_alloc, cuda_free, cuda_move, cuda_read, cuda_write, cuda_memset, cuda_offset, cuda_newkernel, cuda_freekernel, cuda_setkernelarg, cuda_callkernel, cuda_error};
 
 /*
   Local Variables:

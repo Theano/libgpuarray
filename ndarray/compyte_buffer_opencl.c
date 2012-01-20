@@ -30,6 +30,7 @@ struct _gpudata {
 struct _gpukernel {
   cl_program p;
   cl_kernel k;
+  cl_command_queue q;
 };
 
 static const char *get_error_string(cl_int err) {
@@ -84,38 +85,48 @@ static const char *get_error_string(cl_int err) {
   }
 }
 
-static gpudata *cl_alloc(void *ctx, size_t size)
-{
-  gpudata *res;
-  cl_int err;
-  cl_device_id *ids;
+static cl_command_queue make_q(cl_context ctx) {
   size_t sz;
+  cl_device_id *ids;
+  cl_command_queue res;
 
-  /* OpenCL do not always support byte addressing
-     so fudge size to work around that */
-  if (size % 4)
-    size += MIN_SIZE_INCR-(size % MIN_SIZE_INCR);
-
-  if ((err = clGetContextInfo((cl_context)ctx, CL_CONTEXT_DEVICES, 0, NULL, &sz)) != CL_SUCCESS)
+  if ((err = clGetContextInfo(ctx, CL_CONTEXT_DEVICES, 0, NULL, &sz)) != CL_SUCCESS)
     return NULL;
   
   ids = malloc(sz);
   if (ids == NULL)
     return NULL;
 
-  if ((err = clGetContextInfo((cl_context)ctx, CL_CONTEXT_DEVICES, sz, ids, NULL)) != CL_SUCCESS) {
+  if ((err = clGetContextInfo(ctx, CL_CONTEXT_DEVICES, sz, ids, NULL)) != CL_SUCCESS) {
     free(ids);
     return NULL;
   }
+
+  res = clCreateCommandQueue(ctx, ids[0], 0, &err);
+  free(ids);
+  if (err != CL_SUCCESS) {
+    free(res);
+    return NULL;
+  }
+  return res;
+}
+
+static gpudata *cl_alloc(void *ctx, size_t size)
+{
+  gpudata *res;
+  cl_int err;
+
+  /* OpenCL does not always support byte addressing
+     so fudge size to work around that */
+  if (size % 4)
+    size += MIN_SIZE_INCR-(size % MIN_SIZE_INCR);
 
   res = malloc(sizeof(*res));
   if (res == NULL) {
-    free(ids);
     return NULL;
   }
 
-  res->q = clCreateCommandQueue((cl_context)ctx, ids[0], 0, &err);
-  free(ids);
+  res->q = make_q((cl_context)ctx);
   if (err != CL_SUCCESS) {
     free(res);
     return NULL;
@@ -233,7 +244,7 @@ static int cl_memset(gpudata *dst, int data, size_t bytes) {
   
   if (clWaitForEvents(1, &ev) == CL_SUCCESS) {
     /* success! */
-    res = 0;
+    res = GA_NO_ERROR;
   }
   
   clReleaseEvent(ev);
@@ -271,6 +282,8 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
 
   res = malloc(sizeof(*res));
   if (res == NULL) return NULL;
+
+  res->q = make_q((cl_context)ctx);
   
   res->p = clCreateProgramWithSource((cl_context)ctx, count, strings, 
 				     lengths, &err);
@@ -289,13 +302,43 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
 }
 
 static void cl_freekernel(gpukernel *k) {
+  clReleaseCommandQueue(k->q);
   clReleaseKernel(k->k);
   clReleaseProgram(k->p);
   free(k);
+}
+
+static int cl_setkernelarg(gpukernel *k, unsigned int index, size_t sz,
+			   const void *val) {
+  err = clSetKernelArg(k->k, index, sz, val);
+  if (err != CL_SUCCESS) {
+    return GA_IMPL_ERROR;
+  }
+  return GA_NO_ERROR;
+}
+
+static int cl_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
+			 unsigned int gz, unsigned int lx, unsigned int ly,
+			 unsigned int lz) {
+  /* Have to figure out command queue stuff */
+  size_t gs[3], ls[3];
+  cl_event ev;
+
+  gs[0] = gx, gs[1] = gy, gs[2] = gz;
+  ls[0] = lx, gs[1] = ly, gs[2] = lz;
+
+  err = clEnqueueNDRangeKernel(k->q, k->k, 3, NULL, gs, ls, 0, NULL, &ev);
+  if (err != CL_SUCCESS) return GA_IMPL_ERROR;
+
+  err = clWaitForEvents(1, &ev);
+  clReleaseEvent(ev);
+  if (err != CL_SUCCESS) return GA_IMPL_ERROR;
+
+  return GA_NO_ERROR;
 }
 
 static const char *cl_error(void) {
   return get_error_string(err);
 }
 
-compyte_buffer_ops opencl_ops = {cl_alloc, cl_free, cl_move, cl_read, cl_write, cl_memset, cl_offset, cl_newkernel, cl_freekernel, cl_error};
+compyte_buffer_ops opencl_ops = {cl_alloc, cl_free, cl_move, cl_read, cl_write, cl_memset, cl_offset, cl_newkernel, cl_freekernel, cl_setkernelarg, cl_callkernel, cl_error};
