@@ -51,7 +51,18 @@ class ArrayFlags:
 
 
 def get_common_dtype(obj1, obj2):
-    return (obj1.dtype.type(0) + obj2.dtype.type(0)).dtype
+    # Yes, numpy behaves differently depending on whether
+    # we're dealing with arrays or scalars.
+
+    zero1 = np.zeros(1, dtype=obj1.dtype)
+
+    try:
+        zero2 = np.zeros(1, dtype=obj2.dtype)
+    except AttributeError:
+        zero2 = obj2
+
+    return (zero1 + zero2).dtype
+
 
 
 def bound(a):
@@ -65,9 +76,9 @@ def bound(a):
             high += (stri)*(shp-1)
     return low, high
 
-def may_share_memory(a,b):
-    #when this is called with a an ndarray and b
-    #a sparce matrix, numpy.may_share_memory fail.
+def may_share_memory(a, b):
+    # When this is called with a an ndarray and b
+    # a sparse matrix, numpy.may_share_memory fails.
     if a is b:
         return True
     if a.__class__ is b.__class__:
