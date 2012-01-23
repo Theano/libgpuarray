@@ -3,6 +3,13 @@
 #define COMPYTE_TYPES
 #include <sys/types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+#ifdef CONFUSE_EMACS
+}
+#endif
+
 typedef struct _compyte_type {
   const char *cl_name;
   const char *cuda_name;
@@ -87,6 +94,10 @@ enum COMPYTE_TYPES {
 };
 
 extern compyte_type scalar_types[];
-extern compute_type vector_types[];
+extern compyte_type vector_types[];
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* COMPYTE_TYPES */

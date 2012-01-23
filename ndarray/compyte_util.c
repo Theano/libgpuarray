@@ -1,6 +1,6 @@
 #include <assert.h>
 
-#include "compute_util.h"
+#include "compyte_util.h"
 
 compyte_type *compyte_get_type(int typecode) {
   if (typecode < GA_DELIM) {
@@ -9,6 +9,7 @@ compyte_type *compyte_get_type(int typecode) {
   } else {
     assert(vector_types[typecode-256].typecode = typecode);
     return &vector_types[typecode-256];
+  }
 }
 
 size_t compyte_get_elsize(int typecode) {

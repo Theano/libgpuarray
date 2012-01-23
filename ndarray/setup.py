@@ -73,7 +73,9 @@ setup(name='compyte',
       include_dirs = [np.get_include(), '.'],
       ext_modules=[Extension('compyte_buffer',
                              define_macros = [('WITH_CUDA','1'), ('WITH_OPENCL','1')],
-                             sources = ['compyte_buffer.c',
+                             sources = ['compyte_types.c',
+                                        'compyte_util.c',
+                                        'compyte_buffer.c',
                                         'compyte_buffer_cuda.cu',
                                         'compyte_buffer_opencl.c']
                              )

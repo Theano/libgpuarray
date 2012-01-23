@@ -7,6 +7,8 @@
 #include <sys/types.h>
 #include <stdio.h>
 
+#include "compyte_util.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -71,14 +73,13 @@ extern compyte_buffer_ops opencl_ops;
 typedef struct _GpuArray {
   gpudata *data;
   compyte_buffer_ops *ops;
-  int nd;
-  int flags;
-  
-  /* XXX: Replace this by a dtype code like numpy? */
-  size_t elsize;
   size_t *dimensions;
   ssize_t *strides;
   size_t total_size;
+  int nd;
+  int flags;
+  int typecode;
+
   /* Try to keep in sync with numpy values for now*/
 #define GA_C_CONTIGUOUS   0x0001
 #define GA_F_CONTIGUOUS   0x0002
@@ -125,12 +126,12 @@ static inline int GpuArray_CHKFLAGS(GpuArray *a, int flags) {
 #define GpuArray_ISALIGNED(a) GpuArray_CHKFLAGS(a, GA_ALIGNED)
 #define GpuArray_ISONESEGMENT(a) ((a)->flags & (GA_C_CONTIGUOUS|GA_F_CONTIGUOUS))
 #define GpuArray_ISFORTRAN(a) GpuArray_CHKFLAGS(a, GA_F_CONTIGUOUS)
-#define GpuArray_ITEMSIZE(a) ((a)->elsize) /* For now */
+#define GpuArray_ITEMSIZE(a) compyte_get_elsize((a)->typecode) /* For now */
 
 int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
-		   size_t elsize, int nd, size_t *dims, ga_order ord);
+		   int typecode, int nd, size_t *dims, ga_order ord);
 int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
-		   size_t elsize, int nd, size_t *dims, ga_order ord);
+		   int typecode, int nd, size_t *dims, ga_order ord);
 
 void GpuArray_clear(GpuArray *a);
 

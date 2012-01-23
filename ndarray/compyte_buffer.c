@@ -1,15 +1,15 @@
-#include "compyte_buffer.h"
-
 #include <assert.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <strings.h>
 
+#include "compyte_buffer.h"
+
 #define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
 
 int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
-		   size_t elsize, int nd, size_t *dims, ga_order ord) {
-  size_t size = elsize;
+		   int typecode, int nd, size_t *dims, ga_order ord) {
+  size_t size = compyte_get_elsize(typecode);
   int i;
 
   if (ord == GA_ANY_ORDER)
@@ -29,7 +29,7 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
   a->data = a->ops->buffer_alloc(ctx, size);
   a->total_size = size;
   a->nd = nd;
-  a->elsize = elsize;
+  a->typecode = typecode;
   a->dimensions = calloc(nd, sizeof(size_t));
   a->strides = calloc(nd, sizeof(ssize_t));
   /* F/C distinction comes later */
@@ -41,7 +41,7 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
   /* Mult will not overflow since calloc succeded */
   bcopy(dims, a->dimensions, sizeof(size_t)*nd);
 
-  size = elsize;
+  size = compyte_get_elsize(typecode);
   /* mults will not overflow, checked on entry */
   switch (ord) {
   case GA_C_ORDER:
@@ -69,9 +69,9 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 }
 
 int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
-                   size_t elsize, int nd, size_t *dims, ga_order ord) {
+                   int typecode, int nd, size_t *dims, ga_order ord) {
   int err;
-  err = GpuArray_empty(a, ops, ctx, elsize, nd, dims, ord);
+  err = GpuArray_empty(a, ops, ctx, typecode, nd, dims, ord);
   if (err != GA_NO_ERROR)
     return err;
   err = a->ops->buffer_memset(a->data, 0, a->total_size);
@@ -127,6 +127,7 @@ void GpuArray_fprintf(FILE *fd, const GpuArray *a) {
 
   fprintf(fd, "GpuNdArray <%p, %p> nd=%d\n", a, a->data, a->nd);
   fprintf(fd, "\tITEMSIZE: %zd\n", GpuArray_ITEMSIZE(a));
+  fprintf(fd, "\tTYPECODE: %d\n", a->typecode);
   fprintf(fd, "\tHOST_DIMS:      ");
   for (i = 0; i < a->nd; ++i)
     {
