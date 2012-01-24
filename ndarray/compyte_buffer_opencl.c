@@ -33,6 +33,18 @@ struct _gpukernel {
   cl_command_queue q;
 };
 
+static gpukernel *cl_newkernel(void *ctx, unsigned int count,
+			       const char **strings, const size_t *lengths,
+			       const char *fname);
+static void cl_freekernel(gpukernel *k);
+static int cl_setkernelarg(gpukernel *k, unsigned int index,
+			   size_t sz, const void *val);
+static int cl_setkernelargbuf(gpukernel *k, unsigned int index,
+			      gpudata *b);
+static int cl_callkernel(gpukernel *k, unsigned int, unsigned int,
+			 unsigned int, unsigned int, unsigned int,
+			 unsigned int);
+
 static const char *get_error_string(cl_int err) {
   switch (err) {
   case CL_SUCCESS:                        return "Success!";
@@ -192,11 +204,8 @@ static int cl_memset(gpudata *dst, int data, size_t bytes) {
   size_t sz;
   int r, res = GA_IMPL_ERROR;
 
-  cl_event ev;
-  cl_program p;
-  cl_kernel k;
   cl_context ctx;
-  cl_device_id dev;
+  cl_event ev;
 
   /* OpenCL devices do not always support byte-addressable storage
      and stuff will break when used in this way */
@@ -209,37 +218,19 @@ static int cl_memset(gpudata *dst, int data, size_t bytes) {
   if (err != CL_SUCCESS)
     return GA_IMPL_ERROR;
 
-  err = clGetCommandQueueInfo(dst->q, CL_QUEUE_DEVICE, sizeof(dev), &dev, NULL);
-  if (err != CL_SUCCESS)
-    return GA_IMPL_ERROR;
-
   r = snprintf(local_kern, sizeof(local_kern),
 	       "__kernel void memset(__global unsigned int *mem) { mem[get_global_id(0)] = %u; }", pattern);
-  /* If this assert fires, increase the size of local_kern above. */ 
+  /* If this assert fires, increase the size of local_kern above. */
   assert(r <= sizeof(local_kern));
 
   sz = strlen(local_kern);
   rlk[0] = local_kern;
-  p = clCreateProgramWithSource(ctx, 1, rlk, &sz, &err);
-  if (err != CL_SUCCESS) {
-    return GA_IMPL_ERROR;
-  }
 
-  if (clBuildProgram(p, 1, &dev, NULL, NULL, NULL) != CL_SUCCESS) {
-    goto fail_prog;
-  }
+  gpukernel *m = cl_newkernel(ctx, 1, rlk, &sz, "memset");
+  cl_setkernelargbuf(m, 0, dst);
 
-  k = clCreateKernel(p, "memset", &err);
-  if (err != CL_SUCCESS) {
-    goto fail_prog;
-  }
-
-  if (clSetKernelArg(k, 0, sizeof(cl_mem), &dst->buf) != CL_SUCCESS) {
-    goto fail_kern;
-  }
-
-  if (clEnqueueNDRangeKernel(dst->q, k, 1, NULL, &bytes, NULL, 0, NULL, &ev) != CL_SUCCESS) {
-    goto fail_kern;
+  if (clEnqueueNDRangeKernel(m->q, m->k, 1, NULL, &bytes, NULL, 0, NULL, &ev) != CL_SUCCESS) {
+    goto fail;
   }
   
   if (clWaitForEvents(1, &ev) == CL_SUCCESS) {
@@ -248,10 +239,8 @@ static int cl_memset(gpudata *dst, int data, size_t bytes) {
   }
   
   clReleaseEvent(ev);
- fail_kern:
-  clReleaseKernel(k);
- fail_prog:
-  clReleaseProgram(p);
+ fail:
+  cl_freekernel(m);
   return res;
 }
 
@@ -277,6 +266,7 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
 			       const char **strings, const size_t *lengths,
 			       const char *fname) {
   gpukernel *res;
+  cl_device_id dev;
 
   if (count == 0) return NULL;
 
@@ -285,26 +275,38 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
 
   res->q = make_q((cl_context)ctx);
   
-  res->p = clCreateProgramWithSource((cl_context)ctx, count, strings, 
-				     lengths, &err);
+  err = clGetCommandQueueInfo(res->q,CL_QUEUE_DEVICE,sizeof(dev),&dev,NULL);
   if (err != CL_SUCCESS) {
-    free(res);
+    cl_freekernel(res);
     return NULL;
   }
   
-  res->k = clCreateKernel(res->p, fname, &err);
+  res->p = clCreateProgramWithSource((cl_context)ctx, count, strings,
+				     lengths, &err);
   if (err != CL_SUCCESS) {
-    clReleaseProgram(res->p);
-    free(res);
+    cl_freekernel(res);
     return NULL;
   }
+
+  err = clBuildProgram(res->p, 1, &dev, NULL, NULL, NULL);
+  if (err != CL_SUCCESS) {
+    cl_freekernel(res);
+    return NULL;
+  }  
+
+  res->k = clCreateKernel(res->p, fname, &err);
+  if (err != CL_SUCCESS) {
+    cl_freekernel(res);
+    return NULL;
+  }
+
   return res;
 }
 
 static void cl_freekernel(gpukernel *k) {
-  clReleaseCommandQueue(k->q);
-  clReleaseKernel(k->k);
-  clReleaseProgram(k->p);
+  if (k->q) clReleaseCommandQueue(k->q);
+  if (k->k) clReleaseKernel(k->k);
+  if (k->p) clReleaseProgram(k->p);
   free(k);
 }
 
@@ -327,11 +329,24 @@ static int cl_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
   /* Have to figure out command queue stuff */
   size_t gs[3], ls[3];
   cl_event ev;
+  size_t *gsp, *lsp;
 
   gs[0] = gx, gs[1] = gy, gs[2] = gz;
   ls[0] = lx, gs[1] = ly, gs[2] = lz;
 
-  err = clEnqueueNDRangeKernel(k->q, k->k, 3, NULL, gs, ls, 0, NULL, &ev);
+  if ((gx == 0) && (gx == gy) && (gx == gz)) {
+    gsp = NULL;
+  } else {
+    gsp = gs;
+  }
+
+  if ((lx == 0) && (lx == ly) && (lx == lz)) {
+    lsp = NULL;
+  } else {
+    lsp = ls;
+  }
+
+  err = clEnqueueNDRangeKernel(k->q, k->k, 3, NULL, gsp, lsp, 0, NULL, &ev);
   if (err != CL_SUCCESS) return GA_IMPL_ERROR;
 
   err = clWaitForEvents(1, &ev);
