@@ -317,6 +317,10 @@ static int cl_setkernelarg(gpukernel *k, unsigned int index, size_t sz,
   return GA_NO_ERROR;
 }
 
+static int cl_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
+  return cl_setkernelarg(k, index, sizeof(cl_mem), &b->buf);
+}
+
 static int cl_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
 			 unsigned int gz, unsigned int lx, unsigned int ly,
 			 unsigned int lz) {
@@ -341,4 +345,4 @@ static const char *cl_error(void) {
   return get_error_string(err);
 }
 
-compyte_buffer_ops opencl_ops = {cl_alloc, cl_free, cl_move, cl_read, cl_write, cl_memset, cl_offset, cl_newkernel, cl_freekernel, cl_setkernelarg, cl_callkernel, cl_error};
+compyte_buffer_ops opencl_ops = {cl_alloc, cl_free, cl_move, cl_read, cl_write, cl_memset, cl_offset, cl_newkernel, cl_freekernel, cl_setkernelarg, cl_setkernelargbuf, cl_callkernel, cl_error};

@@ -184,7 +184,7 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
 }
 
 static void cuda_freekernel(gpukernel *k) {
-    for (int i = 0; i < k->argcount; i++)
+    for (unsigned int i = 0; i < k->argcount; i++)
         free(k->args[i]);
     free(k->args);
     cuModuleUnload(k->m);
@@ -209,6 +209,10 @@ static int cuda_setkernelarg(gpukernel *k, unsigned int index, size_t sz,
     return GA_NO_ERROR;
 }
 
+static int cuda_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
+    return cuda_setkernelarg(k, index, sizeof(void *), &b->ptr);
+}
+
 static int cuda_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
                            unsigned int gz, unsigned int bx, unsigned int by,
                            unsigned int bz) {
@@ -226,7 +230,7 @@ static const char *cuda_error(void)
     return cudaGetErrorString(cudaPeekAtLastError());
 }
 
-compyte_buffer_ops cuda_ops = {cuda_alloc, cuda_free, cuda_move, cuda_read, cuda_write, cuda_memset, cuda_offset, cuda_newkernel, cuda_freekernel, cuda_setkernelarg, cuda_callkernel, cuda_error};
+compyte_buffer_ops cuda_ops = {cuda_alloc, cuda_free, cuda_move, cuda_read, cuda_write, cuda_memset, cuda_offset, cuda_newkernel, cuda_freekernel, cuda_setkernelarg, cuda_setkernelargbuf, cuda_callkernel, cuda_error};
 
 /*
   Local Variables:
