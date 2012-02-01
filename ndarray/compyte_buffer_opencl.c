@@ -205,7 +205,6 @@ static int cl_memset(gpudata *dst, int data, size_t bytes) {
   int r, res = GA_IMPL_ERROR;
 
   cl_context ctx;
-  cl_event ev;
 
   /* OpenCL devices do not always support byte-addressable storage
      and stuff will break when used in this way */
@@ -227,18 +226,11 @@ static int cl_memset(gpudata *dst, int data, size_t bytes) {
   rlk[0] = local_kern;
 
   gpukernel *m = cl_newkernel(ctx, 1, rlk, &sz, "memset");
-  cl_setkernelargbuf(m, 0, dst);
+  if (m == NULL) return res;
+  res = cl_setkernelargbuf(m, 0, dst);
+  if (res != GA_NO_ERROR) goto fail;
+  res = cl_callkernel(m, 0, 0, 0, 0, 0, 0);
 
-  if (clEnqueueNDRangeKernel(m->q, m->k, 1, NULL, &bytes, NULL, 0, NULL, &ev) != CL_SUCCESS) {
-    goto fail;
-  }
-  
-  if (clWaitForEvents(1, &ev) == CL_SUCCESS) {
-    /* success! */
-    res = GA_NO_ERROR;
-  }
-  
-  clReleaseEvent(ev);
  fail:
   cl_freekernel(m);
   return res;
@@ -326,23 +318,14 @@ static int cl_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
 static int cl_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
 			 unsigned int gz, unsigned int lx, unsigned int ly,
 			 unsigned int lz) {
-  /* Have to figure out command queue stuff */
   size_t gs[3], ls[3];
   cl_event ev;
   size_t *gsp, *lsp;
-
-  gs[0] = gx, gs[1] = gy, gs[2] = gz;
-  ls[0] = lx, gs[1] = ly, gs[2] = lz;
-
-  if ((gx == 0) && (gx == gy) && (gx == gz)) {
-    gsp = NULL;
-  } else {
-    gsp = gs;
-  }
-
+  
   if ((lx == 0) && (lx == ly) && (lx == lz)) {
     lsp = NULL;
   } else {
+    ls[0] = lx, gs[1] = ly, gs[2] = lz;
     lsp = ls;
   }
 
@@ -356,8 +339,87 @@ static int cl_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
   return GA_NO_ERROR;
 }
 
+static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
+  "#define DTYPEB %s\n"
+  "__kernel void elemk(__global const DTYPEA *a_data,"
+  "                    __global DTYPEB *b_data){"
+  "const int idx = get_global_id(0);"
+  "const int numThreads = get_global_size(0);"
+  "for (int i = idx; i < %zu; i+= numThreads) {"
+  "const DTYPE *a = a_data;"
+  "DTYPEB *b = b_data;";
+
+static const char ELEM_FOOTER[] = "}}\n";
+
+static int cl_elemwise(gpudata *input, gpudata *output, int intype,
+		       int outtype, char *op, unsigned int nd,
+		       size_t *dims, ssize_t *a_str, ssize_t *b_str) {
+  char *strs[32];
+  unsigned int count = 0;
+  int res = GA_SYS_ERROR;
+  unsigned int i;
+
+  size_t nEls = 1;
+  for (i = 0; i < nd; i++) {
+    nEls *= dims[i];
+  }
+
+  if (asprintf(&strs[count], ELEM_HEADER,
+	       compyte_get_type(intype)->cl_name,
+	       compyte_get_type(outtype)->cl_name,
+	       nEls) == -1)
+    goto fail;
+  count++;
+  
+  if (0) { /* contiguous case */
+    if (asprintf(&strs[count], "b[i] %s a[i];", op) == -1)
+      goto fail;
+    count++;
+  } else {
+    if (nd > 0) {
+      strs[count] = "int ii = i;";
+      count++;
+
+      for (i = nd; i > 1; i--) {
+	if (asprintf(&strs[count], "int pos%1$d = ii %% %2$zu;"
+		     "ii = ii / %2$zu;a += pos%1$d * %3$zd;"
+		     "b += pos%1$d *%4$zd;", nd-1,
+		     dims[nd-1], a_str[nd-1], b_str[nd-1]) == -1)
+	  goto fail;
+	count++;
+      }
+      if (asprintf(&strs[count], "int pos0 = ii;a += pos0 * %1$zd;"
+		   "b += pos0 * %2$zd;", a_str[0], b_str[0]) == -1)
+	goto fail;
+      count++;
+    }
+    if (asprintf(&strs[count], "b[0] %s a[0];", op) == -1)
+      goto fail;
+    count++;
+  }
+  strs[count] = (char *)ELEM_FOOTER;
+  count++;
+
+  assert(count < (sizeof(strs)/sizeof(strs[0])));
+
+  res = GA_IMPL_ERROR;
+  gpukernel *k = cl_newkernel(NULL, count, (const char **)strs, NULL, "elemk");
+  if (k == NULL) goto fail;
+  res = cl_setkernelargbuf(k, 0, input);
+  if (res != GA_NO_ERROR) goto fail;
+  res = cl_setkernelargbuf(k, 1, output);
+  if (res != GA_NO_ERROR) goto fail;
+
+  res = cl_callkernel(k, nEls, 1, 1, 0, 0, 0);
+ fail:
+  for (i = 0; i< count; i++) {
+    free(strs[i]);
+  }
+  return res;
+}
+
 static const char *cl_error(void) {
   return get_error_string(err);
 }
 
-compyte_buffer_ops opencl_ops = {cl_alloc, cl_free, cl_move, cl_read, cl_write, cl_memset, cl_offset, cl_newkernel, cl_freekernel, cl_setkernelarg, cl_setkernelargbuf, cl_callkernel, cl_error};
+compyte_buffer_ops opencl_ops = {cl_alloc, cl_free, cl_move, cl_read, cl_write, cl_memset, cl_offset, cl_newkernel, cl_freekernel, cl_setkernelarg, cl_setkernelargbuf, cl_callkernel, cl_elemwise, cl_error};

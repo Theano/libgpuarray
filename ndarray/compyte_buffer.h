@@ -59,6 +59,11 @@ typedef struct _compyte_buffer_ops {
 			   unsigned int gz, unsigned int lx, unsigned int ly,
 			   unsigned int lz);
 
+  /* Function to facilitate copy and cast operations*/
+  int (*buffer_elemwise)(gpudata *input, gpudata *output, int intype,
+			 int outtype, char *op, unsigned int nd,
+			 size_t *dims, ssize_t *a_str, ssize_t *b_str);
+
   /* Get a string describing the last error that happened 
      (may change if you make other api calls) */
   const char *(*buffer_error)(void);
@@ -77,7 +82,7 @@ typedef struct _GpuArray {
   compyte_buffer_ops *ops;
   size_t *dimensions;
   ssize_t *strides;
-  size_t total_size;
+  size_t total_size; /* in bytes, not elements */
   int nd;
   int flags;
   int typecode;

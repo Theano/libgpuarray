@@ -2,6 +2,7 @@
 #include <sys/stat.h>
 #include <sys/uio.h>
 
+#include <assert.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -10,6 +11,7 @@
 #include <cuda.h>
 
 #include "compyte_buffer.h"
+#include "compyte_util.h"
 
 #define CNDA_THREAD_SYNC cudaThreadSynchronize()
 
@@ -216,13 +218,110 @@ static int cuda_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
 static int cuda_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
                            unsigned int gz, unsigned int bx, unsigned int by,
                            unsigned int bz) {
-    /* Make sure this is synchronous */
     CUresult err;
+    
     err = cuLaunchKernel(k->k, gx, gy, gz, bx, by, bz, 0, NULL, k->args, NULL);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
+    err = cuCtxSynchronize();
+    if (err != CUDA_SUCCESS) {
+        return GA_IMPL_ERROR;
+    }
     return GA_NO_ERROR;
+}
+
+static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
+    "#define DTYPEB %s\n"
+    "__global__ void elemk(const DTYPEA *a_data, DTYPEB *b_data) {"
+    "const int idx = blockIdx.x * blockDim.x + threadIdx.x;"
+    "const int numThreads = blockDim.x * gridDim.x;"
+    "for (int i = idx; i < %zu; i += numThreads) {"
+    "const DTYPEA *a = a_data;"
+    "DTYPEB *b = b_data;";
+
+static const char ELEM_FOOTER[] = "}}\n";
+
+static inline unsigned int xmin(unsigned long a, unsigned long b) {
+    return (unsigned int)((a < b) ? a : b);
+}
+
+static int cuda_elemwise(gpudata *input, gpudata *output, int intype,
+                         int outtype, char *op, unsigned int nd,
+                         size_t *dims, ssize_t *a_str, ssize_t *b_str) {
+    char *strs[32];
+    unsigned int count = 0;
+    int res = GA_SYS_ERROR;
+    
+    size_t nEls = 1;
+    gpukernel *k;
+
+    for (unsigned int i = 0; i < nd; i++) {
+        nEls *= dims[i];
+    }
+    
+    if (asprintf(&strs[count], ELEM_HEADER,
+                 compyte_get_type(intype)->cuda_name,
+                 compyte_get_type(outtype)->cuda_name,
+                 nEls) == -1)
+        goto fail;
+    count++;
+
+    if (0) { /* contiguous case */
+        if (asprintf(&strs[count], "b[i] %s a[i];", op) == -1)
+            goto fail;
+        count++;
+    } else {
+        if (nd > 0) {
+            strs[count] = "int ii = i;";
+            count++;
+
+            for (int i = nd; i > 1; i--) {
+                if (asprintf(&strs[count], "int pos%1$d = ii %% %2$zu;"
+                             "ii = ii / %2$zu;a += pos%1$d * %3$zd;"
+                             "b += pos%1$d *%4$zd;", nd-1,
+                             dims[nd-1], a_str[nd-1], b_str[nd-1]) == -1)
+                    goto fail;
+                count++;
+            }
+            
+            if (asprintf(&strs[count], "int pos0 = ii;a += pos0 * %1$zd;"
+                         "b += pos0 * %2$zd;", a_str[0], b_str[0]) == -1)
+                goto fail;
+            count++;
+        }
+        if (asprintf(&strs[count], "b[0] %s a[0];", op) == -1)
+            goto fail;
+        count++;
+    }
+
+    strs[count] = (char *)ELEM_FOOTER;
+    count++;
+    
+    assert(count < (sizeof(strs)/sizeof(strs[0])));
+
+    res = GA_IMPL_ERROR;
+    k = cuda_newkernel(NULL, count, (const char **)strs, NULL, "elemk");
+    if (k == NULL) goto fail;
+    res = cuda_setkernelargbuf(k, 0, input);
+    if (res != GA_NO_ERROR) goto fail;
+    res = cuda_setkernelargbuf(k, 1, output);
+    if (res != GA_NO_ERROR) goto fail;
+
+    /* XXX: Revise this crappy block/grid assigment */
+    unsigned int gx, bx;
+    bx = xmin(32, nEls);
+    gx = xmin((nEls/bx)+((nEls % bx != 0)?1:0), 60);
+    if (bx*gx < nEls)
+        bx = xmin(nEls/gx, 512);
+
+    res = cuda_callkernel(k, gx, 1, 1, bx, 1, 1);
+
+fail:
+    for (unsigned int i = 0; i < count; i++) {
+        free(strs[i]);
+    }
+    return res;
 }
 
 static const char *cuda_error(void)
@@ -230,7 +329,7 @@ static const char *cuda_error(void)
     return cudaGetErrorString(cudaPeekAtLastError());
 }
 
-compyte_buffer_ops cuda_ops = {cuda_alloc, cuda_free, cuda_move, cuda_read, cuda_write, cuda_memset, cuda_offset, cuda_newkernel, cuda_freekernel, cuda_setkernelarg, cuda_setkernelargbuf, cuda_callkernel, cuda_error};
+compyte_buffer_ops cuda_ops = {cuda_alloc, cuda_free, cuda_move, cuda_read, cuda_write, cuda_memset, cuda_offset, cuda_newkernel, cuda_freekernel, cuda_setkernelarg, cuda_setkernelargbuf, cuda_callkernel, cuda_elemwise, cuda_error};
 
 /*
   Local Variables:
