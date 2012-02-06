@@ -36,6 +36,7 @@ enum COMPYTE_TYPES {
   GA_CDOUBLE = 15,
   GA_CLONGDOUBLE = 16,
   GA_HALF = 23,
+  GA_NBASE = 24,
 
   GA_DELIM = 255, /* To be forward-compatible with numpy */
 

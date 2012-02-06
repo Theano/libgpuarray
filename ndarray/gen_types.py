@@ -79,6 +79,7 @@ for i in range(ntypes):
     if i in TYPEMAP:
         header.write("  "+TYPEMAP[i][3]+" = "+str(i)+",\n")
 
+header.write("  GA_NBASE = "+str(ntypes)+",\n")
 header.write("\n  GA_DELIM = 255, /* To be forward-compatible with numpy */\n\n")
 
 for i in range(nvec):
