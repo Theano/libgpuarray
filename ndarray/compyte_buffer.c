@@ -8,7 +8,7 @@
 #define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
 
 int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
-		   int typecode, int nd, size_t *dims, ga_order ord) {
+		   int typecode, unsigned int nd, size_t *dims, ga_order ord) {
   size_t size = compyte_get_elsize(typecode);
   int i;
 
@@ -69,7 +69,7 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 }
 
 int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
-                   int typecode, int nd, size_t *dims, ga_order ord) {
+                   int typecode, unsigned int nd, size_t *dims, ga_order ord) {
   int err;
   err = GpuArray_empty(a, ops, ctx, typecode, nd, dims, ord);
   if (err != GA_NO_ERROR)

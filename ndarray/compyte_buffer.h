@@ -83,7 +83,7 @@ typedef struct _GpuArray {
   size_t *dimensions;
   ssize_t *strides;
   size_t total_size; /* in bytes, not elements */
-  int nd;
+  unsigned int nd;
   int flags;
   int typecode;
 
@@ -136,9 +136,9 @@ static inline int GpuArray_CHKFLAGS(GpuArray *a, int flags) {
 #define GpuArray_ITEMSIZE(a) compyte_get_elsize((a)->typecode) /* For now */
 
 int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
-		   int typecode, int nd, size_t *dims, ga_order ord);
+		   int typecode, unsigned int nd, size_t *dims, ga_order ord);
 int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
-		   int typecode, int nd, size_t *dims, ga_order ord);
+		   int typecode, unsigned int nd, size_t *dims, ga_order ord);
 
 void GpuArray_clear(GpuArray *a);
 
