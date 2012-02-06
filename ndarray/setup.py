@@ -1,8 +1,17 @@
 import os, sys
+import subprocess
+
+have_cython = False
+
+try:
+    from Cython.disutils import build_ext
+    have_cython = True
+except:
+    from distutils.command.build_ext import build_ext
 
 from distutils.core import setup, Extension
-from distutils.command.build_ext import build_ext
 from distutils.dep_util import newer
+
 import numpy as np
 
 class build_ext_nvcc(build_ext):
@@ -66,18 +75,28 @@ class build_ext_nvcc(build_ext):
 
         for ext in self.extensions:
             self.cuda_extension(ext)
+            if have_cython:
+                ext.sources = self.cython_sources(ext.sources, ext)
             self.build_extension(ext)
+
+# These are always there
+srcs = ['compyte_types.c', 'compyte_util.c', 'compyte_buffer.c']
+
+# Will need some way of detecting those
+srcs.append('compyte_buffer_cuda.cu')
+srcs.append('compyte_buffer_opencl.c')
+
+if have_cython:
+    srcs.append('pygpu_ndarray.pyx')
+else:
+    srcs.append('pygpu_ndarray.c')
 
 setup(name='compyte',
       cmdclass = {'build_ext': build_ext_nvcc},
       include_dirs = [np.get_include(), '.'],
       ext_modules=[Extension('compyte_buffer',
                              define_macros = [('WITH_CUDA','1'), ('WITH_OPENCL','1')],
-                             sources = ['compyte_types.c',
-                                        'compyte_util.c',
-                                        'compyte_buffer.c',
-                                        'compyte_buffer_cuda.cu',
-                                        'compyte_buffer_opencl.c']
+                             sources = srcs
                              )
                    ]
 )
