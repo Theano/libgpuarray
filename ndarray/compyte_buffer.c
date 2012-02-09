@@ -96,15 +96,14 @@ int GpuArray_move(GpuArray *dst, GpuArray *src) {
     return GA_VALUE_ERROR;
   if (!GpuArray_ISWRITEABLE(dst))
     return GA_VALUE_ERROR;
-  if (!GpuArray_ISONESEGMENT(dst) || !GpuArray_ISONESEGMENT(src))
-    /* XXX: need to support multi-segment copies */
-    return GA_UNSUPPORTED_ERROR;
-  if (GpuArray_ISFORTRAN(dst) != GpuArray_ISFORTRAN(src))
-    /* XXX: will need to support this too */
-    return GA_UNSUPPORTED_ERROR;
-  if (GpuArray_ITEMSIZE(dst) != GpuArray_ITEMSIZE(src))
-    /* will have to perform casts here and know the real dtype */
-    return GA_UNSUPPORTED_ERROR;
+  if (!GpuArray_ISONESEGMENT(dst) || !GpuArray_ISONESEGMENT(src) || 
+      GpuArray_ISFORTRAN(dst) != GpuArray_ISFORTRAN(src) || 
+      GpuArray_ITEMSIZE(dst) != GpuArray_ITEMSIZE(src)) {
+    return dst->ops->buffer_elemwise(src->data, dst->data, src->typecode,
+				     dst->typecode, "=", src->nd,
+				     src->dimensions, src->strides, dst->nd,
+				     dst->dimensions, dst->strides);
+  }
   return dst->ops->buffer_move(dst->data, src->data, dst->total_size);
 }
 

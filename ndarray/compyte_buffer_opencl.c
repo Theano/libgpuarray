@@ -352,16 +352,18 @@ static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
 static const char ELEM_FOOTER[] = "}}\n";
 
 static int cl_elemwise(gpudata *input, gpudata *output, int intype,
-		       int outtype, char *op, unsigned int nd,
-		       size_t *dims, ssize_t *a_str, ssize_t *b_str) {
-  char *strs[32];
+		       int outtype, const char *op, unsigned int a_nd,
+		       const size_t *a_dims, const ssize_t *a_str,
+		       unsigned int b_nd, const size_t *b_dims,
+		       const ssize_t *b_str) {
+  char *strs[64];
   unsigned int count = 0;
   int res = GA_SYS_ERROR;
   unsigned int i;
 
   size_t nEls = 1;
-  for (i = 0; i < nd; i++) {
-    nEls *= dims[i];
+  for (i = 0; i < a_nd; i++) {
+    nEls *= a_dims[i];
   }
 
   if (asprintf(&strs[count], ELEM_HEADER,
@@ -376,23 +378,11 @@ static int cl_elemwise(gpudata *input, gpudata *output, int intype,
       goto fail;
     count++;
   } else {
-    if (nd > 0) {
-      strs[count] = "int ii = i;";
-      count++;
+    if (compyte_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a") == -1)
+      goto fail;
+    if (compyte_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b") == -1)
+      goto fail;
 
-      for (i = nd; i > 1; i--) {
-	if (asprintf(&strs[count], "int pos%1$d = ii %% %2$zu;"
-		     "ii = ii / %2$zu;a += pos%1$d * %3$zd;"
-		     "b += pos%1$d *%4$zd;", nd-1,
-		     dims[nd-1], a_str[nd-1], b_str[nd-1]) == -1)
-	  goto fail;
-	count++;
-      }
-      if (asprintf(&strs[count], "int pos0 = ii;a += pos0 * %1$zd;"
-		   "b += pos0 * %2$zd;", a_str[0], b_str[0]) == -1)
-	goto fail;
-      count++;
-    }
     if (asprintf(&strs[count], "b[0] %s a[0];", op) == -1)
       goto fail;
     count++;
