@@ -81,6 +81,24 @@ int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
   return err;
 }
 
+int GpuArray_view(GpuArray *v, GpuArray *a) {
+  v->ops = a->ops;
+  v->data = a->data;
+  v->nd = a->nd;
+  v->typecode = a->typecode;
+  v->total_size = a->total_size;
+  v->flags = a->flags & ~GA_OWNDATA;
+  v->dimensions = calloc(v->nd, sizeof(size_t));
+  v->strides = calloc(v->nd, sizeof(ssize_t));
+  if (v->dimensions == NULL || v->strides == NULL) {
+    GpuArray_clear(v);
+    return GA_MEMORY_ERROR;
+  }
+  bcopy(a->dimensions, v->dimensions, v->nd*sizeof(size_t));
+  bcopy(a->strides, v->strides, v->nd*sizeof(ssize_t));
+  return GA_NO_ERROR;
+}
+
 void GpuArray_clear(GpuArray *a) {
   if (a->data && GpuArray_OWNSDATA(a))
     a->ops->buffer_free(a->data);

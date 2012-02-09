@@ -142,6 +142,8 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 		   int typecode, unsigned int nd, size_t *dims, ga_order ord);
 
+int GpuArray_view(GpuArray *v, GpuArray *a);
+
 void GpuArray_clear(GpuArray *a);
 
 int GpuArray_move(GpuArray *dst, GpuArray *src);
