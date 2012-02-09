@@ -121,6 +121,12 @@ int GpuArray_read(void *dst, size_t dst_sz, GpuArray *src) {
   return src->ops->buffer_read(dst, src->data, dst_sz);
 }
 
+int GpuArray_memset(GpuArray *a, int data, size_t sz) {
+  if (!GpuArray_ISONESEGMENT(a))
+    return GA_UNSUPPORTED_ERROR;
+  return a->ops->buffer_memset(a->data, data, sz);
+}
+
 void GpuArray_fprintf(FILE *fd, const GpuArray *a) {
   int i;
 
