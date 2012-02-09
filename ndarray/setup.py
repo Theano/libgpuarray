@@ -4,7 +4,7 @@ import subprocess
 have_cython = False
 
 try:
-    from Cython.disutils import build_ext
+    from Cython.Distutils import build_ext
     have_cython = True
 except:
     from distutils.command.build_ext import build_ext
