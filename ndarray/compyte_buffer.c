@@ -26,7 +26,7 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
     size *= d;
   }
   a->ops = ops;
-  a->data = a->ops->buffer_alloc(ctx, size);
+  a->data = a->ops->buffer_alloc(ctx, size, NULL);
   a->total_size = size;
   a->nd = nd;
   a->typecode = typecode;

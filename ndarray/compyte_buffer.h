@@ -24,7 +24,8 @@ typedef struct _gpukernel gpukernel;
 
 typedef struct _compyte_buffer_ops {
   /* This allocates a buffer of size sz in context ctx */
-  gpudata *(*buffer_alloc)(void *ctx, size_t sz);
+  void *(*buffer_init)(int dev, int *ret);
+  gpudata *(*buffer_alloc)(void *ctx, size_t sz, int *res);
   void (*buffer_free)(gpudata *);
   
   /* device to device copy, no overlap */
@@ -43,7 +44,7 @@ typedef struct _compyte_buffer_ops {
      be NUL-terminated.  Otherwise, it doesn't matter. */
   gpukernel *(*buffer_newkernel)(void *ctx, unsigned int count, 
 				 const char **strings, const size_t *lengths,
-				 const char *fname);
+				 const char *fname, int *ret);
   /* Free the kernel and all associated memory (including argument buffers) */
   void (*buffer_freekernel)(gpukernel *k);
   

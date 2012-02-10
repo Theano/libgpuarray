@@ -18,8 +18,6 @@
 /* To work around the lack of byte addressing */
 #define MIN_SIZE_INCR 4
 
-static cl_int err;
-
 struct _gpudata {
   cl_mem buf;
   cl_command_queue q;
@@ -33,9 +31,14 @@ struct _gpukernel {
   cl_command_queue q;
 };
 
+#define FAIL(v, e) { if (ret) *ret = e; return v; }
+#define CHKFAIL(v) if (err != CL_SUCCESS) FAIL(v, GA_IMPL_ERROR)
+
+static cl_int err;
+
 static gpukernel *cl_newkernel(void *ctx, unsigned int count,
 			       const char **strings, const size_t *lengths,
-			       const char *fname);
+			       const char *fname, int *ret);
 static void cl_freekernel(gpukernel *k);
 static int cl_setkernelarg(gpukernel *k, unsigned int index,
 			   size_t sz, const void *val);
@@ -46,6 +49,7 @@ static int cl_callkernel(gpukernel *k, unsigned int, unsigned int,
 			 unsigned int);
 
 static const char *get_error_string(cl_int err) {
+  /* OpenCL 1.0 error codes */
   switch (err) {
   case CL_SUCCESS:                        return "Success!";
   case CL_DEVICE_NOT_FOUND:               return "Device not found.";
@@ -97,36 +101,39 @@ static const char *get_error_string(cl_int err) {
   }
 }
 
-static cl_command_queue make_q(cl_context ctx) {
+static cl_command_queue make_q(cl_context ctx, int *ret) {
   size_t sz;
   cl_device_id *ids;
   cl_command_queue res;
 
-  if ((err = clGetContextInfo(ctx, CL_CONTEXT_DEVICES, 0, NULL, &sz)) != CL_SUCCESS)
-    return NULL;
+  err = clGetContextInfo(ctx, CL_CONTEXT_DEVICES, 0, NULL, &sz);
+  CHKFAIL(NULL);
   
   ids = malloc(sz);
-  if (ids == NULL)
-    return NULL;
-
+  if (ids == NULL) FAIL(NULL, GA_MEMORY_ERROR);
+  
   if ((err = clGetContextInfo(ctx, CL_CONTEXT_DEVICES, sz, ids, NULL)) != CL_SUCCESS) {
     free(ids);
-    return NULL;
+    FAIL(NULL, GA_IMPL_ERROR);
   }
 
   res = clCreateCommandQueue(ctx, ids[0], 0, &err);
   free(ids);
   if (err != CL_SUCCESS) {
     free(res);
-    return NULL;
+    FAIL(NULL, GA_IMPL_ERROR);
   }
   return res;
 }
 
-static gpudata *cl_alloc(void *ctx, size_t size)
+static void *cl_init(int dev, int *ret) {
+  /* XXX: implement */
+  return NULL;
+}
+
+static gpudata *cl_alloc(void *ctx, size_t size, int *ret)
 {
   gpudata *res;
-  cl_int err;
 
   /* OpenCL does not always support byte addressing
      so fudge size to work around that */
@@ -134,23 +141,22 @@ static gpudata *cl_alloc(void *ctx, size_t size)
     size += MIN_SIZE_INCR-(size % MIN_SIZE_INCR);
 
   res = malloc(sizeof(*res));
-  if (res == NULL) {
-    return NULL;
-  }
-
-  res->q = make_q((cl_context)ctx);
-  if (err != CL_SUCCESS) {
+  if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
+  
+  res->q = make_q((cl_context)ctx, ret);
+  if (res->q == NULL) {
     free(res);
     return NULL;
   }
+
   res->buf = clCreateBuffer((cl_context)ctx, CL_MEM_READ_WRITE, size, NULL, &err);
   if (err != CL_SUCCESS) {
     clReleaseCommandQueue(res->q);
     free(res);
-    return NULL;
+    FAIL(NULL, GA_IMPL_ERROR);
   }
   res->offset = 0;
-
+  
   return res;
 }
 
@@ -175,7 +181,7 @@ static int cl_move(gpudata *dst, gpudata *src, size_t sz) {
   }
   clReleaseEvent(ev);
 
-  return 0;
+  return GA_NO_ERROR;
 }
 
 static int cl_read(void *dst, gpudata *src, size_t sz) {
@@ -185,7 +191,7 @@ static int cl_read(void *dst, gpudata *src, size_t sz) {
     return GA_IMPL_ERROR;
   }
 
-  return 0;
+  return GA_NO_ERROR;
 }
 
 static int cl_write(gpudata *dst, void *src, size_t sz) {
@@ -195,7 +201,7 @@ static int cl_write(gpudata *dst, void *src, size_t sz) {
     return GA_IMPL_ERROR;
   }
 
-  return 0;
+  return GA_NO_ERROR;
 }
 
 static int cl_memset(gpudata *dst, int data, size_t bytes) {
@@ -225,7 +231,7 @@ static int cl_memset(gpudata *dst, int data, size_t bytes) {
   sz = strlen(local_kern);
   rlk[0] = local_kern;
 
-  gpukernel *m = cl_newkernel(ctx, 1, rlk, &sz, "memset");
+  gpukernel *m = cl_newkernel(ctx, 1, rlk, &sz, "memset", &res);
   if (m == NULL) return res;
   res = cl_setkernelargbuf(m, 0, dst);
   if (res != GA_NO_ERROR) goto fail;
@@ -251,47 +257,47 @@ static int cl_offset(gpudata *b, int off) {
     }
   }
   b->offset += off;
-  return 0;
+  return GA_NO_ERROR;
 }
 
 static gpukernel *cl_newkernel(void *ctx, unsigned int count, 
 			       const char **strings, const size_t *lengths,
-			       const char *fname) {
+			       const char *fname, int *ret) {
   gpukernel *res;
   cl_device_id dev;
 
-  if (count == 0) return NULL;
+  if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
 
   res = malloc(sizeof(*res));
-  if (res == NULL) return NULL;
+  if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
 
-  res->q = make_q((cl_context)ctx);
+  res->q = make_q((cl_context)ctx, ret);
   
   err = clGetCommandQueueInfo(res->q,CL_QUEUE_DEVICE,sizeof(dev),&dev,NULL);
   if (err != CL_SUCCESS) {
     cl_freekernel(res);
-    return NULL;
+    FAIL(NULL, GA_IMPL_ERROR);
   }
   
   res->p = clCreateProgramWithSource((cl_context)ctx, count, strings,
 				     lengths, &err);
   if (err != CL_SUCCESS) {
     cl_freekernel(res);
-    return NULL;
+    FAIL(NULL, GA_IMPL_ERROR);
   }
 
   err = clBuildProgram(res->p, 1, &dev, NULL, NULL, NULL);
   if (err != CL_SUCCESS) {
     cl_freekernel(res);
-    return NULL;
+    FAIL(NULL, GA_IMPL_ERROR);
   }  
 
   res->k = clCreateKernel(res->p, fname, &err);
   if (err != CL_SUCCESS) {
     cl_freekernel(res);
-    return NULL;
+    FAIL(NULL, GA_IMPL_ERROR);
   }
-
+  
   return res;
 }
 
@@ -392,15 +398,18 @@ static int cl_elemwise(gpudata *input, gpudata *output, int intype,
 
   assert(count < (sizeof(strs)/sizeof(strs[0])));
 
-  res = GA_IMPL_ERROR;
-  gpukernel *k = cl_newkernel(NULL, count, (const char **)strs, NULL, "elemk");
+  gpukernel *k = cl_newkernel(NULL, count, (const char **)strs, NULL, "elemk",
+			      &res);
   if (k == NULL) goto fail;
   res = cl_setkernelargbuf(k, 0, input);
-  if (res != GA_NO_ERROR) goto fail;
+  if (res != GA_NO_ERROR) goto kfail;
   res = cl_setkernelargbuf(k, 1, output);
-  if (res != GA_NO_ERROR) goto fail;
+  if (res != GA_NO_ERROR) goto kfail;
 
   res = cl_callkernel(k, nEls, 1, 1, 0, 0, 0);
+
+ kfail:
+  cl_freekernel(k);
  fail:
   for (i = 0; i< count; i++) {
     free(strs[i]);
@@ -412,4 +421,4 @@ static const char *cl_error(void) {
   return get_error_string(err);
 }
 
-compyte_buffer_ops opencl_ops = {cl_alloc, cl_free, cl_move, cl_read, cl_write, cl_memset, cl_offset, cl_newkernel, cl_freekernel, cl_setkernelarg, cl_setkernelargbuf, cl_callkernel, cl_elemwise, cl_error};
+compyte_buffer_ops opencl_ops = {cl_init, cl_alloc, cl_free, cl_move, cl_read, cl_write, cl_memset, cl_offset, cl_newkernel, cl_freekernel, cl_setkernelarg, cl_setkernelargbuf, cl_callkernel, cl_elemwise, cl_error};
