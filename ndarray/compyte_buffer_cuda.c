@@ -24,7 +24,7 @@
 #define CUDA_THREAD_SYNC cuCtxSynchronize()
 
 struct _gpudata {
-    CUdeviceptr *ptr;
+    CUdeviceptr ptr;
 };
 
 struct _gpukernel {
@@ -91,15 +91,16 @@ static const char *get_error_string(CUresult err) {
     case CUDA_ERROR_HOST_MEMORY_NOT_REGISTERED: return "Memory range is not registered";
     case CUDA_ERROR_UNKNOWN:           return "Unknown internal error";
     default: return "Unknown error code";
+    }
 }
 
-static void *cuda_init(int dev, int *ret) {
+static void *cuda_init(int ord, int *ret) {
     CUdevice dev;
     CUcontext ctx;
 
     err = cuInit(0);
     CHKFAIL(NULL);
-    err = cuDeviceGet(&dev, dev);
+    err = cuDeviceGet(&dev, ord);
     CHKFAIL(NULL);
     err = cuCtxCreate(&ctx, CU_CTX_SCHED_AUTO|CU_CTX_SCHED_BLOCKING_SYNC, dev);
     CHKFAIL(NULL);
@@ -121,10 +122,9 @@ static gpudata *cuda_alloc(void *ctx /* IGNORED */, size_t size, int *ret) {
     return res;
 }
 
-static void cuda_free(gpudata *d, int *ret) {
+static void cuda_free(gpudata *d) {
     err = cuMemFree(d->ptr);
     free(d);
-    CHKFAIL(/*nothing*/);
 }
 
 static int cuda_move(gpudata *dst, gpudata *src, size_t sz)
@@ -158,7 +158,7 @@ static int cuda_write(gpudata *dst, const void *src, size_t sz)
 static int cuda_memset(gpudata *dst, int data, size_t bytes)
 {
     err = cuMemsetD8(dst->ptr, data, bytes);
-    if (err != CUDA_SUCESS) {
+    if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
     return GA_NO_ERROR;
@@ -199,16 +199,17 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     ssize_t s;
     struct iovec descr[count];
     gpukernel *res;
+    unsigned int i;
 
     if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
     
     if (lengths == NULL) {
-        for (unsigned int i = 0; i < count; i++) {
+        for (i = 0; i < count; i++) {
             descr[i].iov_base = (void *)strings[i];
             descr[i].iov_len = strlen(strings[i]);
         }
     } else {
-        for (unsigned int i = 0; i < count; i++) {
+        for (i = 0; i < count; i++) {
             descr[i].iov_base = (void *)strings[i];
             descr[i].iov_len = lengths[i]?lengths[i]:strlen(strings[i]);
         }
@@ -260,7 +261,8 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
 }
 
 static void cuda_freekernel(gpukernel *k) {
-    for (unsigned int i = 0; i < k->argcount; i++)
+    unsigned int i;
+    for (i = 0; i < k->argcount; i++)
         free(k->args[i]);
     free(k->args);
     cuModuleUnload(k->m);
@@ -329,8 +331,9 @@ static int cuda_elemwise(gpudata *input, gpudata *output, int intype,
     
     size_t nEls = 1;
     gpukernel *k;
+    unsigned int i;
 
-    for (unsigned int i = 0; i < a_nd; i++) {
+    for (i = 0; i < a_nd; i++) {
         nEls *= a_dims[i];
     }
     
@@ -380,7 +383,7 @@ static int cuda_elemwise(gpudata *input, gpudata *output, int intype,
 failk:
     cuda_freekernel(k);
 fail:
-    for (unsigned int i = 0; i < count; i++) {
+    for (i = 0; i < count; i++) {
         free(strs[i]);
     }
     return res;
@@ -390,7 +393,21 @@ static const char *cuda_error(void) {
     return get_error_string(err);
 }
 
-compyte_buffer_ops cuda_ops = {cuda_init, cuda_alloc, cuda_free, cuda_move, cuda_read, cuda_write, cuda_memset, cuda_offset, cuda_newkernel, cuda_freekernel, cuda_setkernelarg, cuda_setkernelargbuf, cuda_callkernel, cuda_elemwise, cuda_error};
+compyte_buffer_ops cuda_ops = {cuda_init,
+                               cuda_alloc,
+                               cuda_free,
+                               cuda_move,
+                               cuda_read,
+                               cuda_write,
+                               cuda_memset,
+                               cuda_offset,
+                               cuda_newkernel,
+                               cuda_freekernel,
+                               cuda_setkernelarg,
+                               cuda_setkernelargbuf,
+                               cuda_callkernel,
+                               cuda_elemwise,
+                               cuda_error};
 
 /*
   Local Variables:

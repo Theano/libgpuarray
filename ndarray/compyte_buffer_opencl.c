@@ -406,6 +406,10 @@ static int cl_elemwise(gpudata *input, gpudata *output, int intype,
   res = cl_setkernelargbuf(k, 1, output);
   if (res != GA_NO_ERROR) goto kfail;
 
+  /* XXX: this call really sucks because:
+     a) nEls is a size_t that we assign to an int
+     b) the scheduling sucks
+  */
   res = cl_callkernel(k, nEls, 1, 1, 0, 0, 0);
 
  kfail:
@@ -421,4 +425,18 @@ static const char *cl_error(void) {
   return get_error_string(err);
 }
 
-compyte_buffer_ops opencl_ops = {cl_init, cl_alloc, cl_free, cl_move, cl_read, cl_write, cl_memset, cl_offset, cl_newkernel, cl_freekernel, cl_setkernelarg, cl_setkernelargbuf, cl_callkernel, cl_elemwise, cl_error};
+compyte_buffer_ops opencl_ops = {cl_init,
+				 cl_alloc,
+				 cl_free,
+				 cl_move,
+				 cl_read,
+				 cl_write,
+				 cl_memset,
+				 cl_offset,
+				 cl_newkernel,
+				 cl_freekernel,
+				 cl_setkernelarg,
+				 cl_setkernelargbuf,
+				 cl_callkernel,
+				 cl_elemwise,
+				 cl_error};
