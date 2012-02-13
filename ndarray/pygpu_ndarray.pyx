@@ -85,6 +85,7 @@ cdef extern from "compyte_buffer.h":
 
     enum COMPYTE_TYPES:
         GA_FLOAT,
+        GA_DOUBLE,
         GA_NBASE
 
     int GpuArray_empty(_GpuArray *a, compyte_buffer_ops *ops, void *ctx,
@@ -112,6 +113,8 @@ cdef int dtype_to_typecode(dtype):
     cdef int dnum
     if isinstance(dtype, int):
         return dtype
+    if isinstance(dtype, str):
+        dtype = numpy.dtype(dtype)
     if isinstance(dtype, numpy.dtype):
         dnum = (<np.dtype>dtype).type_num
         if dnum < GA_NBASE:
@@ -223,10 +226,10 @@ def init_cuda(int devno):
     return <size_t>ctx
 cendif()
 
-def zeros(shape, dtype=GA_FLOAT, order='A'):
+def zeros(shape, dtype=GA_DOUBLE, order='A'):
     return GpuArray(shape, dtype=dtype, order=order, memset=0)
 
-def empty(shape, dtype=GA_FLOAT, order='A'):
+def empty(shape, dtype=GA_DOUBLE, order='A'):
     return GpuArray(shape, dtype=dtype, order=order)
 
 cdef class GpuArray:
@@ -341,7 +344,7 @@ cdef class GpuArray:
             cdef unsigned int i
             res = [None] * self.ga.nd
             for i in range(self.ga.nd):
-                res[i] = self.ga.dimensions[i]
+                res[i] = self.ga.strides[i]
             return tuple(res)
         
     property ndim:
@@ -364,5 +367,5 @@ cdef class GpuArray:
             res["WRITEABLE"] = py_CHKFLAGS(self, GA_WRITEABLE)
             res["ALIGNED"] = py_CHKFLAGS(self, GA_ALIGNED)
             res["UPDATEIFCOPY"] = False # Unsupported
-            res["ONWDATA"] = py_CHKFLAGS(self, GA_OWNDATA)
+            res["OWNDATA"] = py_CHKFLAGS(self, GA_OWNDATA)
             return res
