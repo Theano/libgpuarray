@@ -126,9 +126,29 @@ static cl_command_queue make_q(cl_context ctx, int *ret) {
   return res;
 }
 
-static void *cl_init(int dev, int *ret) {
-  /* XXX: implement */
-  return NULL;
+static void *cl_init(int devno, int *ret) {
+  cl_device_id ds[16];
+  cl_platform_id p;
+  cl_uint numd;
+  cl_context_properties props[3] = {
+    CL_CONTEXT_PLATFORM, 0,
+    0,
+  };
+  cl_context ctx;
+
+  err = clGetPlatformIDs(1, &p, NULL);
+  CHKFAIL(NULL);
+
+  err = clGetDeviceIDs(p, CL_DEVICE_TYPE_DEFAULT, 16, ds, &numd);
+  CHKFAIL(NULL);
+
+  if (devno >= numd || devno < 0) FAIL(NULL, GA_VALUE_ERROR);
+  props[1] = (cl_context_properties)p;
+
+  ctx = clCreateContext(props, 1, &ds[devno], NULL, NULL, &err);
+  CHKFAIL(NULL);
+
+  return ctx;
 }
 
 static gpudata *cl_alloc(void *ctx, size_t size, int *ret)

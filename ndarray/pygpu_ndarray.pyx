@@ -26,6 +26,7 @@ cdef extern from "compyte_buffer.h":
         pass
 
     ctypedef struct compyte_buffer_ops:
+        void *buffer_init(int devno, int *ret)
         gpudata *buffer_alloc(void *ctx, size_t sz)
         void buffer_free(gpudata *d)
         int buffer_move(gpudata *dst, gpudata *src, size_t sz)
@@ -187,6 +188,8 @@ cdef compyte_buffer_ops *GpuArray_ops
 cdef void *GpuArray_ctx
 
 def set_kind_context(kind, size_t ctx):
+    global GpuArray_ctx
+    global GpuArray_ops
     GpuArray_ctx = <void *>ctx
     cifcuda()
     if kind == "cuda":
@@ -199,6 +202,26 @@ def set_kind_context(kind, size_t ctx):
         return
     cendif()
     raise ValueError("Unknown kind")
+
+cifopencl()
+def init_opencl(int devno):
+    cdef int err = GA_NO_ERROR
+    cdef void *ctx
+    ctx = opencl_ops.buffer_init(devno, &err)
+    if (err != GA_NO_ERROR):
+        raise GpuArrayException(opencl_ops.buffer_error())
+    return <size_t>ctx
+cendif()
+
+cifcuda()
+def init_cuda(int devno):
+    cdef int err = GA_NO_ERROR
+    cdef void *ctx
+    ctx = cuda_ops.buffer_init(devno, &err)
+    if (err != GA_NO_ERROR):
+        raise GpuArrayException(cuda_ops.buffer_error())
+    return <size_t>ctx
+cendif()
 
 def zeros(shape, dtype=GA_FLOAT, order='A'):
     return GpuArray(shape, dtype=dtype, order=order, memset=0)
