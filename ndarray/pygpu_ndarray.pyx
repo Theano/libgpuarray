@@ -4,7 +4,7 @@ cimport numpy as np
 
 from cpython cimport Py_INCREF
 
-np.import_arrray()
+np.import_array()
 
 cdef extern from "numpy/arrayobject.h":
     object _PyArray_Empty "PyArray_Empty" (int, np.npy_intp *, np.dtype, int)
