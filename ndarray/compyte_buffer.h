@@ -33,7 +33,7 @@ typedef struct _compyte_buffer_ops {
   /* device to host */
   int (*buffer_read)(void *dst, gpudata *src, size_t sz);
   /* host to device */
-  int (*buffer_write)(gpudata *dst, void *src, size_t sz);
+  int (*buffer_write)(gpudata *dst, const void *src, size_t sz);
   /* Set buffer to a single-byte pattern (like C memset) */
   int (*buffer_memset)(gpudata *dst, int data, size_t sz);
   /* Add the specified offset into the buffer, 

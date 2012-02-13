@@ -194,10 +194,10 @@ static int cl_read(void *dst, gpudata *src, size_t sz) {
   return GA_NO_ERROR;
 }
 
-static int cl_write(gpudata *dst, void *src, size_t sz) {
-  if ((err = clEnqueueReadBuffer(dst->q, dst->buf, CL_TRUE,
-				 dst->offset, sz, src,
-				 0, NULL, NULL)) != CL_SUCCESS) {
+static int cl_write(gpudata *dst, const void *src, size_t sz) {
+  if ((err = clEnqueueWriteBuffer(dst->q, dst->buf, CL_TRUE,
+				  dst->offset, sz, src,
+				  0, NULL, NULL)) != CL_SUCCESS) {
     return GA_IMPL_ERROR;
   }
 
