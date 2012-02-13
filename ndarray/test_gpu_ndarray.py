@@ -4,6 +4,8 @@ import numpy
 
 import pygpu_ndarray as gpu_ndarray
 
+gpu_ndarray.set_kind_context("opencl", gpu_ndarray.init_opencl(0))
+
 enable_double = True
 
 dtypes_all = ["float32",
@@ -42,7 +44,7 @@ def test_transfer():
     for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
         for dtype in dtypes_all:
             a = numpy.random.rand(*shp) * 10
-            b = gpu_ndarray.GpuNdArrayObject(a)
+            b = gpu_ndarray.GpuArray(a)
             c = numpy.asarray(b)
 
             assert numpy.allclose(c,a)
@@ -60,7 +62,7 @@ def test_transfer_not_contiguous():
         for dtype in dtypes_all:
             a = numpy.random.rand(*shp) * 10
             a = a[::-1]
-            b = gpu_ndarray.GpuNdArrayObject(a)
+            b = gpu_ndarray.GpuArray(a)
             c = numpy.asarray(b)
 
             assert numpy.allclose(c,a)
@@ -78,7 +80,7 @@ def test_transfer_fortran():
             if len(shp)>1:
                 assert a_.strides != a.strides
             a = a_
-            b = gpu_ndarray.GpuNdArrayObject(a)
+            b = gpu_ndarray.GpuArray(a)
             c = numpy.asarray(b)
 
             assert a.shape == b.shape == c.shape
@@ -109,11 +111,11 @@ def test_empty():
     for shp in [(), (5,),(6,7),(4,8,9),(1,8,9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
-                x = numpy.zeros(shp, dtype, order)
+                x = numpy.empty(shp, dtype, order)
                 y = gpu_ndarray.empty(shp, dtype, order)
                 check_meta(x, y)
-    x = gpu_ndarray.zeros(())# no dtype and order param
-    y = numpy.zeros(())
+    x = gpu_ndarray.empty(())# no dtype and order param
+    y = numpy.empty(())
     check_meta(x, y)
     try:
         gpu_ndarray.empty()
@@ -127,7 +129,7 @@ def test_mapping_getitem_ellipsis():
     for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
         for dtype in dtypes_all:
             a = numpy.asarray(numpy.random.rand(*shp), dtype=dtype)
-            a_gpu = gpu_ndarray.GpuNdArrayObject(a)
+            a_gpu = gpu_ndarray.GpuArray(a)
 
             b = a_gpu[...]
             assert b.bytes == a_gpu.bytes
