@@ -125,6 +125,7 @@ enum ga_error {
   GA_UNSUPPORTED_ERROR,
   GA_SYS_ERROR, /* look at errno for more details */
   /* Add more error types if needed */
+  /* Don't forget to sync with GpuArray_error() */
 };
 
 static inline int GpuArray_CHKFLAGS(GpuArray *a, int flags) {
@@ -152,6 +153,8 @@ int GpuArray_write(GpuArray *dst, void *src, size_t src_sz);
 int GpuArray_read(void *dst, size_t dst_sz, GpuArray *src);
 
 int GpuArray_memset(GpuArray *a, int data, size_t sz);
+
+const char *GpuArray_error(GpuArray *a, int err);
 
 void GpuArray_fprintf(FILE *fd, const GpuArray *a);
 int GpuArray_is_c_contiguous(const GpuArray *a);

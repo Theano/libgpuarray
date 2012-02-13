@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <errno.h>
 
 #include "compyte_buffer.h"
 
@@ -143,6 +144,19 @@ int GpuArray_memset(GpuArray *a, int data, size_t sz) {
   if (!GpuArray_ISONESEGMENT(a))
     return GA_UNSUPPORTED_ERROR;
   return a->ops->buffer_memset(a->data, data, sz);
+}
+
+const char *GpuArray_error(GpuArray *a, int err) {
+  switch (err) {
+  case GA_NO_ERROR:          return "No error";
+  case GA_MEMORY_ERROR:      return "Out of memory";
+  case GA_VALUE_ERROR:       return "Value out of range";
+  case GA_IMPL_ERROR:        return a->ops->buffer_error();
+  case GA_INVALID_ERROR:     return "Invalid value";
+  case GA_UNSUPPORTED_ERROR: return "Unsupported operation";
+  case GA_SYS_ERROR:         return strerror(errno);
+  default: return "Unknown GA error";
+  }
 }
 
 void GpuArray_fprintf(FILE *fd, const GpuArray *a) {

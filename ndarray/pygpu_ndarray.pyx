@@ -98,6 +98,8 @@ cdef extern from "compyte_buffer.h":
     int GpuArray_write(_GpuArray *dst, void *src, size_t src_sz)
     int GpuArray_read(void *dst, size_t dst_sz, _GpuArray *src)
     int GpuArray_memset(_GpuArray *a, int data, size_t sz)
+
+    char *GpuArray_error(_GpuArray *a, int err)
     
     void GpuArray_fprintf(libc.stdio.FILE *fd, _GpuArray *a)
     int GpuArray_is_c_contiguous(_GpuArray *a)
@@ -139,21 +141,20 @@ cdef _empty(GpuArray a, compyte_buffer_ops *ops, void *ctx, int typecode,
     cdef int err
     err = GpuArray_empty(&a.ga, ops, ctx, typecode, nd, dims, ord)
     if err != GA_NO_ERROR:
-        raise GpuArrayException(a.ga.ops.buffer_error())
+        raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef _zeros(GpuArray a, compyte_buffer_ops *ops, void *ctx, int typecode,
             unsigned int nd, size_t *dims, ga_order ord):
     cdef int err
     err = GpuArray_zeros(&a.ga, ops, ctx, typecode, nd, dims, ord)
     if err != GA_NO_ERROR:
-        raise GpuArrayException(a.ga.ops.buffer_error())
-
+        raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef _view(GpuArray v, GpuArray a):
     cdef int err
     err = GpuArray_view(&v.ga, &a.ga)
     if err != GA_NO_ERROR:
-        raise GpuArrayException(a.ga.ops.buffer_error())
+        raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef _clear(GpuArray a):
     GpuArray_clear(&a.ga)
@@ -162,25 +163,25 @@ cdef _move(GpuArray a, GpuArray src):
     cdef int err
     err = GpuArray_move(&a.ga, &src.ga)
     if err != GA_NO_ERROR:
-        raise GpuArrayException(a.ga.ops.buffer_error())
+        raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef _write(GpuArray a, void *src, size_t sz):
     cdef int err
     err = GpuArray_write(&a.ga, src, sz)
     if err != GA_NO_ERROR:
-        raise GpuArrayException(a.ga.ops.buffer_error())
+        raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef _read(void *dst, size_t sz, GpuArray src):
     cdef int err
     err = GpuArray_read(dst, sz, &src.ga)
     if err != GA_NO_ERROR:
-        raise GpuArrayException(src.ga.ops.buffer_error())
+        raise GpuArrayException(GpuArray_error(&src.ga, err))
 
 cdef _memset(GpuArray a, int data, size_t sz):
     cdef int err
     err = GpuArray_memset(&a.ga, data, sz)
     if err != GA_NO_ERROR:
-        raise GpuArrayException(a.ga.ops.buffer_error())
+        raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef compyte_buffer_ops *GpuArray_ops
 cdef void *GpuArray_ctx
