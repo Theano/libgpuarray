@@ -14,6 +14,7 @@ cdef object PyArray_Empty(int a, np.npy_intp *b, np.dtype c, int d):
     Py_INCREF(c)
     return _PyArray_Empty(a, b, c, d)
 
+# This is a horrible hack to introduce ifdefs in cython code.
 cdef extern from *:
     void cifcuda "#ifdef WITH_CUDA //" ()
     void cifopencl "#ifdef WITH_OPENCL //" ()
@@ -325,6 +326,12 @@ cdef class GpuArray:
 
     def view(self):
         return GpuArray(self, view=True)
+
+    def __len__(self):
+        if self.ga.nd > 0:
+            return self.ga.dimensions[0]
+        else:
+            return 1
         
     property shape:
         "shape of this ndarray (tuple)"
