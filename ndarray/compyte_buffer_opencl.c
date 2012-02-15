@@ -346,16 +346,18 @@ static int cl_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
 			 unsigned int lz) {
   size_t gs[3], ls[3];
   cl_event ev;
-  size_t *gsp, *lsp;
-  
+  size_t *lsp;
+
+  gs[0] = gx, gs[1] = gy, gs[2] = gz;
+
   if ((lx == 0) && (lx == ly) && (lx == lz)) {
     lsp = NULL;
   } else {
-    ls[0] = lx, gs[1] = ly, gs[2] = lz;
+    ls[0] = lx, ls[1] = ly, ls[2] = lz;
     lsp = ls;
   }
 
-  err = clEnqueueNDRangeKernel(k->q, k->k, 3, NULL, gsp, lsp, 0, NULL, &ev);
+  err = clEnqueueNDRangeKernel(k->q, k->k, 3, NULL, gs, lsp, 0, NULL, &ev);
   if (err != CL_SUCCESS) return GA_IMPL_ERROR;
 
   err = clWaitForEvents(1, &ev);
