@@ -97,6 +97,8 @@ static const char *get_error_string(cl_int err) {
   case CL_INVALID_GL_OBJECT:              return "Invalid OpenGL object";
   case CL_INVALID_BUFFER_SIZE:            return "Invalid buffer size";
   case CL_INVALID_MIP_LEVEL:              return "Invalid mip-map level";
+  case CL_INVALID_GLOBAL_WORK_SIZE:       return "Invalid global work size";
+  case CL_INVALID_PROPERTY:               return "Invalid property";
   default: return "Unknown error";
   }
 }
