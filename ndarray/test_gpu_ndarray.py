@@ -154,7 +154,7 @@ def test_copy_view():
             shape = (5,)
             a = numpy.asarray(numpy.random.rand(*shape), dtype='float32')
 
-            b = gpu_ndarray.GpuNdArrayObject(a)
+            b = gpu_ndarray.GpuArray(a)
             assert numpy.allclose(a, numpy.asarray(b))
             check_flags(a, b)
 
@@ -188,7 +188,7 @@ def test_len():
     for shp in [(5,),(6,7),(4,8,9),(1,8,9)]:
         for dtype in dtypes_all:
             a = numpy.asarray(numpy.random.rand(*shp), dtype=dtype)
-            a_gpu = gpu_ndarray.GpuNdArrayObject(a)
+            a_gpu = gpu_ndarray.GpuArray(a)
             assert len(a_gpu) == shp[0]
 
 def test_mapping_getitem_w_int():
@@ -262,7 +262,7 @@ def test_mapping_getitem_w_int():
         # test vector
         dim =(2,)
         a = numpy.asarray(numpy.random.rand(*dim)*10, dtype=dtype)
-        _a = gpu_ndarray.GpuNdArrayObject(a)
+        _a = gpu_ndarray.GpuArray(a)
         import sys
         init_ref_count = sys.getrefcount(_a)
         _cmp(_a[...], a[...])
@@ -283,7 +283,7 @@ def test_mapping_getitem_w_int():
         # test scalar
         dim =()
         a = numpy.asarray(numpy.random.rand(*dim)*10, dtype=dtype)
-        _a = gpu_ndarray.GpuNdArrayObject(a)
+        _a = gpu_ndarray.GpuArray(a)
         _cmp(_a[...], a[...])
         _cmpf(_a,0)
         _cmpfV(_a,slice(1))
@@ -291,7 +291,7 @@ def test_mapping_getitem_w_int():
         # test 4d-tensor
         dim =(5,4,3,2)
         a = numpy.asarray(numpy.random.rand(*dim)*10, dtype=dtype)
-        _a = gpu_ndarray.GpuNdArrayObject(a)
+        _a = gpu_ndarray.GpuArray(a)
         _cmpf(_a,slice(-1),slice(-1),10,-10)
         _cmpf(_a,slice(-1),slice(-1),-10,slice(-1))
         _cmpf(_a,0,slice(0,-1,-20),-10)
