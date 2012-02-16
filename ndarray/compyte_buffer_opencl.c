@@ -188,6 +188,21 @@ static void cl_free(gpudata *b) {
   free(b);
 }
 
+static int cl_share(gpudata *a, gpudata *b, int *ret) {
+  if (a->buf == b->buf) return 1;
+#ifdef CL_VERSION_1_1
+  cl_mem ab, bb;
+  err = clGetMemObjectInfo(a->buf, CL_MEM_ASSOCIATED_MEMOBJECT, sizeof(ab), &ab, NULL);
+  CHKFAIL(-1);
+  err = clGetMemObjectInfo(a->buf, CL_MEM_ASSOCIATED_MEMOBJECT, sizeof(bb), &bb, NULL);
+  CHKFAIL(-1);
+  if (ab == NULL) ab = a->buf;
+  if (bb == NULL) bb = b->buf;
+  if (ab == bb) return 1;
+#endif
+  return 0;
+}
+
 static int cl_move(gpudata *dst, gpudata *src, size_t sz) {
   cl_event ev;
 
@@ -453,6 +468,7 @@ static const char *cl_error(void) {
 compyte_buffer_ops opencl_ops = {cl_init,
 				 cl_alloc,
 				 cl_free,
+				 cl_share,
 				 cl_move,
 				 cl_read,
 				 cl_write,

@@ -108,6 +108,11 @@ void GpuArray_clear(GpuArray *a) {
   bzero(a, sizeof(*a));
 }
 
+int GpuArray_share(GpuArray *a, GpuArray *b) {
+  if (a->ops != b->ops) return 0;
+  return a->ops->buffer_share(a->data, b->data, NULL);
+}
+
 int GpuArray_move(GpuArray *dst, GpuArray *src) {
   if (dst->ops != src->ops)
     return GA_INVALID_ERROR;

@@ -127,6 +127,11 @@ static void cuda_free(gpudata *d) {
     free(d);
 }
 
+static int cuda_share(gpudata *a, gpudata *b, int *ret) {
+    /* XXX: How to detect boundaries ? */
+    return 1;
+}
+
 static int cuda_move(gpudata *dst, gpudata *src, size_t sz)
 {
     err = cuMemcpyDtoD(dst->ptr, src->ptr, sz);
@@ -396,6 +401,7 @@ static const char *cuda_error(void) {
 compyte_buffer_ops cuda_ops = {cuda_init,
                                cuda_alloc,
                                cuda_free,
+                               cuda_share,
                                cuda_move,
                                cuda_read,
                                cuda_write,

@@ -96,7 +96,9 @@ cdef extern from "compyte_buffer.h":
     int GpuArray_view(_GpuArray *v, _GpuArray *a)
 
     void GpuArray_clear(_GpuArray *a)
-    
+
+    int GpuArray_share(_GpuArray *a, _GpuArray *b)
+
     int GpuArray_move(_GpuArray *dst, _GpuArray *src)
     int GpuArray_write(_GpuArray *dst, void *src, size_t src_sz)
     int GpuArray_read(void *dst, size_t dst_sz, _GpuArray *src)
@@ -163,6 +165,9 @@ cdef _view(GpuArray v, GpuArray a):
 
 cdef _clear(GpuArray a):
     GpuArray_clear(&a.ga)
+
+cdef bint _share(GpuArray a, GpuArray b):
+    return GpuArray_share(&a.ga, &b.ga);
 
 cdef _move(GpuArray a, GpuArray src):
     cdef int err
@@ -232,6 +237,9 @@ def zeros(shape, dtype=GA_DOUBLE, order='A'):
 
 def empty(shape, dtype=GA_DOUBLE, order='A'):
     return GpuArray(shape, dtype=dtype, order=order)
+
+def may_share_memory(GpuArray a not None, GpuArray b not None):
+    return _share(a, b)
 
 cdef class GpuArray:
     cdef _GpuArray ga

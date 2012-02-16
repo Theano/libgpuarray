@@ -27,6 +27,7 @@ typedef struct _compyte_buffer_ops {
   void *(*buffer_init)(int dev, int *ret);
   gpudata *(*buffer_alloc)(void *ctx, size_t sz, int *res);
   void (*buffer_free)(gpudata *);
+  int (*buffer_share)(gpudata *, gpudata *, int *ret);
   
   /* device to device copy, no overlap */
   int (*buffer_move)(gpudata *dst, gpudata *src, size_t sz);
@@ -147,6 +148,8 @@ int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 int GpuArray_view(GpuArray *v, GpuArray *a);
 
 void GpuArray_clear(GpuArray *a);
+
+int GpuArray_share(GpuArray *a, GpuArray *b);
 
 int GpuArray_move(GpuArray *dst, GpuArray *src);
 int GpuArray_write(GpuArray *dst, void *src, size_t src_sz);

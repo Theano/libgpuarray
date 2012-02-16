@@ -139,9 +139,9 @@ def test_mapping_getitem_ellipsis():
             assert numpy.allclose(a, b_cpu)
 
 def test_copy_view():
-    from ..array import may_share_memory
     def check_memory_region(a, a_op, b, b_op):
-        assert numpy.may_share_memory(a, a_op) == may_share_memory(b, b_op)
+        assert numpy.may_share_memory(a, a_op) == \
+            gpu_ndarray.may_share_memory(b, b_op)
 
         if a_op.base is None:
             assert b_op.base is None
