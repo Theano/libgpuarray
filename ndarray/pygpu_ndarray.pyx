@@ -243,7 +243,7 @@ def may_share_memory(GpuArray a not None, GpuArray b not None):
 
 cdef class GpuArray:
     cdef _GpuArray ga
-    cdef object base
+    cdef readonly object base
 
     def __dealloc__(self):
         _clear(self)
@@ -258,9 +258,10 @@ cdef class GpuArray:
             elif isinstance(proto, GpuArray):
                 if 'view' in kwa and kwa['view']:
                     self.make_view(proto)
-                self.make_copy(proto, kwa.get('dtype',
-                                              (<GpuArray>proto).ga.typecode),
-                               to_ga_order(kwa.get('order', 'A')))
+                else:
+                    self.make_copy(proto, kwa.get('dtype',
+                                                  (<GpuArray>proto).ga.typecode),
+                                   to_ga_order(kwa.get('order', 'A')))
             elif isinstance(proto, (list, tuple)):
                 cdims = <size_t *>calloc(len(proto), sizeof(size_t));
                 if cdims == NULL:
@@ -331,6 +332,15 @@ cdef class GpuArray:
         if dtype is None:
             dtype = self.ga.typecode
         return GpuArray(self, dtype=dtype, order=order)
+
+    def __copy__(self):
+        return GpuArray(self)
+
+    def __deepcopy__(self, memo):
+        if id(self) in memo:
+            return memo[id(self)]
+        else:
+            return GpuArray(self)
 
     def view(self):
         return GpuArray(self, view=True)
