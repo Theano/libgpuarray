@@ -322,7 +322,7 @@ cdef class GpuArray:
     def copy(self, dtype=None, order='A'):
         if dtype is None:
             dtype = self.ga.typecode
-        return GpuArray(self, dtype, order)
+        return GpuArray(self, dtype=dtype, order=order)
 
     def view(self):
         return GpuArray(self, view=True)
