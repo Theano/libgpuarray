@@ -280,7 +280,7 @@ cdef class GpuArray:
                     if fill is not None:
                         self.memset(fill)
         else:
-            raise ValueError("Cannot initialize from the given arguments")
+            raise ValueError("Cannot initialize from the given arguments", a, kwa)
     
     cdef make_empty(self, unsigned int nd, size_t *dims, dtype, ord):
         _empty(self, GpuArray_ops, GpuArray_ctx, dtype_to_typecode(dtype),
