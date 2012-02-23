@@ -31,13 +31,13 @@ typedef struct _compyte_buffer_ops {
   int (*buffer_share)(gpudata *, gpudata *, int *ret);
   
   /* device to device copy, no overlap */
-  int (*buffer_move)(gpudata *dst, gpudata *src, size_t sz);
+  int (*buffer_move)(gpudata *dst, gpudata *src);
   /* device to host */
   int (*buffer_read)(void *dst, gpudata *src, size_t sz);
   /* host to device */
   int (*buffer_write)(gpudata *dst, const void *src, size_t sz);
   /* Set buffer to a single-byte pattern (like C memset) */
-  int (*buffer_memset)(gpudata *dst, int data, size_t sz);
+  int (*buffer_memset)(gpudata *dst, int data);
   /* Add the specified offset into the buffer, 
      must not go beyond the buffer limits */
   int (*buffer_offset)(gpudata *buf, ssize_t offset);
@@ -87,7 +87,6 @@ typedef struct _GpuArray {
   compyte_buffer_ops *ops;
   size_t *dimensions;
   ssize_t *strides;
-  size_t total_size; /* in bytes, not elements */
   unsigned int nd;
   int flags;
   int typecode;

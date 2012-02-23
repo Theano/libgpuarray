@@ -161,6 +161,9 @@ static gpudata *cl_alloc(void *ctx, size_t size, int *ret)
      so fudge size to work around that */
   if (size % 4)
     size += MIN_SIZE_INCR-(size % MIN_SIZE_INCR);
+  /* make sure that all valid offset values will leave at least 4 bytes of
+     addressable space */
+  size += 4
 
   res = malloc(sizeof(*res));
   if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
@@ -216,12 +219,28 @@ static int cl_share(gpudata *a, gpudata *b, int *ret) {
   return 0;
 }
 
-static int cl_move(gpudata *dst, gpudata *src, size_t sz) {
+static int cl_move(gpudata *dst, gpudata *src) {
   cl_event ev;
+  size_t dst_sz, src_sz;
+  
+  if ((err = clGetMemObjectInfo(dst->buf, CL_MEM_SIZE, sizeof(size_t),
+				&dst_sz, NULL)) != CL_SUCCESS) {
+    return GA_IMPL_ERROR;
+  }
+
+  if ((err = clGetMemObjectInfo(src->buf, CL_MEM_SIZE, sizeof(size_t),
+				&src_sz, NULL)) != CL_SUCCESS) {
+    return GA_IMPL_ERROR;
+  }
+
+  dst_sz -= dst->offset;
+  src_sz -= src->offset;
+  
+  if (dst_sz != src_sz) return GA_VALUE_ERROR;
 
   if ((err = clEnqueueCopyBuffer(dst->q, src->buf, dst->buf,
 				 src->offset, dst->offset,
-				 sz, 0, NULL, &ev)) != CL_SUCCESS) {
+				 dst_sz, 0, NULL, &ev)) != CL_SUCCESS) {
     return GA_IMPL_ERROR;
   }
 
@@ -254,23 +273,32 @@ static int cl_write(gpudata *dst, const void *src, size_t sz) {
   return GA_NO_ERROR;
 }
 
-static int cl_memset(gpudata *dst, int data, size_t bytes) {
+static int cl_memset(gpudata *dst, int data) {
   char local_kern[92];
   const char *rlk[1];
-  size_t sz;
+  size_t sz, bytes;
   int r, res = GA_IMPL_ERROR;
 
   cl_context ctx;
 
-  /* OpenCL devices do not always support byte-addressable storage
-     and stuff will break when used in this way */
-  bytes = (bytes+3) / 4;
-
   unsigned char val = (unsigned)data;
   unsigned int pattern = (unsigned int)val & (unsigned int)val >> 8 & (unsigned int)val >> 16 & (unsigned int)val >> 24;
 
-  err = clGetCommandQueueInfo(dst->q, CL_QUEUE_CONTEXT, sizeof(ctx), &ctx, NULL);
-  if (err != CL_SUCCESS)
+  if ((err = clGetMemObjectInfo(dst->buf, CL_MEM_SIZE, sizeof(bytes), &bytes,
+				NULL)) != CL_SUCCESS) {
+    return GA_IMPL_ERROR;
+  }
+
+  bytes -= dst->offset;
+  /* undo alloc size fudging (while remaining in 4 bytes chunks) */
+  if (bytes % 4) {
+    bytes -= (bytes % 4);
+  } else {
+    bytes -= 4;
+  }
+
+  if ((err = clGetCommandQueueInfo(dst->q, CL_QUEUE_CONTEXT, sizeof(ctx),
+				   &ctx, NULL)) != CL_SUCCESS)
     return GA_IMPL_ERROR;
 
   r = snprintf(local_kern, sizeof(local_kern),

@@ -28,7 +28,6 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
   }
   a->ops = ops;
   a->data = a->ops->buffer_alloc(ctx, size, NULL);
-  a->total_size = size;
   a->nd = nd;
   a->typecode = typecode;
   a->dimensions = calloc(nd, sizeof(size_t));
@@ -75,7 +74,7 @@ int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
   err = GpuArray_empty(a, ops, ctx, typecode, nd, dims, ord);
   if (err != GA_NO_ERROR)
     return err;
-  err = a->ops->buffer_memset(a->data, 0, a->total_size);
+  err = a->ops->buffer_memset(a->data, 0);
   if (err != GA_NO_ERROR) {
     GpuArray_clear(a);
   }
@@ -87,7 +86,6 @@ int GpuArray_view(GpuArray *v, GpuArray *a) {
   v->data = a->data;
   v->nd = a->nd;
   v->typecode = a->typecode;
-  v->total_size = a->total_size;
   v->flags = a->flags & ~GA_OWNDATA;
   v->dimensions = calloc(v->nd, sizeof(size_t));
   v->strides = calloc(v->nd, sizeof(ssize_t));
@@ -116,8 +114,6 @@ int GpuArray_share(GpuArray *a, GpuArray *b) {
 int GpuArray_move(GpuArray *dst, GpuArray *src) {
   if (dst->ops != src->ops)
     return GA_INVALID_ERROR;
-  if (dst->total_size != src->total_size)
-    return GA_VALUE_ERROR;
   if (!GpuArray_ISWRITEABLE(dst))
     return GA_VALUE_ERROR;
   if (!GpuArray_ISONESEGMENT(dst) || !GpuArray_ISONESEGMENT(src) || 
@@ -128,7 +124,7 @@ int GpuArray_move(GpuArray *dst, GpuArray *src) {
 				     src->dimensions, src->strides, dst->nd,
 				     dst->dimensions, dst->strides);
   }
-  return dst->ops->buffer_move(dst->data, src->data, dst->total_size);
+  return dst->ops->buffer_move(dst->data, src->data);
 }
 
 int GpuArray_write(GpuArray *dst, void *src, size_t src_sz) {

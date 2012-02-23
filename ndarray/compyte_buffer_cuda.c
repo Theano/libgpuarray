@@ -29,6 +29,7 @@ struct _gpudata {
 #define gdata_size(b) ((b)->sz & SSIZE_T_MAX)
 #define gdata_canfree(b) ((b)->sz & ~SSIZE_T_MAX)
 #define gdata_setfree(b) ((b)->sz |= ~SSIZE_T_MAX)
+#define gdata_setsize(b, s) ((b)->sz = (s) & gdata_canfree(b))
 };
 
 struct _gpukernel {
@@ -149,9 +150,11 @@ static int cuda_share(gpudata *a, gpudata *b, int *ret) {
             (b->ptr < a->ptr && b->ptr + gdata_size(b) > a->ptr));
 }
 
-static int cuda_move(gpudata *dst, gpudata *src, size_t sz)
+static int cuda_move(gpudata *dst, gpudata *src)
 {
-    err = cuMemcpyDtoD(dst->ptr, src->ptr, sz);
+    if (gdata_size(dst) != gdata_size(src))
+        return GA_VALUE_ERROR;
+    err = cuMemcpyDtoD(dst->ptr, src->ptr, gdata_size(dst));
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
@@ -160,6 +163,8 @@ static int cuda_move(gpudata *dst, gpudata *src, size_t sz)
 
 static int cuda_read(void *dst, gpudata *src, size_t sz)
 {
+    if (sz != gdata_size(src))
+        return GA_VALUE_ERROR;
     err = cuMemcpyDtoH(dst, src->ptr, sz);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
@@ -169,6 +174,8 @@ static int cuda_read(void *dst, gpudata *src, size_t sz)
 
 static int cuda_write(gpudata *dst, const void *src, size_t sz)
 {
+    if (gdata_size(dst) != sz)
+        return GA_VALUE_ERROR;
     err = cuMemcpyHtoD(dst->ptr, src, sz);
     CUDA_THREAD_SYNC;
     if (err != CUDA_SUCCESS) {
@@ -177,9 +184,8 @@ static int cuda_write(gpudata *dst, const void *src, size_t sz)
     return GA_NO_ERROR;
 }
 
-static int cuda_memset(gpudata *dst, int data, size_t bytes)
-{
-    err = cuMemsetD8(dst->ptr, data, bytes);
+static int cuda_memset(gpudata *dst, int data) {
+    err = cuMemsetD8(dst->ptr, data, gdata_size(dst));
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
@@ -189,6 +195,7 @@ static int cuda_memset(gpudata *dst, int data, size_t bytes)
 static int cuda_offset(gpudata *buf, ssize_t off) {
     /* XXX: this does not check for overflow */
     buf->ptr += off;
+    gdata_setsize(buf, gdata_size(buf) - off);
     return GA_NO_ERROR;
 }
 
