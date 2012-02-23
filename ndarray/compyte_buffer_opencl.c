@@ -182,6 +182,19 @@ static gpudata *cl_alloc(void *ctx, size_t size, int *ret)
   return res;
 }
 
+static int cl_dup(gpudata *b, int *ret) {
+  gpudata *res;
+  res = malloc(sizeof(*res));
+  if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
+  
+  res->buf = b->buf;
+  clRetainMemObject(res->buf);
+  res->q = b->q;
+  clRetainCommandQueue(res->q);
+  res->offset = b->offset;
+  return res;
+}
+
 static void cl_free(gpudata *b) {
   clReleaseCommandQueue(b->q);
   clReleaseMemObject(b->buf);
@@ -280,17 +293,17 @@ static int cl_memset(gpudata *dst, int data, size_t bytes) {
   return res;
 }
 
-static int cl_offset(gpudata *b, int off) {
-  /* check for overflow (int and size_t) */
+static int cl_offset(gpudata *b, ssize_t off) {
+  /* check for overflow (ssize_t and size_t) */
   if (off < 0) {
     /* negative */
-    if (((off == INT_MIN) && (b->offset <= INT_MAX)) || 
+    if (((off == SSIZE_T_MIN) && (b->offset <= SSIZE_T_MAX)) ||
 	(-off > b->offset)) {
       return GA_VALUE_ERROR;
     }
   } else {
     /* positive */
-    if ((SIZE_MAX - off) < b->offset) {
+    if ((SIZE_MAX - (size_t)off) < b->offset) {
       return GA_VALUE_ERROR;
     }
   }
@@ -467,6 +480,7 @@ static const char *cl_error(void) {
 
 compyte_buffer_ops opencl_ops = {cl_init,
 				 cl_alloc,
+				 cl_dup,
 				 cl_free,
 				 cl_share,
 				 cl_move,

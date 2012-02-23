@@ -25,6 +25,10 @@
 
 struct _gpudata {
     CUdeviceptr ptr;
+    size_t sz;
+#define gdata_size(b) ((b)->sz & SSIZE_T_MAX)
+#define gdata_canfree(b) ((b)->sz & ~SSIZE_T_MAX)
+#define gdata_setfree(b) ((b)->sz |= ~SSIZE_T_MAX)
 };
 
 struct _gpukernel {
@@ -113,6 +117,7 @@ static gpudata *cuda_alloc(void *ctx /* IGNORED */, size_t size, int *ret) {
     res = malloc(sizeof(*res));
     if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
     
+    res->sz = size;
     
     err = cuMemAlloc(&res->ptr, size);
     if (err != CUDA_SUCCESS) {
@@ -122,14 +127,26 @@ static gpudata *cuda_alloc(void *ctx /* IGNORED */, size_t size, int *ret) {
     return res;
 }
 
+static gpudata *cuda_dup(gpudata *b, int *ret) {
+    gpudata *res;
+    res = malloc(sizeof(*res));
+    if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
+    
+    res->ptr = b->ptr;
+    res->sz = b->sz;
+    gdata_setfree(res);
+    return res;
+}
+
 static void cuda_free(gpudata *d) {
-    err = cuMemFree(d->ptr);
+    if (gdata_canfree(d))
+        err = cuMemFree(d->ptr);
     free(d);
 }
 
 static int cuda_share(gpudata *a, gpudata *b, int *ret) {
-    /* XXX: How to detect boundaries ? */
-    return 1;
+    return ((a->ptr < b->ptr && a->ptr + gdata_size(a) > b->ptr) ||
+            (b->ptr < a->ptr && b->ptr + gdata_size(b) > a->ptr));
 }
 
 static int cuda_move(gpudata *dst, gpudata *src, size_t sz)
@@ -169,7 +186,7 @@ static int cuda_memset(gpudata *dst, int data, size_t bytes)
     return GA_NO_ERROR;
 }
 
-static int cuda_offset(gpudata *buf, int off) {
+static int cuda_offset(gpudata *buf, ssize_t off) {
     /* XXX: this does not check for overflow */
     buf->ptr += off;
     return GA_NO_ERROR;
@@ -400,6 +417,7 @@ static const char *cuda_error(void) {
 
 compyte_buffer_ops cuda_ops = {cuda_init,
                                cuda_alloc,
+                               cuda_dup,
                                cuda_free,
                                cuda_share,
                                cuda_move,

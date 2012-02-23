@@ -26,6 +26,7 @@ typedef struct _compyte_buffer_ops {
   /* This allocates a buffer of size sz in context ctx */
   void *(*buffer_init)(int dev, int *ret);
   gpudata *(*buffer_alloc)(void *ctx, size_t sz, int *res);
+  gpudata *(*buffer_dup)(gpudata *b);
   void (*buffer_free)(gpudata *);
   int (*buffer_share)(gpudata *, gpudata *, int *ret);
   
@@ -39,7 +40,7 @@ typedef struct _compyte_buffer_ops {
   int (*buffer_memset)(gpudata *dst, int data, size_t sz);
   /* Add the specified offset into the buffer, 
      must not go beyond the buffer limits */
-  int (*buffer_offset)(gpudata *buf, int offset);
+  int (*buffer_offset)(gpudata *buf, ssize_t offset);
   /* Compile the kernel composed of the concatenated strings and return
      a callable kernel.  If lengths is NULL then all the strings must 
      be NUL-terminated.  Otherwise, it doesn't matter. */
