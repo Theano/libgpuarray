@@ -196,13 +196,12 @@ def test_mapping_getitem_w_int():
         assert x.strides == y.strides
         assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
         assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
+        # GpuArrays always own their data after indexing
+        assert x.flags["OWNDATA"]
+        # we don't check for y.flags["OWNDATA"] since the logic
+        # is a bit twisty and this is not a testsuite for numpy.
         if x.flags["WRITEABLE"] != y.flags["WRITEABLE"]:
             assert x.ndim == 0
-            assert not x.flags["OWNDATA"]
-            assert y.flags["OWNDATA"]
-        else:
-            assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"]
-            assert x.flags["OWNDATA"] == y.flags["OWNDATA"]
         assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
         assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
         x = numpy.asarray(x)
@@ -226,7 +225,10 @@ def test_mapping_getitem_w_int():
         assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
         assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"]
         assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
-        assert x.flags["OWNDATA"] == y.flags["OWNDATA"]
+        # GpuArrays always own their data after indexing
+        assert x.flags["OWNDATA"]
+        # we don't check for y.flags["OWNDATA"] since the logic
+        # is a bit twisty and this is not a testsuite for numpy.
         assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
         x_ = numpy.asarray(x)
         assert x_.shape == y.shape
