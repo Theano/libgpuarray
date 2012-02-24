@@ -30,10 +30,10 @@ cdef extern from "compyte_buffer.h":
         void *buffer_init(int devno, int *ret)
         gpudata *buffer_alloc(void *ctx, size_t sz)
         void buffer_free(gpudata *d)
-        int buffer_move(gpudata *dst, gpudata *src, size_t sz)
+        int buffer_move(gpudata *dst, gpudata *src)
         int buffer_read(void *dst, gpudata *src, size_t sz)
         int buffer_write(gpudata *dst, void *src, size_t sz)
-        int buffer_memset(gpudata *dst, int data, size_t sz)
+        int buffer_memset(gpudata *dst, int data)
         int buffer_offset(gpudata *buf, int offset)
         gpukernel *buffer_newkernel(void *ctx, unsigned int count,
                                     char **strings,
@@ -59,7 +59,6 @@ cdef extern from "compyte_buffer.h":
         compyte_buffer_ops *ops
         size_t *dimensions
         ssize_t *strides
-        size_t total_size
         unsigned int nd
         int flags
         int typecode
@@ -102,7 +101,7 @@ cdef extern from "compyte_buffer.h":
     int GpuArray_move(_GpuArray *dst, _GpuArray *src)
     int GpuArray_write(_GpuArray *dst, void *src, size_t src_sz)
     int GpuArray_read(void *dst, size_t dst_sz, _GpuArray *src)
-    int GpuArray_memset(_GpuArray *a, int data, size_t sz)
+    int GpuArray_memset(_GpuArray *a, int data)
 
     char *GpuArray_error(_GpuArray *a, int err)
     
@@ -187,9 +186,9 @@ cdef _read(void *dst, size_t sz, GpuArray src):
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&src.ga, err))
 
-cdef _memset(GpuArray a, int data, size_t sz):
+cdef _memset(GpuArray a, int data):
     cdef int err
-    err = GpuArray_memset(&a.ga, data, sz)
+    err = GpuArray_memset(&a.ga, data)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err))
 
@@ -295,7 +294,7 @@ cdef class GpuArray:
         self.base = other
 
     def memset(self, value):
-        _memset(self, value, self.ga.total_size)
+        _memset(self, value)
     
     cdef from_array(self, np.ndarray a):
         if not np.PyArray_ISONESEGMENT(a):
@@ -310,7 +309,7 @@ cdef class GpuArray:
         self.make_empty(np.PyArray_NDIM(a), <size_t *>np.PyArray_DIMS(a),
                         a.dtype, order)
 
-        _write(self, np.PyArray_DATA(a), self.ga.total_size)
+        _write(self, np.PyArray_DATA(a), np.PyArray_NBYTES(a))
 
     def __array__(self):
         cdef np.ndarray res
@@ -323,7 +322,7 @@ cdef class GpuArray:
                                 and not py_CHKFLAGS(self, GA_C_CONTIGUOUS))
         
         _read(np.PyArray_DATA(res),
-              np.PyArray_SIZE(res)*np.PyArray_ITEMSIZE(res),
+              np.PyArray_NBYTES(res),
               self)
         
         return res
