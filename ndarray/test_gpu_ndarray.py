@@ -132,9 +132,7 @@ def test_mapping_getitem_ellipsis():
             a_gpu = gpu_ndarray.GpuArray(a)
 
             b = a_gpu[...]
-            assert b.bytes == a_gpu.bytes
-            assert b.strides == a.strides
-            assert b.shape == a.shape
+            assert b is a_gpu
             b_cpu = numpy.asarray(b)
             assert numpy.allclose(a, b_cpu)
 
