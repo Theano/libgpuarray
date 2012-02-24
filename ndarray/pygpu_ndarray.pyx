@@ -2,7 +2,7 @@ cimport libc.stdio
 from libc.stdlib cimport calloc, free
 cimport numpy as np
 
-from cpython cimport Py_INCREF
+from cpython cimport Py_INCREF, PyNumber_Index
 
 np.import_array()
 
@@ -13,6 +13,12 @@ cdef extern from "numpy/arrayobject.h":
 cdef object PyArray_Empty(int a, np.npy_intp *b, np.dtype c, int d):
     Py_INCREF(c)
     return _PyArray_Empty(a, b, c, d)
+
+cdef extern from "Python.h":
+    cdef int PySlice_GetIndicesEx(slice slice, Py_ssize_t length,
+                                  Py_ssize_t *start, Py_ssize_t *stop,
+                                  Py_ssize_t *step,
+                                  Py_ssize_t *slicelength) except -1
 
 # This is a horrible hack to introduce ifdefs in cython code.
 cdef extern from *:
@@ -93,6 +99,8 @@ cdef extern from "compyte_buffer.h":
     int GpuArray_zeros(_GpuArray *a, compyte_buffer_ops *ops, void *ctx,
                        int typecode, int nd, size_t *dims, ga_order ord)
     int GpuArray_view(_GpuArray *v, _GpuArray *a)
+    int GpuArray_index(_GpuArray *r, _GpuArray *a, size_t *starts,
+                       size_t *stops, ssize_t *steps)
 
     void GpuArray_clear(_GpuArray *a)
 
@@ -159,6 +167,13 @@ cdef _zeros(GpuArray a, compyte_buffer_ops *ops, void *ctx, int typecode,
 cdef _view(GpuArray v, GpuArray a):
     cdef int err
     err = GpuArray_view(&v.ga, &a.ga)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(GpuArray_error(&a.ga, err))
+
+cdef _index(GpuArray r, GpuArray a, size_t *starts, size_t *stops,
+            ssize_t *steps):
+    cdef int err
+    err = GpuArray_index(&r.ga, &a.ga, starts, stops, steps)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err))
 
@@ -257,6 +272,8 @@ cdef class GpuArray:
             elif isinstance(proto, GpuArray):
                 if 'view' in kwa and kwa['view']:
                     self.make_view(proto)
+                elif 'index' in kwa:
+                    self.make_index(proto, kwa['index'])
                 else:
                     self.make_copy(proto, kwa.get('dtype',
                                                   (<GpuArray>proto).ga.typecode),
@@ -291,7 +308,65 @@ cdef class GpuArray:
 
     cdef make_view(self, GpuArray other):
         _view(self, other)
-        self.base = other
+        base = other
+        while base.base is not None:
+            base = base.base
+        self.base = base
+
+    cdef __index_helper(self, key, unsigned int i, size_t *start,
+                        size_t *stop, ssize_t *step):
+        cdef Py_ssize_t dummy
+        cdef size_t k
+        try:
+            k = PyNumber_Index(key)
+            if k < 0:
+                k += self.ga.dimensions[i]
+            if k < 0 or k >= self.ga.dimensions[i]:
+                raise IndexError("index %d out of bounds"%(i,))
+            start[0] = k
+            step[0] = 0
+        except TypeError:
+            pass
+        if isinstance(key, slice):
+            PySlice_GetIndicesEx(key, self.ga.dimensions[i],
+                                 <Py_ssize_t *>start, <Py_ssize_t *>stop,
+                                 step, &dummy)
+        elif key is Ellipsis:
+            start[0] = 0
+            stop[0] = self.ga.dimensions[i]
+            step[0] = 1
+        else:
+            raise IndexError("cannot index with: %s"%(key,))
+
+    cdef make_index(self, GpuArray other, key):
+        cdef size_t *starts
+        cdef size_t *stops
+        cdef ssize_t *steps
+        cdef unsigned int i
+        cdef unsigned int d
+
+        starts = <size_t *>calloc(other.ga.nd, sizeof(size_t))
+        stops = <size_t *>calloc(other.ga.nd, sizeof(size_t))
+        steps = <ssize_t *>calloc(other.ga.nd, sizeof(ssize_t))
+        d = 0
+
+        if isinstance(key, tuple):
+            if len(key) > other.ga.nd:
+                raise IndexError("invalid index")
+            for i in range(0, len(key)):
+                other.__index_helper(key[i], i, &starts[i], &stops[i],
+                                    &steps[i])
+            d += len(key)
+        else:
+            other.__index_helper(key, 0, starts, stops, steps)
+            d += 1
+
+        for i in range(d, other.ga.nd):
+            starts[i] = 0
+            stops[i] = other.ga.dimensions[i]
+            steps[i] = 1
+
+        _index(self, other, starts, stops, steps);
 
     def memset(self, value):
         _memset(self, value)
@@ -348,8 +423,15 @@ cdef class GpuArray:
         if self.ga.nd > 0:
             return self.ga.dimensions[0]
         else:
-            return 1
-        
+            raise TypeError("len() of unsized object")
+
+    def __getitem__(self, key):
+        if key is Ellipsis:
+            return self
+        elif self.ga.nd == 0:
+            raise IndexError("0-d arrays can't be indexed")
+        return GpuArray(self, index=key)
+
     property shape:
         "shape of this ndarray (tuple)"
         def __get__(self):
