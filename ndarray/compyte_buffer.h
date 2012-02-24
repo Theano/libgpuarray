@@ -25,8 +25,8 @@ typedef struct _gpukernel gpukernel;
 typedef struct _compyte_buffer_ops {
   /* This allocates a buffer of size sz in context ctx */
   void *(*buffer_init)(int dev, int *ret);
-  gpudata *(*buffer_alloc)(void *ctx, size_t sz, int *res);
-  gpudata *(*buffer_dup)(gpudata *b);
+  gpudata *(*buffer_alloc)(void *ctx, size_t sz, int *ret);
+  gpudata *(*buffer_dup)(gpudata *b, int *ret);
   void (*buffer_free)(gpudata *);
   int (*buffer_share)(gpudata *, gpudata *, int *ret);
   
@@ -91,7 +91,7 @@ typedef struct _GpuArray {
   int flags;
   int typecode;
 
-  /* Try to keep in sync with numpy values for now*/
+  /* Try to keep in sync with numpy values for now */
 #define GA_C_CONTIGUOUS   0x0001
 #define GA_F_CONTIGUOUS   0x0002
 #define GA_OWNDATA        0x0004

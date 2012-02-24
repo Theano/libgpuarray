@@ -15,6 +15,8 @@
 #include <string.h>
 #include <limits.h>
 
+#define SSIZE_MIN (-SSIZE_MAX-1)
+
 /* To work around the lack of byte addressing */
 #define MIN_SIZE_INCR 4
 
@@ -159,12 +161,12 @@ static gpudata *cl_alloc(void *ctx, size_t size, int *ret)
 
   /* OpenCL does not always support byte addressing
      so fudge size to work around that */
-  if (size % 4)
+  if (size % MIN_SIZE_INCR)
     size += MIN_SIZE_INCR-(size % MIN_SIZE_INCR);
   /* make sure that all valid offset values will leave at least 4 bytes of
      addressable space */
-  size += 4
-
+  size += MIN_SIZE_INCR;
+  
   res = malloc(sizeof(*res));
   if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
   
@@ -181,11 +183,11 @@ static gpudata *cl_alloc(void *ctx, size_t size, int *ret)
     FAIL(NULL, GA_IMPL_ERROR);
   }
   res->offset = 0;
-  
+
   return res;
 }
 
-static int cl_dup(gpudata *b, int *ret) {
+static gpudata *cl_dup(gpudata *b, int *ret) {
   gpudata *res;
   res = malloc(sizeof(*res));
   if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
@@ -291,10 +293,10 @@ static int cl_memset(gpudata *dst, int data) {
 
   bytes -= dst->offset;
   /* undo alloc size fudging (while remaining in 4 bytes chunks) */
-  if (bytes % 4) {
-    bytes -= (bytes % 4);
+  if (bytes % MIN_SIZE_INCR) {
+    bytes -= (bytes % MIN_SIZE_INCR);
   } else {
-    bytes -= 4;
+    bytes -= MIN_SIZE_INCR;
   }
 
   if ((err = clGetCommandQueueInfo(dst->q, CL_QUEUE_CONTEXT, sizeof(ctx),
@@ -314,7 +316,7 @@ static int cl_memset(gpudata *dst, int data) {
   res = cl_setkernelargbuf(m, 0, dst);
   if (res != GA_NO_ERROR) goto fail;
   
-  res = cl_callkernel(m, bytes, 1, 1, 0, 0, 0);
+  res = cl_callkernel(m, bytes/4, 1, 1, 0, 0, 0);
 
  fail:
   cl_freekernel(m);
@@ -325,7 +327,7 @@ static int cl_offset(gpudata *b, ssize_t off) {
   /* check for overflow (ssize_t and size_t) */
   if (off < 0) {
     /* negative */
-    if (((off == SSIZE_T_MIN) && (b->offset <= SSIZE_T_MAX)) ||
+    if (((off == SSIZE_MIN) && (b->offset <= SSIZE_MAX)) ||
 	(-off > b->offset)) {
       return GA_VALUE_ERROR;
     }

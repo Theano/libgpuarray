@@ -26,9 +26,9 @@
 struct _gpudata {
     CUdeviceptr ptr;
     size_t sz;
-#define gdata_size(b) ((b)->sz & SSIZE_T_MAX)
-#define gdata_canfree(b) ((b)->sz & ~SSIZE_T_MAX)
-#define gdata_setfree(b) ((b)->sz |= ~SSIZE_T_MAX)
+#define gdata_size(b) ((b)->sz & SSIZE_MAX)
+#define gdata_canfree(b) ((b)->sz & ~SSIZE_MAX)
+#define gdata_setfree(b) ((b)->sz |= ~SSIZE_MAX)
 #define gdata_setsize(b, s) ((b)->sz = (s) & gdata_canfree(b))
 };
 
