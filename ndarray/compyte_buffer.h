@@ -146,6 +146,8 @@ int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 		   int typecode, unsigned int nd, size_t *dims, ga_order ord);
 
 int GpuArray_view(GpuArray *v, GpuArray *a);
+int GpuArray_index(GpuArray *r, GpuArray *a, size_t *starts, size_t *ends,
+		   ssize_t *strs);
 
 void GpuArray_clear(GpuArray *a);
 

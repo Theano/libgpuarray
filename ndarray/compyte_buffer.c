@@ -98,6 +98,61 @@ int GpuArray_view(GpuArray *v, GpuArray *a) {
   return GA_NO_ERROR;
 }
 
+int GpuArray_index(GpuArray *r, GpuArray *a, size_t *starts, size_t *stops,
+		   ssize_t *steps) {
+  int err;
+  unsigned int i, r_i;
+  unsigned int new_nd = a->nd;
+
+  if ((starts == NULL) || (stops == NULL) || (steps == NULL))
+    return GA_VALUE_ERROR;
+
+  for (i = 0; i < r->nd; i++) {
+    if (steps[i] == 0) new_nd -= 1;
+  }
+
+  r->ops = a->ops;
+  r->data = a->ops->buffer_dup(a->data, &err);
+  if (r->data == NULL) {
+    GpuArray_clear(r);
+    return err;
+  }
+  r->flags = a->flags;
+  r->nd = new_nd;
+  r->dimensions = calloc(r->nd, sizeof(size_t));
+  r->strides = calloc(r->nd, sizeof(ssize_t));
+  if (r->dimensions == NULL || r->strides == NULL) {
+    GpuArray_clear(r);
+    return GA_MEMORY_ERROR;
+  }
+
+  r_i = 0;
+  for (i = 0; i < a->nd; i++) {
+    if (starts[i] >= a->dimensions[i]) {
+      GpuArray_clear(r);
+      return GA_VALUE_ERROR;
+    }
+    r->ops->buffer_offset(r->data, starts[i] * a->strides[i]);
+    if (steps[i] != 0) {
+      r->strides[r_i] = steps[i] * a->strides[i];
+      r->dimensions[r_i] = (stops[i]-starts[i]+steps[i]-
+			    (steps[i] < 0? -1 : 1))/steps[i];
+      r_i++;
+    }
+    assert(r_i <= r->nd);
+  }
+  if (GpuArray_is_c_contiguous(r))
+    r->flags |= GA_C_CONTIGUOUS;
+  else
+    r->flags &= ~GA_C_CONTIGUOUS;
+  if (GpuArray_is_f_contiguous(r))
+    r->flags |= GA_F_CONTIGUOUS;
+  else
+    r->flags &= ~GA_F_CONTIGUOUS;
+
+  return GA_NO_ERROR;
+}
+
 void GpuArray_clear(GpuArray *a) {
   if (a->data && GpuArray_OWNSDATA(a))
     a->ops->buffer_free(a->data);
