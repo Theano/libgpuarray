@@ -98,7 +98,7 @@ int GpuArray_view(GpuArray *v, GpuArray *a) {
   return GA_NO_ERROR;
 }
 
-int GpuArray_index(GpuArray *r, GpuArray *a, size_t *starts, size_t *stops,
+int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
 		   ssize_t *steps) {
   int err;
   unsigned int i, r_i;
@@ -107,7 +107,7 @@ int GpuArray_index(GpuArray *r, GpuArray *a, size_t *starts, size_t *stops,
   if ((starts == NULL) || (stops == NULL) || (steps == NULL))
     return GA_VALUE_ERROR;
 
-  for (i = 0; i < r->nd; i++) {
+  for (i = 0; i < a->nd; i++) {
     if (steps[i] == 0) new_nd -= 1;
   }
 
@@ -117,6 +117,7 @@ int GpuArray_index(GpuArray *r, GpuArray *a, size_t *starts, size_t *stops,
     GpuArray_clear(r);
     return err;
   }
+  r->typecode = a->typecode;
   r->flags = a->flags;
   r->nd = new_nd;
   r->dimensions = calloc(r->nd, sizeof(size_t));

@@ -99,8 +99,8 @@ cdef extern from "compyte_buffer.h":
     int GpuArray_zeros(_GpuArray *a, compyte_buffer_ops *ops, void *ctx,
                        int typecode, int nd, size_t *dims, ga_order ord)
     int GpuArray_view(_GpuArray *v, _GpuArray *a)
-    int GpuArray_index(_GpuArray *r, _GpuArray *a, size_t *starts,
-                       size_t *stops, ssize_t *steps)
+    int GpuArray_index(_GpuArray *r, _GpuArray *a, ssize_t *starts,
+                       ssize_t *stops, ssize_t *steps)
 
     void GpuArray_clear(_GpuArray *a)
 
@@ -170,7 +170,7 @@ cdef _view(GpuArray v, GpuArray a):
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err))
 
-cdef _index(GpuArray r, GpuArray a, size_t *starts, size_t *stops,
+cdef _index(GpuArray r, GpuArray a, ssize_t *starts, ssize_t *stops,
             ssize_t *steps):
     cdef int err
     err = GpuArray_index(&r.ga, &a.ga, starts, stops, steps)
@@ -313,10 +313,10 @@ cdef class GpuArray:
             base = base.base
         self.base = base
 
-    cdef __index_helper(self, key, unsigned int i, size_t *start,
-                        size_t *stop, ssize_t *step):
+    cdef __index_helper(self, key, unsigned int i, ssize_t *start,
+                        ssize_t *stop, ssize_t *step):
         cdef Py_ssize_t dummy
-        cdef size_t k
+        cdef Py_ssize_t k
         try:
             k = PyNumber_Index(key)
             if k < 0:
@@ -325,11 +325,12 @@ cdef class GpuArray:
                 raise IndexError("index %d out of bounds"%(i,))
             start[0] = k
             step[0] = 0
+            return
         except TypeError:
             pass
+
         if isinstance(key, slice):
-            PySlice_GetIndicesEx(key, self.ga.dimensions[i],
-                                 <Py_ssize_t *>start, <Py_ssize_t *>stop,
+            PySlice_GetIndicesEx(key, self.ga.dimensions[i], start, stop,
                                  step, &dummy)
         elif key is Ellipsis:
             start[0] = 0
@@ -339,14 +340,14 @@ cdef class GpuArray:
             raise IndexError("cannot index with: %s"%(key,))
 
     cdef make_index(self, GpuArray other, key):
-        cdef size_t *starts
-        cdef size_t *stops
+        cdef ssize_t *starts
+        cdef ssize_t *stops
         cdef ssize_t *steps
         cdef unsigned int i
         cdef unsigned int d
 
-        starts = <size_t *>calloc(other.ga.nd, sizeof(size_t))
-        stops = <size_t *>calloc(other.ga.nd, sizeof(size_t))
+        starts = <ssize_t *>calloc(other.ga.nd, sizeof(ssize_t))
+        stops = <ssize_t *>calloc(other.ga.nd, sizeof(ssize_t))
         steps = <ssize_t *>calloc(other.ga.nd, sizeof(ssize_t))
         d = 0
 
