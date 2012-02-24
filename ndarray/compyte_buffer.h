@@ -155,7 +155,7 @@ int GpuArray_move(GpuArray *dst, GpuArray *src);
 int GpuArray_write(GpuArray *dst, void *src, size_t src_sz);
 int GpuArray_read(void *dst, size_t dst_sz, GpuArray *src);
 
-int GpuArray_memset(GpuArray *a, int data, size_t sz);
+int GpuArray_memset(GpuArray *a, int data);
 
 const char *GpuArray_error(GpuArray *a, int err);
 

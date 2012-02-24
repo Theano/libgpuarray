@@ -61,7 +61,7 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
   default:
     assert(0); /* cannot be reached */
   }
-  
+
   if (a->nd <= 1)
     a->flags |= GA_F_CONTIGUOUS|GA_C_CONTIGUOUS;
 
@@ -141,10 +141,10 @@ int GpuArray_read(void *dst, size_t dst_sz, GpuArray *src) {
   return src->ops->buffer_read(dst, src->data, dst_sz);
 }
 
-int GpuArray_memset(GpuArray *a, int data, size_t sz) {
+int GpuArray_memset(GpuArray *a, int data) {
   if (!GpuArray_ISONESEGMENT(a))
     return GA_UNSUPPORTED_ERROR;
-  return a->ops->buffer_memset(a->data, data, sz);
+  return a->ops->buffer_memset(a->data, data);
 }
 
 const char *GpuArray_error(GpuArray *a, int err) {
