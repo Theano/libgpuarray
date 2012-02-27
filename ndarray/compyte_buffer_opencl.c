@@ -432,11 +432,12 @@ static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
   "#define DTYPEB %s\n"
   "__kernel void elemk(__global const DTYPEA *a_data,"
   "                    __global DTYPEB *b_data){"
+  "a_data += %zd; b_data += %zd;"
   "const int idx = get_global_id(0);"
   "const int numThreads = get_global_size(0);"
   "for (int i = idx; i < %zu; i+= numThreads) {"
-  "const DTYPE *a = a_data;"
-  "DTYPEB *b = b_data;";
+  "__global const DTYPEA *a = a_data;"
+  "__global DTYPEB *b = b_data;";
 
 static const char ELEM_FOOTER[] = "}}\n";
 
@@ -450,6 +451,12 @@ static int cl_elemwise(gpudata *input, gpudata *output, int intype,
   int res = GA_SYS_ERROR;
   unsigned int i;
 
+  cl_context ctx;
+
+  if ((err = clGetCommandQueueInfo(input->q, CL_QUEUE_CONTEXT, sizeof(ctx),
+				   &ctx, NULL)) != CL_SUCCESS)
+    return GA_IMPL_ERROR;
+
   size_t nEls = 1;
   for (i = 0; i < a_nd; i++) {
     nEls *= a_dims[i];
@@ -458,6 +465,8 @@ static int cl_elemwise(gpudata *input, gpudata *output, int intype,
   if (asprintf(&strs[count], ELEM_HEADER,
 	       compyte_get_type(intype)->cl_name,
 	       compyte_get_type(outtype)->cl_name,
+	       input->offset/compyte_get_elsize(intype),
+	       output->offset/compyte_get_elsize(outtype),
 	       nEls) == -1)
     goto fail;
   count++;
@@ -467,21 +476,25 @@ static int cl_elemwise(gpudata *input, gpudata *output, int intype,
       goto fail;
     count++;
   } else {
-    if (compyte_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a") == -1)
+    if (compyte_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a",
+			    compyte_get_elsize(intype)) == -1)
       goto fail;
-    if (compyte_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b") == -1)
+    if (compyte_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b",
+			    compyte_get_elsize(outtype)) == -1)
       goto fail;
 
     if (asprintf(&strs[count], "b[0] %s a[0];", op) == -1)
       goto fail;
     count++;
   }
-  strs[count] = (char *)ELEM_FOOTER;
+  strs[count] = strdup(ELEM_FOOTER);
+  if (strs[count] == NULL) 
+    goto fail;
   count++;
 
   assert(count < (sizeof(strs)/sizeof(strs[0])));
 
-  gpukernel *k = cl_newkernel(NULL, count, (const char **)strs, NULL, "elemk",
+  gpukernel *k = cl_newkernel(ctx, count, (const char **)strs, NULL, "elemk",
 			      &res);
   if (k == NULL) goto fail;
   res = cl_setkernelargbuf(k, 0, input);

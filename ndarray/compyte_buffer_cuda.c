@@ -378,9 +378,10 @@ static int cuda_elemwise(gpudata *input, gpudata *output, int intype,
             goto fail;
         count++;
     } else {
-        if (compyte_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a") == -1)
+        /* XXX: does cuda does C-style pointer manip? */
+        if (compyte_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a", 1) == -1)
             goto fail;
-        if (compyte_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b") == -1)
+        if (compyte_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b", 1) == -1)
             goto fail;
 
         if (asprintf(&strs[count], "b[0] %s a[0];", op) == -1)
