@@ -110,16 +110,15 @@ int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
   for (i = 0; i < a->nd; i++) {
     if (steps[i] == 0) new_nd -= 1;
   }
-
   r->ops = a->ops;
   r->data = a->ops->buffer_dup(a->data, &err);
+  r->typecode = a->typecode;
+  r->flags = a->flags;
+  r->nd = new_nd;
   if (r->data == NULL) {
     GpuArray_clear(r);
     return err;
   }
-  r->typecode = a->typecode;
-  r->flags = a->flags;
-  r->nd = new_nd;
   r->dimensions = calloc(r->nd, sizeof(size_t));
   r->strides = calloc(r->nd, sizeof(ssize_t));
   if (r->dimensions == NULL || r->strides == NULL) {
@@ -172,9 +171,9 @@ int GpuArray_move(GpuArray *dst, GpuArray *src) {
     return GA_INVALID_ERROR;
   if (!GpuArray_ISWRITEABLE(dst))
     return GA_VALUE_ERROR;
-  if (!GpuArray_ISONESEGMENT(dst) || !GpuArray_ISONESEGMENT(src) || 
-      GpuArray_ISFORTRAN(dst) != GpuArray_ISFORTRAN(src) || 
-      GpuArray_ITEMSIZE(dst) != GpuArray_ITEMSIZE(src)) {
+  if (!GpuArray_ISONESEGMENT(dst) || !GpuArray_ISONESEGMENT(src) ||
+      GpuArray_ISFORTRAN(dst) != GpuArray_ISFORTRAN(src) ||
+      dst->typecode != src->typecode) {
     return dst->ops->buffer_elemwise(src->data, dst->data, src->typecode,
 				     dst->typecode, "=", src->nd,
 				     src->dimensions, src->strides, dst->nd,
