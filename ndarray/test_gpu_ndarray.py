@@ -283,7 +283,7 @@ def test_mapping_getitem_w_int():
         _a = gpu_ndarray.GpuArray(a)
         _cmp(_a[...], a[...])
         _cmpf(_a,0)
-        _cmpfV(_a,slice(1))
+        _cmpf(_a,slice(1))
 
         # test 4d-tensor
         dim =(5,4,3,2)
