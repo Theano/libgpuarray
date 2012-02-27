@@ -351,8 +351,15 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
 
   res = malloc(sizeof(*res));
   if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
+  res->q = NULL;
+  res->k = NULL;
+  res->p = NULL;
 
   res->q = make_q((cl_context)ctx, ret);
+  if (res->q == NULL) {
+    cl_freekernel(res);
+    return NULL;
+  }
   
   err = clGetCommandQueueInfo(res->q,CL_QUEUE_DEVICE,sizeof(dev),&dev,NULL);
   if (err != CL_SUCCESS) {
