@@ -303,6 +303,12 @@ cdef class GpuArray:
                nd, dims, ord)
 
     cdef make_copy(self, GpuArray other, dtype, ord):
+        if ord == GA_ANY_ORDER:
+            if py_CHKFLAGS(other, GA_F_CONTIGUOUS) and \
+                    not py_CHKFLAGS(other, GA_C_CONTIGUOUS):
+                ord = GA_F_ORDER
+            else:
+                ord = GA_C_ORDER
         self.make_empty(other.ga.nd, other.ga.dimensions, dtype, ord)
         _move(self, other)
 
