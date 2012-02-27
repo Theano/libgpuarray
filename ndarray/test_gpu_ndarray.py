@@ -233,11 +233,8 @@ def test_mapping_getitem_w_int():
         x_ = numpy.asarray(x)
         assert x_.shape == y.shape
         assert x_.dtype == y.dtype
-        if not numpy.all(x_ == y):
-            print x_
-            print y
         assert numpy.all(x_ == y),(x_, y)
-        pass
+
     def _cmpf(x,*y):
         try:
             x.__getitem__(y)
