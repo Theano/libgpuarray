@@ -226,25 +226,25 @@ def set_kind_context(kind, size_t ctx):
     cendif()
     raise ValueError("Unknown kind")
 
-cifopencl()
-def init_opencl(int devno):
+def init(kind, int devno):
     cdef int err = GA_NO_ERROR
     cdef void *ctx
-    ctx = opencl_ops.buffer_init(devno, &err)
-    if (err != GA_NO_ERROR):
-        raise GpuArrayException(opencl_ops.buffer_error())
+    ctx = NULL
+    cifopencl()
+    if kind == "opencl":
+        ctx = opencl_ops.buffer_init(devno, &err)
+        if (err != GA_NO_ERROR):
+            raise GpuArrayException(opencl_ops.buffer_error())
+    cendif()
+    cifcuda()
+    if kind == "cuda":
+        ctx = cuda_ops.buffer_init(devno, &err)
+        if (err != GA_NO_ERROR):
+            raise GpuArrayException(cuda_ops.buffer_error())
+    cendif()
+    if ctx == NULL:
+        raise RuntimeError("Unsupported kind: %s"%(kind,))
     return <size_t>ctx
-cendif()
-
-cifcuda()
-def init_cuda(int devno):
-    cdef int err = GA_NO_ERROR
-    cdef void *ctx
-    ctx = cuda_ops.buffer_init(devno, &err)
-    if (err != GA_NO_ERROR):
-        raise GpuArrayException(cuda_ops.buffer_error())
-    return <size_t>ctx
-cendif()
 
 def zeros(shape, dtype=GA_DOUBLE, order='A'):
     return GpuArray(shape, dtype=dtype, order=order, memset=0)
