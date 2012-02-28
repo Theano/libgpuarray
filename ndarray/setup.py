@@ -60,8 +60,8 @@ def try_cuda(arg):
             print "WARNING: no CUDA_ROOT specified, assuming it is part of the default search path"
         else:
             include_dirs.append(os.path.join(cuda_root, 'include'))
-            lib = os.path.join(self.cuda_root, 'lib')
-            lib64 = os.path.join(self.cuda_root, 'lib64')
+            lib = os.path.join(cuda_root, 'lib')
+            lib64 = os.path.join(cuda_root, 'lib64')
             if os.path.isdir(lib):
                 lib_dirs.append(lib)
                 ext_link_args.append('-Xlinker')
