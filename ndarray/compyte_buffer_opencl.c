@@ -100,7 +100,9 @@ static const char *get_error_string(cl_int err) {
   case CL_INVALID_BUFFER_SIZE:            return "Invalid buffer size";
   case CL_INVALID_MIP_LEVEL:              return "Invalid mip-map level";
   case CL_INVALID_GLOBAL_WORK_SIZE:       return "Invalid global work size";
+#ifdef CL_VERSION_1_1
   case CL_INVALID_PROPERTY:               return "Invalid property";
+#endif
   default: return "Unknown error";
   }
 }
