@@ -338,6 +338,8 @@ cdef class GpuArray:
         if isinstance(key, slice):
             PySlice_GetIndicesEx(key, self.ga.dimensions[i], start, stop,
                                  step, &dummy)
+            if stop[0] < start[0] and step[0] > 0:
+                stop[0] = start[0]
         elif key is Ellipsis:
             start[0] = 0
             stop[0] = self.ga.dimensions[i]

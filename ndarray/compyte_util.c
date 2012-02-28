@@ -30,9 +30,9 @@ int compyte_elem_perdim(char *strs[], unsigned int *count, unsigned int nd,
 
     for (i = nd-1; i > 0; i--) {
       assert(str[i]%elemsize == 0);
-      if (asprintf(&strs[*count], "%1$si = %1$si / %2$zu;"
-		   "%1$s += (%1$si %% %2$zu) * %3$zd;",
-		   id, dims[i], str[i]/elemsize) == -1)
+      if (asprintf(&strs[*count], "%1$s += (%1$si %% %2$zu) * %3$zd;"
+		   "%1$si = %1$si / %2$zu;", id, dims[i],
+		   str[i]/elemsize) == -1)
 	return -1;
       (*count)++;
     }
