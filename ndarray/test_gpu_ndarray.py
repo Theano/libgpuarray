@@ -254,7 +254,8 @@ def test_mapping_getitem_w_int():
         else:
             raise Exception("Did not generate value error")
 
-    for dtype in dtypes_all:
+    # No support for complex kernels for now.
+    for dtype in dtypes_no_complex:
 
         # test vector
         dim =(2,)
