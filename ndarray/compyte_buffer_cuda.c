@@ -53,10 +53,6 @@ static const char *get_error_string(CUresult err) {
     case CUDA_ERROR_OUT_OF_MEMORY:     return "Out of host memory";
     case CUDA_ERROR_NOT_INITIALIZED:   return "API not initialized";
     case CUDA_ERROR_DEINITIALIZED:     return "Driver is shutting down";
-    case CUDA_ERROR_PROFILER_DISABLED: return "Profiler is disabled";
-    case CUDA_ERROR_PROFILER_NOT_INITIALIZED: return "Profiler is not initialized";
-    case CUDA_ERROR_PROFILER_ALREADY_STARTED: return "Profiler has already started";
-    case CUDA_ERROR_PROFILER_ALREADY_STOPPED: return "Profiler has already stopped";
     case CUDA_ERROR_NO_DEVICE:         return "No CUDA devices avaiable";
     case CUDA_ERROR_INVALID_DEVICE:    return "Invalid device ordinal";
     case CUDA_ERROR_INVALID_IMAGE:     return "Invalid module image";
@@ -73,7 +69,6 @@ static const char *get_error_string(CUresult err) {
     case CUDA_ERROR_NOT_MAPPED_AS_POINTER: return "Resource cannot be accessed as pointer";
     case CUDA_ERROR_ECC_UNCORRECTABLE: return "Uncorrectable ECC error";
     case CUDA_ERROR_UNSUPPORTED_LIMIT: return "Limit not supported by device";
-    case CUDA_ERROR_CONTEXT_ALREADY_IN_USE: return "Context is already bound to another thread";
     case CUDA_ERROR_INVALID_SOURCE:    return "Invalid kernel source";
     case CUDA_ERROR_FILE_NOT_FOUND:    return "File was not found";
     case CUDA_ERROR_SHARED_OBJECT_SYMBOL_NOT_FOUND: return "Could not resolve link to shared object";
@@ -86,6 +81,12 @@ static const char *get_error_string(CUresult err) {
     case CUDA_ERROR_LAUNCH_OUT_OF_RESOURCES: return "Not enough resource to launch kernel (or passed wrong arguments)";
     case CUDA_ERROR_LAUNCH_TIMEOUT:    return "Kernel took too long to execute";
     case CUDA_ERROR_LAUNCH_INCOMPATIBLE_TEXTURING: return "Kernel launch uses incompatible texture mode";
+#if CUDA_VERSION >= 4000
+    case CUDA_ERROR_PROFILER_DISABLED: return "Profiler is disabled";
+    case CUDA_ERROR_PROFILER_NOT_INITIALIZED: return "Profiler is not initialized";
+    case CUDA_ERROR_PROFILER_ALREADY_STARTED: return "Profiler has already started";
+    case CUDA_ERROR_PROFILER_ALREADY_STOPPED: return "Profiler has already stopped";
+    case CUDA_ERROR_CONTEXT_ALREADY_IN_USE: return "Context is already bound to another thread";
     case CUDA_ERROR_PEER_ACCESS_ALREADY_ENABLED: return "Peer access already enabled";
     case CUDA_ERROR_PEER_ACCESS_NOT_ENABLED: return "Peer access not enabled";
     case CUDA_ERROR_PRIMARY_CONTEXT_ACTIVE: return "Primary context already initialized";
@@ -94,6 +95,7 @@ static const char *get_error_string(CUresult err) {
     case CUDA_ERROR_TOO_MANY_PEERS:    return "Not enough ressoures to enable peer access";
     case CUDA_ERROR_HOST_MEMORY_ALREADY_REGISTERED: return "Memory range already registered";
     case CUDA_ERROR_HOST_MEMORY_NOT_REGISTERED: return "Memory range is not registered";
+#endif
     case CUDA_ERROR_UNKNOWN:           return "Unknown internal error";
     default: return "Unknown error code";
     }
@@ -107,7 +109,7 @@ static void *cuda_init(int ord, int *ret) {
     CHKFAIL(NULL);
     err = cuDeviceGet(&dev, ord);
     CHKFAIL(NULL);
-    err = cuCtxCreate(&ctx, CU_CTX_SCHED_AUTO|CU_CTX_SCHED_BLOCKING_SYNC, dev);
+    err = cuCtxCreate(&ctx, CU_CTX_SCHED_AUTO, dev);
     CHKFAIL(NULL);
     return ctx;
 }
