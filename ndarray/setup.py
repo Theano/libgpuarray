@@ -23,6 +23,10 @@ lib_dirs = []
 libraries = []
 ext_link_args = []
 
+if sys.platform.startswith('linux'):
+    # stupid linux and its lack of strlcat/strlcpy
+    srcs.append('stupid_linux.c')
+
 fnull = open(os.devnull, 'r+')
 
 # Detect CUDA install

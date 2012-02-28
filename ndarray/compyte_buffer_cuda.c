@@ -18,6 +18,11 @@
 
 #endif
 
+#ifdef __linux__
+size_t strlcpy(char *dst, const char *src, size_t siz);
+size_t strlcat(char *dst, const char *src, size_t siz);
+#endif
+
 #include "compyte_buffer.h"
 #include "compyte_util.h"
 
