@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <string.h>
 #include <errno.h>
 
 #include "compyte_buffer.h"
