@@ -156,8 +156,8 @@ static void cuda_free(gpudata *d) {
 }
 
 static int cuda_share(gpudata *a, gpudata *b, int *ret) {
-    return ((a->ptr < b->ptr && a->ptr + gdata_size(a) > b->ptr) ||
-            (b->ptr < a->ptr && b->ptr + gdata_size(b) > a->ptr));
+    return ((a->ptr <= b->ptr && a->ptr + gdata_size(a) > b->ptr) ||
+            (b->ptr <= a->ptr && b->ptr + gdata_size(b) > a->ptr));
 }
 
 static int cuda_move(gpudata *dst, gpudata *src)
