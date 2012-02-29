@@ -1,6 +1,7 @@
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
+#include <sys/wait.h>
 
 #include <assert.h>
 #include <fcntl.h>
@@ -42,6 +43,9 @@ struct _gpukernel {
     CUfunction k;
     void **args;
     unsigned int argcount;
+#if CUDA_VERSION < 4000
+    size_t *szs;
+#endif
 };
 
 
@@ -51,7 +55,6 @@ struct _gpukernel {
 static CUresult err;
 
 static const char *get_error_string(CUresult err) {
-    /* CUDA 4.1 error codes */
     switch (err) {
     case CUDA_SUCCESS:                 return "Success!";
     case CUDA_ERROR_INVALID_VALUE:     return "Invalid value";
@@ -281,6 +284,9 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
     res->args = NULL;
     res->argcount = 0;
+#if CUDA_VERSION < 4000
+    res->szs = NULL;
+#endif
     
     if ((err = cuModuleLoad(&res->m, outbuf)) != CUDA_SUCCESS) {
         free(res);
@@ -301,6 +307,9 @@ static void cuda_freekernel(gpukernel *k) {
     for (i = 0; i < k->argcount; i++)
         free(k->args[i]);
     free(k->args);
+#if CUDA_VERSION < 4000
+    free(k->szs);
+#endif
     cuModuleUnload(k->m);
     free(k);
 }
@@ -314,12 +323,22 @@ static int cuda_setkernelarg(gpukernel *k, unsigned int index, size_t sz,
         bcopy(k->args, tmp, sizeof(void *)*k->argcount);
         free(k->args);
         k->args = (void **)tmp;
+#if CUDA_VERSION < 4000
+        tmp = calloc(index+1, sizeof(size_t));
+        if (tmp == NULL) return GA_MEMORY_ERROR;
+        bcopy(k->szs, tmp, sizeof(size_t)*k->argcount);
+        free(k->szs);
+        k->szs = (size_t *)tmp;
+#endif
         k->argcount = index+1;
     }
     tmp = malloc(sz);
     if (tmp == NULL) return GA_MEMORY_ERROR;
     bcopy(val, tmp, sz);
     k->args[index] = tmp;
+#if CUDA_VERSION < 4000
+    k->szs[index] = sz;
+#endif
     return GA_NO_ERROR;
 }
 
@@ -330,10 +349,29 @@ static int cuda_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
 static int cuda_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
                            unsigned int gz, unsigned int bx, unsigned int by,
                            unsigned int bz) {
+#if CUDA_VERSION >= 4000
     err = cuLaunchKernel(k->k, gx, gy, gz, bx, by, bz, 0, NULL, k->args, NULL);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
+#else
+    size_t total = 0;
+    unsigned int i;
+    for (i = 0; i < k->argcount; i++)
+        total += k->szs[i];
+    err = cuParamSetSize(k->k, total);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+    total = 0;
+    for (i = 0; i < k->argcount; i++) {
+        err = cuParamSetv(k->k,(int)total,k->args[i],(unsigned int)k->szs[i]);
+        if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+        total += k->szs[i];
+    }
+    err = cuFuncSetBlockShape(k->k, (int)bx, (int)by, (int)bz);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+    err = cuLaunchGrid(k->k, (int)gx, (int)gz*gy);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+#endif
     err = cuCtxSynchronize();
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
