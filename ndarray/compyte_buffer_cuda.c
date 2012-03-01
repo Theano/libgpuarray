@@ -31,8 +31,6 @@ size_t strlcat(char *dst, const char *src, size_t siz);
 #include "compyte_buffer.h"
 #include "compyte_util.h"
 
-#define CUDA_THREAD_SYNC cuCtxSynchronize()
-
 struct _gpudata {
     CUdeviceptr ptr;
     size_t sz;
@@ -203,7 +201,6 @@ static int cuda_write(gpudata *dst, const void *src, size_t sz)
     if (gdata_size(dst) != sz)
         return GA_VALUE_ERROR;
     err = cuMemcpyHtoD(dst->ptr, src, sz);
-    CUDA_THREAD_SYNC;
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
