@@ -242,6 +242,8 @@ static int call_compiler(char *fname, char *oname) {
     return 0;
 }
 
+static const char INT_HEADERS[] = "#include <inttypes.h>\n";
+
 static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
                                  const char **strings, const size_t *lengths,
                                  const char *fname, int *ret) {
@@ -250,21 +252,24 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     char *tmpdir;
     int fd, sys_err;
     ssize_t s;
-    struct iovec descr[count];
+    struct iovec descr[count+1];
     gpukernel *res;
     unsigned int i;
 
     if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
 
+    descr[0].iov_base = (void *)INT_HEADERS;
+    descr[0].iov_len = strlen(INT_HEADERS);
+
     if (lengths == NULL) {
         for (i = 0; i < count; i++) {
-            descr[i].iov_base = (void *)strings[i];
-            descr[i].iov_len = strlen(strings[i]);
+            descr[i+1].iov_base = (void *)strings[i];
+            descr[i+1].iov_len = strlen(strings[i]);
         }
     } else {
         for (i = 0; i < count; i++) {
-            descr[i].iov_base = (void *)strings[i];
-            descr[i].iov_len = lengths[i]?lengths[i]:strlen(strings[i]);
+            descr[i+1].iov_base = (void *)strings[i];
+            descr[i+1].iov_len = lengths[i]?lengths[i]:strlen(strings[i]);
         }
     }
 
@@ -280,7 +285,7 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     strlcpy(outbuf, namebuf, sizeof(outbuf));
     strlcat(outbuf, ".cubin", sizeof(outbuf));
 
-    s = writev(fd, descr, count);
+    s = writev(fd, descr, count+1);
     /* fd is not non-blocking so should have complete write */
     if (s == -1) {
         close(fd);
