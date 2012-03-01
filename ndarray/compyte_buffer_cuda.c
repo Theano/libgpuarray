@@ -254,7 +254,7 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     unsigned int i;
 
     if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
-    
+
     if (lengths == NULL) {
         for (i = 0; i < count; i++) {
             descr[i].iov_base = (void *)strings[i];
@@ -266,19 +266,19 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
             descr[i].iov_len = lengths[i]?lengths[i]:strlen(strings[i]);
         }
     }
-    
+
     tmpdir = getenv("TMPDIR");
     if (tmpdir == NULL) tmpdir = "/tmp";
-    
+
     strlcpy(namebuf, tmpdir, sizeof(namebuf));
     strlcat(namebuf, "/compyte.cuda.XXXXXXXX", sizeof(namebuf));
 
-    strlcpy(outbuf, namebuf, sizeof(outbuf));
-    strlcat(outbuf, ".cubin", sizeof(outbuf));
-    
     fd = mkstemp(namebuf);
     if (fd == -1) FAIL(NULL, GA_SYS_ERROR);
-    
+
+    strlcpy(outbuf, namebuf, sizeof(outbuf));
+    strlcat(outbuf, ".cubin", sizeof(outbuf));
+
     s = writev(fd, descr, count);
     /* fd is not non-blocking so should have complete write */
     if (s == -1) {
@@ -291,17 +291,27 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     close(fd);
     unlink(namebuf);
 
-    if (sys_err != GA_NO_ERROR) FAIL(NULL, sys_err);
-        
+    if (sys_err != GA_NO_ERROR) {
+        unlink(outbuf);
+        FAIL(NULL, sys_err);
+    }
+
     res = malloc(sizeof(*res));
-    if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
+    if (res == NULL) {
+        unlink(outbuf);
+        FAIL(NULL, GA_SYS_ERROR);
+    }
     res->args = NULL;
     res->argcount = 0;
 #if CUDA_VERSION < 4000
     res->szs = NULL;
 #endif
-    
-    if ((err = cuModuleLoad(&res->m, outbuf)) != CUDA_SUCCESS) {
+
+    err = cuModuleLoad(&res->m, outbuf);
+
+    unlink(outbuf);
+
+    if (err != CUDA_SUCCESS) {
         free(res);
         FAIL(NULL, GA_IMPL_ERROR);
     }
