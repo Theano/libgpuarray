@@ -187,7 +187,7 @@ static int cuda_move(gpudata *dst, gpudata *src)
 
 static int cuda_read(void *dst, gpudata *src, size_t sz)
 {
-    if (sz != gdata_size(src))
+    if (sz > gdata_size(src))
         return GA_VALUE_ERROR;
     err = cuMemcpyDtoH(dst, src->ptr, sz);
     if (err != CUDA_SUCCESS) {
