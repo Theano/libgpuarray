@@ -125,6 +125,7 @@ enum ga_error {
   GA_INVALID_ERROR,
   GA_UNSUPPORTED_ERROR,
   GA_SYS_ERROR, /* look at errno for more details */
+  GA_RUN_ERROR,
   /* Add more error types if needed */
   /* Don't forget to sync with GpuArray_error() */
 };

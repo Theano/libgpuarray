@@ -237,7 +237,7 @@ static int call_compiler(char *fname, char *oname) {
     }
     if (waitpid(p, &sys_err, 0) == -1)
         return GA_SYS_ERROR;
-    if (WIFSIGNALED(err) || WEXITSTATUS(err) != 0) return GA_SYS_ERROR;
+    if (WIFSIGNALED(sys_err) || WEXITSTATUS(sys_err) != 0) return GA_RUN_ERROR;
     return 0;
 }
 

@@ -212,6 +212,7 @@ const char *GpuArray_error(GpuArray *a, int err) {
   case GA_INVALID_ERROR:     return "Invalid value";
   case GA_UNSUPPORTED_ERROR: return "Unsupported operation";
   case GA_SYS_ERROR:         return strerror(errno);
+  case GA_RUN_ERROR:         return "Could not execute helper program";
   default: return "Unknown GA error";
   }
 }
