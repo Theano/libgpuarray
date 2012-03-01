@@ -295,12 +295,12 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     sys_err = call_compiler(namebuf, outbuf);
 
     close(fd);
-    unlink(namebuf);
 
     if (sys_err != GA_NO_ERROR) {
         unlink(outbuf);
         FAIL(NULL, sys_err);
     }
+    unlink(namebuf);
 
     res = malloc(sizeof(*res));
     if (res == NULL) {
