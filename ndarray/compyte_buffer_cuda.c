@@ -222,15 +222,68 @@ static int cuda_offset(gpudata *buf, ssize_t off) {
     return GA_NO_ERROR;
 }
 
+static const char *arch_arg = NULL;
+
+static int detect_arch(void) {
+    CUdevice dev;
+    int major, minor;
+    err = cuCtxGetDevice(&dev);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+    err = cuDeviceComputeCapability(&major, &minor, dev);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+    switch (major) {
+    case 1:
+        switch (minor) {
+        case 0:
+            arch_arg = "sm_10";
+            break;
+        case 1:
+            arch_arg = "sm_11";
+            break;
+        case 2:
+            arch_arg = "sm_12";
+            break;
+        case 3:
+        default:
+            arch_arg = "sm_13";
+        }
+        break;
+    case 2:
+        switch (minor) {
+        case 0:
+            arch_arg = "sm_20";
+            break;
+        case 1:
+            arch_arg = "sm_21";
+            break;
+        case 2:
+            arch_arg = "sm_22";
+            break;
+        case 3:
+        default:
+            arch_arg = "sm_23";
+        }
+        break;
+    default:
+        arch_arg = "sm_23";
+    }
+    return GA_NO_ERROR;
+}
+
 /* This is a unix version, might need a windows one. */
 static int call_compiler(char *fname, char *oname) {
     int sys_err;
     pid_t p;
+
+    if (arch_arg == NULL) {
+        err = detect_arch();
+        if (err != GA_NO_ERROR) return err;
+        assert(arch_arg != NULL);
+    }
     
     p = fork();
     if (p == 0) {
-        /* Will need some way to specify arch (or detect it live) */
-        execlp(CUDA_BIN_PATH "nvcc", "nvcc", "-x", "cu",
+        execlp(CUDA_BIN_PATH "nvcc", "nvcc", "-arch", arch_arg, "-x", "cu",
                "--cubin", fname, "-o", oname, NULL);
         exit(1);
     } else if (p == -1) {
