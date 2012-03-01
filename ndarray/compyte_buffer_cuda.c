@@ -36,11 +36,23 @@ size_t strlcat(char *dst, const char *src, size_t siz);
 struct _gpudata {
     CUdeviceptr ptr;
     size_t sz;
-#define gdata_size(b) ((b)->sz & SSIZE_MAX)
-#define gdata_canfree(b) ((b)->sz & ~SSIZE_MAX)
-#define gdata_setfree(b) ((b)->sz |= ~SSIZE_MAX)
-#define gdata_setsize(b, s) ((b)->sz = (s) & gdata_canfree(b))
 };
+
+static inline size_t gdata_size(gpudata *b) {
+    return b->sz & SSIZE_MAX;
+}
+
+static inline int gdata_canfree(gpudata *b) {
+    return (b->sz & ~SSIZE_MAX) ? 0 : 1;
+}
+
+static inline void gdata_setfree(gpudata *b) {
+    b->sz |= ~SSIZE_MAX;
+}
+
+static inline void gdata_setsize(gpudata *b, size_t s) {
+    b->sz = (b->sz & ~SSIZE_MAX) | s;
+}
 
 struct _gpukernel {
     CUmodule m;
