@@ -405,6 +405,7 @@ static int cuda_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
 
 static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
     "#define DTYPEB %s\n"
+    "extern \"C\" {"
     "__global__ void elemk(const DTYPEA *a_data, DTYPEB *b_data) {"
     "const int idx = blockIdx.x * blockDim.x + threadIdx.x;"
     "const int numThreads = blockDim.x * gridDim.x;"
@@ -412,7 +413,7 @@ static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
     "const DTYPEA *a = a_data;"
     "DTYPEB *b = b_data;";
 
-static const char ELEM_FOOTER[] = "}}\n";
+static const char ELEM_FOOTER[] = "}}}\n";
 
 static inline unsigned int xmin(unsigned long a, unsigned long b) {
     return (unsigned int)((a < b) ? a : b);
