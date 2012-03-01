@@ -1,3 +1,6 @@
+#ifdef __linux__
+#define _GNU_SOURCE
+#endif
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
@@ -8,6 +11,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdio.h>
 
 #ifdef __APPLE__
 
