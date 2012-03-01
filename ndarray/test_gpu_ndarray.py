@@ -4,7 +4,10 @@ import numpy
 
 import pygpu_ndarray as gpu_ndarray
 
-gpu_ndarray.set_kind_context("opencl", gpu_ndarray.init_opencl(0))
+# Run the tests for cuda
+#gpu_ndarray.set_kind_context("cuda", gpu_ndarray.init("cuda", 0))
+# Run the tests for opencl
+gpu_ndarray.set_kind_context("opencl", gpu_ndarray.init("opencl", 0))
 
 enable_double = True
 
