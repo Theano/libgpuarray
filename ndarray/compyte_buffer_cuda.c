@@ -341,7 +341,7 @@ static void cuda_freekernel(gpukernel *k) {
 static int cuda_setkernelarg(gpukernel *k, unsigned int index, size_t sz,
                              const void *val) {
     void *tmp;
-    if (index > k->argcount) {
+    if (index >= k->argcount) {
         tmp = calloc(index+1, sizeof(void *));
         if (tmp == NULL) return GA_MEMORY_ERROR;
         bcopy(k->args, tmp, sizeof(void *)*k->argcount);
