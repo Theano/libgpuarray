@@ -230,7 +230,8 @@ static int call_compiler(char *fname, char *oname) {
     p = fork();
     if (p == 0) {
         /* Will need some way to specify arch (or detect it live) */
-        execlp(CUDA_BIN_PATH "nvcc", "-xcu", "--cubin", fname, "-o", oname, NULL);
+        execlp(CUDA_BIN_PATH "nvcc", "nvcc", "-x", "cu",
+               "--cubin", fname, "-o", oname, NULL);
         exit(1);
     } else if (p == -1) {
         return GA_SYS_ERROR;
