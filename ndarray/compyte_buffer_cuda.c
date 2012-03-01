@@ -447,7 +447,8 @@ static int cuda_elemwise(gpudata *input, gpudata *output, int intype,
         count++;
     }
 
-    strs[count] = (char *)ELEM_FOOTER;
+    strs[count] = strdup(ELEM_FOOTER);
+    if (strs[count] == NULL) goto fail;
     count++;
     
     assert(count < (sizeof(strs)/sizeof(strs[0])));
