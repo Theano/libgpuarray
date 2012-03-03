@@ -357,25 +357,33 @@ cdef class GpuArray:
         starts = <ssize_t *>calloc(other.ga.nd, sizeof(ssize_t))
         stops = <ssize_t *>calloc(other.ga.nd, sizeof(ssize_t))
         steps = <ssize_t *>calloc(other.ga.nd, sizeof(ssize_t))
-        d = 0
+        try:
+            if starts == NULL or stops == NULL or steps == NULL:
+                raise MemoryError()
 
-        if isinstance(key, tuple):
-            if len(key) > other.ga.nd:
-                raise IndexError("invalid index")
-            for i in range(0, len(key)):
-                other.__index_helper(key[i], i, &starts[i], &stops[i],
-                                    &steps[i])
-            d += len(key)
-        else:
-            other.__index_helper(key, 0, starts, stops, steps)
-            d += 1
+            d = 0
 
-        for i in range(d, other.ga.nd):
-            starts[i] = 0
-            stops[i] = other.ga.dimensions[i]
-            steps[i] = 1
+            if isinstance(key, tuple):
+                if len(key) > other.ga.nd:
+                    raise IndexError("invalid index")
+                for i in range(0, len(key)):
+                    other.__index_helper(key[i], i, &starts[i], &stops[i],
+                                         &steps[i])
+                d += len(key)
+            else:
+                other.__index_helper(key, 0, starts, stops, steps)
+                d += 1
 
-        _index(self, other, starts, stops, steps);
+            for i in range(d, other.ga.nd):
+                starts[i] = 0
+                stops[i] = other.ga.dimensions[i]
+                steps[i] = 1
+
+            _index(self, other, starts, stops, steps);
+        finally:
+            free(starts)
+            free(stops)
+            free(steps)
 
     def memset(self, value):
         _memset(self, value)
