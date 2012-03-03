@@ -1,3 +1,9 @@
+/* We define _GNU_SOURCE since otherwise stdio.h will not expose
+   asprintf on linux.  It is crazy, but whatever. */
+#ifdef __linux__
+#define _GNU_SOURCE
+#endif
+
 #include "compyte_buffer.h"
 
 #ifdef __APPLE__
