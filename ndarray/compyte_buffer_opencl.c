@@ -138,6 +138,10 @@ static cl_command_queue make_q(cl_context ctx, int *ret) {
   return res;
 }
 
+static void errcb(const char *errinfo, const void *pi, size_t cb, void *u) {
+  fprintf(stderr, "%s\n", errinfo);
+}
+
 static void *cl_init(int devno, int *ret) {
   cl_device_id ds[16];
   cl_platform_id p;
@@ -157,7 +161,7 @@ static void *cl_init(int devno, int *ret) {
   if (devno >= numd || devno < 0) FAIL(NULL, GA_VALUE_ERROR);
   props[1] = (cl_context_properties)p;
 
-  ctx = clCreateContext(props, 1, &ds[devno], NULL, NULL, &err);
+  ctx = clCreateContext(props, 1, &ds[devno], errcb, NULL, &err);
   CHKFAIL(NULL);
 
   return ctx;
