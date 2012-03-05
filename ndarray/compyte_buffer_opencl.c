@@ -155,7 +155,7 @@ static void *cl_init(int devno, int *ret) {
   err = clGetPlatformIDs(1, &p, NULL);
   CHKFAIL(NULL);
 
-  err = clGetDeviceIDs(p, CL_DEVICE_TYPE_DEFAULT, 16, ds, &numd);
+  err = clGetDeviceIDs(p, CL_DEVICE_TYPE_ALL, 16, ds, &numd);
   CHKFAIL(NULL);
 
   if (devno >= numd || devno < 0) FAIL(NULL, GA_VALUE_ERROR);
