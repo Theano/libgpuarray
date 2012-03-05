@@ -11,6 +11,11 @@ gpu_ndarray.set_kind_context("opencl", gpu_ndarray.init("opencl", 0))
 
 enable_double = True
 
+if numpy.__version__ < '1.6.0':
+    skip_single_f = True
+else:
+    skip_single_f = False
+
 dtypes_all = ["float32",
               "int8", "int16", "int32", "int64",
               "uint8", "uint16", "uint32", "uint64",
@@ -26,20 +31,28 @@ if enable_double:
     dtypes_no_complex += ["float64"]
 
 def check_flags(x, y):
+    assert isinstance(x, gpu_ndarray.GpuArray) 
     assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
-    assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
+    if not (skip_single_f and x.shape == ()):
+        # Numpy below 1.6.0 does not have a consistent hangling of
+        # f-contiguous for 0-d arrays
+        assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
+    else:
+        assert x.flags["F_CONTIGUOUS"]
     assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"]
     assert x.flags["OWNDATA"] == y.flags["OWNDATA"]
     assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
     assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
 
 def check_meta(x, y):
+    assert isinstance(x, gpu_ndarray.GpuArray)
     assert x.shape == y.shape
     assert x.dtype == y.dtype
     assert x.strides == y.strides
     check_flags(x, y)
 
 def check_all(x, y):
+    assert isinstance(x, gpu_ndarray.GpuArray)
     check_meta(x, y)
     assert numpy.allclose(numpy.asarray(x), numpy.asarray(y))
 
@@ -97,8 +110,8 @@ def test_zeros():
     for shp in [(), (5,),(6,7),(4,8,9),(1,8,9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
-                x = numpy.zeros(shp, dtype, order)
-                y = gpu_ndarray.zeros(shp, dtype, order)
+                x = gpu_ndarray.zeros(shp, dtype, order)
+                y = numpy.zeros(shp, dtype, order)
                 check_all(x, y)
     x = gpu_ndarray.zeros(())# no dtype and order param
     y = numpy.zeros(())
@@ -114,8 +127,8 @@ def test_empty():
     for shp in [(), (5,),(6,7),(4,8,9),(1,8,9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
-                x = numpy.empty(shp, dtype, order)
-                y = gpu_ndarray.empty(shp, dtype, order)
+                x = gpu_ndarray.empty(shp, dtype, order)
+                y = numpy.empty(shp, dtype, order)
                 check_meta(x, y)
     x = gpu_ndarray.empty(())# no dtype and order param
     y = numpy.empty(())
@@ -157,7 +170,7 @@ def test_copy_view():
 
             b = gpu_ndarray.GpuArray(a)
             assert numpy.allclose(a, numpy.asarray(b))
-            check_flags(a, b)
+            check_flags(b, a)
 
             c = b.copy()
             assert numpy.allclose(a, numpy.asarray(c))
@@ -194,11 +207,15 @@ def test_len():
 
 def test_mapping_getitem_w_int():
     def _cmp(x,y):
+        assert isinstance(x, gpu_ndarray.GpuArray)
         assert x.shape == y.shape
         assert x.dtype == y.dtype
         assert x.strides == y.strides
         assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
-        assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
+        if not (skip_single_f and y.shape == ()):
+            assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
+        else:
+            assert x.flags["F_CONTIGUOUS"]
         # GpuArrays always own their data after indexing
         assert x.flags["OWNDATA"]
         # we don't check for y.flags["OWNDATA"] since the logic
