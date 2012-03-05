@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -271,4 +272,66 @@ int GpuArray_is_f_contiguous(const GpuArray *a) {
     size *= a->dimensions[i];
   }
   return 1;
+}
+
+int GpuKernel_init(GpuKernel *k, compyte_buffer_ops *ops, void *ctx, int count,
+		   const char **strs, size_t *lens, const char *name) {
+  int res = GA_NO_ERROR;
+
+  k->ops = ops;
+  k->k = k->ops->buffer_newkernel(ctx, count, strs, lens, name, &res);
+  return res;
+}
+
+void GpuKernel_clear(GpuKernel *k) {
+  k->ops->buffer_freekernel(k->k);
+  k->k = NULL;
+  k->ops = NULL;
+}
+
+int GpuKernel_setarg(GpuKernel *k, unsigned int index, int typecode, ...) {
+#define extract(t1, t2) do {						\
+    t2 v = va_arg(a, t1);						\
+    res = k->ops->buffer_setkernelarg(k->k, index, sizeof(v), &v);	\
+  } while (0)
+
+  va_list a;
+  int res = GA_NO_ERROR;
+  
+  va_start(a, typecode);
+
+  switch (typecode) {
+    /* 
+       We don't support a lot of types here since it's tricky what happens
+       with argument promotion on the kernel side, especially for CUDA.
+
+       Anyway the supported types should cover the vast majority of cases.
+    */
+  case GA_INT: extract(int, int); break;
+  case GA_UINT: extract(unsigned int, unsigned int); break;
+  case GA_LONG: extract(long, long); break;
+  case GA_ULONG: extract(unsigned long, unsigned long); break;
+  case GA_FLOAT: extract(double, float); break;
+  case GA_DOUBLE: extract(double, double); break;
+  default:
+    res = GA_UNSUPPORTED_ERROR;
+  }
+
+#undef extract
+  va_end(a);
+  return res;
+}
+
+int GpuKernel_setbufarg(GpuKernel *k, unsigned int index, GpuArray *a) {
+  return k->ops->buffer_setkernelargbuf(k->k, index, a->data);
+}
+
+int GpuKernel_setrawarg(GpuKernel *k, unsigned int index, size_t sz, void *v) {
+  return k->ops->buffer_setkernelarg(k->k, index, sz, v);
+}
+
+int GpuKernel_call(GpuKernel *k, unsigned int gx, unsigned int gy,
+                   unsigned int gz, unsigned int lx, unsigned int ly,
+                   unsigned int lz) {
+  return k->ops->buffer_callkernel(k->k, gx, gy, gz, lx, ly, lz);
 }

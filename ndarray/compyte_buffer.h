@@ -111,6 +111,11 @@ typedef struct _GpuArray {
      Maybe will define other flags later */
 } GpuArray;
 
+typedef struct _GpuKernel {
+  gpukernel *k;
+  compyte_buffer_ops *ops;
+} GpuKernel;
+
 typedef enum _ga_order {
   GA_ANY_ORDER=-1,
   GA_C_ORDER=0,
@@ -165,6 +170,19 @@ const char *GpuArray_error(GpuArray *a, int err);
 void GpuArray_fprintf(FILE *fd, const GpuArray *a);
 int GpuArray_is_c_contiguous(const GpuArray *a);
 int GpuArray_is_f_contiguous(const GpuArray *a);
+
+int GpuKernel_init(GpuKernel *, compyte_buffer_ops *ops, void *ctx, int count,
+		   const char **strs, size_t *lens, const char *name);
+
+void GpuKernel_clear(GpuKernel *);
+
+int GpuKernel_setarg(GpuKernel *, unsigned int index, int typecode, ...);
+int GpuKernel_setbufarg(GpuKernel *, unsigned int index, GpuArray *);
+int GpuKernel_setrawarg(GpuKernel *, unsigned int index, size_t sz, void *val);
+
+int GpuKernel_call(GpuKernel *, unsigned int gx, unsigned int gy,
+		   unsigned int gz, unsigned int lx, unsigned int ly,
+		   unsigned int lz);
 
 #ifdef __cplusplus
 }
