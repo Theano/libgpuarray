@@ -139,7 +139,7 @@ for i, a in enumerate(sys.argv):
     elif a == '--disable-opencl':
         to_del.append(i)
         have_opencl = False
-    elif a == 'disable-cython':
+    elif a == '--disable-cython':
         to_del.append(i)
         have_cython = False
 
