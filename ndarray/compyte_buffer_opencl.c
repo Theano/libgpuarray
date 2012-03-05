@@ -312,14 +312,14 @@ static int cl_memset(gpudata *dst, int data) {
     return GA_IMPL_ERROR;
 
   r = snprintf(local_kern, sizeof(local_kern),
-	       "__kernel void memset(__global unsigned int *mem) { mem[get_global_id(0)] = %u; }", pattern);
+	       "__kernel void kmemset(__global unsigned int *mem) { mem[get_global_id(0)] = %u; }", pattern);
   /* If this assert fires, increase the size of local_kern above. */
   assert(r <= sizeof(local_kern));
 
   sz = strlen(local_kern);
   rlk[0] = local_kern;
 
-  gpukernel *m = cl_newkernel(ctx, 1, rlk, &sz, "memset", &res);
+  gpukernel *m = cl_newkernel(ctx, 1, rlk, &sz, "kmemset", &res);
   if (m == NULL) return res;
   res = cl_setkernelargbuf(m, 0, dst);
   if (res != GA_NO_ERROR) goto fail;
