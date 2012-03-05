@@ -144,7 +144,7 @@ static inline int GpuArray_CHKFLAGS(GpuArray *a, int flags) {
 #define GpuArray_ISALIGNED(a) GpuArray_CHKFLAGS(a, GA_ALIGNED)
 #define GpuArray_ISONESEGMENT(a) ((a)->flags & (GA_C_CONTIGUOUS|GA_F_CONTIGUOUS))
 #define GpuArray_ISFORTRAN(a) GpuArray_CHKFLAGS(a, GA_F_CONTIGUOUS)
-#define GpuArray_ITEMSIZE(a) compyte_get_elsize((a)->typecode) /* For now */
+#define GpuArray_ITEMSIZE(a) compyte_get_elsize((a)->typecode)
 
 int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 		   int typecode, unsigned int nd, size_t *dims, ga_order ord);
