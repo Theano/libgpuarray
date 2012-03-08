@@ -50,7 +50,7 @@ class ArrayFlags:
 
 
 
-def get_common_dtype(obj1, obj2):
+def get_common_dtype(obj1, obj2, allow_double):
     # Yes, numpy behaves differently depending on whether
     # we're dealing with arrays or scalars.
 
@@ -61,7 +61,15 @@ def get_common_dtype(obj1, obj2):
     except AttributeError:
         zero2 = obj2
 
-    return (zero1 + zero2).dtype
+    result = (zero1 + zero2).dtype
+
+    if not allow_double:
+        if result == np.float64:
+            result = np.dtype(np.float32)
+        elif result == np.complex128:
+            result = np.dtype(np.complex64)
+
+    return result
 
 
 
