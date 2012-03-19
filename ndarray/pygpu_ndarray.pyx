@@ -77,42 +77,42 @@ cdef extern from "compyte_buffer.h":
         GA_DOUBLE,
         GA_NBASE
 
-    char *Gpu_error(compyte_buffer_ops *o, int err)
+    char *Gpu_error(compyte_buffer_ops *o, int err) nogil
 
     int GpuArray_empty(_GpuArray *a, compyte_buffer_ops *ops, void *ctx,
-                       int typecode, int nd, size_t *dims, ga_order ord)
+                       int typecode, int nd, size_t *dims, ga_order ord) nogil
     int GpuArray_zeros(_GpuArray *a, compyte_buffer_ops *ops, void *ctx,
-                       int typecode, int nd, size_t *dims, ga_order ord)
-    int GpuArray_view(_GpuArray *v, _GpuArray *a)
+                       int typecode, int nd, size_t *dims, ga_order ord) nogil
+    int GpuArray_view(_GpuArray *v, _GpuArray *a) nogil
     int GpuArray_index(_GpuArray *r, _GpuArray *a, ssize_t *starts,
-                       ssize_t *stops, ssize_t *steps)
+                       ssize_t *stops, ssize_t *steps) nogil
 
-    void GpuArray_clear(_GpuArray *a)
+    void GpuArray_clear(_GpuArray *a) nogil
 
-    int GpuArray_share(_GpuArray *a, _GpuArray *b)
+    int GpuArray_share(_GpuArray *a, _GpuArray *b) nogil
 
-    int GpuArray_move(_GpuArray *dst, _GpuArray *src)
-    int GpuArray_write(_GpuArray *dst, void *src, size_t src_sz)
-    int GpuArray_read(void *dst, size_t dst_sz, _GpuArray *src)
-    int GpuArray_memset(_GpuArray *a, int data)
+    int GpuArray_move(_GpuArray *dst, _GpuArray *src) nogil
+    int GpuArray_write(_GpuArray *dst, void *src, size_t src_sz) nogil
+    int GpuArray_read(void *dst, size_t dst_sz, _GpuArray *src) nogil
+    int GpuArray_memset(_GpuArray *a, int data) nogil
 
-    char *GpuArray_error(_GpuArray *a, int err)
+    char *GpuArray_error(_GpuArray *a, int err) nogil
     
-    void GpuArray_fprintf(libc.stdio.FILE *fd, _GpuArray *a)
-    int GpuArray_is_c_contiguous(_GpuArray *a)
-    int GpuArray_is_f_contiguous(_GpuArray *a)
+    void GpuArray_fprintf(libc.stdio.FILE *fd, _GpuArray *a) nogil
+    int GpuArray_is_c_contiguous(_GpuArray *a) nogil
+    int GpuArray_is_f_contiguous(_GpuArray *a) nogil
 
     int GpuKernel_init(_GpuKernel *k, compyte_buffer_ops *ops, void *ctx,
                        unsigned int count, char **strs, size_t *lens,
-                       char *name)
-    void GpuKernel_clear(_GpuKernel *k)
-    int GpuKernel_setarg(_GpuKernel *k, unsigned int index, int typecode, ...)
-    int GpuKernel_setbufarg(_GpuKernel *k, unsigned int index, _GpuArray *a)
+                       char *name) nogil
+    void GpuKernel_clear(_GpuKernel *k) nogil
+    int GpuKernel_setarg(_GpuKernel *k, unsigned int index, int typecode, ...) nogil
+    int GpuKernel_setbufarg(_GpuKernel *k, unsigned int index, _GpuArray *a) nogil
     int GpuKernel_setrawarg(_GpuKernel *k, unsigned int index, size_t sz,
-                            void *val)
+                            void *val) nogil
     int GpuKernel_call(_GpuKernel *, unsigned int gx, unsigned int gy,
                        unsigned int gz, unsigned int lx, unsigned int ly,
-                       unsigned int lz)
+                       unsigned int lz) nogil
 
 cdef object call_compiler = None
 cdef extern call_compiler_unix(char *fname, char *oname)
@@ -170,73 +170,88 @@ cdef bint py_ISONESEGMENT(GpuArray a):
 cdef array_empty(GpuArray a, compyte_buffer_ops *ops, void *ctx, int typecode,
             unsigned int nd, size_t *dims, ga_order ord):
     cdef int err
-    err = GpuArray_empty(&a.ga, ops, ctx, typecode, nd, dims, ord)
+    with nogil:
+        err = GpuArray_empty(&a.ga, ops, ctx, typecode, nd, dims, ord)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef array_zeros(GpuArray a, compyte_buffer_ops *ops, void *ctx, int typecode,
             unsigned int nd, size_t *dims, ga_order ord):
     cdef int err
-    err = GpuArray_zeros(&a.ga, ops, ctx, typecode, nd, dims, ord)
+    with nogil:
+        err = GpuArray_zeros(&a.ga, ops, ctx, typecode, nd, dims, ord)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef array_view(GpuArray v, GpuArray a):
     cdef int err
-    err = GpuArray_view(&v.ga, &a.ga)
+    with nogil:
+        err = GpuArray_view(&v.ga, &a.ga)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef array_index(GpuArray r, GpuArray a, ssize_t *starts, ssize_t *stops,
             ssize_t *steps):
     cdef int err
-    err = GpuArray_index(&r.ga, &a.ga, starts, stops, steps)
+    with nogil:
+        err = GpuArray_index(&r.ga, &a.ga, starts, stops, steps)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef array_clear(GpuArray a):
-    GpuArray_clear(&a.ga)
+    with nogil:
+        GpuArray_clear(&a.ga)
 
 cdef bint array_share(GpuArray a, GpuArray b):
-    return GpuArray_share(&a.ga, &b.ga);
+    cdef int res
+    with nogil:
+        res = GpuArray_share(&a.ga, &b.ga);
+    return res
 
 cdef array_move(GpuArray a, GpuArray src):
     cdef int err
-    err = GpuArray_move(&a.ga, &src.ga)
+    with nogil:
+        err = GpuArray_move(&a.ga, &src.ga)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef array_write(GpuArray a, void *src, size_t sz):
     cdef int err
-    err = GpuArray_write(&a.ga, src, sz)
+    with nogil:
+        err = GpuArray_write(&a.ga, src, sz)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef array_read(void *dst, size_t sz, GpuArray src):
     cdef int err
-    err = GpuArray_read(dst, sz, &src.ga)
+    with nogil:
+        err = GpuArray_read(dst, sz, &src.ga)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&src.ga, err))
 
 cdef array_memset(GpuArray a, int data):
     cdef int err
-    err = GpuArray_memset(&a.ga, data)
+    with nogil:
+        err = GpuArray_memset(&a.ga, data)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef kernel_init(GpuKernel k, compyte_buffer_ops *ops, void *ctx,
                  unsigned int count, char **strs, size_t *len, char *name):
     cdef int err
-    err = GpuKernel_init(&k.k, ops, ctx, count, strs, len, name)
+    with nogil:
+        err = GpuKernel_init(&k.k, ops, ctx, count, strs, len, name)
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(ops, err))
 
 cdef kernel_clear(GpuKernel k):
-    GpuKernel_clear(&k.k)
+    with nogil:
+        GpuKernel_clear(&k.k)
 
 cdef kernel_setbufarg(GpuKernel k, unsigned int index, GpuArray a):
     cdef int err
-    err = GpuKernel_setbufarg(&k.k, index, &a.ga)
+    with nogil:
+        err = GpuKernel_setbufarg(&k.k, index, &a.ga)
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(k.k.ops, err))
 
@@ -244,7 +259,8 @@ cdef kernel_call(GpuKernel k, unsigned int gx, unsigned int gy,
                  unsigned int gz, unsigned int lx, unsigned int ly,
                  unsigned int lz):
     cdef int err
-    err = GpuKernel_call(&k.k, gx, gy, gz, lx, ly, lz)
+    with nogil:
+        err = GpuKernel_call(&k.k, gx, gy, gz, lx, ly, lz)
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(k.k.ops, err))
 
@@ -301,7 +317,7 @@ def empty(shape, dtype=GA_DOUBLE, order='A'):
     return GpuArray(shape, dtype=dtype, order=order)
 
 def may_share_memory(GpuArray a not None, GpuArray b not None):
-    return _share(a, b)
+    return array_share(a, b)
 
 cdef class GpuArray:
     cdef _GpuArray ga
