@@ -8,6 +8,20 @@
 
 #include "compyte_buffer.h"
 
+const char *Gpu_error(compyte_buffer_ops *o, int err) {
+  switch (err) {
+  case GA_NO_ERROR:          return "No error";
+  case GA_MEMORY_ERROR:      return "Out of memory";
+  case GA_VALUE_ERROR:       return "Value out of range";
+  case GA_IMPL_ERROR:        return o->buffer_error();
+  case GA_INVALID_ERROR:     return "Invalid value";
+  case GA_UNSUPPORTED_ERROR: return "Unsupported operation";
+  case GA_SYS_ERROR:         return strerror(errno);
+  case GA_RUN_ERROR:         return "Could not execute helper program";
+  default: return "Unknown GA error";
+  }
+}
+
 #define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
 
 int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
@@ -205,17 +219,7 @@ int GpuArray_memset(GpuArray *a, int data) {
 }
 
 const char *GpuArray_error(GpuArray *a, int err) {
-  switch (err) {
-  case GA_NO_ERROR:          return "No error";
-  case GA_MEMORY_ERROR:      return "Out of memory";
-  case GA_VALUE_ERROR:       return "Value out of range";
-  case GA_IMPL_ERROR:        return a->ops->buffer_error();
-  case GA_INVALID_ERROR:     return "Invalid value";
-  case GA_UNSUPPORTED_ERROR: return "Unsupported operation";
-  case GA_SYS_ERROR:         return strerror(errno);
-  case GA_RUN_ERROR:         return "Could not execute helper program";
-  default: return "Unknown GA error";
-  }
+  return Gpu_error(a->ops, err);
 }
 
 void GpuArray_fprintf(FILE *fd, const GpuArray *a) {

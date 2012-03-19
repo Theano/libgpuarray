@@ -132,8 +132,10 @@ enum ga_error {
   GA_SYS_ERROR, /* look at errno for more details */
   GA_RUN_ERROR,
   /* Add more error types if needed */
-  /* Don't forget to sync with GpuArray_error() */
+  /* Don't forget to sync with Gpu_error() */
 };
+
+const char *Gpu_error(compyte_buffer_ops *o, int err);
 
 static inline int GpuArray_CHKFLAGS(GpuArray *a, int flags) {
   return (a->flags & flags) == flags;
