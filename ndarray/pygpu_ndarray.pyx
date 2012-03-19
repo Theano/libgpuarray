@@ -34,27 +34,6 @@ cdef extern from "compyte_buffer.h":
 
     ctypedef struct compyte_buffer_ops:
         void *buffer_init(int devno, int *ret)
-        gpudata *buffer_alloc(void *ctx, size_t sz)
-        void buffer_free(gpudata *d)
-        int buffer_move(gpudata *dst, gpudata *src)
-        int buffer_read(void *dst, gpudata *src, size_t sz)
-        int buffer_write(gpudata *dst, void *src, size_t sz)
-        int buffer_memset(gpudata *dst, int data)
-        int buffer_offset(gpudata *buf, int offset)
-        gpukernel *buffer_newkernel(void *ctx, unsigned int count,
-                                    char **strings,
-                                    size_t *lengths,
-                                    char *fname)
-        void buffer_freekernel(gpukernel *k)
-        int buffer_setkernelarg(gpukernel *k, unsigned int index, size_t sz,
-                                void *val)
-        int buffer_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *d)
-        int buffer_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
-                              unsigned int gz, unsigned int lx,
-                              unsigned int ly, unsigned int lz)
-        int buffer_elemwise(gpudata *input, gpudata *output, int intype,
-                            int outtype, char *op, unsigned int nd,
-                            size_t *dims, ssize_t *in_str, ssize_t *out_str)
         char *buffer_error()
 
     compyte_buffer_ops cuda_ops
