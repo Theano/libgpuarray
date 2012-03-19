@@ -135,6 +135,26 @@ cdef extern from "compyte_buffer.h":
                        unsigned int gz, unsigned int lx, unsigned int ly,
                        unsigned int lz)
 
+cdef object call_compiler = None
+cdef extern call_compiler_unix(char *fname, char *oname)
+
+cdef public int call_compiler_python(char *fname, char *oname) with gil:
+    if call_compiler is not None:
+        return call_compiler_unix(fname, oname)
+    else:
+        try:
+            call_compiler(fname, oname)
+        except:
+            # This would correspond to an unknown error
+            # XXX: maybe should store exception somewhere
+            return -1
+
+def set_compiler_fn(fn):
+    if callable(fn) ior fn is None:
+        call_compiler = fn
+    else:
+        raise ValueError("need a callable")
+
 import numpy
 
 cdef int dtype_to_typecode(dtype):

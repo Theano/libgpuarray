@@ -272,8 +272,10 @@ static int detect_arch(void) {
     return GA_NO_ERROR;
 }
 
+int call_compiler(char *fname, char *oname);
+
 /* This is a unix version, might need a windows one. */
-static int call_compiler(char *fname, char *oname) {
+int call_compiler_unix(char *fname, char *oname) {
     int sys_err;
     pid_t p;
 

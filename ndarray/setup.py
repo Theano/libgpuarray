@@ -52,6 +52,7 @@ def try_cuda(arg):
     print "Found nvcc at:", os.path.join(cuda_bin_prefix, 'nvcc')
     macros.append(('WITH_CUDA', '1'))
     macros.append(('CUDA_BIN_PATH', '"'+cuda_bin_prefix+'"'))
+    macros.append(('call_compiler', 'call_compiler_python '))
     srcs.append('compyte_buffer_cuda.c')
     
     if sys.platform == 'darwin':
