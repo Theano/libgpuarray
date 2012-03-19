@@ -278,8 +278,9 @@ int GpuArray_is_f_contiguous(const GpuArray *a) {
   return 1;
 }
 
-int GpuKernel_init(GpuKernel *k, compyte_buffer_ops *ops, void *ctx, int count,
-		   const char **strs, size_t *lens, const char *name) {
+int GpuKernel_init(GpuKernel *k, compyte_buffer_ops *ops, void *ctx,
+		   unsigned int count, const char **strs, size_t *lens,
+		   const char *name) {
   int res = GA_NO_ERROR;
 
   k->ops = ops;

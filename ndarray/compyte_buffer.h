@@ -173,8 +173,9 @@ void GpuArray_fprintf(FILE *fd, const GpuArray *a);
 int GpuArray_is_c_contiguous(const GpuArray *a);
 int GpuArray_is_f_contiguous(const GpuArray *a);
 
-int GpuKernel_init(GpuKernel *, compyte_buffer_ops *ops, void *ctx, int count,
-		   const char **strs, size_t *lens, const char *name);
+int GpuKernel_init(GpuKernel *, compyte_buffer_ops *ops, void *ctx,
+		   unsigned int count, const char **strs, size_t *lens,
+		   const char *name);
 
 void GpuKernel_clear(GpuKernel *);
 
