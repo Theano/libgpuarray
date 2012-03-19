@@ -296,7 +296,7 @@ void GpuKernel_clear(GpuKernel *k) {
 
 int GpuKernel_setarg(GpuKernel *k, unsigned int index, int typecode, ...) {
 #define extract(t1, t2) do {						\
-    t2 v = va_arg(a, t1);						\
+    t2 v = (t2)va_arg(a, t1);						\
     res = k->ops->buffer_setkernelarg(k->k, index, sizeof(v), &v);	\
   } while (0)
 
