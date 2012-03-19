@@ -129,7 +129,7 @@ cdef public int call_compiler_python(char *fname, char *oname) with gil:
             return -1
 
 def set_compiler_fn(fn):
-    if callable(fn) ior fn is None:
+    if callable(fn) or fn is None:
         call_compiler = fn
     else:
         raise ValueError("need a callable")
