@@ -6,6 +6,7 @@
 
 #include <sys/types.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 #include "compyte_util.h"
 
@@ -180,6 +181,8 @@ int GpuKernel_init(GpuKernel *, compyte_buffer_ops *ops, void *ctx,
 void GpuKernel_clear(GpuKernel *);
 
 int GpuKernel_setarg(GpuKernel *, unsigned int index, int typecode, ...);
+int GpuKernel_setargv(GpuKernel *, unsigned int index, int typecode,
+		      va_list ap);
 int GpuKernel_setbufarg(GpuKernel *, unsigned int index, GpuArray *);
 int GpuKernel_setrawarg(GpuKernel *, unsigned int index, size_t sz, void *val);
 

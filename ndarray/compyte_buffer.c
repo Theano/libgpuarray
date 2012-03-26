@@ -295,15 +295,20 @@ void GpuKernel_clear(GpuKernel *k) {
 }
 
 int GpuKernel_setarg(GpuKernel *k, unsigned int index, int typecode, ...) {
+  int res;
+  va_list a;
+  va_start(a, typecode);
+  res = GpuKernel_setargv(k, index, typecode, a);
+  va_end(a);
+  return res;
+}
+
+int GpuKernel_setargv(GpuKernel *k, unsigned int index, int typecode,
+		      va_list a) {
 #define extract(t1, t2) do {						\
     t2 v = (t2)va_arg(a, t1);						\
-    res = k->ops->buffer_setkernelarg(k->k, index, sizeof(v), &v);	\
+    return k->ops->buffer_setkernelarg(k->k, index, sizeof(v), &v);	\
   } while (0)
-
-  va_list a;
-  int res = GA_NO_ERROR;
-  
-  va_start(a, typecode);
 
   switch (typecode) {
     /* 
@@ -312,19 +317,17 @@ int GpuKernel_setarg(GpuKernel *k, unsigned int index, int typecode, ...) {
 
        Anyway the supported types should cover the vast majority of cases.
     */
-  case GA_INT: extract(int, int); break;
-  case GA_UINT: extract(unsigned int, unsigned int); break;
-  case GA_LONG: extract(long, long); break;
-  case GA_ULONG: extract(unsigned long, unsigned long); break;
-  case GA_FLOAT: extract(double, float); break;
-  case GA_DOUBLE: extract(double, double); break;
+  case GA_INT: extract(int, int);
+  case GA_UINT: extract(unsigned int, unsigned int);
+  case GA_LONG: extract(long, long);
+  case GA_ULONG: extract(unsigned long, unsigned long);
+  case GA_FLOAT: extract(double, float);
+  case GA_DOUBLE: extract(double, double);
   default:
-    res = GA_UNSUPPORTED_ERROR;
+    return GA_UNSUPPORTED_ERROR;
   }
 
 #undef extract
-  va_end(a);
-  return res;
 }
 
 int GpuKernel_setbufarg(GpuKernel *k, unsigned int index, GpuArray *a) {
