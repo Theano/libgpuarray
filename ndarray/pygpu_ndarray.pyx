@@ -599,10 +599,42 @@ cdef class GpuKernel:
         l = len(source)
         kernel_init(self, GpuArray_ops, GpuArray_ctx, 1, s, &l, name);
 
+    def __call__(self, grid=None, block=None, *args):
+        if block is None:
+            raise ValueError("Must specify block")
+        if grid is None:
+            raise ValueError("Must specify grid")
+
+        block = tuple(block)
+        grid = tuple(grid)
+
+        if len(block) < 3:
+            block = block + (1,) * (3 - len(block))
+        if len(grid) < 3:
+            grid = grid + (1,) * (3 - len(grid))
+
+        if len(block) != 3:
+            raise ValueError("len(block) != 3")
+        if len(grid) != 3:
+            raise ValueError("len(grid) != 3")
+
+        # Work backwards to avoid a lot of reallocations in the argument code.
+        for i in range(len(args)-1, -1, -1):
+            self.setarg(i, args[i])
+
+        self.call(*(grid+block))
+        
+    def setarg(self, unsigned int index, o):
+        if isinstance(o, GpuArray):
+            self.setbufarg(index, o)
+        else:
+            # this will break for object that are not numpy-like, but meh.
+            self._setarg(index, o.dtype, o)
+
     def setbufarg(self, unsigned int index, GpuArray a not None):
         kernel_setbufarg(self, index, a)
 
-    def setarg(self, unsigned int index, np.dtype t, object o):
+    cdef _setarg(self, unsigned int index, np.dtype t, object o):
         cdef double d
         cdef int i
         cdef unsigned int ui
