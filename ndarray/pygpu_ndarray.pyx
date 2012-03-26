@@ -6,6 +6,13 @@ from cpython cimport Py_INCREF, PyNumber_Index
 
 np.import_array()
 
+cdef extern from "stdarg.h":
+    ctypedef struct va_list:
+        pass
+    # I only need "int" for this
+    void va_start(va_list, int)
+    void va_end(va_list)
+
 cdef extern from "numpy/arrayobject.h":
     object _PyArray_Empty "PyArray_Empty" (int, np.npy_intp *, np.dtype, int)
 
@@ -73,6 +80,10 @@ cdef extern from "compyte_buffer.h":
         GA_INVALID_ERROR, GA_UNSUPPORTED_ERROR, GA_SYS_ERROR
 
     enum COMPYTE_TYPES:
+        GA_INT,
+        GA_UINT,
+        GA_LONG,
+        GA_ULONG,
         GA_FLOAT,
         GA_DOUBLE,
         GA_NBASE
@@ -106,8 +117,10 @@ cdef extern from "compyte_buffer.h":
                        unsigned int count, char **strs, size_t *lens,
                        char *name) nogil
     void GpuKernel_clear(_GpuKernel *k) nogil
-    int GpuKernel_setarg(_GpuKernel *k, unsigned int index, int typecode, ...) nogil
-    int GpuKernel_setbufarg(_GpuKernel *k, unsigned int index, _GpuArray *a) nogil
+    int GpuKernel_setargv(_GpuKernel *k, unsigned int index, int typecode,
+                          va_list ap) nogil
+    int GpuKernel_setbufarg(_GpuKernel *k, unsigned int index,
+                            _GpuArray *a) nogil
     int GpuKernel_setrawarg(_GpuKernel *k, unsigned int index, size_t sz,
                             void *val) nogil
     int GpuKernel_call(_GpuKernel *, unsigned int gx, unsigned int gy,
@@ -141,8 +154,8 @@ cdef int dtype_to_typecode(dtype):
     if isinstance(dtype, int):
         return dtype
     if isinstance(dtype, str):
-        dtype = numpy.dtype(dtype)
-    if isinstance(dtype, numpy.dtype):
+        dtype = np.dtype(dtype)
+    if isinstance(dtype, np.dtype):
         dnum = (<np.dtype>dtype).type_num
         if dnum < GA_NBASE:
             return dnum
@@ -247,6 +260,16 @@ cdef kernel_init(GpuKernel k, compyte_buffer_ops *ops, void *ctx,
 cdef kernel_clear(GpuKernel k):
     with nogil:
         GpuKernel_clear(&k.k)
+
+cdef kernel_setarg(GpuKernel k, unsigned int index, int typecode, ...):
+    cdef int err
+    cdef va_list ap
+    va_start(ap, typecode);
+    with nogil:
+        err = GpuKernel_setargv(&k.k, index, typecode, ap)
+    va_end(ap)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(Gpu_error(k.k.ops, err))
 
 cdef kernel_setbufarg(GpuKernel k, unsigned int index, GpuArray a):
     cdef int err
@@ -556,3 +579,55 @@ cdef class GpuArray:
             res["UPDATEIFCOPY"] = False # Unsupported
             res["OWNDATA"] = py_CHKFLAGS(self, GA_OWNDATA)
             return res
+
+cdef class GpuKernel:
+    cdef _GpuKernel k
+    
+    def __dealloc__(self):
+        kernel_clear(self)
+
+    def __cinit__(self, source, name, *a, **kwa):
+        cdef char *s[1]
+        cdef size_t l
+        
+        if not isinstance(source, (str, unicode)):
+            raise TypeError("Expected a string for the kernel source")
+        if not isinstance(source, (str, unicode)):
+            raise TypeError("Expected a string for the kernel name")
+        
+        s[0] = source
+        l = len(source)
+        kernel_init(self, GpuArray_ops, GpuArray_ctx, 1, s, &l, name);
+
+    def setbufarg(self, unsigned int index, GpuArray a not None):
+        kernel_setbufarg(self, index, a)
+
+    def setarg(self, unsigned int index, np.dtype t, object o):
+        cdef double d
+        cdef int i
+        cdef unsigned int ui
+        cdef long l
+        cdef unsigned long ul
+        cdef unsigned int typecode
+        typecode = dtype_to_typecode(t)
+        if typecode == GA_FLOAT or typecode == GA_DOUBLE:
+            d = o
+            kernel_setarg(self, index, typecode, d)
+        elif typecode == GA_INT:
+            i = o
+            kernel_setarg(self, index, typecode, i)
+        elif typecode == GA_UINT:
+            ui = o
+            kernel_setarg(self, index, typecode, ui)
+        elif typecode == GA_LONG:
+            l = o
+            kernel_setarg(self, index, typecode, l)
+        elif typecode == GA_ULONG:
+            ul = o
+            kernel_setarg(self, index, typecode, ul)
+        else:
+            raise ValueError("Can't set argument of this type")
+
+    def call(self, unsigned int gx, unsigned int gy, unsigned int gz,
+             unsigned int lx, unsigned int ly, unsigned int lz):
+        kernel_call(self, gx, gy, gz, lx, ly, lz)
