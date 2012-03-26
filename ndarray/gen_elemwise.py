@@ -703,63 +703,6 @@ nd_collapse_[i]=0;
         #define INTMOD_POW2(a, b) (a & ((1<<b)-1))
         """
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def dummy_holder_for_code_not_used():
 
     def c_src_kernel_tiling(self, inputs, outputs, nodename):
