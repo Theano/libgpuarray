@@ -128,17 +128,17 @@ cdef extern from "compyte_buffer.h":
                        unsigned int lz) nogil
 
 cdef object call_compiler = None
-cdef extern call_compiler_unix(char *fname, char *oname)
+cdef extern int call_compiler_unix(char *fname, char *oname)
 
 cdef public int call_compiler_python(char *fname, char *oname) with gil:
-    if call_compiler is not None:
+    if call_compiler is None:
         return call_compiler_unix(fname, oname)
     else:
         try:
-            call_compiler(fname, oname)
+            return call_compiler(fname, oname)
         except:
             # This would correspond to an unknown error
-            # XXX: maybe should store exception somewhere
+            # XXX: maybe should store the exception somewhere
             return -1
 
 def set_compiler_fn(fn):
