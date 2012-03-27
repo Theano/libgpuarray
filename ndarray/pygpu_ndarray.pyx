@@ -619,7 +619,7 @@ cdef class GpuKernel:
         l = len(source)
         kernel_init(self, GpuArray_ops, GpuArray_ctx, 1, s, &l, name);
 
-    def __call__(self, grid=None, block=None, *args):
+    def __call__(self, *args, grid=None, block=None):
         if block is None:
             raise ValueError("Must specify block")
         if grid is None:
