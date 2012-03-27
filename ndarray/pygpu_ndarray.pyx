@@ -33,6 +33,9 @@ cdef extern from *:
     void cifopencl "#ifdef WITH_OPENCL //" ()
     void cendif "#endif //" ()
 
+cdef extern from "compyte_util.h":
+     size_t compyte_get_elsize(int typecode)
+
 cdef extern from "compyte_buffer.h":
     ctypedef struct gpudata:
         pass
@@ -568,6 +571,10 @@ cdef class GpuArray:
                 return np.PyArray_DescrFromType(self.ga.typecode)
             else:
                 raise NotImplementedError("TODO")
+
+    property itemsize:
+        def __get__(self):
+            return compyte_get_elsize(self.ga.typecode)
     
     property flags:
         def __get__(self):
