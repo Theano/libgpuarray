@@ -8,9 +8,9 @@ The elemwise fct are also used with scalar operation! So it can happen that ndim
 import numpy
 import StringIO
 
-import pycuda.autoinit
-import pycuda.driver as drv
-from pycuda.compiler import SourceModule
+#import pycuda.autoinit
+#import pycuda.driver as drv
+#from pycuda.compiler import SourceModule
 from theano import Apply
 from theano import scalar
 from theano.tensor import TensorType
@@ -1175,15 +1175,17 @@ class MyGpuNdArray():
             elemwise_algo = ElemwiseAlgo(node.op.scalar_op)
 
             # Compile the gpu function with pycuda
-            mod = SourceModule(
-                elemwise_algo.c_src_kernel(node.inputs, node.outputs, nodename, nd, static=""))
-            fct = mod.get_function("kernel_%s_%d"%(nodename, nd))
-            fcts.append(fct)
+            k = gpu_ndarray.GpuKernel(
+                elemwise_algo.c_src_kernel(node.inputs, node.outputs, nodename, nd, static=""),
+                "kernel_%s_%d"%(nodename, nd))
+            fcts.append(k)
 
         # All inputs/outputs C contiguous case
-        mod = SourceModule(elemwise_algo.c_src_kernel_Ccontiguous(
-                node.inputs, node.outputs, nodename, static=""))
-        fcts[0] = mod.get_function("kernel_%s_Ccontiguous"%nodename)
+        k = gpu_ndarray.GpuKernel(
+            elemwise_algo.c_src_kernel_Ccontiguous(
+                node.inputs, node.outputs, nodename, static=""),
+            "kernel_%s_Ccontiguous"%nodename)
+        fcts[0] = k
 
         def call_fct2(inputs, test=False):
             " Do dimensions collapsing before call the gpu code "
@@ -1252,7 +1254,7 @@ class MyGpuNdArray():
     bytes = property(lambda self: self.gpu_nd_array.bytes)
 
     # TODO: remove this when pycuda is updated to accept .bytes property!
-    gpudata = property(lambda self: self.gpu_nd_array.gpudata)
+    #gpudata = property(lambda self: self.gpu_nd_array.gpudata)
 
     def __getitem__(self, *inputs):
         return MyGpuNdArray(self.gpu_nd_array.__getitem__(*inputs))
