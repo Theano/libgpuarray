@@ -1123,6 +1123,8 @@ def call_elemwise(fct, input_vals, block=None, grid=None, out=None,
     idx = 0
     for i in list(input_vals)+[out]:
         itemsize = i.dtype.itemsize
+        if isinstance(i, MyGpuNdArray):
+            i = i.gpu_nd_array
         args.append(i)
         for j in range(nd):
             # We force a stride of 0 for broadcastable dimensions
