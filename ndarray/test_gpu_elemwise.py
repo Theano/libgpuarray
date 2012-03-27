@@ -5,6 +5,11 @@ import numpy
 import theano
 
 import pygpu_ndarray as gpu_ndarray
+# Run the tests for cuda
+#gpu_ndarray.set_kind_context("cuda", gpu_ndarray.init("cuda", 0))
+# Run the tests for opencl
+gpu_ndarray.set_kind_context("opencl", gpu_ndarray.init("opencl", 0))
+
 from gen_elemwise import MyGpuNdArray, elemwise_collapses
 
 def rand(shape, dtype):
@@ -20,7 +25,7 @@ def speed_elemwise_collapse():
     """ used to time if the collapse of ccontiguous dims are useful """
 
     shape = (30,40,50,600)
-    a = gpu_ndarray.GpuNdArrayObject(numpy.asarray(numpy.random.rand(*shape),dtype='float32'))
+    a = gpu_ndarray.GpuArray(numpy.asarray(numpy.random.rand(*shape),dtype='float32'))
     a = numpy.asarray(numpy.random.rand(*shape),dtype='float32')
     a2 = tcn.shared_constructor(a, 'a')
     a3 = a2[:,::2,:,:]
@@ -31,7 +36,7 @@ def speed_elemwise_collapse():
 
     v = numpy.asarray(numpy.random.rand(*shape),dtype='float32')
     v = v[:,::2,:,:]
-    v=gpu_ndarray.GpuNdArrayObject(v)
+    v=gpu_ndarray.GpuArray(v)
     for id,n in enumerate(f.maker.env.toposort()):
         print id, n
     t1=time.time()
@@ -44,7 +49,7 @@ def speed_elemwise_collapse2():
     """ used to test the speed up of the generalised collapse of ccontiguous dims"""
 
     shape = (30,40,50,600)
-    a = gpu_ndarray.GpuNdArrayObject(numpy.asarray(numpy.random.rand(*shape),dtype='float32'))
+    a = gpu_ndarray.GpuArray(numpy.asarray(numpy.random.rand(*shape),dtype='float32'))
     a = numpy.asarray(numpy.random.rand(*shape),dtype='float32')
     a2 = tcn.shared_constructor(a, 'a')
     a3 = a2[:,:,:,::2]
@@ -55,7 +60,7 @@ def speed_elemwise_collapse2():
 
     v = numpy.asarray(numpy.random.rand(*shape),dtype='float32')
     v = v[:,:,:,::2]
-    v=gpu_ndarray.GpuNdArrayObject(v)
+    v=gpu_ndarray.GpuArray(v)
     for id,n in enumerate(f.maker.env.toposort()):
         print id, n
     t1=time.time()
@@ -71,7 +76,7 @@ def test_elemwise_collapse():
         for dtype2 in ["int16", "float32", "int8"]:
 
             scalar_cpu = rand((1,1,1,1),dtype=dtype1)
-            scalar_gpu = gpu_ndarray.GpuNdArrayObject(scalar_cpu)
+            scalar_gpu = gpu_ndarray.GpuArray(scalar_cpu)
             scalar_gpu1 = MyGpuNdArray(scalar_gpu)
             for shape1_, shape2_, expected in [
                 # No broadcastable dimensions
@@ -105,11 +110,11 @@ def test_elemwise_collapse():
                 ]:
                 for shape1, shape2 in [(shape1_,shape2_),(shape2_,shape1_)]:
                     a_cpu = rand(shape1, dtype=dtype1)
-                    a = gpu_ndarray.GpuNdArrayObject(a_cpu)
+                    a = gpu_ndarray.GpuArray(a_cpu)
                     a1 = MyGpuNdArray(a)
 
                     b_cpu = rand(shape2, dtype=dtype2)
-                    b = gpu_ndarray.GpuNdArrayObject(b_cpu)
+                    b = gpu_ndarray.GpuArray(b_cpu)
                     b1 = MyGpuNdArray(b)
 
                     assert len(shape1) == len(shape2)
@@ -149,7 +154,7 @@ def test_elemwise_collapse():
                         shape = list(shape1)
                         shape[0]*=2
                         c_cpu = rand(shape, dtype='float32')
-                        c = gpu_ndarray.GpuNdArrayObject(c_cpu)[::2]
+                        c = gpu_ndarray.GpuArray(c_cpu)[::2]
                         c1 = MyGpuNdArray(c)
 
                         err = ("strided", c.shape, shape2, nd_collaps, expected, info)
@@ -164,7 +169,7 @@ def test_elemwise_collapse():
                         shape = list(shape1)
                         shape[1]*=2
                         c_cpu = rand(shape, dtype='float32')
-                        c = gpu_ndarray.GpuNdArrayObject(c_cpu)[::,::2]
+                        c = gpu_ndarray.GpuArray(c_cpu)[::,::2]
                         c1 = MyGpuNdArray(c)
 
                         err = ("strided", c.shape, shape2, nd_collaps, expected, info)
@@ -180,7 +185,7 @@ def test_elemwise_collapse():
                         shape = list(shape1)
                         shape[2]*=2
                         c_cpu = rand(shape, dtype='float32')
-                        c = gpu_ndarray.GpuNdArrayObject(c_cpu)[::,::,::2]
+                        c = gpu_ndarray.GpuArray(c_cpu)[::,::,::2]
                         c1 = MyGpuNdArray(c)
 
                         err = ("strided", c.shape, shape2, nd_collaps, expected, info)
@@ -196,7 +201,7 @@ def test_elemwise_collapse():
                         shape = list(shape1)
                         shape[3]*=2
                         c_cpu = rand(shape, dtype='float32')
-                        c = gpu_ndarray.GpuNdArrayObject(c_cpu)[::,::,::,::2]
+                        c = gpu_ndarray.GpuArray(c_cpu)[::,::,::,::2]
                         c1 = MyGpuNdArray(c)
 
                         err = ("strided", c.shape, shape2, nd_collaps, expected, info)
@@ -221,7 +226,7 @@ def test_elemwise_mixed_dtype():
             for shape in [(500,),(50,5),(5,6,7)]:
                 input_vals = [rand(shape, dtype) for dtype in [dtype1, dtype2]]
                 del dtype
-                gpu_vals = [gpu_ndarray.GpuNdArrayObject(i) for i in input_vals]
+                gpu_vals = [gpu_ndarray.GpuArray(i) for i in input_vals]
                 assert all([numpy.allclose(to_cpu(ig), i) for ig,i in zip(gpu_vals,input_vals)])
 
                 gpu_vals = [MyGpuNdArray(x) for x in gpu_vals]
@@ -240,7 +245,7 @@ def test_elemwise_mixed_dtype():
             #print "    Test inside a wrapping python object %d inputs"%nb_in
             for shape in [(500,),(50,5),(5,6,7)]:
                 input_vals = [rand(shape, dtype) for dtype in [dtype1,dtype2,dtype1,dtype2]]
-                gpu_vals = [gpu_ndarray.GpuNdArrayObject(i)
+                gpu_vals = [gpu_ndarray.GpuArray(i)
                             for i in input_vals]
                 assert all([numpy.allclose(to_cpu(ig), i)
                             for ig,i in zip(gpu_vals,input_vals)])
@@ -258,7 +263,7 @@ def test_elemwise_mixed_dtype():
                                   ((33,1,5),(33,10,1),((1,10,5))),
                                   ]:
                 input_vals = [rand(shape, dtype) for shape,dtype in zip(shapes,[dtype1,dtype2])]
-                gpu_vals = [gpu_ndarray.GpuNdArrayObject(i)
+                gpu_vals = [gpu_ndarray.GpuArray(i)
                             for i in input_vals]
                 assert all([numpy.allclose(to_cpu(ig), i)
                             for ig,i in zip(gpu_vals,input_vals)])
