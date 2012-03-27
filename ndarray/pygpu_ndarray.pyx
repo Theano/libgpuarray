@@ -570,10 +570,12 @@ cdef class GpuArray:
             return tuple(res)
         
     property ndim:
+        "The number of dimensions in this object"
         def __get__(self):
             return self.ga.nd
         
     property dtype:
+        "The dtype of the element"
         def __get__(self):
             # XXX: will have to figure out the right numpy dtype
             if self.ga.typecode < GA_NBASE:
@@ -582,10 +584,12 @@ cdef class GpuArray:
                 raise NotImplementedError("TODO")
 
     property itemsize:
+        "The size of the base element."
         def __get__(self):
             return compyte_get_elsize(self.ga.typecode)
     
     property flags:
+        "Return the flags as a dictionary"
         def __get__(self):
             res = dict()
             res["C_CONTIGUOUS"] = py_CHKFLAGS(self, GA_C_CONTIGUOUS)
