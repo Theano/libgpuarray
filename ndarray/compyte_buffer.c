@@ -289,7 +289,8 @@ int GpuKernel_init(GpuKernel *k, compyte_buffer_ops *ops, void *ctx,
 }
 
 void GpuKernel_clear(GpuKernel *k) {
-  k->ops->buffer_freekernel(k->k);
+  if (k->k)
+    k->ops->buffer_freekernel(k->k);
   k->k = NULL;
   k->ops = NULL;
 }
