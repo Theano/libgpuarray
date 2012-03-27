@@ -551,6 +551,15 @@ cdef class GpuArray:
         def __set__(self, newshape):
             raise NotImplementedError("TODO: call reshape")
 
+    property size:
+        "The number of elements in this object."
+        def __get__(self):
+            cdef size_t res = 1
+            cdef unsigned int i
+            for i in range(self.ga.nd):
+                res *= self.ga.dimensions[i]
+            return res
+
     property strides:
         "data pointer strides (in bytes)"
         def __get__(self):
