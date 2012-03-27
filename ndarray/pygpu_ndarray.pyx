@@ -614,9 +614,14 @@ cdef class GpuKernel:
             raise TypeError("Expected a string for the kernel source")
         if not isinstance(source, (str, unicode)):
             raise TypeError("Expected a string for the kernel name")
-        
-        s[0] = source
-        l = len(source)
+
+        # This is required under CUDA otherwise the function is compiled
+        # as a C++ mangled name and is irretriveable
+        # XXX: I don't know if it works in OpenCL, and can't test for now.
+        ss = 'extern "C" {%s}'%(source,)
+
+        s[0] = ss
+        l = len(ss)
         kernel_init(self, GpuArray_ops, GpuArray_ctx, 1, s, &l, name);
 
     def __call__(self, *args, grid=None, block=None):
