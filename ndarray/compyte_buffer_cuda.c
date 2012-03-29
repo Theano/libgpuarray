@@ -54,13 +54,16 @@ static inline void gdata_setsize(gpudata *b, size_t s) {
     b->sz = (b->sz & ~SSIZE_MAX) | s;
 }
 
+/* The total size of the arguments is limited to 256 bytes */
+#define NUM_ARGS (256/sizeof(void*))
+
 struct _gpukernel {
     CUmodule m;
     CUfunction k;
-    void **args;
+    void *args[NUM_ARGS];
     unsigned int argcount;
 #if CUDA_VERSION < 4000
-    size_t *szs;
+    size_t szs[NUM_ARGS];
 #endif
 };
 
@@ -364,11 +367,7 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
         unlink(outbuf);
         FAIL(NULL, GA_SYS_ERROR);
     }
-    res->args = NULL;
-    res->argcount = 0;
-#if CUDA_VERSION < 4000
-    res->szs = NULL;
-#endif
+    bzero(res, sizeof(*res));
 
     err = cuModuleLoad(&res->m, outbuf);
 
@@ -392,10 +391,6 @@ static void cuda_freekernel(gpukernel *k) {
     unsigned int i;
     for (i = 0; i < k->argcount; i++)
         free(k->args[i]);
-    free(k->args);
-#if CUDA_VERSION < 4000
-    free(k->szs);
-#endif
     cuModuleUnload(k->m);
     free(k);
 }
@@ -403,21 +398,11 @@ static void cuda_freekernel(gpukernel *k) {
 static int cuda_setkernelarg(gpukernel *k, unsigned int index, size_t sz,
                              const void *val) {
     void *tmp;
-    if (index >= k->argcount) {
-        tmp = calloc(index+1, sizeof(void *));
-        if (tmp == NULL) return GA_MEMORY_ERROR;
-        bcopy(k->args, tmp, sizeof(void *)*k->argcount);
-        free(k->args);
-        k->args = (void **)tmp;
-#if CUDA_VERSION < 4000
-        tmp = calloc(index+1, sizeof(size_t));
-        if (tmp == NULL) return GA_MEMORY_ERROR;
-        bcopy(k->szs, tmp, sizeof(size_t)*k->argcount);
-        free(k->szs);
-        k->szs = (size_t *)tmp;
-#endif
+    if (index >= NUM_ARGS) return GA_VALUE_ERROR;
+
+    if (index >= k->argcount)
         k->argcount = index+1;
-    }
+
     tmp = malloc(sz);
     if (tmp == NULL) return GA_MEMORY_ERROR;
     bcopy(val, tmp, sz);
