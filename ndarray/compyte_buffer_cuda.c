@@ -417,6 +417,41 @@ static int cuda_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
     return cuda_setkernelarg(k, index, sizeof(void *), &b->ptr);
 }
 
+static size_t find_align(size_t v) {
+    unsigned int c;
+
+    if (v & 0x1) {
+        /* special case for odd v (assumed to happen half of the time) */
+        c = 0;
+    } else {
+        c = 1;
+        /* this should work on 32 and 64 bits systems since the shift
+           would never get done on a 32 bit machine */
+        if ((v & 0xffffffff) == 0) {
+            v >>= 32;
+            c += 32;
+        }
+        if ((v & 0xffff) == 0) {
+            v >>= 16;
+            c += 16;
+        }
+        if ((v & 0xff) == 0) {
+            v >>= 8;
+            c += 8;
+        }
+        if ((v & 0xf) == 0) {
+            v >>= 4;
+            c += 4;
+        }
+        if ((v & 0x3) == 0) {
+            v >>= 2;
+            c += 2;
+        }
+        c -= v & 0x1;
+    }
+    return (size_t)0x1 << c;
+}
+
 static int cuda_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
                            unsigned int gz, unsigned int bx, unsigned int by,
                            unsigned int bz) {
@@ -427,6 +462,7 @@ static int cuda_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
     }
 #else
     size_t total = 0;
+    size_t align;
     unsigned int i;
     for (i = 0; i < k->argcount; i++)
         total += k->szs[i];
@@ -434,6 +470,10 @@ static int cuda_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
     total = 0;
     for (i = 0; i < k->argcount; i++) {
+        /* pad up to alignment (which is guessed to be the size of the type) */
+        align = find_align(k->szs[i]);
+        if ((total % align) != 0)
+            total += align - (total % align);
         err = cuParamSetv(k->k,(int)total,k->args[i],(unsigned int)k->szs[i]);
         if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
         total += k->szs[i];
