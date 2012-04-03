@@ -612,7 +612,7 @@ cdef class GpuKernel:
         
         if not isinstance(source, (str, unicode)):
             raise TypeError("Expected a string for the kernel source")
-        if not isinstance(source, (str, unicode)):
+        if not isinstance(name, (str, unicode)):
             raise TypeError("Expected a string for the kernel name")
 
         # This is required under CUDA otherwise the function is compiled
