@@ -31,6 +31,9 @@ def debug(*msg):
 
 import pygpu_ndarray as gpu_ndarray
 
+# Set to True if you want the kernel to print the arguments it recieves
+# instead of doing any work.
+PRINT_ARGS = False
 
 cast_int = numpy.intc
 cast_uint = numpy.uintc
@@ -103,48 +106,68 @@ class ElemwiseAlgo(object):
             #print >> sio, "\t,", ", ".join("int o%i_str_%i" % (ipos, d) for d in xrange(nd))
             #print >> sio, "\t,", "float * o%i_data" % ipos
         print >> sio, "\t)\n{"
-        print >> sio, "    const int idx = blockIdx.x * blockDim.x + threadIdx.x;"
-        print >> sio, "    const int numThreads = blockDim.x * gridDim.x;"
+        if PRINT_ARGS:
+            print >> sio, 'printf("', ' '.join(['%d']*nd), '",', ", ".join("dim%i" % i for i in xrange(nd)), ');'
+            print >> sio, 'printf("',
+            for i in inputs:
+                print >> sio, " ".join(["%p"] + list("%d" for d in xrange(nd))),
+            print >> sio, '"',
+            for ipos, i, in enumerate(inputs):
+                print >> sio, ',', ", ".join(["i%i_data" % ipos] +
+                                             list("i%i_str_%i" % (ipos, d) for d in xrange(nd))),
+            print >> sio, ');'
+            print >> sio, 'printf("',
+            for o in outputs:
+                print >> sio, " ".join(["%p"] + list("%d" for d in xrange(nd))),
+            print >> sio, '"',
+            for opos, o in enumerate(outputs):
+                print >> sio, ',', ", ".join(["o%i_data" % opos]
+                                             + list("o%i_str_%i" % (opos, d) for d in xrange(nd))),
+            print >> sio, ');'
 
-        # For each input that is a scalar which has been broadcasted to a tensor,
-        #     load it into a local variable
-        for ipos, i in enumerate(inputs):
-            if _logical_scalar(i):
-                print >> sio, "    const %s ii_i%i_value = i%i_data[0];" % (
-                    ctype_from_dtype(i.dtype), ipos, ipos)
+        else:
+            print >> sio, "    const int idx = blockIdx.x * blockDim.x + threadIdx.x;"
+            print >> sio, "    const int numThreads = blockDim.x * gridDim.x;"
 
-        #loop over the elements to be treated by this kernel call
-        print >> sio, "    for (int i = idx; i < numEls; i += numThreads) {"
-        # calculate the data pointers for all arguments
-        print >> sio, "        int ii = i;"
-        for ipos, i in enumerate(inputs):
-            if not _logical_scalar(i):
-                print >> sio, "        const %s * ii_i%i_data = i%i_data;" % (
-                    ctype_from_dtype(i.dtype), ipos, ipos)
-        for ipos, i in enumerate(outputs):
-            print >> sio, "        %s * ii_o%i_data = o%i_data;" % (
-                ctype_from_dtype(i.dtype), ipos, ipos)
-        for d in xrange(nd-1, -1, -1):
-            if d > 0:
-                print >> sio, "        int pos%i = ii %% dim%i;" %(d, d)
-                print >> sio, "        ii = ii / dim%i;" %d
-            else:
-                print >> sio, "        int pos%i = ii;" %d
+            # For each input that is a scalar which has been broadcasted to a tensor,
+            #     load it into a local variable
+            for ipos, i in enumerate(inputs):
+                if _logical_scalar(i):
+                    print >> sio, "    const %s ii_i%i_value = i%i_data[0];" % (
+                        ctype_from_dtype(i.dtype), ipos, ipos)
 
+            #loop over the elements to be treated by this kernel call
+            print >> sio, "    for (int i = idx; i < numEls; i += numThreads) {"
+            # calculate the data pointers for all arguments
+            print >> sio, "        int ii = i;"
             for ipos, i in enumerate(inputs):
                 if not _logical_scalar(i):
-                    print >> sio, "        ii_i%i_data += pos%i * i%i_str_%i;" % (ipos, d, ipos, d)
+                    print >> sio, "        const %s * ii_i%i_data = i%i_data;" % (
+                        ctype_from_dtype(i.dtype), ipos, ipos)
             for ipos, i in enumerate(outputs):
-                print >> sio, "        ii_o%i_data += pos%i * o%i_str_%i;" % (ipos, d, ipos, d)
+                print >> sio, "        %s * ii_o%i_data = o%i_data;" % (
+                    ctype_from_dtype(i.dtype), ipos, ipos)
+            for d in xrange(nd-1, -1, -1):
+                if d > 0:
+                    print >> sio, "        int pos%i = ii %% dim%i;" %(d, d)
+                    print >> sio, "        ii = ii / dim%i;" %d
+                else:
+                    print >> sio, "        int pos%i = ii;" %d
+                    
+                for ipos, i in enumerate(inputs):
+                    if not _logical_scalar(i):
+                        print >> sio, "        ii_i%i_data += pos%i * i%i_str_%i;" % (ipos, d, ipos, d)
+                for ipos, i in enumerate(outputs):
+                    print >> sio, "        ii_o%i_data += pos%i * o%i_str_%i;" % (ipos, d, ipos, d)
 
-        # perform the scalar operation on the input and output references
-        #TODO: What if the scalar_op needs support_code??
-        self.task_code(inputs, outputs, sio, nodename)
-        print >> sio, "    }"
+            # perform the scalar operation on the input and output references
+            #TODO: What if the scalar_op needs support_code??
+            self.task_code(inputs, outputs, sio, nodename)
+            print >> sio, "    }"
 
-        #indent = " "*(4*d+7)
-        #for ipos, i in enumerate(inputs):
-            #print >> sio, indent, "const float * i%i" % ipos, '= i%i_data', ''
+           #indent = " "*(4*d+7)
+           #for ipos, i in enumerate(inputs):
+              #print >> sio, indent, "const float * i%i" % ipos, '= i%i_data', ''
         print >> sio, "}"
 
         #print sio.getvalue()
