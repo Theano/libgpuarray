@@ -23,6 +23,10 @@ size_t compyte_get_elsize(int typecode) {
   return compyte_get_type(typecode)->size;
 }
 
+static inline ssize_t ssabs(ssize_t v) {
+  return (v < 0 ? -v : v);
+}
+
 int compyte_elem_perdim(char *strs[], unsigned int *count, unsigned int nd,
 			const size_t *dims, const ssize_t *str,
 			const char *id, ssize_t elemsize) {
@@ -35,16 +39,16 @@ int compyte_elem_perdim(char *strs[], unsigned int *count, unsigned int nd,
 
     for (i = nd-1; i > 0; i--) {
       assert(str[i]%elemsize == 0);
-      if (asprintf(&strs[*count], "%1$s += (%1$si %% %2$zu) * %3$zd;"
+      if (asprintf(&strs[*count], "%1$s %4$c= ((%1$si %% %2$zu) * %3$zd);"
 		   "%1$si = %1$si / %2$zu;", id, dims[i],
-		   str[i]/elemsize) == -1)
+		   ssabs(str[i]/elemsize), (str[i] < 0 ? '-' : '+')) == -1)
 	return -1;
       (*count)++;
     }
  
     assert(str[0]%elemsize == 0);
-    if (asprintf(&strs[*count], "%1$s += %1$si * %2$zd;", id, 
-		 str[0]/elemsize) == -1)
+    if (asprintf(&strs[*count], "%1$s %3$c= (%1$si * %2$zd);", id,
+		 ssabs(str[0]/elemsize), (str[0] < 0 ? '-' : '+')) == -1)
       return -1;
     (*count)++;
   }
