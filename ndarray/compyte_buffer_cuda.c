@@ -464,11 +464,6 @@ static int cuda_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
     size_t total = 0;
     size_t align;
     unsigned int i;
-    for (i = 0; i < k->argcount; i++)
-        total += k->szs[i];
-    err = cuParamSetSize(k->k, total);
-    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-    total = 0;
     for (i = 0; i < k->argcount; i++) {
         /* pad up to alignment (which is guessed to be the size of the type) */
         align = find_align(k->szs[i]);
@@ -478,6 +473,8 @@ static int cuda_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
         if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
         total += k->szs[i];
     }
+    err = cuParamSetSize(k->k, total);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
     err = cuFuncSetBlockShape(k->k, (int)bx, (int)by, (int)bz);
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
     err = cuLaunchGrid(k->k, (int)gx, (int)gz*gy);
