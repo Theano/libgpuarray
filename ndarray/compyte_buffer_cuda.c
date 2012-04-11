@@ -302,8 +302,6 @@ int call_compiler_unix(char *fname, char *oname) {
     return 0;
 }
 
-static const char INT_HEADERS[] = "#include <inttypes.h>\n";
-
 static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
                                  const char **strings, const size_t *lengths,
                                  const char *fname, int *ret) {
@@ -318,8 +316,8 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
 
     if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
 
-    descr[0].iov_base = (void *)INT_HEADERS;
-    descr[0].iov_len = strlen(INT_HEADERS);
+    descr[0].iov_base = (void *)CUDA_HEAD;
+    descr[0].iov_len = strlen(CUDA_HEAD);
 
     if (lengths == NULL) {
         for (i = 0; i < count; i++) {
