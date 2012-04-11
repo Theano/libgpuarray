@@ -53,7 +53,7 @@ typedef struct _compyte_buffer_ops {
   
   /* Copy the passed value to a kernel argument buffer */
   int (*buffer_setkernelarg)(gpukernel *k, unsigned int index,
-			     size_t sz, const void *val);
+			     int typecode, const void *val);
   int (*buffer_setkernelargbuf)(gpukernel *k, unsigned int index,
 				gpudata *b);
   
@@ -180,11 +180,8 @@ int GpuKernel_init(GpuKernel *, compyte_buffer_ops *ops, void *ctx,
 
 void GpuKernel_clear(GpuKernel *);
 
-int GpuKernel_setarg(GpuKernel *, unsigned int index, int typecode, ...);
-int GpuKernel_setargv(GpuKernel *, unsigned int index, int typecode,
-		      va_list ap);
+int GpuKernel_setarg(GpuKernel *, unsigned int index, int typecode, void *arg);
 int GpuKernel_setbufarg(GpuKernel *, unsigned int index, GpuArray *);
-int GpuKernel_setrawarg(GpuKernel *, unsigned int index, size_t sz, void *val);
 
 int GpuKernel_call(GpuKernel *, unsigned int gx, unsigned int gy,
 		   unsigned int gz, unsigned int lx, unsigned int ly,

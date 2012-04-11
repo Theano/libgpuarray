@@ -6,13 +6,6 @@ from cpython cimport Py_INCREF, PyNumber_Index
 
 np.import_array()
 
-cdef extern from "stdarg.h":
-    ctypedef struct va_list:
-        pass
-    # I only need "int" for this
-    void va_start(va_list, int)
-    void va_end(va_list)
-
 cdef extern from "numpy/arrayobject.h":
     object _PyArray_Empty "PyArray_Empty" (int, np.npy_intp *, np.dtype, int)
 
@@ -120,12 +113,10 @@ cdef extern from "compyte_buffer.h":
                        unsigned int count, char **strs, size_t *lens,
                        char *name) nogil
     void GpuKernel_clear(_GpuKernel *k) nogil
-    int GpuKernel_setargv(_GpuKernel *k, unsigned int index, int typecode,
-                          va_list ap) nogil
+    int GpuKernel_setarg(_GpuKernel *k, unsigned int index, int typecode,
+                         void *arg) nogil
     int GpuKernel_setbufarg(_GpuKernel *k, unsigned int index,
                             _GpuArray *a) nogil
-    int GpuKernel_setrawarg(_GpuKernel *k, unsigned int index, size_t sz,
-                            void *val) nogil
     int GpuKernel_call(_GpuKernel *, unsigned int gx, unsigned int gy,
                        unsigned int gz, unsigned int lx, unsigned int ly,
                        unsigned int lz) nogil
@@ -264,13 +255,10 @@ cdef kernel_clear(GpuKernel k):
     with nogil:
         GpuKernel_clear(&k.k)
 
-cdef kernel_setarg(GpuKernel k, unsigned int index, int typecode, ...):
+cdef kernel_setarg(GpuKernel k, unsigned int index, int typecode, void *arg):
     cdef int err
-    cdef va_list ap
-    va_start(ap, typecode);
     with nogil:
-        err = GpuKernel_setargv(&k.k, index, typecode, ap)
-    va_end(ap)
+        err = GpuKernel_setarg(&k.k, index, typecode, arg)
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(k.k.ops, err))
 
@@ -653,13 +641,14 @@ cdef class GpuKernel:
         if isinstance(o, GpuArray):
             self.setbufarg(index, o)
         else:
-            # this will break for object that are not numpy-like, but meh.
+            # this will break for objects that are not numpy-like, but meh.
             self._setarg(index, o.dtype, o)
 
     def setbufarg(self, unsigned int index, GpuArray a not None):
         kernel_setbufarg(self, index, a)
 
     cdef _setarg(self, unsigned int index, np.dtype t, object o):
+        cdef float f
         cdef double d
         cdef int i
         cdef unsigned int ui
@@ -667,21 +656,24 @@ cdef class GpuKernel:
         cdef unsigned long ul
         cdef unsigned int typecode
         typecode = dtype_to_typecode(t)
-        if typecode == GA_FLOAT or typecode == GA_DOUBLE:
+        if typecode == GA_FLOAT:
+            f = o
+            kernel_setarg(self, index, typecode, &f)
+        elif typecode == GA_DOUBLE:
             d = o
-            kernel_setarg(self, index, typecode, d)
+            kernel_setarg(self, index, typecode, &d)
         elif typecode == GA_INT:
             i = o
-            kernel_setarg(self, index, typecode, i)
+            kernel_setarg(self, index, typecode, &i)
         elif typecode == GA_UINT:
             ui = o
-            kernel_setarg(self, index, typecode, ui)
+            kernel_setarg(self, index, typecode, &ui)
         elif typecode == GA_LONG:
             l = o
-            kernel_setarg(self, index, typecode, l)
+            kernel_setarg(self, index, typecode, &l)
         elif typecode == GA_ULONG:
             ul = o
-            kernel_setarg(self, index, typecode, ul)
+            kernel_setarg(self, index, typecode, &ul)
         else:
             raise ValueError("Can't set argument of this type")
 

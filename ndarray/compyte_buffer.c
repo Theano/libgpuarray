@@ -295,48 +295,13 @@ void GpuKernel_clear(GpuKernel *k) {
   k->ops = NULL;
 }
 
-int GpuKernel_setarg(GpuKernel *k, unsigned int index, int typecode, ...) {
-  int res;
-  va_list a;
-  va_start(a, typecode);
-  res = GpuKernel_setargv(k, index, typecode, a);
-  va_end(a);
-  return res;
-}
-
-int GpuKernel_setargv(GpuKernel *k, unsigned int index, int typecode,
-		      va_list a) {
-#define extract(t1, t2) do {						\
-    t2 v = (t2)va_arg(a, t1);						\
-    return k->ops->buffer_setkernelarg(k->k, index, sizeof(v), &v);	\
-  } while (0)
-
-  switch (typecode) {
-    /* 
-       We don't support a lot of types here since it's tricky what happens
-       with argument promotion on the kernel side, especially for CUDA.
-
-       Anyway the supported types should cover the vast majority of cases.
-    */
-  case GA_INT: extract(int, int);
-  case GA_UINT: extract(unsigned int, unsigned int);
-  case GA_LONG: extract(long, long);
-  case GA_ULONG: extract(unsigned long, unsigned long);
-  case GA_FLOAT: extract(double, float);
-  case GA_DOUBLE: extract(double, double);
-  default:
-    return GA_UNSUPPORTED_ERROR;
-  }
-
-#undef extract
+int GpuKernel_setarg(GpuKernel *k, unsigned int index, int typecode,
+		     void *arg) {
+  return k->ops->buffer_setkernelarg(k->k, index, typecode, arg);
 }
 
 int GpuKernel_setbufarg(GpuKernel *k, unsigned int index, GpuArray *a) {
   return k->ops->buffer_setkernelargbuf(k->k, index, a->data);
-}
-
-int GpuKernel_setrawarg(GpuKernel *k, unsigned int index, size_t sz, void *v) {
-  return k->ops->buffer_setkernelarg(k->k, index, sz, v);
 }
 
 int GpuKernel_call(GpuKernel *k, unsigned int gx, unsigned int gy,

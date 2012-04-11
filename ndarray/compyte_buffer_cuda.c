@@ -33,6 +33,9 @@ size_t strlcat(char *dst, const char *src, size_t siz);
 #include "compyte_buffer.h"
 #include "compyte_util.h"
 
+typedef struct {char c; CUdeviceptr x; } st_devptr;
+#define DEVPTR_ALIGN (sizeof(st_devptr) - sizeof(CUdeviceptr))
+
 struct _gpudata {
     CUdeviceptr ptr;
     size_t sz;
@@ -61,12 +64,11 @@ struct _gpukernel {
     CUmodule m;
     CUfunction k;
     void *args[NUM_ARGS];
-    unsigned int argcount;
 #if CUDA_VERSION < 4000
-    size_t szs[NUM_ARGS];
+    size_t types[NUM_ARGS];
 #endif
+    unsigned int argcount;
 };
-
 
 #define FAIL(v, e) { if (ret) *ret = e; return v; }
 #define CHKFAIL(v) if (err != CUDA_SUCCESS) FAIL(v, GA_IMPL_ERROR)
@@ -393,26 +395,34 @@ static void cuda_freekernel(gpukernel *k) {
     free(k);
 }
 
-static int cuda_setkernelarg(gpukernel *k, unsigned int index, size_t sz,
+static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
                              const void *val) {
     void *tmp;
+    size_t sz;
     if (index >= NUM_ARGS) return GA_VALUE_ERROR;
 
     if (index >= k->argcount)
         k->argcount = index+1;
+
+    /* Flag value (and a horrible abuse of reserved values) */
+    if (typecode == GA_DELIM) {
+        sz = sizeof(CUdeviceptr);
+    } else {
+        sz = compyte_get_elsize(typecode);
+    }
 
     tmp = malloc(sz);
     if (tmp == NULL) return GA_MEMORY_ERROR;
     bcopy(val, tmp, sz);
     k->args[index] = tmp;
 #if CUDA_VERSION < 4000
-    k->szs[index] = sz;
+    k->types[index] = typecode;
 #endif
     return GA_NO_ERROR;
 }
 
 static int cuda_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
-    return cuda_setkernelarg(k, index, sizeof(void *), &b->ptr);
+    return cuda_setkernelarg(k, index, GA_DELIM, &b->ptr);
 }
 
 static size_t find_align(size_t v) {
@@ -450,6 +460,8 @@ static size_t find_align(size_t v) {
     return (size_t)0x1 << c;
 }
 
+#define ALIGN_UP(offset, align) ((offset) + (align) - 1) & ~((align) - 1)
+
 static int cuda_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
                            unsigned int gz, unsigned int bx, unsigned int by,
                            unsigned int bz) {
@@ -460,16 +472,20 @@ static int cuda_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
     }
 #else
     size_t total = 0;
-    size_t align;
+    size_t align, sz;
     unsigned int i;
     for (i = 0; i < k->argcount; i++) {
-        /* pad up to alignment (which is guessed to be the size of the type) */
-        align = find_align(k->szs[i]);
-        if ((total % align) != 0)
-            total += align - (total % align);
-        err = cuParamSetv(k->k,(int)total,k->args[i],(unsigned int)k->szs[i]);
+        if (k->types[i] == GA_DELIM) {
+            align = DEVPTR_ALIGN;
+            sz = sizeof(CUdeviceptr);
+        } else {
+            align = compyte_get_type(k->types[i])->align;
+            sz = compyte_get_elsize(k->types[i]);
+        }
+        total = ALIGN_UP(total, align);
+        err = cuParamSetv(k->k, (int)total, k->args[i], (unsigned int)sz);
         if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-        total += k->szs[i];
+        total += sz;
     }
     err = cuParamSetSize(k->k, total);
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;

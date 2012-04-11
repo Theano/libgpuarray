@@ -49,7 +49,7 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
 			       const char *fname, int *ret);
 static void cl_freekernel(gpukernel *k);
 static int cl_setkernelarg(gpukernel *k, unsigned int index,
-			   size_t sz, const void *val);
+			   int typecode, const void *val);
 static int cl_setkernelargbuf(gpukernel *k, unsigned int index,
 			      gpudata *b);
 static int cl_callkernel(gpukernel *k, unsigned int, unsigned int,
@@ -408,8 +408,13 @@ static void cl_freekernel(gpukernel *k) {
   free(k);
 }
 
-static int cl_setkernelarg(gpukernel *k, unsigned int index, size_t sz,
+static int cl_setkernelarg(gpukernel *k, unsigned int index, int typecode,
 			   const void *val) {
+  size_t sz;
+  if (typecode == GA_DELIM)
+    sz = sizeof(cl_mem);
+  else
+    sz = compyte_get_elsize(typecode);
   err = clSetKernelArg(k->k, index, sz, val);
   if (err != CL_SUCCESS) {
     return GA_IMPL_ERROR;
@@ -418,7 +423,7 @@ static int cl_setkernelarg(gpukernel *k, unsigned int index, size_t sz,
 }
 
 static int cl_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
-  return cl_setkernelarg(k, index, sizeof(cl_mem), &b->buf);
+  return cl_setkernelarg(k, index, GA_DELIM, &b->buf);
 }
 
 static int cl_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
