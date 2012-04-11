@@ -39,23 +39,9 @@ typedef struct {char c; CUdeviceptr x; } st_devptr;
 struct _gpudata {
     CUdeviceptr ptr;
     size_t sz;
+    gpudata *base;
+    unsigned int refcnt;
 };
-
-static inline size_t gdata_size(gpudata *b) {
-    return b->sz & SSIZE_MAX;
-}
-
-static inline int gdata_canfree(gpudata *b) {
-    return (b->sz & ~SSIZE_MAX) ? 0 : 1;
-}
-
-static inline void gdata_setfree(gpudata *b) {
-    b->sz |= ~SSIZE_MAX;
-}
-
-static inline void gdata_setsize(gpudata *b, size_t s) {
-    b->sz = (b->sz & ~SSIZE_MAX) | s;
-}
 
 /* The total size of the arguments is limited to 256 bytes */
 #define NUM_ARGS (256/sizeof(void*))
@@ -150,6 +136,8 @@ static gpudata *cuda_alloc(void *ctx /* IGNORED */, size_t size, int *ret) {
     if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
     
     res->sz = size;
+    res->base = NULL;
+    res->refcnt = 1;
     
     err = cuMemAlloc(&res->ptr, size);
     if (err != CUDA_SUCCESS) {
@@ -166,26 +154,35 @@ static gpudata *cuda_dup(gpudata *b, int *ret) {
     
     res->ptr = b->ptr;
     res->sz = b->sz;
-    gdata_setfree(res);
+    res->base = b;
+    if (res->base->base != NULL)
+        res->base = res->base->base;
+    res->refcnt = 1;
+    b->refcnt += 1;
     return res;
 }
 
 static void cuda_free(gpudata *d) {
-    if (gdata_canfree(d))
-        err = cuMemFree(d->ptr);
-    free(d);
+    d->refcnt -= 1;
+    if (d->refcnt == 0) {
+        if (d->base != NULL)
+            cuda_free(d->base);
+        else
+            cuMemFree(d->ptr);
+        free(d);
+    }
 }
 
 static int cuda_share(gpudata *a, gpudata *b, int *ret) {
-    return ((a->ptr <= b->ptr && a->ptr + gdata_size(a) > b->ptr) ||
-            (b->ptr <= a->ptr && b->ptr + gdata_size(b) > a->ptr));
+    return ((a->ptr <= b->ptr && a->ptr + a->sz > b->ptr) ||
+            (b->ptr <= a->ptr && b->ptr + b->sz > a->ptr));
 }
 
 static int cuda_move(gpudata *dst, gpudata *src)
 {
-    if (gdata_size(dst) != gdata_size(src))
+    if (dst->sz != src->sz)
         return GA_VALUE_ERROR;
-    err = cuMemcpyDtoD(dst->ptr, src->ptr, gdata_size(dst));
+    err = cuMemcpyDtoD(dst->ptr, src->ptr, dst->sz);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
@@ -194,7 +191,7 @@ static int cuda_move(gpudata *dst, gpudata *src)
 
 static int cuda_read(void *dst, gpudata *src, size_t sz)
 {
-    if (sz > gdata_size(src))
+    if (sz > src->sz)
         return GA_VALUE_ERROR;
     err = cuMemcpyDtoH(dst, src->ptr, sz);
     if (err != CUDA_SUCCESS) {
@@ -205,7 +202,7 @@ static int cuda_read(void *dst, gpudata *src, size_t sz)
 
 static int cuda_write(gpudata *dst, const void *src, size_t sz)
 {
-    if (gdata_size(dst) != sz)
+    if (dst->sz != sz)
         return GA_VALUE_ERROR;
     err = cuMemcpyHtoD(dst->ptr, src, sz);
     if (err != CUDA_SUCCESS) {
@@ -215,7 +212,7 @@ static int cuda_write(gpudata *dst, const void *src, size_t sz)
 }
 
 static int cuda_memset(gpudata *dst, int data) {
-    err = cuMemsetD8(dst->ptr, data, gdata_size(dst));
+    err = cuMemsetD8(dst->ptr, data, dst->sz);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
@@ -225,7 +222,7 @@ static int cuda_memset(gpudata *dst, int data) {
 static int cuda_offset(gpudata *buf, ssize_t off) {
     /* XXX: this does not check for overflow */
     buf->ptr += off;
-    gdata_setsize(buf, gdata_size(buf) - off);
+    buf->sz -= off;
     return GA_NO_ERROR;
 }
 
