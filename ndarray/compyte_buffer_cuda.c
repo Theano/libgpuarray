@@ -364,7 +364,7 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
         unlink(outbuf);
         FAIL(NULL, GA_SYS_ERROR);
     }
-    bzero(res, sizeof(*res));
+    memset(res, 0, sizeof(*res));
 
     err = cuModuleLoad(&res->m, outbuf);
 
@@ -410,7 +410,7 @@ static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
 
     tmp = malloc(sz);
     if (tmp == NULL) return GA_MEMORY_ERROR;
-    bcopy(val, tmp, sz);
+    memcpy(tmp, val, sz);
     k->args[index] = tmp;
 #if CUDA_VERSION < 4000
     k->types[index] = typecode;

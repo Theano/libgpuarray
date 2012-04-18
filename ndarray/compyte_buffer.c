@@ -2,7 +2,6 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <strings.h>
 #include <string.h>
 #include <errno.h>
 
@@ -55,7 +54,7 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
     return GA_MEMORY_ERROR;
   }
   /* Mult will not overflow since calloc succeded */
-  bcopy(dims, a->dimensions, sizeof(size_t)*nd);
+  memcpy(a->dimensions, dims, sizeof(size_t)*nd);
 
   size = compyte_get_elsize(typecode);
   /* mults will not overflow, checked on entry */
@@ -109,8 +108,8 @@ int GpuArray_view(GpuArray *v, GpuArray *a) {
     GpuArray_clear(v);
     return GA_MEMORY_ERROR;
   }
-  bcopy(a->dimensions, v->dimensions, v->nd*sizeof(size_t));
-  bcopy(a->strides, v->strides, v->nd*sizeof(ssize_t));
+  memcpy(v->dimensions, a->dimensions, v->nd*sizeof(size_t));
+  memcpy(v->strides, a->strides, v->nd*sizeof(ssize_t));
   return GA_NO_ERROR;
 }
 
@@ -174,7 +173,7 @@ void GpuArray_clear(GpuArray *a) {
     a->ops->buffer_free(a->data);
   free(a->dimensions);
   free(a->strides);
-  bzero(a, sizeof(*a));
+  memset(a, 0, sizeof(*a));
 }
 
 int GpuArray_share(GpuArray *a, GpuArray *b) {
