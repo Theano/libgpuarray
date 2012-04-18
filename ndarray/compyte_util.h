@@ -8,7 +8,7 @@ extern "C" {
 }
 #endif
 
-#include <sys/types.h>
+#include "compyte_compat.h"
 
 #include "compyte_types.h"
 
