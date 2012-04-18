@@ -227,6 +227,7 @@ const char *GpuArray_error(GpuArray *a, int err) {
 
 void GpuArray_fprintf(FILE *fd, const GpuArray *a) {
   unsigned int i;
+  int comma = 0;
 
   fprintf(fd, "GpuNdArray <%p, %p> nd=%d\n", a, a->data, a->nd);
   fprintf(fd, "\tITEMSIZE: %zd\n", GpuArray_ITEMSIZE(a));
@@ -240,7 +241,6 @@ void GpuArray_fprintf(FILE *fd, const GpuArray *a) {
       fprintf(fd, "%zd\t", a->strides[i]);
   }
   fprintf(fd, "\nFLAGS:");
-  int comma = 0;
 #define PRINTFLAG(flag) if (a->flags & flag) { \
     if (comma) fputc(',', fd);                \
     fprintf(fd, " " #flag);                   \
