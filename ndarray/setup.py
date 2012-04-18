@@ -24,8 +24,12 @@ libraries = []
 ext_link_args = []
 
 if sys.platform.startswith('linux'):
-    # stupid linux and its lack of strlcat/strlcpy
+    # stupid glibc and its lack of strlcat/strlcpy
     srcs.append('stupid_linux.c')
+
+if sys.platform.startswith('win'):
+    # no asprintf on windows
+    srcs.append('compyte_asprintf.c')
 
 fnull = open(os.devnull, 'r+')
 
