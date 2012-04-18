@@ -3,6 +3,7 @@
 #ifndef COMPYTE_TYPES
 #define COMPYTE_TYPES
 #include <sys/types.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {

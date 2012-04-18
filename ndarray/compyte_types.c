@@ -3,7 +3,18 @@
 #include <stdlib.h> /* For NULL */
 
 
-#include <inttypes.h>
+#ifdef _MSC_VER
+typedef __int8 int8_t;
+typedef unsigned __int8 uint8_t;
+typedef __int16 int16_t;
+typedef unsigned __int16 uint16_t;
+typedef __int32 int32_t;
+typedef unsigned __int32 uint32_t;
+typedef __int64 int64_t;
+typedef unsigned __int64 uint64_t;
+#else
+#include <stdint.h>
+#endif
 
 typedef struct _int128 {
     union int128_u {
@@ -43,7 +54,18 @@ typedef uint16_t half_t;
 const char CL_HEAD[] = "";
 const char CUDA_HEAD[] = ""
  "\n"
- "#include <inttypes.h>\n"
+ "#ifdef _MSC_VER\n"
+ "typedef __int8 int8_t;\n"
+ "typedef unsigned __int8 uint8_t;\n"
+ "typedef __int16 int16_t;\n"
+ "typedef unsigned __int16 uint16_t;\n"
+ "typedef __int32 int32_t;\n"
+ "typedef unsigned __int32 uint32_t;\n"
+ "typedef __int64 int64_t;\n"
+ "typedef unsigned __int64 uint64_t;\n"
+ "#else\n"
+ "#include <stdint.h>\n"
+ "#endif\n"
  "\n"
  "typedef struct _int128 {\n"
  "    union int128_u {\n"
