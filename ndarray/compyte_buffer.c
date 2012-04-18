@@ -1,3 +1,7 @@
+#ifdef _MSC_VER
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include <assert.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -26,7 +30,7 @@ const char *Gpu_error(compyte_buffer_ops *o, int err) {
 int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 		   int typecode, unsigned int nd, size_t *dims, ga_order ord) {
   size_t size = compyte_get_elsize(typecode);
-  int i;
+  unsigned int i;
 
   if (ord == GA_ANY_ORDER)
     ord = GA_C_ORDER;
@@ -222,21 +226,19 @@ const char *GpuArray_error(GpuArray *a, int err) {
 }
 
 void GpuArray_fprintf(FILE *fd, const GpuArray *a) {
-  int i;
+  unsigned int i;
 
   fprintf(fd, "GpuNdArray <%p, %p> nd=%d\n", a, a->data, a->nd);
   fprintf(fd, "\tITEMSIZE: %zd\n", GpuArray_ITEMSIZE(a));
   fprintf(fd, "\tTYPECODE: %d\n", a->typecode);
   fprintf(fd, "\tHOST_DIMS:      ");
-  for (i = 0; i < a->nd; ++i)
-    {
+  for (i = 0; i < a->nd; ++i) {
       fprintf(fd, "%zd\t", a->dimensions[i]);
-    }
+  }
   fprintf(fd, "\n\tHOST_STRIDES: ");
-  for (i = 0; i < a->nd; ++i)
-    {
+  for (i = 0; i < a->nd; ++i) {
       fprintf(fd, "%zd\t", a->strides[i]);
-    }
+  }
   fprintf(fd, "\nFLAGS:");
   int comma = 0;
 #define PRINTFLAG(flag) if (a->flags & flag) { \
@@ -267,7 +269,7 @@ int GpuArray_is_c_contiguous(const GpuArray *a) {
 
 int GpuArray_is_f_contiguous(const GpuArray *a) {
   size_t size = GpuArray_ITEMSIZE(a);
-  int i;
+  unsigned int i;
 
   for (i = 0; i < a->nd; i++) {
     if (a->strides[i] != size) return 0;
