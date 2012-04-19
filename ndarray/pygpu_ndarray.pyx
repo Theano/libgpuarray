@@ -1,3 +1,5 @@
+include "defs.pxi"
+
 cimport libc.stdio
 from libc.stdlib cimport calloc, free
 cimport numpy as np
@@ -19,12 +21,6 @@ cdef extern from "Python.h":
                                   Py_ssize_t *start, Py_ssize_t *stop,
                                   Py_ssize_t *step,
                                   Py_ssize_t *slicelength) except -1
-
-# This is a horrible hack to introduce ifdefs in cython code.
-cdef extern from *:
-    void cifcuda "#ifdef WITH_CUDA //" ()
-    void cifopencl "#ifdef WITH_OPENCL //" ()
-    void cendif "#endif //" ()
 
 cdef extern from "compyte_util.h":
      size_t compyte_get_elsize(int typecode)
@@ -121,25 +117,26 @@ cdef extern from "compyte_buffer.h":
                        unsigned int gz, unsigned int lx, unsigned int ly,
                        unsigned int lz) nogil
 
-cdef object call_compiler = None
-cdef extern int call_compiler_unix(char *fname, char *oname)
+IF WITH_CUDA:
+    cdef object call_compiler = None
+    cdef extern int call_compiler_unix(char *fname, char *oname)
 
-cdef public int call_compiler_python(char *fname, char *oname) with gil:
-    if call_compiler is None:
-        return call_compiler_unix(fname, oname)
-    else:
-        try:
-            return call_compiler(fname, oname)
-        except:
-            # This would correspond to an unknown error
-            # XXX: maybe should store the exception somewhere
-            return -1
+    cdef public int call_compiler_python(char *fname, char *oname) with gil:
+        if call_compiler is None:
+            return call_compiler_unix(fname, oname)
+        else:
+            try:
+                return call_compiler(fname, oname)
+            except:
+                # This would correspond to an unknown error
+                # XXX: maybe should store the exception somewhere
+                return -1
 
-def set_compiler_fn(fn):
-    if callable(fn) or fn is None:
-        call_compiler = fn
-    else:
-        raise ValueError("need a callable")
+    def set_compiler_fn(fn):
+        if callable(fn) or fn is None:
+            call_compiler = fn
+        else:
+            raise ValueError("need a callable")
 
 import numpy
 
@@ -286,40 +283,36 @@ def set_kind_context(kind, size_t ctx):
     global GpuArray_ctx
     global GpuArray_ops
     GpuArray_ctx = <void *>ctx
-    cifcuda()
-    if kind == "cuda":
-        GpuArray_ops = &cuda_ops
-        return
-    cendif()
-    cifopencl()
-    if kind == "opencl":
-        GpuArray_ops = &opencl_ops
-        return
-    cendif()
+    IF WITH_CUDA:
+        if kind == "cuda":
+            GpuArray_ops = &cuda_ops
+            return
+    IF WITH_OPENCL:
+        if kind == "opencl":
+            GpuArray_ops = &opencl_ops
+            return
     raise ValueError("Unknown kind")
 
 def init(kind, int devno):
     cdef int err = GA_NO_ERROR
     cdef void *ctx
     ctx = NULL
-    cifopencl()
-    if kind == "opencl":
-        ctx = opencl_ops.buffer_init(devno, &err)
-        if (err != GA_NO_ERROR):
-            if err == GA_VALUE_ERROR:
-                raise GpuArrayException("No device %d"%(devno,))
-            else:
-                raise GpuArrayException(opencl_ops.buffer_error())
-    cendif()
-    cifcuda()
-    if kind == "cuda":
-        ctx = cuda_ops.buffer_init(devno, &err)
-        if (err != GA_NO_ERROR):
-            if err == GA_VALUE_ERROR:
-                raise GpuArrayException("No device %d"%(devno,))
-            else:
-                raise GpuArrayException(cuda_ops.buffer_error())
-    cendif()
+    IF WITH_OPENCL:
+        if kind == "opencl":
+            ctx = opencl_ops.buffer_init(devno, &err)
+            if (err != GA_NO_ERROR):
+                if err == GA_VALUE_ERROR:
+                    raise GpuArrayException("No device %d"%(devno,))
+                else:
+                    raise GpuArrayException(opencl_ops.buffer_error())
+    IF WITH_CUDA:
+        if kind == "cuda":
+            ctx = cuda_ops.buffer_init(devno, &err)
+            if (err != GA_NO_ERROR):
+                if err == GA_VALUE_ERROR:
+                    raise GpuArrayException("No device %d"%(devno,))
+                else:
+                    raise GpuArrayException(cuda_ops.buffer_error())
     if ctx == NULL:
         raise RuntimeError("Unsupported kind: %s"%(kind,))
     return <size_t>ctx

@@ -18,6 +18,7 @@ import numpy as np
 # These are always there
 srcs = ['compyte_types.c', 'compyte_util.c', 'compyte_buffer.c']
 macros = []
+cython_env = {'WITH_CUDA': False, 'WITH_OPENCL': False}
 include_dirs = [np.get_include(), '.']
 lib_dirs = []
 libraries = []
@@ -55,6 +56,7 @@ def try_cuda(arg):
 
     print "Found nvcc at:", os.path.join(cuda_bin_prefix, 'nvcc')
     macros.append(('WITH_CUDA', '1'))
+    cython_end['WITH_CUDA'] = True
     macros.append(('CUDA_BIN_PATH', '"'+cuda_bin_prefix+'"'))
     macros.append(('call_compiler', 'call_compiler_python '))
     srcs.append('compyte_buffer_cuda.c')
@@ -110,6 +112,7 @@ def try_opencl(arg):
         libraries.append('OpenCL')
     srcs.append('compyte_buffer_opencl.c')
     macros.append(('WITH_OPENCL', '1'))
+    cython_env['WITH_OPENCL'] = True
     have_opencl = True
 
 def enable_opencl(arg):
@@ -163,6 +166,13 @@ if have_cython:
     srcs.append('pygpu_ndarray.pyx')
 else:
     srcs.append('pygpu_ndarray.c')
+
+# update definitions
+with open('defs.pxi', 'w') as f:
+    f.write("""
+DEF WITH_CUDA = %(WITH_CUDA)r
+DEF WITH_OPENCL = %(WITH_OPENCL)r
+""" % cython_env)
 
 setup(name='compyte',
       cmdclass = {'build_ext': build_ext},
