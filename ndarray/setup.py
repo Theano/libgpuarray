@@ -58,7 +58,7 @@ def try_cuda(arg):
     macros.append(('WITH_CUDA', '1'))
     cython_end['WITH_CUDA'] = True
     macros.append(('CUDA_BIN_PATH', '"'+cuda_bin_prefix+'"'))
-    macros.append(('call_compiler', 'call_compiler_python '))
+    macros.append(('call_compiler', 'call_compiler_python'))
     srcs.append('compyte_buffer_cuda.c')
     
     if sys.platform == 'darwin':
