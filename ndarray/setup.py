@@ -12,6 +12,9 @@ except:
     from distutils.command.build_ext import build_ext
 
 from distutils.core import setup, Extension
+from distutils import ccompiler
+
+cc = ccompiler.new_compiler()
 
 import numpy as np
 
@@ -24,17 +27,111 @@ lib_dirs = []
 libraries = []
 ext_link_args = []
 
-if sys.platform.startswith('linux'):
-    # stupid glibc and its lack of strlcat/strlcpy
-    srcs.append('stupid_linux.c')
+def has_function(cc, func_call, includes=None, include_dirs=None,
+                 frameworks=None, libraries=None, library_dirs=None,
+                 macros=None):
+    from distutils.errors import CompileError, LinkError
+    import tempfile
+    if includes is None:
+        includes = []
+    if include_dirs is None:
+        include_dirs = []
+    if frameworks is None:
+        frameworks = []
+    if libraries is None:
+        librairies = []
+    if library_dirs is None:
+        libraries = []
+    if macros is None:
+        macros = []
+    fd, fname, = tempfile.mkstemp(".c", 'configtest', text=True)
+    f = os.fdopen(fd, "w")
+    try:
+        for incl in includes:
+            f.write("""#include "%s"\n"""%(incl,))
+        f.write("""int main() { %s; }"""%(func_call,))
+    finally:
+        f.close()
 
-if sys.platform.startswith('win'):
-    # no asprintf on windows
-    srcs.append('compyte_asprintf.c')
+    for m in macros:
+        cc.macros.append(m)
+    try:
+        objs = cc.compile([fname], include_dirs=include_dirs)
+    except CompileError:
+        return False
+    finally:
+        for m in macros:
+            cc.macros.pop(-1)
+
+    ext_a = []
+    for f in frameworks:
+        ext_a.append('-framework')
+        ext_a.append(f)
+
+    try:
+        cc.link_executable(objs, "a.out", libraries=libraries,
+                           library_dirs=library_dirs, extra_postargs=ext_a)
+    except (LinkError, TypeError):
+        return False
+    return True
+
+if not has_function(cc, 'strlcat((char *)NULL, "aaa", 3)',
+                    includes=['string.h']):
+    srcs.append('compyte_strl.c')
+
+if not has_function(cc, 'asprintf((char **)NULL, "aaa", "b", 1.0, 2)',
+                       includes=['stdio.h']):
+    if has_function(cc, 'asprintf((char **)NULL, "aaa", "b", 1.0, 2)',
+                       includes=['stdio.h'], macros=[('_GNU_SOURCE', 1)]):
+        macros.append(('_GNU_SOURCE', 1))
+    else:
+        srcs.append('compyte_asprintf.c')
 
 fnull = open(os.devnull, 'r+')
 
 # Detect CUDA install
+def find_cuda_lib(cuda_root):
+    if sys.platform == 'darwin':
+        if has_function(cc, 'cuInit', includes=['CUDA/cuda.h'],
+                         frameworks=['CUDA'], cc=cc):
+            ext_link_args = []
+            ext_link_args.append('-framework')
+            ext_link_args.append('CUDA')
+            return {'extra_link_args', ext_link_args}
+    if cuda_root:
+        inc = os.path.join(cuda_root, 'include')
+        lib = os.path.join(cuda_root, 'lib')
+        lib64 = os.path.join(cuda_root, 'lib64')
+        if has_function(cc, 'cuInit', includes=['cuda.h'], include_dirs=[inc],
+                           libraries=['cuda']):
+            return {'library': ['cuda'], 'include_dirs': [inc]}
+        elif has_function(cc, 'cuInit', includes=['cuda.h'],
+                          include_dirs=[inc], libraries=['cuda'],
+                          library_dirs=[lib]):
+            ext_link_args = []
+            if not sys.platform.startswith('win'):
+                ext_link_args.append('-Xlinker')
+                ext_link_args.append('-rpath')
+                ext_link_args.append('-Xlinker')
+                ext_link_args.append(lib)
+            return {'library': ['cuda'], 'include_dirs': [inc],
+                    'library_dirs': [lib], 'extra_link_args': ext_link_args}
+        elif has_function(cc, 'cuInit', includes=['cuda.h'],
+                          include_dirs=[inc], libraries=['cuda'],
+                          library_dirs=[lib64]):
+            ext_link_args = []
+            if not sys.platform.startswith('win'):
+                ext_link_args.append('-Xlinker')
+                ext_link_args.append('-rpath')
+                ext_link_args.append('-Xlinker')
+                ext_link_args.append(lib64)
+            return {'library': ['cuda'], 'include_dirs': [inc],
+                    'library_dirs': [lib64], 'extra_link_args': ext_link_args}
+    else:
+        if has_function(cc, 'cuInit', includes=['cuda.h'], libraries=['cuda']):
+            return {'libraries': ['cuda']}
+    return None
+
 def try_cuda(arg):
     global have_cuda
     print "Searching for CUDA..."
@@ -55,36 +152,23 @@ def try_cuda(arg):
         return
 
     print "Found nvcc at:", os.path.join(cuda_bin_prefix, 'nvcc')
+
+    res = find_cuda_lib(cuda_root)
+    if res is None:
+        have_cuda = False
+        return
+
     macros.append(('WITH_CUDA', '1'))
-    cython_end['WITH_CUDA'] = True
+    cython_env['WITH_CUDA'] = True
     macros.append(('CUDA_BIN_PATH', '"'+cuda_bin_prefix+'"'))
     macros.append(('call_compiler', 'call_compiler_python'))
     srcs.append('compyte_buffer_cuda.c')
     
-    if sys.platform == 'darwin':
-        print "Mac platform, using CUDA framework"
-        ext_link_args.append('-framework')
-        ext_link_args.append('CUDA')
-    else:
-        libraries.append('cuda')
-        if cuda_root is None:
-            print "WARNING: no CUDA_ROOT specified, assuming it is part of the default search path"
-        else:
-            include_dirs.append(os.path.join(cuda_root, 'include'))
-            lib = os.path.join(cuda_root, 'lib')
-            lib64 = os.path.join(cuda_root, 'lib64')
-            if os.path.isdir(lib):
-                lib_dirs.append(lib)
-                ext_link_args.append('-Xlinker')
-                ext_link_args.append('-rpath')
-                ext_link_args.append('-Xlinker')
-                ext_link_args.append(lib)
-            if os.path.isdir(lib64):
-                lib_dirs.append(lib64)
-                ext_link_args.append('-Xlinker')
-                ext_link_args.append('-rpath')
-                ext_link_args.append('-Xlinker')
-                ext_link_args.append(lib64)
+    ext_link_args.extend(res.pop('extra_link_args', []))
+    libraries.extend(res.pop('libraries', []))
+    lib_dirs.extend(res.pop('library_dirs', []))
+    include_dirs.extend(res.pop('include_dirs', []))
+    
     have_cuda = True
 
 def enable_cuda(arg):
@@ -108,8 +192,12 @@ def try_opencl(arg):
         ext_link_args.append('-framework')
         ext_link_args.append('OpenCL')
     else:
-        print "Assuming OpenCL install in default search paths"
-        libraries.append('OpenCL')
+        if has_function(cc, 'clCreateContext', includes=['opencl.h'],
+                        libraries=['OpenCL']):
+            libraries.append('OpenCL')
+        else:
+            have_opencl = False
+            return
     srcs.append('compyte_buffer_opencl.c')
     macros.append(('WITH_OPENCL', '1'))
     cython_env['WITH_OPENCL'] = True
@@ -120,7 +208,8 @@ def enable_opencl(arg):
     if not have_opencl:
         print "Could not find OpenCL"
         if sys.platform == 'darwin':
-            print "OpenCL support on Mac starts with 10.6, please upgrade"
+            print "OpenCL support on Mac starts with 10.6, upgrade or", \
+                "install a runtime"
         else:
             print "Install an OpenCL runtime."
 
