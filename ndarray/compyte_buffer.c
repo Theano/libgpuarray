@@ -33,7 +33,7 @@ const char *Gpu_error(compyte_buffer_ops *o, int err) {
 int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 		   int typecode, unsigned int nd, size_t *dims, ga_order ord) {
   size_t size = compyte_get_elsize(typecode);
-  unsigned int i;
+  int i;
 
   if (ord == GA_ANY_ORDER)
     ord = GA_C_ORDER;
