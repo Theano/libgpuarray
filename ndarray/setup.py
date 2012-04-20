@@ -87,7 +87,7 @@ fnull = open(os.devnull, 'r+')
 # Detect CUDA install
 def find_cuda_lib(cuda_root):
     if sys.platform == 'darwin':
-        if has_function(cc, 'cuInit', includes=['CUDA/cuda.h'],
+        if has_function(cc, 'cuInit(0)', includes=['CUDA/cuda.h'],
                          frameworks=['CUDA'], cc=cc):
             ext_link_args = []
             ext_link_args.append('-framework')
@@ -97,10 +97,10 @@ def find_cuda_lib(cuda_root):
         inc = os.path.join(cuda_root, 'include')
         lib = os.path.join(cuda_root, 'lib')
         lib64 = os.path.join(cuda_root, 'lib64')
-        if has_function(cc, 'cuInit', includes=['cuda.h'], include_dirs=[inc],
+        if has_function(cc, 'cuInit(0)', includes=['cuda.h'], include_dirs=[inc],
                            libraries=['cuda']):
             return {'library': ['cuda'], 'include_dirs': [inc]}
-        elif has_function(cc, 'cuInit', includes=['cuda.h'],
+        elif has_function(cc, 'cuInit(0)', includes=['cuda.h'],
                           include_dirs=[inc], libraries=['cuda'],
                           library_dirs=[lib]):
             ext_link_args = []
@@ -111,7 +111,7 @@ def find_cuda_lib(cuda_root):
                 ext_link_args.append(lib)
             return {'library': ['cuda'], 'include_dirs': [inc],
                     'library_dirs': [lib], 'extra_link_args': ext_link_args}
-        elif has_function(cc, 'cuInit', includes=['cuda.h'],
+        elif has_function(cc, 'cuInit(0)', includes=['cuda.h'],
                           include_dirs=[inc], libraries=['cuda'],
                           library_dirs=[lib64]):
             ext_link_args = []
@@ -123,7 +123,7 @@ def find_cuda_lib(cuda_root):
             return {'library': ['cuda'], 'include_dirs': [inc],
                     'library_dirs': [lib64], 'extra_link_args': ext_link_args}
     else:
-        if has_function(cc, 'cuInit', includes=['cuda.h'], libraries=['cuda']):
+        if has_function(cc, 'cuInit(0)', includes=['cuda.h'], libraries=['cuda']):
             return {'libraries': ['cuda']}
     return None
 
