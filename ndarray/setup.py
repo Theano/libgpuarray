@@ -176,23 +176,51 @@ def enable_cuda(arg):
             print "try specifying the cuda root (either as argument to --enable-cuda or by the envionnement variable CUDA_ROOT)"
         raise Exception("Could not find CUDA")
 
+def find_ocl_root():
+    # Detect the AMD runtime
+    root = os.getenv('AMDAPPSDKROOT')
+    if root is not None:
+        return root
+    return None
+
+def find_ocl_lib(ocl_root):
+    if ocl_root is None:
+        if sys.platform == 'darwin':
+            if has_function(cc, 'clGetPlatformIDs(0, NULL, NULL)', includes=['OpenCL/opencl.h'],
+                            frameworks=['OpenCL']):
+                return {'extra_link_args': ['-framework', 'OpenCL']}
+        if has_function(cc, 'clGetPlatformIDs(0, NULL, NULL)', includes=['CL/opencl.h'],
+                        libraries=['OpenCL']):
+            return {'libraries': ['OpenCL']}
+    else:
+        inc = os.path.join(ocl_root, 'include')
+        lib = os.path.join(ocl_root, 'lib', 'x86')
+        lib64 = os.path.join(ocl_root, 'lib', 'x86_64')
+        if has_function(cc, 'clGetPlatformIDs(0, NULL, NULL)', includes=['CL/opencl.h'],
+                        include_dirs=[inc], libraries=['OpenCL'], library_dirs=[lib]):
+            return {'libraries': ['OpenCL'], 'include_dirs': [inc], 'library_dirs': [lib]}
+        if has_function(cc, 'clGetPlatformIDs(0, NULL, NULL)', includes=['CL/opencl.h'],
+                        include_dirs=[inc], libraries=['OpenCL'], library_dirs=[lib64]):
+            return {'libraries': ['OpenCL'], 'include_dirs': [inc], 'library_dirs': [lib64]}
+    return None
+
 def try_opencl(arg):
     global have_opencl
-    print "Searching for OpenCL..."
-    if sys.platform == 'darwin':
-        if int(os.uname()[2].split('.')[0]) <= 9:
-            have_opencl = False
-            return
-        print "On Mac >= 10.6, using framework"
-        ext_link_args.append('-framework')
-        ext_link_args.append('OpenCL')
+    if arg is None:
+        ocl_root = find_ocl_root()
     else:
-        if has_function(cc, 'clCreateContext', includes=['opencl.h'],
-                        libraries=['OpenCL']):
-            libraries.append('OpenCL')
-        else:
-            have_opencl = False
-            return
+        ocl_root = arg
+	
+    res = find_ocl_lib(ocl_root)
+    if res is None:
+        have_opencl = False
+        return
+
+    ext_link_args.extend(res.pop('extra_link_args', []))
+    libraries.extend(res.pop('libraries', []))
+    lib_dirs.extend(res.pop('library_dirs', []))
+    include_dirs.extend(res.pop('include_dirs', []))
+
     srcs.append('compyte_buffer_opencl.c')
     macros.append(('WITH_OPENCL', '1'))
     cython_env['WITH_OPENCL'] = True
