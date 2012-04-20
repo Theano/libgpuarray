@@ -1,10 +1,10 @@
-/* We define _GNU_SOURCE since otherwise stdio.h will not expose
-   asprintf on linux.  It is crazy, but whatever. */
-#ifdef __linux__
-#define _GNU_SOURCE
+#ifdef _MSC_VER
+#define _CRT_SECURE_NO_WARNINGS
 #endif
 
+#include "compyte_compat.h"
 #include "compyte_buffer.h"
+
 
 #ifdef __APPLE__
 
@@ -138,7 +138,11 @@ static cl_command_queue make_q(cl_context ctx, int *ret) {
   return res;
 }
 
-static void errcb(const char *errinfo, const void *pi, size_t cb, void *u) {
+static void
+#ifdef _MSC_VER
+__stdcall
+#endif
+errcb(const char *errinfo, const void *pi, size_t cb, void *u) {
   fprintf(stderr, "%s\n", errinfo);
 }
 
@@ -219,9 +223,11 @@ static void cl_free(gpudata *b) {
 }
 
 static int cl_share(gpudata *a, gpudata *b, int *ret) {
-  if (a->buf == b->buf) return 1;
 #ifdef CL_VERSION_1_1
   cl_mem ab, bb;
+#endif
+  if (a->buf == b->buf) return 1;
+#ifdef CL_VERSION_1_1
   err = clGetMemObjectInfo(a->buf, CL_MEM_ASSOCIATED_MEMOBJECT, sizeof(ab), &ab, NULL);
   CHKFAIL(-1);
   err = clGetMemObjectInfo(a->buf, CL_MEM_ASSOCIATED_MEMOBJECT, sizeof(bb), &bb, NULL);
@@ -291,6 +297,7 @@ static int cl_memset(gpudata *dst, int data) {
   char local_kern[92];
   const char *rlk[1];
   size_t sz, bytes;
+  gpukernel *m;
   int r, res = GA_IMPL_ERROR;
 
   cl_context ctx;
@@ -323,7 +330,7 @@ static int cl_memset(gpudata *dst, int data) {
   sz = strlen(local_kern);
   rlk[0] = local_kern;
 
-  gpukernel *m = cl_newkernel(ctx, 1, rlk, &sz, "kmemset", &res);
+  m = cl_newkernel(ctx, 1, rlk, &sz, "kmemset", &res);
   if (m == NULL) return res;
   res = cl_setkernelargbuf(m, 0, dst);
   if (res != GA_NO_ERROR) goto fail;
@@ -471,17 +478,19 @@ static int cl_elemwise(gpudata *input, gpudata *output, int intype,
 		       unsigned int b_nd, const size_t *b_dims,
 		       const ssize_t *b_str) {
   char *strs[64];
+  size_t nEls;
+  cl_context ctx;
+  gpukernel *k;
   unsigned int count = 0;
   int res = GA_SYS_ERROR;
   unsigned int i;
 
-  cl_context ctx;
 
   if ((err = clGetCommandQueueInfo(input->q, CL_QUEUE_CONTEXT, sizeof(ctx),
 				   &ctx, NULL)) != CL_SUCCESS)
     return GA_IMPL_ERROR;
 
-  size_t nEls = 1;
+  nEls = 1;
   for (i = 0; i < a_nd; i++) {
     nEls *= a_dims[i];
   }
@@ -518,8 +527,8 @@ static int cl_elemwise(gpudata *input, gpudata *output, int intype,
 
   assert(count < (sizeof(strs)/sizeof(strs[0])));
 
-  gpukernel *k = cl_newkernel(ctx, count, (const char **)strs, NULL, "elemk",
-			      &res);
+  k = cl_newkernel(ctx, count, (const char **)strs, NULL, "elemk",
+				   &res);
   if (k == NULL) goto fail;
   res = cl_setkernelargbuf(k, 0, input);
   if (res != GA_NO_ERROR) goto kfail;
