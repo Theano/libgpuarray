@@ -53,15 +53,10 @@ def has_function(cc, func_call, includes=None, include_dirs=None,
     finally:
         f.close()
 
-    for m in macros:
-        cc.macros.append(m)
     try:
-        objs = cc.compile([fname], include_dirs=include_dirs)
+        objs = cc.compile([fname], macros=macros, include_dirs=include_dirs)
     except CompileError:
         return False
-    finally:
-        for m in macros:
-            cc.macros.pop(-1)
 
     ext_a = []
     for f in frameworks:
