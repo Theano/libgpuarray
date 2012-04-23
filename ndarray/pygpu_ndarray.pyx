@@ -72,12 +72,23 @@ cdef extern from "compyte_buffer.h":
         GA_INVALID_ERROR, GA_UNSUPPORTED_ERROR, GA_SYS_ERROR
 
     enum COMPYTE_TYPES:
+        GA_BOOL,
+        GA_BYTE,
+        GA_UBYTE,
+        GA_SHORT,
+        GA_USHORT,
         GA_INT,
         GA_UINT,
         GA_LONG,
         GA_ULONG,
+        GA_LONGLONG,
+        GA_ULONGLONG,
         GA_FLOAT,
         GA_DOUBLE,
+        GA_LONGDOUBLE,
+        GA_CFLOAT,
+        GA_CDOUBLE,
+        GA_CLONGDOUBLE,
         GA_NBASE
 
     char *Gpu_error(compyte_buffer_ops *o, int err) nogil
@@ -140,16 +151,32 @@ IF WITH_CUDA:
 
 import numpy
 
+cdef dict NP_TYPE_MAP = {
+    np.dtype('bool'): GA_BOOL,
+    np.dtype('int8'): GA_BYTE,
+    np.dtype('uint8'): GA_UBYTE,
+    np.dtype('int16'): GA_SHORT,
+    np.dtype('uint16'): GA_USHORT,
+    np.dtype('int32'): GA_INT,
+    np.dtype('uint32'): GA_UINT,
+    np.dtype('int64'): GA_LONG,
+    np.dtype('uint64'): GA_ULONG,
+    np.dtype('float32'): GA_FLOAT,
+    np.dtype('float64'): GA_DOUBLE,
+    np.dtype('float128'): GA_LONGDOUBLE,
+    np.dtype('complex64'): GA_CFLOAT,
+    np.dtype('complex128'): GA_CDOUBLE,
+    np.dtype('complex256'): GA_CLONGDOUBLE,
+    }
+
 cdef int dtype_to_typecode(dtype):
-    cdef int dnum
     if isinstance(dtype, int):
         return dtype
     if isinstance(dtype, str):
         dtype = np.dtype(dtype)
     if isinstance(dtype, np.dtype):
-        dnum = (<np.dtype>dtype).type_num
-        if dnum < GA_NBASE:
-            return dnum
+        if dtype in NP_TYPE_MAP:
+            return NP_TYPE_MAP[dtype]
     raise ValueError("don't know how to convert to dtype: %s"%(dtype,))
 
 cdef int to_ga_order(ord):
