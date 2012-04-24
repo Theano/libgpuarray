@@ -463,10 +463,10 @@ static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
   "#define DTYPEB %s\n"
   "__kernel void elemk(__global const DTYPEA *a_data,"
   "                    __global DTYPEB *b_data){"
-  "a_data += %zd; b_data += %zd;"
+  "a_data += %" SPREFIX "d; b_data += %" SPREFIX "d;"
   "const int idx = get_global_id(0);"
   "const int numThreads = get_global_size(0);"
-  "for (int i = idx; i < %zu; i+= numThreads) {"
+  "for (int i = idx; i < %" SPREFIX "u; i+= numThreads) {"
   "__global const DTYPEA *a = a_data;"
   "__global DTYPEB *b = b_data;";
 

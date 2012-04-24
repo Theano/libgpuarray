@@ -504,7 +504,7 @@ static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
     "__global__ void elemk(const DTYPEA *a_data, DTYPEB *b_data) {"
     "const int idx = blockIdx.x * blockDim.x + threadIdx.x;"
     "const int numThreads = blockDim.x * gridDim.x;"
-    "for (int i = idx; i < %zu; i += numThreads) {"
+    "for (int i = idx; i < %" SPREFIX "u; i += numThreads) {"
     "const DTYPEA *a = a_data;"
     "DTYPEB *b = b_data;";
 

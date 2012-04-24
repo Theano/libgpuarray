@@ -32,16 +32,17 @@ int compyte_elem_perdim(char *strs[], unsigned int *count, unsigned int nd,
 
     for (i = nd-1; i > 0; i--) {
       assert(str[i]%elemsize == 0);
-      if (asprintf(&strs[*count], "%1$s %4$c= ((%1$si %% %2$zu) * %3$zd);"
-		   "%1$si = %1$si / %2$zu;", id, dims[i],
-		   ssabs(str[i]/elemsize), (str[i] < 0 ? '-' : '+')) == -1)
+      if (asprintf(&strs[*count], "%s %c= ((%si %% %" SPREFIX "u) * %" SPREFIX
+		   "d);%si = %si / %" SPREFIX "u;", id,
+		   (str[i] < 0 ? '-' : '+'), id, dims[i],
+		   ssabs(str[i]/elemsize), id, id, dims[i]) == -1)
 	return -1;
       (*count)++;
     }
  
     assert(str[0]%elemsize == 0);
-    if (asprintf(&strs[*count], "%1$s %3$c= (%1$si * %2$zd);", id,
-		 ssabs(str[0]/elemsize), (str[0] < 0 ? '-' : '+')) == -1)
+    if (asprintf(&strs[*count], "%s %c= (%si * %" SPREFIX "d);", id,
+		 (str[0] < 0 ? '-' : '+'), id, ssabs(str[0]/elemsize)) == -1)
       return -1;
     (*count)++;
   }
