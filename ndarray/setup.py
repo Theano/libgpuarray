@@ -96,7 +96,7 @@ def find_cuda_lib(cuda_root):
         lib64 = os.path.join(cuda_root, 'lib64')
         if has_function(cc, 'cuInit(0)', includes=['cuda.h'], include_dirs=[inc],
                            libraries=['cuda']):
-            return {'library': ['cuda'], 'include_dirs': [inc]}
+            return {'libraries': ['cuda'], 'include_dirs': [inc]}
         elif has_function(cc, 'cuInit(0)', includes=['cuda.h'],
                           include_dirs=[inc], libraries=['cuda'],
                           library_dirs=[lib]):
@@ -106,7 +106,7 @@ def find_cuda_lib(cuda_root):
                 ext_link_args.append('-rpath')
                 ext_link_args.append('-Xlinker')
                 ext_link_args.append(lib)
-            return {'library': ['cuda'], 'include_dirs': [inc],
+            return {'libraries': ['cuda'], 'include_dirs': [inc],
                     'library_dirs': [lib], 'extra_link_args': ext_link_args}
         elif has_function(cc, 'cuInit(0)', includes=['cuda.h'],
                           include_dirs=[inc], libraries=['cuda'],
@@ -117,7 +117,7 @@ def find_cuda_lib(cuda_root):
                 ext_link_args.append('-rpath')
                 ext_link_args.append('-Xlinker')
                 ext_link_args.append(lib64)
-            return {'library': ['cuda'], 'include_dirs': [inc],
+            return {'libraries': ['cuda'], 'include_dirs': [inc],
                     'library_dirs': [lib64], 'extra_link_args': ext_link_args}
     else:
         if has_function(cc, 'cuInit(0)', includes=['cuda.h'], libraries=['cuda']):
