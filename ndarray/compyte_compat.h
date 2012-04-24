@@ -27,7 +27,7 @@ int asprintf(char **ret, const char *fmt, ...);
 #define inline 
 #endif
 
-#ifdef __WIN32__
+#ifdef _MSC_VER
 #define SPREFIX "I"
 #else
 #define SPREFIX "z"
