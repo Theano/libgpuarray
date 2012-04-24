@@ -151,7 +151,7 @@ IF WITH_CUDA:
 
 import numpy
 
-cdef dict NP_TYPE_MAP = {
+cdef dict NP_TO_TYPE = {
     np.dtype('bool'): GA_BOOL,
     np.dtype('int8'): GA_BYTE,
     np.dtype('uint8'): GA_UBYTE,
@@ -163,11 +163,11 @@ cdef dict NP_TYPE_MAP = {
     np.dtype('uint64'): GA_ULONG,
     np.dtype('float32'): GA_FLOAT,
     np.dtype('float64'): GA_DOUBLE,
-    np.dtype('float128'): GA_LONGDOUBLE,
     np.dtype('complex64'): GA_CFLOAT,
     np.dtype('complex128'): GA_CDOUBLE,
-    np.dtype('complex256'): GA_CLONGDOUBLE,
     }
+
+cdef dict TYPE_TO_NP = dict((v, k) for k, v in NP_TO_TYPE.iteritems())
 
 cdef int dtype_to_typecode(dtype):
     if isinstance(dtype, int):
@@ -175,8 +175,9 @@ cdef int dtype_to_typecode(dtype):
     if isinstance(dtype, str):
         dtype = np.dtype(dtype)
     if isinstance(dtype, np.dtype):
-        if dtype in NP_TYPE_MAP:
-            return NP_TYPE_MAP[dtype]
+        res = NP_TO_TYPE.get(dtype, None)
+        if res is not None:
+            return res
     raise ValueError("don't know how to convert to dtype: %s"%(dtype,))
 
 cdef int to_ga_order(ord):
@@ -585,9 +586,9 @@ cdef class GpuArray:
     property dtype:
         "The dtype of the element"
         def __get__(self):
-            # XXX: will have to figure out the right numpy dtype
-            if self.ga.typecode < GA_NBASE:
-                return np.PyArray_DescrFromType(self.ga.typecode)
+            res = TYPE_TO_NP.get(self.ga.typecode, None)
+            if res is not None:
+                return res
             else:
                 raise NotImplementedError("TODO")
 
