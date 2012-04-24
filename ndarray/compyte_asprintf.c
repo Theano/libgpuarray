@@ -20,7 +20,7 @@ int asprintf(char **ret, const char *fmt, ...) {
 #endif
   va_end(ap);
   if (size < 0) return -1;
-  size += 1
+  size += 1;
 
   res = malloc(size);
   if (res == NULL) return -1;
