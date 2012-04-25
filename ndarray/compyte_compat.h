@@ -12,10 +12,20 @@
 #endif
 
 #ifdef _MSC_VER
-int asprintf(char **ret, const char *fmt, ...);
+struct iovec {
+  char *iov_base;
+  size_t iov_len;
+};
+#else
+#include <sys/uio.h>
 #endif
 
 #include <stdio.h>
+
+#ifdef _MSC_VER
+int asprintf(char **ret, const char *fmt, ...);
+#endif
+
 
 #ifdef _MSC_VER
 /* God damn Microsoft ... */
