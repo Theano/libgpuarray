@@ -33,4 +33,10 @@ int asprintf(char **ret, const char *fmt, ...);
 #define SPREFIX "z"
 #endif
 
+#include <string.h>
+#ifdef NO_STRL
+size_t strlcpy(char *dst, const char *src, size_t size);
+size_t strlcat(char *dst, const char *src, size_t size);
+#endif
+
 #endif

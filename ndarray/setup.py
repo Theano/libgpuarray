@@ -73,6 +73,7 @@ def has_function(cc, func_call, includes=None, include_dirs=None,
 if not has_function(cc, 'strlcat((char *)NULL, "aaa", 3)',
                     includes=['string.h']):
     srcs.append('compyte_strl.c')
+    macros.append(('NO_STRL', '1'))
 
 if not has_function(cc, 'asprintf((char **)NULL, "aaa", "b", 1.0, 2)',
                        includes=['stdio.h']):
