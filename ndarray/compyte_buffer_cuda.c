@@ -1,19 +1,12 @@
-/* We define _GNU_SOURCE since otherwise stdio.h will not expose
-   asprintf on linux.  It is crazy, but whatever. */
-#ifdef __linux__
-#define _GNU_SOURCE
-#endif
+#include "compyte_compat.h"
 #include <sys/param.h>
 #include <sys/stat.h>
-#include <sys/uio.h>
 #include <sys/wait.h>
 
 #include <assert.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
-#include <stdio.h>
 
 #ifdef __APPLE__
 
@@ -23,11 +16,6 @@
 
 #include <cuda.h>
 
-#endif
-
-#ifdef __linux__
-size_t strlcpy(char *dst, const char *src, size_t siz);
-size_t strlcat(char *dst, const char *src, size_t siz);
 #endif
 
 #include "compyte_buffer.h"
