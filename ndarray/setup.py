@@ -89,7 +89,7 @@ fnull = open(os.devnull, 'r+')
 def find_cuda_lib(cuda_root):
     if sys.platform == 'darwin':
         if has_function(cc, 'cuInit(0)', includes=['CUDA/cuda.h'],
-                         frameworks=['CUDA'], cc=cc):
+                         frameworks=['CUDA']):
             return {'extra_link_args': ['-framework', 'CUDA']}
     if cuda_root:
         inc = os.path.join(cuda_root, 'include')
