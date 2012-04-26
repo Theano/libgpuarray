@@ -1,7 +1,11 @@
 include "defs.pxi"
 
 cimport libc.stdio
-from libc.stdlib cimport calloc, free
+from libc.stdlib cimport malloc, calloc, free
+
+cdef extern from "stdlib.h":
+    void *memcpy(void *dst, void *src, size_t n)
+
 cimport numpy as np
 
 from cpython cimport Py_INCREF, PyNumber_Index
@@ -130,18 +134,30 @@ cdef extern from "compyte_buffer.h":
 
 IF WITH_CUDA:
     cdef object call_compiler = None
-    cdef extern int call_compiler_unix(char *fname, char *oname)
+    cdef extern void *call_compiler_unix(char *src, size_t len, int *ret)
 
-    cdef public int call_compiler_python(char *fname, char *oname) with gil:
+    cdef public void *call_compiler_python(char *src, size_t len,
+                                           int *ret) with gil:
+        cdef bytes res
+        cdef void *buf
         if call_compiler is None:
-            return call_compiler_unix(fname, oname)
+            return call_compiler_unix(src, len, ret)
         else:
             try:
-                return call_compiler(fname, oname)
+                res = call_compiler(src[:len])
+                buf = malloc(len(res))
+                if buf == NULL:
+                    if ret != NULL:
+                        *ret = GA_SYS_ERROR
+                    return NULL
+                memcpy(buf, res, len(res))
+                return buf
             except:
                 # This would correspond to an unknown error
                 # XXX: maybe should store the exception somewhere
-                return -1
+                if ret != NULL:
+                    *ret = -1
+                return NULL
 
     def set_compiler_fn(fn):
         if callable(fn) or fn is None:

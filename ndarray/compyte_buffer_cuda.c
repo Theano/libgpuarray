@@ -262,60 +262,25 @@ static int detect_arch(void) {
     return GA_NO_ERROR;
 }
 
-int call_compiler(char *fname, char *oname);
+void *call_compiler(const char *src, size_t len, int *ret);
 
 /* This is a unix version, might need a windows one. */
-int call_compiler_unix(char *fname, char *oname) {
-    int sys_err;
-    pid_t p;
-
-    if (arch_arg == NULL) {
-        err = detect_arch();
-        if (err != GA_NO_ERROR) return err;
-        assert(arch_arg != NULL);
-    }
-    
-    p = fork();
-    if (p == 0) {
-        execlp(CUDA_BIN_PATH "nvcc", "nvcc", "-arch", arch_arg, "-x", "cu",
-               "--cubin", fname, "-o", oname, NULL);
-        exit(1);
-    } else if (p == -1) {
-        return GA_SYS_ERROR;
-    }
-    if (waitpid(p, &sys_err, 0) == -1)
-        return GA_SYS_ERROR;
-    if (WIFSIGNALED(sys_err) || WEXITSTATUS(sys_err) != 0) return GA_RUN_ERROR;
-    return 0;
-}
-
-static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
-                                 const char **strings, const size_t *lengths,
-                                 const char *fname, int *ret) {
+void *call_compiler_unix(const char *src, size_t len, int *ret) {
     char namebuf[MAXPATHLEN];
     char outbuf[MAXPATHLEN];
+    struct stat st;
     char *tmpdir;
-    int fd, sys_err;
+    char *buf;
     ssize_t s;
-    struct iovec descr[count+1];
-    gpukernel *res;
-    unsigned int i;
+    pid_t p;
+    int sys_err;
+    int fd;
+    int res;
 
-    if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
-
-    descr[0].iov_base = (void *)CUDA_HEAD;
-    descr[0].iov_len = strlen(CUDA_HEAD);
-
-    if (lengths == NULL) {
-        for (i = 0; i < count; i++) {
-            descr[i+1].iov_base = (void *)strings[i];
-            descr[i+1].iov_len = strlen(strings[i]);
-        }
-    } else {
-        for (i = 0; i < count; i++) {
-            descr[i+1].iov_base = (void *)strings[i];
-            descr[i+1].iov_len = lengths[i]?lengths[i]:strlen(strings[i]);
-        }
+    if (arch_arg == NULL) {
+        res = detect_arch();
+        if (res != GA_NO_ERROR) FAIL(NULL, res);
+        assert(arch_arg != NULL);
     }
 
     tmpdir = getenv("TMPDIR");
@@ -324,39 +289,133 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     strlcpy(namebuf, tmpdir, sizeof(namebuf));
     strlcat(namebuf, "/compyte.cuda.XXXXXXXX", sizeof(namebuf));
 
-    fd = mkstemp(namebuf);
-    if (fd == -1) FAIL(NULL, GA_SYS_ERROR);
-
     strlcpy(outbuf, namebuf, sizeof(outbuf));
     strlcat(outbuf, ".cubin", sizeof(outbuf));
 
-    s = writev(fd, descr, count+1);
-    /* fd is not non-blocking so should have complete write */
+    fd = mkstemp(namebuf);
+    if (fd == -1) FAIL(NULL, GA_SYS_ERROR);
+
+    s = write(fd, src, len);
+    close(fd);
+    /* fd is not non-blocking; should have complete write */
     if (s == -1) {
-        close(fd);
         unlink(namebuf);
         FAIL(NULL, GA_SYS_ERROR);
     }
-    sys_err = call_compiler(namebuf, outbuf);
 
-    close(fd);
-
-    if (sys_err != GA_NO_ERROR) {
-        unlink(outbuf);
-        FAIL(NULL, sys_err);
+    p = fork();
+    if (p == 0) {
+        execlp(CUDA_BIN_PATH "nvcc", "nvcc", "-arch", arch_arg, "-x", "cu",
+               "--cubin", namebuf, "-o", outbuf, NULL);
+        exit(1);
     }
     unlink(namebuf);
+    if (p == -1)
+        FAIL(NULL, GA_SYS_ERROR);
 
-    res = malloc(sizeof(*res));
-    if (res == NULL) {
+    if (waitpid(p, &sys_err, 0) == -1) {
         unlink(outbuf);
         FAIL(NULL, GA_SYS_ERROR);
     }
+
+    if (WIFSIGNALED(sys_err) || WEXITSTATUS(sys_err) != 0) {
+        unlink(outbuf);
+        FAIL(NULL, GA_RUN_ERROR);
+    }
+
+    fd = open(outbuf, O_RDONLY);
+    /* This will make the file go away as soon as we close the fd */
+    unlink(outbuf);
+    if (fd == -1) {
+        FAIL(NULL, GA_SYS_ERROR);
+    }
+
+    if (fstat(fd, &st) == -1) {
+        close(fd);
+        FAIL(NULL, GA_SYS_ERROR);
+    }
+
+    if (st.st_size > SIZE_MAX) {
+        close(fd);
+        FAIL(NULL, GA_VALUE_ERROR);
+    }
+
+    buf = malloc(st.st_size);
+    if (buf == NULL) {
+        close(fd);
+        FAIL(NULL, GA_SYS_ERROR);
+    }
+
+    s = read(fd, buf, st.st_size);
+    close(fd);
+    /* fd is not non-blocking; should have complete read */
+    if (s == -1) {
+        free(buf);
+        FAIL(NULL, GA_SYS_ERROR);
+    }
+
+    return buf;
+}
+
+static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
+                                 const char **strings, const size_t *lengths,
+                                 const char *fname, int *ret) {
+    struct iovec *descr;
+    void *buf;
+    void *p;
+    gpukernel *res;
+    size_t tot_len;
+    unsigned int i;
+
+    if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
+    
+    descr = calloc(count+1, sizeof(*descr));
+    if (descr == NULL) FAIL(NULL, GA_SYS_ERROR);
+
+    descr[0].iov_base = (void *)CUDA_HEAD;
+    descr[0].iov_len = strlen(CUDA_HEAD);
+    tot_len = descr[0].iov_len;
+
+    if (lengths == NULL) {
+        for (i = 0; i < count; i++) {
+            descr[i+1].iov_base = (void *)strings[i];
+            descr[i+1].iov_len = strlen(strings[i]);
+            tot_len += descr[i+1].iov_len;
+        }
+    } else {
+        for (i = 0; i < count; i++) {
+            descr[i+1].iov_base = (void *)strings[i];
+            descr[i+1].iov_len = lengths[i]?lengths[i]:strlen(strings[i]);
+            tot_len += descr[i+1].iov_len;
+        }
+    }
+
+    buf = malloc(tot_len);
+    if (buf == NULL) {
+        free(descr);
+        FAIL(NULL, GA_SYS_ERROR);
+    }
+
+    p = buf;
+    for (i = 0; i < count+1; i++) {
+        memcpy(p, descr[i].iov_base, descr[i].iov_len);
+        p += descr[i].iov_len;
+    }
+    free(descr);
+
+    p = call_compiler(buf, tot_len, ret);
+    free(buf);
+    if (p == NULL)
+        return NULL;
+
+    res = malloc(sizeof(*res));
+    if (res == NULL)
+        FAIL(NULL, GA_SYS_ERROR);
+
     memset(res, 0, sizeof(*res));
 
-    err = cuModuleLoad(&res->m, outbuf);
-
-    unlink(outbuf);
+    err = cuModuleLoadData(&res->m, p);
+    free(p);
 
     if (err != CUDA_SUCCESS) {
         free(res);
@@ -408,41 +467,6 @@ static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
 
 static int cuda_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
     return cuda_setkernelarg(k, index, GA_DELIM, &b->ptr);
-}
-
-static size_t find_align(size_t v) {
-    unsigned int c;
-
-    if (v & 0x1) {
-        /* special case for odd v (assumed to happen half of the time) */
-        c = 0;
-    } else {
-        c = 1;
-        /* this should work on 32 and 64 bits systems since the shift
-           would never get done on a 32 bit machine */
-        if ((v & 0xffffffff) == 0) {
-            v >>= 32;
-            c += 32;
-        }
-        if ((v & 0xffff) == 0) {
-            v >>= 16;
-            c += 16;
-        }
-        if ((v & 0xff) == 0) {
-            v >>= 8;
-            c += 8;
-        }
-        if ((v & 0xf) == 0) {
-            v >>= 4;
-            c += 4;
-        }
-        if ((v & 0x3) == 0) {
-            v >>= 2;
-            c += 2;
-        }
-        c -= v & 0x1;
-    }
-    return (size_t)0x1 << c;
 }
 
 #define ALIGN_UP(offset, align) ((offset) + (align) - 1) & ~((align) - 1)
