@@ -76,15 +76,20 @@ def has_function(cc, func_call, includes=None, include_dirs=None,
 if not has_function(cc, 'strlcat((char *)NULL, "aaa", 3)',
                     includes=['string.h']):
     srcs.append('compyte_strl.c')
-    macros.append(('NO_STRL', '1'))
+    macros.append(('NO_STRL', ''))
 
 if not has_function(cc, 'asprintf((char **)NULL, "aaa", "b", 1.0, 2)',
                        includes=['stdio.h']):
     if has_function(cc, 'asprintf((char **)NULL, "aaa", "b", 1.0, 2)',
-                       includes=['stdio.h'], macros=[('_GNU_SOURCE', 1)]):
-        macros.append(('_GNU_SOURCE', 1))
+                       includes=['stdio.h'], macros=[('_GNU_SOURCE', '')]):
+        macros.append(('_GNU_SOURCE', ''))
     else:
         srcs.append('compyte_asprintf.c')
+	macros.append(('NO_ASPRINTF', ''))
+
+if not has_function(cc, 'mkstemp((char *)NULL)', includes=['stdlib.h']):
+    srcs.append('compyte_mkstemp.c')
+    macros.append(('NO_MKSTEMP', ''))
 
 fnull = open(os.devnull, 'r+')
 

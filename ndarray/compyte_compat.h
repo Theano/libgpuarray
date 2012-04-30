@@ -21,11 +21,15 @@ struct iovec {
 #endif
 
 #include <stdio.h>
+#include <stdlib.h>
 
-#ifdef _MSC_VER
+#ifdef NO_ASPRINTF
 int asprintf(char **ret, const char *fmt, ...);
 #endif
 
+#ifdef NO_MKSTEMP
+int mkstemp(char *path);
+#endif
 
 #ifdef _MSC_VER
 /* God damn Microsoft ... */
