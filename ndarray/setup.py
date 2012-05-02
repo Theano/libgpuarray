@@ -50,27 +50,38 @@ def has_function(cc, func_call, includes=None, include_dirs=None,
     fd, fname, = tempfile.mkstemp(".c", 'configtest', text=True)
     f = os.fdopen(fd, "w")
     try:
-        for incl in includes:
-            f.write("""#include "%s"\n"""%(incl,))
-        f.write("""int main() { %s; }"""%(func_call,))
+        try:
+            for incl in includes:
+                f.write("""#include "%s"\n"""%(incl,))
+            f.write("""int main() { %s; }"""%(func_call,))
+        finally:
+            f.close()
+
+        try:
+            objs = cc.compile([fname], macros=macros, include_dirs=include_dirs)
+        except CompileError:
+            return False
     finally:
-        f.close()
+        try: os.unlink(fname)
+        except Exception: pass
 
     try:
-        objs = cc.compile([fname], macros=macros, include_dirs=include_dirs)
-    except CompileError:
-        return False
+        ext_a = []
+        for f in frameworks:
+            ext_a.append('-framework')
+            ext_a.append(f)
 
-    ext_a = []
-    for f in frameworks:
-        ext_a.append('-framework')
-        ext_a.append(f)
-
-    try:
-        cc.link_executable(objs, "a.out", libraries=libraries,
-                           library_dirs=library_dirs, extra_postargs=ext_a)
-    except (LinkError, TypeError):
-        return False
+        try:
+            cc.link_executable(objs, "a.out", libraries=libraries,
+                               library_dirs=library_dirs, extra_postargs=ext_a)
+        except (LinkError, TypeError):
+            return False
+    finally:
+        for o in objs:
+            try: os.unlink(o)
+            except Exception: pass
+        try: os.unlink('a.out')
+        except Exception: pass
     return True
 
 if not has_function(cc, 'strlcat((char *)NULL, "aaa", 3)',
