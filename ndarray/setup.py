@@ -192,7 +192,10 @@ def try_cuda(arg):
 
     macros.append(('WITH_CUDA', '1'))
     cython_env['WITH_CUDA'] = True
-    macros.append(('NVCC_BIN', '\\"'+nvcc_bin+'\\"'))
+    if sys.platform == 'win32':
+        macros.append(('NVCC_BIN', '\\"'+nvcc_bin+'\\"'))
+    else:
+        macros.append(('NVCC_BIN', '"'+nvcc_bin+'"'))
     macros.append(('call_compiler', 'call_compiler_python'))
     srcs.append('compyte_buffer_cuda.c')
     
