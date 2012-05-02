@@ -104,6 +104,19 @@ if not has_function(cc, 'mkstemp((char *)NULL)', includes=['stdlib.h']):
 
 fnull = open(os.devnull, 'r+')
 
+def find_cuda_root():
+    root = os.getenv('CUDA_ROOT')
+    if root is not None:
+        return root
+    for loc in ('/usr/local/cuda',
+                'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v4.2'
+                'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v4.1'
+                'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v4.0'
+                'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v3.2'):
+        if os.path.isdir(loc):
+            return loc
+    return None
+
 # Detect CUDA install
 def find_cuda_lib(cuda_root):
     if sys.platform == 'darwin':
@@ -152,7 +165,7 @@ def try_cuda(arg):
     global have_cuda
     print "Searching for CUDA..."
     if arg is None:
-        cuda_root = os.getenv('CUDA_ROOT')
+        cuda_root = find_cuda_root()
     else:
         cuda_root = arg
 
