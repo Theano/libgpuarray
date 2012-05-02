@@ -134,29 +134,31 @@ cdef extern from "compyte_buffer.h":
 
 IF WITH_CUDA:
     cdef object call_compiler = None
-    cdef extern void *call_compiler_unix(char *src, size_t len, int *ret)
+    cdef extern void *call_compiler_impl(char *src, size_t len, int *ret)
 
-    cdef public void *call_compiler_python(char *src, size_t len,
+    cdef public void *call_compiler_python(char *src, size_t sz,
                                            int *ret) with gil:
         cdef bytes res
         cdef void *buf
+        cdef char *tmp
         if call_compiler is None:
-            return call_compiler_unix(src, len, ret)
+            return call_compiler_impl(src, sz, ret)
         else:
             try:
-                res = call_compiler(src[:len])
+                res = call_compiler(src[:sz])
                 buf = malloc(len(res))
                 if buf == NULL:
                     if ret != NULL:
-                        *ret = GA_SYS_ERROR
+                        ret[0] = GA_SYS_ERROR
                     return NULL
-                memcpy(buf, res, len(res))
+                tmp = res
+                memcpy(buf, tmp, len(res))
                 return buf
             except:
                 # This would correspond to an unknown error
                 # XXX: maybe should store the exception somewhere
                 if ret != NULL:
-                    *ret = -1
+                    ret[0] = -1
                 return NULL
 
     def set_compiler_fn(fn):
