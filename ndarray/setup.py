@@ -5,13 +5,16 @@ have_cython = False
 have_cuda = None
 have_opencl = None
 
+import distribute_setup
+distribute_setup.use_setuptools()
+
 try:
     from Cython.Distutils import build_ext
     have_cython = True
 except:
-    from distutils.command.build_ext import build_ext
+    from setuptools.command.build_ext import build_ext
 
-from distutils.core import setup, Extension
+from setuptools import setup, Extension
 from distutils import ccompiler
 
 cc = ccompiler.new_compiler()
@@ -39,7 +42,7 @@ def has_function(cc, func_call, includes=None, include_dirs=None,
     if frameworks is None:
         frameworks = []
     if libraries is None:
-        librairies = []
+        libraries = []
     if library_dirs is None:
         libraries = []
     if macros is None:
