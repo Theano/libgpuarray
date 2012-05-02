@@ -39,7 +39,7 @@ def has_function(cc, func_call, includes=None, include_dirs=None,
     if frameworks is None:
         frameworks = []
     if libraries is None:
-        librairies = []
+        libraries = []
     if library_dirs is None:
         libraries = []
     if macros is None:
