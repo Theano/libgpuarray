@@ -20,6 +20,19 @@
 #include <sys/wait.h>
 #endif
 
+#ifdef _MSC_VER
+#include <io.h>
+#define read _read
+#define write _write
+#define close _close
+#define unlink _unlink
+#define fstat _fstat
+#define stat _stat
+#else
+#include <unistd.h>
+#endif
+
+
 #ifdef __APPLE__
 
 #include <CUDA/cuda.h>
@@ -32,16 +45,6 @@
 
 #include "compyte_buffer.h"
 #include "compyte_util.h"
-
-#ifdef _MSC_VER
-#include <io.h>
-#define read _read
-#define write _write
-#define close _close
-#define unlink _unlink
-#define fstat _fstat
-#define stat _stat
-#endif
 
 typedef struct {char c; CUdeviceptr x; } st_devptr;
 #define DEVPTR_ALIGN (sizeof(st_devptr) - sizeof(CUdeviceptr))
