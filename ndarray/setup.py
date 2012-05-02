@@ -112,8 +112,12 @@ def find_cuda_lib(cuda_root):
             return {'extra_link_args': ['-framework', 'CUDA']}
     if cuda_root:
         inc = os.path.join(cuda_root, 'include')
-        lib = os.path.join(cuda_root, 'lib')
-        lib64 = os.path.join(cuda_root, 'lib64')
+        if sys.platform == 'win32':
+            lib = os.path.join(cuda_root, 'lib', 'Win32')
+            lib64 = os.path.join(cuda_root, 'lib', 'x64')
+        else:
+            lib = os.path.join(cuda_root, 'lib')
+            lib64 = os.path.join(cuda_root, 'lib64')
         if has_function(cc, 'cuInit(0)', includes=['cuda.h'], include_dirs=[inc],
                            libraries=['cuda']):
             return {'libraries': ['cuda'], 'include_dirs': [inc]}
@@ -151,19 +155,22 @@ def try_cuda(arg):
         cuda_root = os.getenv('CUDA_ROOT')
     else:
         cuda_root = arg
-    if cuda_root is None:
-        cuda_bin_prefix = ''
-    else:
-        cuda_bin_prefix = os.path.join(cuda_root, 'bin')+os.path.sep
-    
+
+    nvcc_bin = 'nvcc'
+    if sys.platform == 'win32':
+        nvcc_bin = nvcc_bin + '.exe'
+
+    if cuda_root:
+        nvcc_bin = os.path.join(cuda_root, 'bin', nvcc_bin)
+
     try:
-        subprocess.check_call([os.path.join(cuda_bin_prefix, 'nvcc'),
-                               '--version'], stdout=fnull, stderr=fnull)
+        subprocess.check_call([nvcc_bin, '--version'],
+                              stdout=fnull, stderr=fnull)
     except Exception:
         have_cuda = False
         return
 
-    print "Found nvcc at:", os.path.join(cuda_bin_prefix, 'nvcc')
+    print "Found nvcc at:", nvcc_bin
 
     res = find_cuda_lib(cuda_root)
     if res is None:
@@ -172,7 +179,7 @@ def try_cuda(arg):
 
     macros.append(('WITH_CUDA', '1'))
     cython_env['WITH_CUDA'] = True
-    macros.append(('CUDA_BIN_PATH', '"'+cuda_bin_prefix+'"'))
+    macros.append(('NVCC_BIN', '\\"'+nvcc_bin+'\\"'))
     macros.append(('call_compiler', 'call_compiler_python'))
     srcs.append('compyte_buffer_cuda.c')
     

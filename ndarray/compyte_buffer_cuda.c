@@ -1,12 +1,24 @@
 #include "compyte_compat.h"
-#include <sys/param.h>
+
+#include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 
 #include <assert.h>
 #include <fcntl.h>
 #include <stdlib.h>
-#include <unistd.h>
+#include <limits.h>
+
+#ifdef _WIN32
+#include <process.h>
+/* I am really tired of hunting through online docs
+ * to find where the define is.  256 seem to be the
+ * concencus for the value so there it is.
+ */
+#define PATH_MAX 256
+#else
+#include <sys/param.h>
+#include <sys/wait.h>
+#endif
 
 #ifdef __APPLE__
 
@@ -20,6 +32,16 @@
 
 #include "compyte_buffer.h"
 #include "compyte_util.h"
+
+#ifdef _MSC_VER
+#include <io.h>
+#define read _read
+#define write _write
+#define close _close
+#define unlink _unlink
+#define fstat _fstat
+#define stat _stat
+#endif
 
 typedef struct {char c; CUdeviceptr x; } st_devptr;
 #define DEVPTR_ALIGN (sizeof(st_devptr) - sizeof(CUdeviceptr))
@@ -264,17 +286,21 @@ static int detect_arch(void) {
 
 void *call_compiler(const char *src, size_t len, int *ret);
 
-/* This is a unix version, might need a windows one. */
-void *call_compiler_unix(const char *src, size_t len, int *ret) {
-    char namebuf[MAXPATHLEN];
-    char outbuf[MAXPATHLEN];
-    struct stat st;
+static const char *TMP_VAR_NAMES[] = {"COMPYTE_TMPDIR", "TMPDIR", "TEMP", "TMP"};
+
+void *call_compiler_impl(const char *src, size_t len, int *ret) {
+    char namebuf[PATH_MAX];
+    char outbuf[PATH_MAX];
     char *tmpdir;
-    char *buf;
+    struct stat st;
     ssize_t s;
+#ifndef _WIN32
     pid_t p;
+#endif
+    unsigned int i;
     int sys_err;
     int fd;
+    char *buf;
     int res;
 
     if (arch_arg == NULL) {
@@ -283,17 +309,26 @@ void *call_compiler_unix(const char *src, size_t len, int *ret) {
         assert(arch_arg != NULL);
     }
 
-    tmpdir = getenv("TMPDIR");
-    if (tmpdir == NULL) tmpdir = "/tmp";
+    for (i = 0; i < sizeof(TMP_VAR_NAMES); i++) {
+        tmpdir = getenv(TMP_VAR_NAMES[i]);
+        if (tmpdir != NULL) break;
+    }
+    if (tmpdir == NULL) {
+#ifdef _WIN32
+            tmpdir = ".";
+#else
+            tmpdir = "/tmp";
+#endif
+    }
 
     strlcpy(namebuf, tmpdir, sizeof(namebuf));
     strlcat(namebuf, "/compyte.cuda.XXXXXXXX", sizeof(namebuf));
 
-    strlcpy(outbuf, namebuf, sizeof(outbuf));
-    strlcat(outbuf, ".cubin", sizeof(outbuf));
-
     fd = mkstemp(namebuf);
     if (fd == -1) FAIL(NULL, GA_SYS_ERROR);
+
+    strlcpy(outbuf, namebuf, sizeof(outbuf));
+    strlcat(outbuf, ".cubin", sizeof(outbuf));
 
     s = write(fd, src, len);
     close(fd);
@@ -303,10 +338,18 @@ void *call_compiler_unix(const char *src, size_t len, int *ret) {
         FAIL(NULL, GA_SYS_ERROR);
     }
 
+    /* This block executes nvcc on the written-out file */
+#define NVCC_ARGS "nvcc", "-arch", arch_arg, "-x", "cu", \
+      "--cubin", namebuf, "-o", outbuf
+#ifdef _WIN32
+    sys_err = _spawnlp(_P_WAIT, NVCC_BIN, NVCC_ARGS, NULL);
+    unlink(namebuf);
+    if (sys_err == -1) FAIL(NULL, GA_SYS_ERROR);
+    if (sys_err != 0) FAIL(NULL, GA_RUN_ERROR);
+#else
     p = fork();
     if (p == 0) {
-        execlp(CUDA_BIN_PATH "nvcc", "nvcc", "-arch", arch_arg, "-x", "cu",
-               "--cubin", namebuf, "-o", outbuf, NULL);
+        execlp(NVCC_BIN, NVCC_ARGS, NULL);
         exit(1);
     }
     unlink(namebuf);
@@ -322,32 +365,30 @@ void *call_compiler_unix(const char *src, size_t len, int *ret) {
         unlink(outbuf);
         FAIL(NULL, GA_RUN_ERROR);
     }
+#endif
 
     fd = open(outbuf, O_RDONLY);
-    /* This will make the file go away as soon as we close the fd */
-    unlink(outbuf);
     if (fd == -1) {
+        unlink(outbuf);
         FAIL(NULL, GA_SYS_ERROR);
     }
 
     if (fstat(fd, &st) == -1) {
         close(fd);
+        unlink(outbuf);
         FAIL(NULL, GA_SYS_ERROR);
-    }
-
-    if (st.st_size > SIZE_MAX) {
-        close(fd);
-        FAIL(NULL, GA_VALUE_ERROR);
     }
 
     buf = malloc(st.st_size);
     if (buf == NULL) {
         close(fd);
+        unlink(outbuf);
         FAIL(NULL, GA_SYS_ERROR);
     }
 
     s = read(fd, buf, st.st_size);
     close(fd);
+    unlink(outbuf);
     /* fd is not non-blocking; should have complete read */
     if (s == -1) {
         free(buf);
@@ -361,8 +402,8 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
                                  const char **strings, const size_t *lengths,
                                  const char *fname, int *ret) {
     struct iovec *descr;
-    void *buf;
-    void *p;
+    char *buf;
+    char *p;
     gpukernel *res;
     size_t tot_len;
     unsigned int i;
@@ -538,6 +579,7 @@ static int cuda_elemwise(gpudata *input, gpudata *output, int intype,
     size_t nEls = 1;
     gpukernel *k;
     unsigned int i;
+    unsigned int gx, bx;
 
     for (i = 0; i < a_nd; i++) {
         nEls *= a_dims[i];
@@ -582,7 +624,6 @@ static int cuda_elemwise(gpudata *input, gpudata *output, int intype,
     if (res != GA_NO_ERROR) goto failk;
 
     /* XXX: Revise this crappy block/grid assigment */
-    unsigned int gx, bx;
     bx = xmin(32, nEls);
     gx = xmin((nEls/bx)+((nEls % bx != 0)?1:0), 60);
     if (bx*gx < nEls)
