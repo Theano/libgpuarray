@@ -290,6 +290,7 @@ cdef kernel_init(GpuKernel k, compyte_buffer_ops *ops, void *ctx,
                  unsigned int count, char **strs, size_t *len, char *name):
     cdef int err
     with nogil:
+        # The C compiler error about argument 5 is ok.  It's a const thing.
         err = GpuKernel_init(&k.k, ops, ctx, count, strs, len, name)
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(ops, err))
@@ -453,6 +454,8 @@ cdef class GpuArray:
             pass
 
         if isinstance(key, slice):
+            # C compiler complains about argument 1 (key) because it's
+            # declared as a PyObject.  But we know it's a slice so it's ok.
             PySlice_GetIndicesEx(key, self.ga.dimensions[i], start, stop,
                                  step, &dummy)
             if stop[0] < start[0] and step[0] > 0:
