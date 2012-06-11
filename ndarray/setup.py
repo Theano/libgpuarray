@@ -279,14 +279,14 @@ def enable_opencl(arg):
 to_del = []
 
 for i, a in enumerate(sys.argv):
-    if a.startswith('--enable-cuda'):
+    if a.startswith('--with-cuda'):
         to_del.append(i)
         s = a.split('=', 1)
         if len(s) == 1:
             enable_cuda(None)
         else:
             enable_cuda(s[1])
-    elif a.startswith('--enable-opencl'):
+    elif a.startswith('--with-opencl'):
         to_del.append(i)
         s = a.split('=', 1)
         if len(s) == 1:
