@@ -33,6 +33,28 @@ struct _gpudata {
   size_t offset;
 };
 
+gpudata *cl_make_buf(cl_mem buf, cl_command_queue q, size_t offset,
+                     int retain) {
+  gpudata *res;
+  res = malloc(sizeof(*res));
+  if (res == NULL) return NULL;
+
+  res->buf = buf;
+  res->q = q;
+  res->offset = offset;
+  
+  if (retain) {
+    clRetainMemObject(res->buf);
+    clRetainCommandQueue(res->q);
+  }
+  
+  return res;
+}
+
+cl_mem cl_get_buf(gpudata *g) { return g->buf; }
+cl_command_queue cl_get_q(gpudata *g) { return g->q; }
+size_t cl_get_offset(gpudata *g) { return g->offset; }
+
 struct _gpukernel {
   cl_program p;
   cl_kernel k;

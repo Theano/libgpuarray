@@ -56,6 +56,22 @@ struct _gpudata {
     unsigned int refcnt;
 };
 
+gpudata *cuda_make_buf(CUdeviceptr p, size_t sz) {
+    gpudata *res;
+    res = malloc(sizeof(*res));
+    if (res == NULL) return NULL;
+
+    res->ptr = p;
+    res->sz = sz;
+    res->base = NULL;
+    res->refcnt = 1;
+
+    return res;
+}
+
+CUdeviceptr cuda_get_ptr(gpudata *g) { return g->ptr; }
+size_t cuda_get_sz(gpudata *g) { return g->sz; }
+
 /* The total size of the arguments is limited to 256 bytes */
 #define NUM_ARGS (256/sizeof(void*))
 
