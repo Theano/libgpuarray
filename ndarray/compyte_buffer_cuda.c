@@ -211,6 +211,8 @@ static int cuda_move(gpudata *dst, gpudata *src)
 {
     if (dst->sz != src->sz)
         return GA_VALUE_ERROR;
+    if (dst->sz == 0) return GA_NO_ERROR;
+
     err = cuMemcpyDtoD(dst->ptr, src->ptr, dst->sz);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
@@ -222,6 +224,8 @@ static int cuda_read(void *dst, gpudata *src, size_t sz)
 {
     if (sz > src->sz)
         return GA_VALUE_ERROR;
+    if (sz == 0) return GA_NO_ERROR;
+
     err = cuMemcpyDtoH(dst, src->ptr, sz);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
@@ -233,6 +237,8 @@ static int cuda_write(gpudata *dst, const void *src, size_t sz)
 {
     if (dst->sz != sz)
         return GA_VALUE_ERROR;
+    if (sz == 0) return GA_NO_ERROR;
+
     err = cuMemcpyHtoD(dst->ptr, src, sz);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
@@ -241,6 +247,8 @@ static int cuda_write(gpudata *dst, const void *src, size_t sz)
 }
 
 static int cuda_memset(gpudata *dst, int data) {
+    if (dst->sz == 0) return GA_NO_ERROR;
+
     err = cuMemsetD8(dst->ptr, data, dst->sz);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
@@ -603,7 +611,9 @@ static int cuda_elemwise(gpudata *input, gpudata *output, int intype,
     for (i = 0; i < a_nd; i++) {
         nEls *= a_dims[i];
     }
-    
+
+    if (nEls == 0) return GA_NO_ERROR;
+
     if (asprintf(&strs[count], ELEM_HEADER,
                  compyte_get_type(intype)->cuda_name,
                  compyte_get_type(outtype)->cuda_name,

@@ -277,8 +277,10 @@ static int cl_move(gpudata *dst, gpudata *src) {
 
   dst_sz -= dst->offset;
   src_sz -= src->offset;
-  
+
   if (dst_sz != src_sz) return GA_VALUE_ERROR;
+
+  if (dst_sz == 0) return GA_NO_ERROR;
 
   if ((err = clEnqueueCopyBuffer(dst->q, src->buf, dst->buf,
 				 src->offset, dst->offset,
@@ -296,6 +298,8 @@ static int cl_move(gpudata *dst, gpudata *src) {
 }
 
 static int cl_read(void *dst, gpudata *src, size_t sz) {
+  if (sz == 0) return GA_NO_ERROR;
+
   if ((err = clEnqueueReadBuffer(src->q, src->buf, CL_TRUE,
 				 src->offset, sz, dst,
 				 0, NULL, NULL)) != CL_SUCCESS) {
@@ -306,6 +310,8 @@ static int cl_read(void *dst, gpudata *src, size_t sz) {
 }
 
 static int cl_write(gpudata *dst, const void *src, size_t sz) {
+  if (sz == 0) return GA_NO_ERROR;
+
   if ((err = clEnqueueWriteBuffer(dst->q, dst->buf, CL_TRUE,
 				  dst->offset, sz, src,
 				  0, NULL, NULL)) != CL_SUCCESS) {
@@ -339,6 +345,8 @@ static int cl_memset(gpudata *dst, int data) {
   } else {
     bytes -= MIN_SIZE_INCR;
   }
+
+  if (bytes == 0) return GA_NO_ERROR;
 
   if ((err = clGetCommandQueueInfo(dst->q, CL_QUEUE_CONTEXT, sizeof(ctx),
 				   &ctx, NULL)) != CL_SUCCESS)
@@ -516,6 +524,8 @@ static int cl_elemwise(gpudata *input, gpudata *output, int intype,
   for (i = 0; i < a_nd; i++) {
     nEls *= a_dims[i];
   }
+
+  if (nEls == 0) return GA_NO_ERROR;
 
   if (asprintf(&strs[count], ELEM_HEADER,
 	       compyte_get_type(intype)->cl_name,
