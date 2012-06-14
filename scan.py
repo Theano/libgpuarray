@@ -20,8 +20,11 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-Derived from thrust/detail/backend/cuda/detail/fast_scan.h
+Derived from thrust/detail/backend/cuda/detail/fast_scan.inl
 within the Thrust project, https://code.google.com/p/thrust/
+
+Direct browse link:
+https://code.google.com/p/thrust/source/browse/thrust/detail/backend/cuda/detail/fast_scan.inl
 """
 
 
@@ -60,7 +63,7 @@ typedef ${scan_type} scan_type;
 
 
 
-SCAN_INTERVALS_SOURCE = mako.template.Template(SHARED_PREAMBLE + """
+SCAN_INTERVALS_SOURCE = mako.template.Template(SHARED_PREAMBLE + """//CL//
 #define K ${wg_seq_batches}
 
 <%def name="make_group_scan(name, with_bounds_check)">
@@ -107,155 +110,140 @@ void ${name_prefix}_scan_intervals(
     GLOBAL_MEM scan_type *output,
     GLOBAL_MEM scan_type *group_results)
 {
-    LOCAL_MEM scan_type sdata[K + 1][WG_SIZE + 1];  // padded to avoid bank conflicts
-
-    local_barrier(); // TODO figure out why this seems necessary now
+    // padded in WG_SIZE to avoid bank conflicts
+    // index K in first dimension used for carry storage
+    LOCAL_MEM scan_type ldata[K + 1][WG_SIZE + 1];
 
     const unsigned int interval_begin = interval_size * GID_0;
     const unsigned int interval_end   = min(interval_begin + interval_size, N);
 
     const unsigned int unit_size  = K * WG_SIZE;
 
-    unsigned int base = interval_begin;
+    unsigned int unit_base = interval_begin;
 
-    // process full units
-    for(; base + unit_size <= interval_end; base += unit_size)
-    {
-        // read data
-        for(unsigned int k = 0; k < K; k++)
+    %for is_tail in [False, True]:
+
+        %if not is_tail:
+            for(; unit_base + unit_size <= interval_end; unit_base += unit_size)
+        %else:
+            if (unit_base < interval_end)
+        %endif
+
         {
-            const unsigned int offset = k*WG_SIZE + LID_0;
+            // Algorithm: Each work group is responsible for one contiguous
+            // 'interval', of which there are just enough to fill all compute
+            // units.  Intervals are split into 'units'. A unit is what gets
+            // worked on in parallel by one work group.
 
-            GLOBAL_MEM scan_type *temp = input + (base + offset);
-            sdata[offset % K][offset / K] = *temp;
-        }
+            // Each unit has two axes--the local-id axis and the k axis.
+            //
+            // * * * * * * * * * * ----> lid
+            // * * * * * * * * * *
+            // * * * * * * * * * *
+            // * * * * * * * * * *
+            // * * * * * * * * * *
+            // |
+            // v k
 
-        // carry in
-        if (LID_0 == 0 && base != interval_begin)
-            sdata[0][0] = SCAN_EXPR(sdata[K][WG_SIZE - 1], sdata[0][0]);
+            // This is a three-phase algorithm, in which first each interval
+            // does its local scan, then a scan across intervals exchanges data
+            // globally, and the final update adds the exchanged sums to each
+            // interval.
 
-        local_barrier();
+            // Exclusive scan is realized by performing a right-shift inside
+            // the final update.
 
-        // scan local values
-        scan_type sum = sdata[0][LID_0];
-
-        for(unsigned int k = 1; k < K; k++)
-        {
-            scan_type tmp = sdata[k][LID_0];
-            sum = SCAN_EXPR(sum, tmp);
-            sdata[k][LID_0] = sum;
-        }
-
-        // second level scan
-        sdata[K][LID_0] = sum;
-        local_barrier();
-        scan_group(&sdata[K][0]);
-
-        // update local values
-        if (LID_0 > 0)
-        {
-            sum = sdata[K][LID_0 - 1];
+            // read a unit's worth of data from global
 
             for(unsigned int k = 0; k < K; k++)
             {
-                scan_type tmp = sdata[k][LID_0];
-                sdata[k][LID_0] = SCAN_EXPR(sum, tmp);
-            }
-        }
+                const unsigned int offset = k*WG_SIZE + LID_0;
 
-        local_barrier();
-
-        // write data
-        for(unsigned int k = 0; k < K; k++)
-        {
-            const unsigned int offset = k*WG_SIZE + LID_0;
-
-            GLOBAL_MEM scan_type *temp = output + (base + offset);
-            *temp = sdata[offset % K][offset / K];
-        }
-
-        local_barrier();
-    }
-
-    // process partially full unit at end of input (if necessary)
-    if (base < interval_end)
-    {
-        // read data
-        for(unsigned int k = 0; k < K; k++)
-        {
-            const unsigned int offset = k*WG_SIZE + LID_0;
-
-            if (base + offset < interval_end)
-            {
-                GLOBAL_MEM scan_type *temp = input + (base + offset);
-                sdata[offset % K][offset / K] = *temp;
-            }
-        }
-
-        // carry in
-        if (LID_0 == 0 && base != interval_begin)
-            sdata[0][0] = SCAN_EXPR(sdata[K][WG_SIZE - 1], sdata[0][0]);
-
-        local_barrier();
-
-        // scan local values
-        scan_type sum = sdata[0][LID_0];
-
-        const unsigned int offset_end = interval_end - base;
-
-        for(unsigned int k = 1; k < K; k++)
-        {
-            if (K * LID_0 + k < offset_end)
-            {
-                scan_type tmp = sdata[k][LID_0];
-                sum = SCAN_EXPR(sum, tmp);
-                sdata[k][LID_0] = sum;
-            }
-        }
-
-        // second level scan
-        sdata[K][LID_0] = sum;
-        local_barrier();
-        scan_group_n(&sdata[K][0], offset_end / K);
-
-        // update local values
-        if (LID_0 > 0)
-        {
-            sum = sdata[K][LID_0 - 1];
-
-            for(unsigned int k = 0; k < K; k++)
-            {
-                if (K * LID_0 + k < offset_end)
+                %if is_tail:
+                if (unit_base + offset < interval_end)
+                %endif
                 {
-                    scan_type tmp = sdata[k][LID_0];
-                    sdata[k][LID_0] = SCAN_EXPR(sum, tmp);
+                    ldata[offset % K][offset / K] = input[unit_base + offset];
                 }
             }
-        }
 
-        local_barrier();
+            // carry in from previous unit, if applicable.
+            if (LID_0 == 0 && unit_base != interval_begin)
+                ldata[0][0] = SCAN_EXPR(ldata[K][WG_SIZE - 1], ldata[0][0]);
 
-        // write data
-        for(unsigned int k = 0; k < K; k++)
-        {
-            const unsigned int offset = k*WG_SIZE + LID_0;
+            local_barrier();
 
-            if (base + offset < interval_end)
+            // scan along k (sequentially in each work item)
+            scan_type sum = ldata[0][LID_0];
+
+            %if is_tail:
+                const unsigned int offset_end = interval_end - unit_base;
+            %endif
+
+            for(unsigned int k = 1; k < K; k++)
             {
-                GLOBAL_MEM scan_type *temp = output + (base + offset);
-                *temp = sdata[offset % K][offset / K];
+                %if is_tail:
+                if (K * LID_0 + k < offset_end)
+                %endif
+                {
+                    scan_type tmp = ldata[k][LID_0];
+                    sum = SCAN_EXPR(sum, tmp);
+                    ldata[k][LID_0] = sum;
+                }
             }
+
+            // store carry in out-of-bounds (padding) array entry in the K direction
+            ldata[K][LID_0] = sum;
+            local_barrier();
+
+            // tree-based parallel scan along local id
+            %if not is_tail:
+                scan_group(&ldata[K][0]);
+            %else:
+                scan_group_n(&ldata[K][0], offset_end / K);
+            %endif
+
+            // update local values
+            if (LID_0 > 0)
+            {
+                sum = ldata[K][LID_0 - 1];
+
+                for(unsigned int k = 0; k < K; k++)
+                {
+                    %if is_tail:
+                    if (K * LID_0 + k < offset_end)
+                    %endif
+                    {
+                        scan_type tmp = ldata[k][LID_0];
+                        ldata[k][LID_0] = SCAN_EXPR(sum, tmp);
+                    }
+                }
+            }
+
+            local_barrier();
+
+            // write data
+            for(unsigned int k = 0; k < K; k++)
+            {
+                const unsigned int offset = k*WG_SIZE + LID_0;
+
+                %if is_tail:
+                if (unit_base + offset < interval_end)
+                %endif
+                {
+                    output[unit_base + offset] = ldata[offset % K][offset / K];
+                }
+            }
+
+            local_barrier();
         }
 
-    }
-
-    local_barrier();
+    % endfor
 
     // write interval sum
     if (LID_0 == 0)
     {
-        GLOBAL_MEM scan_type *temp = output + (interval_end - 1);
-        group_results[GID_0] = *temp;
+        group_results[GID_0] = output[interval_end - 1];
     }
 }
 """)
@@ -263,7 +251,7 @@ void ${name_prefix}_scan_intervals(
 
 
 
-INCLUSIVE_UPDATE_SOURCE = mako.template.Template(SHARED_PREAMBLE + """
+INCLUSIVE_UPDATE_SOURCE = mako.template.Template(SHARED_PREAMBLE + """//CL//
 KERNEL
 REQD_WG_SIZE(WG_SIZE, 1, 1)
 void ${name_prefix}_final_update(
@@ -279,22 +267,21 @@ void ${name_prefix}_final_update(
         return;
 
     // value to add to this segment
-    scan_type sum = group_results[GID_0 - 1];
+    scan_type prev_group_sum = group_results[GID_0 - 1];
 
     // advance result pointer
     output += interval_begin + LID_0;
 
-    for(unsigned int base = interval_begin; base < interval_end; base += WG_SIZE, output += WG_SIZE)
+    for(unsigned int unit_base = interval_begin;
+        unit_base < interval_end;
+        unit_base += WG_SIZE, output += WG_SIZE)
     {
-        const unsigned int i = base + LID_0;
+        const unsigned int i = unit_base + LID_0;
 
         if(i < interval_end)
         {
-            scan_type tmp = *output;
-            *output = SCAN_EXPR(sum, tmp);
+            *output = SCAN_EXPR(prev_group_sum, *output);
         }
-
-        local_barrier();
     }
 }
 """)
@@ -302,7 +289,7 @@ void ${name_prefix}_final_update(
 
 
 
-EXCLUSIVE_UPDATE_SOURCE = mako.template.Template(SHARED_PREAMBLE + """
+EXCLUSIVE_UPDATE_SOURCE = mako.template.Template(SHARED_PREAMBLE + """//CL//
 KERNEL
 REQD_WG_SIZE(WG_SIZE, 1, 1)
 void ${name_prefix}_final_update(
@@ -311,9 +298,7 @@ void ${name_prefix}_final_update(
     const unsigned int interval_size,
     GLOBAL_MEM scan_type *group_results)
 {
-    LOCAL_MEM scan_type sdata[WG_SIZE];
-
-    local_barrier(); // TODO figure out why this seems necessary now
+    LOCAL_MEM scan_type ldata[WG_SIZE];
 
     const unsigned int interval_begin = interval_size * GID_0;
     const unsigned int interval_end   = min(interval_begin + interval_size, N);
@@ -326,31 +311,37 @@ void ${name_prefix}_final_update(
         carry = SCAN_EXPR(carry, tmp);
     }
 
-    scan_type val   = carry;
+    scan_type val = carry;
 
     // advance result pointer
     output += interval_begin + LID_0;
 
-    for(unsigned int base = interval_begin; base < interval_end; base += WG_SIZE, output += WG_SIZE)
+    for (unsigned int unit_base = interval_begin;
+        unit_base < interval_end;
+        unit_base += WG_SIZE, output += WG_SIZE)
     {
-        const unsigned int i = base + LID_0;
+        const unsigned int i = unit_base + LID_0;
 
         if(i < interval_end)
         {
             scan_type tmp = *output;
-            sdata[LID_0] = SCAN_EXPR(carry, tmp);
+            ldata[LID_0] = SCAN_EXPR(carry, tmp);
         }
 
         local_barrier();
 
         if (LID_0 != 0)
-            val = sdata[LID_0 - 1];
+            val = ldata[LID_0 - 1];
+        /*
+        else (see above)
+            val = carry OR last tail;
+        */
 
         if (i < interval_end)
             *output = val;
 
         if(LID_0 == 0)
-            val = sdata[WG_SIZE - 1];
+            val = ldata[WG_SIZE - 1];
 
         local_barrier();
     }
@@ -379,39 +370,57 @@ if _CL_MODE:
 
             max_wg_size = min(dev.max_work_group_size for dev in self.devices)
 
-            # Thrust says these are good for GT200
-            self.scan_wg_size = min(max_wg_size, 128)
-            self.update_wg_size = min(max_wg_size, 256)
+            # loop to find suitable workgrouop size
+            trip_count = 0
+            while True:
+                # Thrust says these are good for GT200
+                self.scan_wg_size = min(max_wg_size, 128)
+                self.update_wg_size = min(max_wg_size, 256)
 
-            if self.scan_wg_size < 16:
-                # Hello, Apple CPU. Nice to see you.
-                self.scan_wg_seq_batches = 128 # FIXME: guesswork
-            else:
-                self.scan_wg_seq_batches = 6
+                # scan_wg_seq_batches should be a power of two because of in-kernel
+                # division.
 
-            from pytools import all
-            from pyopencl.characterize import has_double_support
+                if self.scan_wg_size < 16:
+                    # Hello, Apple CPU. Nice to see you.
+                    self.scan_wg_seq_batches = 128 # FIXME: guesswork
+                else:
+                    self.scan_wg_seq_batches = 8
 
-            kw_values = dict(
-                preamble=preamble,
-                name_prefix=name_prefix,
-                scan_type=dtype_to_ctype(dtype),
-                scan_expr=scan_expr,
-                neutral=neutral,
-                double_support=all(
-                    has_double_support(dev) for dev in devices)
-                )
+                from pytools import all
+                from pyopencl.characterize import has_double_support
 
-            scan_intervals_src = str(SCAN_INTERVALS_SOURCE.render(
-                wg_size=self.scan_wg_size,
-                wg_seq_batches=self.scan_wg_seq_batches,
-                **kw_values))
-            scan_intervals_prg = cl.Program(ctx, scan_intervals_src).build(options)
-            self.scan_intervals_knl = getattr(
-                    scan_intervals_prg,
-                    name_prefix+"_scan_intervals")
-            self.scan_intervals_knl.set_scalar_arg_dtypes(
-                    (None, np.uint32, np.uint32, None, None))
+                kw_values = dict(
+                    preamble=preamble,
+                    name_prefix=name_prefix,
+                    scan_type=dtype_to_ctype(dtype),
+                    scan_expr=scan_expr,
+                    neutral=neutral,
+                    double_support=all(
+                        has_double_support(dev) for dev in devices)
+                    )
+
+                scan_intervals_src = str(SCAN_INTERVALS_SOURCE.render(
+                    wg_size=self.scan_wg_size,
+                    wg_seq_batches=self.scan_wg_seq_batches,
+                    **kw_values))
+                scan_intervals_prg = cl.Program(ctx, scan_intervals_src).build(options)
+                self.scan_intervals_knl = getattr(
+                        scan_intervals_prg,
+                        name_prefix+"_scan_intervals")
+                self.scan_intervals_knl.set_scalar_arg_dtypes(
+                        (None, np.uint32, np.uint32, None, None))
+
+                kernel_max_wg_size = self.scan_intervals_knl.get_work_group_info(
+                        cl.kernel_work_group_info.WORK_GROUP_SIZE,
+                        ctx.devices[0])
+
+                if self.scan_wg_size <= kernel_max_wg_size:
+                    break
+                else:
+                    max_wg_size = kernel_max_wg_size
+
+                trip_count += 1
+                assert trip_count <= 2
 
             final_update_src = str(self.final_update_tp.render(
                 wg_size=self.update_wg_size,
@@ -426,6 +435,8 @@ if _CL_MODE:
 
         def __call__(self, input_ary, output_ary=None, allocator=None,
                 queue=None):
+            # see CL source above for terminology
+
             allocator = allocator or input_ary.allocator
             queue = queue or input_ary.queue or output_ary.queue
 
@@ -459,26 +470,33 @@ if _CL_MODE:
 
             # first level scan of interval (one interval per block)
             self.scan_intervals_knl(
-                    queue, (num_groups*self.scan_wg_size,), (self.scan_wg_size,),
+                    queue, (num_groups,), (self.scan_wg_size,),
                     input_ary.data,
                     n, interval_size,
                     output_ary.data,
-                    block_results)
+                    block_results,
+                    g_times_l=True)
 
-            # second level inclusive scan of per-block results
+            # second level inclusive scan of per-group results
+
+            # can scan at most one interval
+            assert interval_size >= num_groups
+
             self.scan_intervals_knl(
-                    queue, (self.scan_wg_size,), (self.scan_wg_size,),
+                    queue, (1,), (self.scan_wg_size,),
                     block_results,
                     num_groups, interval_size,
                     block_results,
-                    dummy_results)
+                    dummy_results,
+                    g_times_l=True)
 
-            # update intervals with result of second level scan
+            # update intervals with result of groupwise scan
             self.final_update_knl(
-                    queue, (num_groups*self.update_wg_size,), (self.update_wg_size,),
+                    queue, (num_groups,), (self.update_wg_size,),
                     output_ary.data,
                     n, interval_size,
-                    block_results)
+                    block_results,
+                    g_times_l=True)
 
             return output_ary
 
