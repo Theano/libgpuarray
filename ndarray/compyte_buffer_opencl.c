@@ -357,7 +357,7 @@ static int cl_memset(gpudata *dst, int data) {
   res = cl_setkernelargbuf(m, 0, dst);
   if (res != GA_NO_ERROR) goto fail;
   
-  res = cl_callkernel(m, bytes/4, 1, 1, 0, 0, 0);
+  res = cl_callkernel(m, bytes/MIN_SIZE_INCR, 1, 1, 0, 0, 0);
 
  fail:
   cl_freekernel(m);
