@@ -99,8 +99,6 @@ cdef extern from "compyte_buffer.h":
 
     int GpuArray_empty(_GpuArray *a, compyte_buffer_ops *ops, void *ctx,
                        int typecode, int nd, size_t *dims, ga_order ord) nogil
-    int GpuArray_zeros(_GpuArray *a, compyte_buffer_ops *ops, void *ctx,
-                       int typecode, int nd, size_t *dims, ga_order ord) nogil
     int GpuArray_view(_GpuArray *v, _GpuArray *a) nogil
     int GpuArray_index(_GpuArray *r, _GpuArray *a, ssize_t *starts,
                        ssize_t *stops, ssize_t *steps) nogil
@@ -222,14 +220,6 @@ cdef array_empty(GpuArray a, compyte_buffer_ops *ops, void *ctx, int typecode,
     cdef int err
     with nogil:
         err = GpuArray_empty(&a.ga, ops, ctx, typecode, nd, dims, ord)
-    if err != GA_NO_ERROR:
-        raise GpuArrayException(GpuArray_error(&a.ga, err))
-
-cdef array_zeros(GpuArray a, compyte_buffer_ops *ops, void *ctx, int typecode,
-            unsigned int nd, size_t *dims, ga_order ord):
-    cdef int err
-    with nogil:
-        err = GpuArray_zeros(&a.ga, ops, ctx, typecode, nd, dims, ord)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err))
 
