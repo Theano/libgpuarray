@@ -326,42 +326,32 @@ cdef kernel_call(GpuKernel k, unsigned int gx, unsigned int gy,
 cdef compyte_buffer_ops *GpuArray_ops
 cdef void *GpuArray_ctx
 
+cdef compyte_buffer_ops *get_ops(kind):
+    IF WITH_OPENCL:
+        if kind == "opencl":
+            return opencl_ops
+    IF WITH_CUDA:
+        if kind == "cuda":
+            return cuda_ops
+    raise RuntimeError("Unsupported kind: %s"%(kind,))
+
 def set_kind_context(kind, size_t ctx):
     global GpuArray_ctx
     global GpuArray_ops
     GpuArray_ctx = <void *>ctx
-    IF WITH_CUDA:
-        if kind == "cuda":
-            GpuArray_ops = &cuda_ops
-            return
-    IF WITH_OPENCL:
-        if kind == "opencl":
-            GpuArray_ops = &opencl_ops
-            return
-    raise ValueError("Unknown kind")
+    GpuArray_ops = get_ops(kind)
 
 def init(kind, int devno):
     cdef int err = GA_NO_ERROR
     cdef void *ctx
-    ctx = NULL
-    IF WITH_OPENCL:
-        if kind == "opencl":
-            ctx = opencl_ops.buffer_init(devno, &err)
-            if (err != GA_NO_ERROR):
-                if err == GA_VALUE_ERROR:
-                    raise GpuArrayException("No device %d"%(devno,))
-                else:
-                    raise GpuArrayException(opencl_ops.buffer_error())
-    IF WITH_CUDA:
-        if kind == "cuda":
-            ctx = cuda_ops.buffer_init(devno, &err)
-            if (err != GA_NO_ERROR):
-                if err == GA_VALUE_ERROR:
-                    raise GpuArrayException("No device %d"%(devno,))
-                else:
-                    raise GpuArrayException(cuda_ops.buffer_error())
-    if ctx == NULL:
-        raise RuntimeError("Unsupported kind: %s"%(kind,))
+    cdef compyte_buffer_ops *ops
+    ops = get_ops(kind)
+    ctx = ops.buffer_init(devno, &err)
+    if (err != GA_NO_ERROR):
+        if err == GA_VALUE_ERROR:
+            raise GpuArrayException("No device %d"%(devno,))
+        else:
+            raise GpuArrayException(ops.buffer_error())
     return <size_t>ctx
 
 def zeros(shape, dtype=GA_DOUBLE, order='A'):
