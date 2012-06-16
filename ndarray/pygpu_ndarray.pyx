@@ -319,10 +319,10 @@ cdef void *GpuArray_ctx
 cdef compyte_buffer_ops *get_ops(kind):
     IF WITH_OPENCL:
         if kind == "opencl":
-            return opencl_ops
+            return &opencl_ops
     IF WITH_CUDA:
         if kind == "cuda":
-            return cuda_ops
+            return &cuda_ops
     raise RuntimeError("Unsupported kind: %s"%(kind,))
 
 def set_kind_context(kind, size_t ctx):
