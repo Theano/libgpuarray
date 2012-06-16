@@ -82,7 +82,7 @@ def gen_gpu_nd_array(shape_orig, dtype='float32', offseted_outer=False,
     assert order in ['c', 'f']
     if order == 'f' and len(shape) > 0:
         a = numpy.asfortranarray(a)
-    b = gpu_ndarray.GpuNdArrayObject(a)
+    b = gpu_ndarray.array(a)
     if order == 'f' and len(shape) > 0 and b.size > 1:
         assert b.flags['F_CONTIGUOUS']
 
@@ -145,7 +145,7 @@ def test_transfer_not_contiguous():
         for dtype in dtypes_all:
             a = numpy.random.rand(*shp) * 10
             a = a[::-1]
-            b = gpu_ndarray.GpuArray(a)
+            b = gpu_ndarray.array(a)
             c = numpy.asarray(b)
 
             assert numpy.allclose(c, a)
@@ -164,7 +164,7 @@ def test_transfer_fortran():
             if len(shp) > 1:
                 assert a_.strides != a.strides
             a = a_
-            b = gpu_ndarray.GpuArray(a)
+            b = gpu_ndarray.array(a)
             c = numpy.asarray(b)
 
             assert a.shape == b.shape == c.shape
