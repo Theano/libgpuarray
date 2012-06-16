@@ -196,7 +196,7 @@ cdef int dtype_to_typecode(dtype):
             return res
     raise ValueError("don't know how to convert to dtype: %s"%(dtype,))
 
-cdef int to_ga_order(ord):
+cdef ga_order to_ga_order(ord):
     if ord == "C":
         return GA_C_ORDER
     elif ord == "A":
