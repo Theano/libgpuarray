@@ -185,7 +185,7 @@ cdef dict NP_TO_TYPE = {
 
 cdef dict TYPE_TO_NP = dict((v, k) for k, v in NP_TO_TYPE.iteritems())
 
-cdef int dtype_to_typecode(dtype):
+cdef int dtype_to_typecode(dtype) except -1:
     if isinstance(dtype, int):
         return dtype
     if isinstance(dtype, str):
