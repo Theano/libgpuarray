@@ -325,6 +325,21 @@ cdef compyte_buffer_ops *get_ops(kind):
             return &cuda_ops
     raise RuntimeError("Unsupported kind: %s"%(kind,))
 
+cdef ops_kind(compyte_buffer_ops *ops):
+    IF WITH_OPENCL:
+        if ops == &opencl_ops:
+            return "opencl"
+    IF WITH_CUDA:
+        if ops == &cuda_ops:
+            return "cuda"
+    raise RuntimeError("Unknown ops vector")
+
+cdef void *get_ctx(size_t ctx):
+    return <void*>ctx
+
+cdef size_t ctx_object(void *ctx):
+    return <size_t>ctx
+
 def set_kind_context(kind, size_t ctx):
     global GpuArray_ctx
     global GpuArray_ops
