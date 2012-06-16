@@ -367,6 +367,15 @@ def zeros(shape, dtype=GA_DOUBLE, order='A'):
 def empty(shape, dtype=GA_DOUBLE, order='A'):
     return GpuArray(shape, dtype=dtype, order=order)
 
+def asarray(a, dtype=None, order=None):
+    return array(a, dtype=dtype, order=order, copy=False)
+
+def ascontiguousarray(a, dtype=None):
+    return array(a, order='C', dtype=dtype, ndmin=1)
+
+def asfortranarray(a, dtype=None):
+    return array(a, order='F', dtype=dtype, ndmin=1)
+
 def may_share_memory(GpuArray a not None, GpuArray b not None):
     return array_share(a, b)
 
