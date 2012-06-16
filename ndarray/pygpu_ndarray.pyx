@@ -689,18 +689,30 @@ cdef class GpuArray:
 
 cdef class GpuKernel:
     cdef _GpuKernel k
+    cdef void  *ctx
     
     def __dealloc__(self):
         kernel_clear(self)
 
-    def __cinit__(self, source, name, *a, **kwa):
+    def __cinit__(self, source, name, kind=None, context=None, *a, **kwa):
         cdef char *s[1]
         cdef size_t l
+        cdef compyte_buffer_ops *ops
         
         if not isinstance(source, (str, unicode)):
             raise TypeError("Expected a string for the kernel source")
         if not isinstance(name, (str, unicode)):
             raise TypeError("Expected a string for the kernel name")
+
+        if kind is None:
+            ops = GpuArray_ops
+        else:
+            ops = get_ops(kind)
+
+        if context is None:
+            self.ctx = GpuArray_ctx
+        else:
+            self.ctx = get_ctx(context)
 
         # This is required under CUDA otherwise the function is compiled
         # as a C++ mangled name and is irretriveable
@@ -709,7 +721,7 @@ cdef class GpuKernel:
 
         s[0] = ss
         l = len(ss)
-        kernel_init(self, GpuArray_ops, GpuArray_ctx, 1, s, &l, name);
+        kernel_init(self, ops, self.ctx, 1, s, &l, name);
 
     def __call__(self, *args, grid=None, block=None):
         if block is None:
