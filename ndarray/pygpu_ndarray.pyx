@@ -360,7 +360,9 @@ def init(kind, int devno):
     return <size_t>ctx
 
 def zeros(shape, dtype=GA_DOUBLE, order='A'):
-    return GpuArray(shape, dtype=dtype, order=order, memset=0)
+    res = empty(shape, dtype=dtype, order=order)
+    array_memset(res, 0)
+    return res
 
 def empty(shape, dtype=GA_DOUBLE, order='A'):
     return GpuArray(shape, dtype=dtype, order=order)
