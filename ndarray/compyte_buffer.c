@@ -34,6 +34,7 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 		   int typecode, unsigned int nd, size_t *dims, ga_order ord) {
   size_t size = compyte_get_elsize(typecode);
   int i;
+  int res = GA_NO_ERROR;
 
   if (ord == GA_ANY_ORDER)
     ord = GA_C_ORDER;
@@ -48,15 +49,17 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
       return GA_VALUE_ERROR;
     size *= d;
   }
+
   a->ops = ops;
-  a->data = a->ops->buffer_alloc(ctx, size, NULL);
+  a->data = a->ops->buffer_alloc(ctx, size, &res);
+  if (res != GA_NO_ERROR) return res;
   a->nd = nd;
   a->typecode = typecode;
   a->dimensions = calloc(nd, sizeof(size_t));
   a->strides = calloc(nd, sizeof(ssize_t));
   /* F/C distinction comes later */
   a->flags = GA_OWNDATA|GA_BEHAVED;
-  if (a->dimensions == NULL || a->strides == NULL || a->data == NULL) {
+  if (a->dimensions == NULL || a->strides == NULL) {
     GpuArray_clear(a);
     return GA_MEMORY_ERROR;
   }
