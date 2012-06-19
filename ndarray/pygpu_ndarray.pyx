@@ -373,12 +373,12 @@ def asarray(a, dtype=None, order=None, context=None, kind=None):
                  kind=kind)
 
 def ascontiguousarray(a, dtype=None, context=None, kind=None):
-    return array(a, order='C', dtype=dtype, ndmin=1, context=context,
-                 kind=kind)
+    return array(a, order='C', dtype=dtype, ndmin=1, copy=False,
+                 context=context, kind=kind)
 
 def asfortranarray(a, dtype=None, context=None, kind=None):
-    return array(a, order='F', dtype=dtype, ndmin=1, context=context,
-                 kind=kind)
+    return array(a, order='F', dtype=dtype, ndmin=1, copy=False,
+                 context=context, kind=kind)
 
 def may_share_memory(GpuArray a not None, GpuArray b not None):
     return array_share(a, b)
