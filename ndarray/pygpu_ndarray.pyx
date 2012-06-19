@@ -596,6 +596,7 @@ cdef class GpuArray:
         cdef ssize_t *steps
         cdef unsigned int i
         cdef unsigned int d
+        cdef unsigned int el
 
         if key is Ellipsis:
             return self
@@ -612,11 +613,22 @@ cdef class GpuArray:
             d = 0
 
             if isinstance(key, tuple):
+                if Ellipsis in key:
+                    # The following code replaces the first Ellipsis
+                    # found in the key by a bunch of them depending on
+                    # the number of dimensions.  As example, this
+                    # allows indexing on the last dimension with
+                    # a[..., 1:] on any array (including 1-dim).  This
+                    # is also required for numpy compat.
+                    el = key.index(Ellipsis)
+                    key = key[:el] + \
+                        (Ellipsis,)*(self.ga.nd - (len(key) - 1)) + \
+                        key[el+1:]
                 if len(key) > self.ga.nd:
-                    raise IndexError("invalid index")
+                    raise IndexError("too many indices")
                 for i in range(0, len(key)):
                     self.__index_helper(key[i], i, &starts[i], &stops[i],
-                                         &steps[i])
+                                        &steps[i])
                 d += len(key)
             else:
                 self.__index_helper(key, 0, starts, stops, steps)
