@@ -452,10 +452,15 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
     else:
         ord = GA_C_ORDER
 
-    res = GpuArray.__new__(GpuArray)
-    array_empty(res, c_ops, ctx, dtype_to_typecode(a.dtype),
+    res = new_GpuArray(ctx)
+    array_empty(res, ops, ctx, dtype_to_typecode(a.dtype),
                 np.PyArray_NDIM(a), <size_t *>np.PyArray_DIMS(a), ord)
     array_write(res, np.PyArray_DATA(a), np.PyArray_NBYTES(a))
+    return res
+
+cdef new_GpuArray(void *ctx):
+    cdef GpuArray res = GpuArray.__new__(GpuArray)
+    res.ctx = ctx
     return res
 
 cdef class GpuArray:
@@ -539,7 +544,7 @@ cdef class GpuArray:
         return res
 
     def copy(self, dtype=None, order='A'):
-        cdef GpuArray res = GpuArray.__new__(GpuArray)
+        cdef GpuArray res = new_GpuArray(self.ctx)
         cdef int typecode
         cdef ga_order ord = to_ga_order(order)
 
@@ -570,7 +575,7 @@ cdef class GpuArray:
             return self.copy()
 
     def view(self):
-        cdef GpuArray res = GpuArray.__new__(GpuArray)
+        cdef GpuArray res = new_GpuArray(self.ctx)
         array_view(res, self)
         base = self
         while base.base is not None:
@@ -622,7 +627,7 @@ cdef class GpuArray:
                 stops[i] = self.ga.dimensions[i]
                 steps[i] = 1
 
-            res = GpuArray.__new__(GpuArray)
+            res = new_GpuArray(self.ctx)
             array_index(res, self, starts, stops, steps);
         finally:
             free(starts)
