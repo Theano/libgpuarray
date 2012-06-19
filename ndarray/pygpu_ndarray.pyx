@@ -405,7 +405,7 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
 
         arg = proto
         if not copy and \
-                (dtype is not None and np.dtype(dtype) == arg.dtype) and \
+                (dtype is None or np.dtype(dtype) == arg.dtype) and \
                 (arg.ga.nd >= ndmin) and \
                 (order is None or order == 'A' or \
                      (order == 'C' and py_CHKFLAGS(arg, GA_C_CONTIGUOUS)) or \
