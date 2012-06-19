@@ -359,44 +359,48 @@ def init(kind, int devno):
             raise GpuArrayException(ops.buffer_error())
     return <size_t>ctx
 
-def zeros(shape, dtype=GA_DOUBLE, order='A'):
-    res = empty(shape, dtype=dtype, order=order)
+def zeros(shape, dtype=GA_DOUBLE, order='A', context=None, kind=None):
+    res = empty(shape, dtype=dtype, order=order, context=context, kind=kind)
     array_memset(res, 0)
     return res
 
-def empty(shape, dtype=GA_DOUBLE, order='A'):
-    return GpuArray(shape, dtype=dtype, order=order)
+def empty(shape, dtype=GA_DOUBLE, order='A', context=None, kind=None):
+    return GpuArray(shape, dtype=dtype, order=order, context=context,
+                    kind=kind)
 
-def asarray(a, dtype=None, order=None):
-    return array(a, dtype=dtype, order=order, copy=False)
+def asarray(a, dtype=None, order=None, context=None, kind=None):
+    return array(a, dtype=dtype, order=order, copy=False, context=context,
+                 kind=kind)
 
-def ascontiguousarray(a, dtype=None):
-    return array(a, order='C', dtype=dtype, ndmin=1)
+def ascontiguousarray(a, dtype=None, context=None, kind=None):
+    return array(a, order='C', dtype=dtype, ndmin=1, context=context,
+                 kind=kind)
 
-def asfortranarray(a, dtype=None):
-    return array(a, order='F', dtype=dtype, ndmin=1)
+def asfortranarray(a, dtype=None, context=None, kind=None):
+    return array(a, order='F', dtype=dtype, ndmin=1, context=context,
+                 kind=kind)
 
 def may_share_memory(GpuArray a not None, GpuArray b not None):
     return array_share(a, b)
 
-def array(proto, dtype=None, copy=True, order=None, ndmin=0, ops=None,
+def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
           context=None):
     cdef GpuArray res
     cdef GpuArray arg
     cdef GpuArray tmp
     cdef np.ndarray a
-    cdef compyte_buffer_ops *c_ops
+    cdef compyte_buffer_ops *ops
     cdef void *ctx
     cdef ga_order ord
 
     if isinstance(proto, (list, tuple)):
         if len(proto) < ndmin:
             proto = ((1,) * (ndmin - len(proto))) + tuple(proto)
-        return GpuArray(proto, dtype=dtype, order=order, ops=ops,
+        return GpuArray(proto, dtype=dtype, order=order, kind=kind,
                         context=context)
 
     if isinstance(proto, GpuArray):
-        if ops is not None or context is not None:
+        if kind is not None or context is not None:
             raise ValueError("cannot copy GpuArray to a different context")
 
         arg = proto
@@ -425,10 +429,10 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, ops=None,
         array_move(tmp, arg)
         return res
 
-    if ops is None:
-        c_ops = GpuArray_ops
+    if kind is None:
+        ops = GpuArray_ops
     else:
-        c_ops = get_ops(ops)
+        ops = get_ops(kind)
 
     if context is None:
         ctx = GpuArray_ctx
