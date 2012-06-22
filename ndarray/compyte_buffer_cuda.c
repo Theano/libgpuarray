@@ -49,6 +49,9 @@
 typedef struct {char c; CUdeviceptr x; } st_devptr;
 #define DEVPTR_ALIGN (sizeof(st_devptr) - sizeof(CUdeviceptr))
 
+static int DONTFREE_ADDR;
+#define DONTFREE ((gpudata *)&DONTFREE_ADDR)
+
 struct _gpudata {
     CUdeviceptr ptr;
     size_t sz;
@@ -63,7 +66,7 @@ gpudata *cuda_make_buf(CUdeviceptr p, size_t sz) {
 
     res->ptr = p;
     res->sz = sz;
-    res->base = NULL;
+    res->base = DONTFREE;
     res->refcnt = 1;
 
     return res;
@@ -187,17 +190,18 @@ static gpudata *cuda_dup(gpudata *b, int *ret) {
     if (res->base->base != NULL)
         res->base = res->base->base;
     res->refcnt = 1;
-    b->refcnt += 1;
+    if (res->base != DONTFREE)
+        b->refcnt += 1;
     return res;
 }
 
 static void cuda_free(gpudata *d) {
     d->refcnt -= 1;
     if (d->refcnt == 0) {
-        if (d->base != NULL)
-            cuda_free(d->base);
-        else
+        if (d->base == NULL)
             cuMemFree(d->ptr);
+        else if (d->base != DONTFREE)
+            cuda_free(d->base);
         free(d);
     }
 }

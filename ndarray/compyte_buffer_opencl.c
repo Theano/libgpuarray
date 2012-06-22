@@ -33,8 +33,7 @@ struct _gpudata {
   size_t offset;
 };
 
-gpudata *cl_make_buf(cl_mem buf, cl_command_queue q, size_t offset,
-                     int retain) {
+gpudata *cl_make_buf(cl_mem buf, cl_command_queue q, size_t offset) {
   gpudata *res;
   res = malloc(sizeof(*res));
   if (res == NULL) return NULL;
@@ -43,10 +42,8 @@ gpudata *cl_make_buf(cl_mem buf, cl_command_queue q, size_t offset,
   res->q = q;
   res->offset = offset;
   
-  if (retain) {
-    clRetainMemObject(res->buf);
-    clRetainCommandQueue(res->q);
-  }
+  clRetainMemObject(res->buf);
+  clRetainCommandQueue(res->q);
   
   return res;
 }
