@@ -106,6 +106,31 @@ int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
   return err;
 }
 
+int GpuArray_fromdata(GpuArray *a, compyte_buffer_ops *ops, gpudata *data,
+                      int typecode, unsigned int nd, size_t *dims,
+                      ssize_t *strides, int writeable) {
+  a->ops = ops;
+  assert(data != NULL);
+  a->data = data;
+  a->nd = nd;
+  a->typecode = typecode;
+  a->dimensions = calloc(nd, sizeof(size_t));
+  a->strides = calloc(nd, sizeof(ssize_t));
+  /* XXX: We assume that the buffer is aligned */
+  a->flags = (writeable ? GA_WRITEABLE : 0)|GA_ALIGNED;
+  if (a->dimensions == NULL || a->strides == NULL) {
+    GpuArray_clear(a);
+    return GA_MEMORY_ERROR;
+  }
+  memcpy(a->dimensions, dims, nd*sizeof(size_t));
+  memcpy(a->strides, strides, nd*sizeof(ssize_t));
+
+  if (GpuArray_is_c_contiguous(a)) a->flags |= GA_C_CONTIGUOUS;
+  if (GpuArray_is_f_contiguous(a)) a->flags |= GA_F_CONTIGUOUS;
+
+  return GA_NO_ERROR;
+}
+
 int GpuArray_view(GpuArray *v, GpuArray *a) {
   v->ops = a->ops;
   v->data = a->data;

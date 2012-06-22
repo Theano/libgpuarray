@@ -154,6 +154,10 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 		   int typecode, unsigned int nd, size_t *dims, ga_order ord);
 
+int GpuArray_fromdata(GpuArray *a, compyte_buffer_ops *ops, gpudata *data,
+                      int typecode, unsigned int nd, size_t *dims,
+                      ssize_t *strides, int writeable);
+
 int GpuArray_view(GpuArray *v, GpuArray *a);
 int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
 		   ssize_t *steps);
