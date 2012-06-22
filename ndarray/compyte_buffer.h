@@ -77,10 +77,16 @@ typedef struct _compyte_buffer_ops {
 
 #ifdef WITH_CUDA
 extern compyte_buffer_ops cuda_ops;
+#ifdef CUDA_VERSION
+gpudata *cuda_make_buf(CUdeviceptr p, size_t sz);
+#endif
 #endif
 
 #ifdef WITH_OPENCL
 extern compyte_buffer_ops opencl_ops;
+#ifdef CL_VERSION_1_0
+gpudata *cl_make_buf(cl_mem buf, cl_command_queue q, size_t offset);
+#endif
 #endif
 
 typedef struct _GpuArray {
