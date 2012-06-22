@@ -99,6 +99,9 @@ cdef extern from "compyte_buffer.h":
 
     int GpuArray_empty(_GpuArray *a, compyte_buffer_ops *ops, void *ctx,
                        int typecode, int nd, size_t *dims, ga_order ord) nogil
+    int GpuArray_fromdata(_GpuArray *a, compyte_buffer_ops *ops, gpudata *data,
+                          int typecode, unsigned int nd, size_t *dims,
+                          ssize_t *strides, int writable) nogil
     int GpuArray_view(_GpuArray *v, _GpuArray *a) nogil
     int GpuArray_index(_GpuArray *r, _GpuArray *a, ssize_t *starts,
                        ssize_t *stops, ssize_t *steps) nogil
@@ -222,6 +225,16 @@ cdef array_empty(GpuArray a, compyte_buffer_ops *ops, void *ctx, int typecode,
         err = GpuArray_empty(&a.ga, ops, ctx, typecode, nd, dims, ord)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err))
+
+cdef array_fromdata(GpuArray a, compyte_buffer_ops *ops, gpudata *data,
+                    int typecode, unsigned int nd, size_t *dims,
+                    ssize_t *strides, int writeable):
+   cdef int err
+   with nogil:
+       err = GpuArray_fromdata(&a.ga, ops, data, typecode, nd, dims, strides,
+                               writeable)
+   if err != GA_NO_ERROR:
+       raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef array_view(GpuArray v, GpuArray a):
     cdef int err
@@ -382,6 +395,57 @@ def asfortranarray(a, dtype=None, context=None, kind=None):
 
 def may_share_memory(GpuArray a not None, GpuArray b not None):
     return array_share(a, b)
+
+def from_gpudata(size_t data, dtype, shape, kind=None, context=None,
+                 strides=None, writable=True):
+    cdef GpuArray res
+    cdef compyte_buffer_ops *ops
+    cdef void *ctx
+    cdef size_t *cdims
+    cdef ssize_t *cstrides
+    cdef unsigned int nd
+    cdef size_t size
+    cdef int typecode
+
+    if kind is None:
+        ops = GpuArray_ops
+    else:
+        ops = get_ops(kind)
+
+    if context is None:
+        ctx = GpuArray_ctx
+    else:
+        ctx = get_ctx(context)
+
+    nd = len(shape)
+    if strides is not None and len(strides) != nd:
+        raise ValueError("strides must be the same length as shape")
+
+    typecode = dtype_to_typecode(dtype)
+
+    try:
+        cdims = <size_t *>calloc(nd, sizeof(size_t))
+        cstrides = <ssize_t *>calloc(nd, sizeof(ssize_t))
+        if cdims == NULL or cstrides == NULL:
+            raise MemoryError
+        for i, d in enumerate(shape):
+            cdims[i] = d
+        if strides:
+            for i, s in enumerate(strides):
+                cstrides[i] = s
+        else:
+            size = compyte_get_elsize(typecode)
+            for i in range(nd-1, -1, -1):
+                strides[i] = size
+                size *= cdims[i]
+
+        res = new_GpuArray(ctx)
+        array_fromdata(res, ops, <gpudata *>data, typecode, nd, cdims,
+                       cstrides, (1 if writable else 0))
+    finally:
+        free(cdims)
+        free(cstrides)
+    return res
 
 def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
           context=None):
@@ -707,6 +771,11 @@ cdef class GpuArray:
             res["UPDATEIFCOPY"] = False # Unsupported
             res["OWNDATA"] = py_CHKFLAGS(self, GA_OWNDATA)
             return res
+
+    property gpudata:
+        "Return a pointer to the raw gpudata object."
+        def __get__(self):
+            return <size_t>self.ga.data
 
 cdef class GpuKernel:
     cdef _GpuKernel k
