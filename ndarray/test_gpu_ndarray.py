@@ -340,7 +340,7 @@ def test_copy_view():
                                                 order=order1)
 
                         assert numpy.allclose(a, numpy.asarray(b))
-                        check_flags(a, b)
+                        check_flags(b, a)
 
                         c = b.copy(order2)
                         assert numpy.allclose(a, numpy.asarray(c))
