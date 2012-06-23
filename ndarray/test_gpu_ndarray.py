@@ -237,7 +237,7 @@ def test_asfortranarray():
                                 if (sliced == 1 and not offseted_outer and
                                     order != 'c'):
                                     assert ((a.data is cpu.data) ==
-                                            (b.bytes is gpu.bytes))
+                                            (b.gpudata == gpu.gpudata))
                             else:
                                 assert b is gpu
                                 pass
@@ -303,7 +303,7 @@ def test_mapping_getitem_ellipsis():
                 a, a_gpu = gen_gpu_nd_array(shp, dtype, offseted)
 
                 b = a_gpu[...]
-                assert b.bytes == a_gpu.bytes
+                assert b.gpudata == a_gpu.gpudata
                 assert b.strides == a.strides
                 assert b.shape == a.shape
                 b_cpu = numpy.asarray(b)
