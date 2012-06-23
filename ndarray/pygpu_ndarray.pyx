@@ -607,10 +607,12 @@ cdef class GpuArray:
         
         return res
 
-    def copy(self, dtype=None, order='A'):
+    def copy(self, order='C'):
         cdef GpuArray res = new_GpuArray(self.ctx)
         cdef int typecode
         cdef ga_order ord = to_ga_order(order)
+        # XXX: support numpy order='K'
+        # (which means: exactly the same layout as the source)
 
         if ord == GA_ANY_ORDER:
             if py_CHKFLAGS(self, GA_F_CONTIGUOUS) and \
@@ -619,12 +621,7 @@ cdef class GpuArray:
             else:
                 ord = GA_C_ORDER
 
-        if dtype is None:
-            typecode = self.ga.typecode
-        else:
-            typecode = dtype_to_typecode(dtype)
-
-        array_empty(res, self.ga.ops, self.ctx, typecode,
+        array_empty(res, self.ga.ops, self.ctx, self.ga.typecode,
                     self.ga.nd, self.ga.dimensions, ord)
         array_move(res, self)
         return res
