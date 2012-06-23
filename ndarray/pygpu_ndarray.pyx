@@ -199,12 +199,12 @@ cdef int dtype_to_typecode(dtype) except -1:
             return res
     raise ValueError("don't know how to convert to dtype: %s"%(dtype,))
 
-cdef ga_order to_ga_order(ord):
-    if ord == "C":
+cdef ga_order to_ga_order(ord) except <ga_order>-1:
+    if ord == "C" or ord == "c":
         return GA_C_ORDER
-    elif ord == "A":
+    elif ord == "A" or ord == "a":
         return GA_ANY_ORDER
-    elif ord == "F":
+    elif ord == "F" or ord == "f":
         return GA_F_ORDER
     else:
         raise ValueError("Valid orders are: 'A' (any), 'C' (C), 'F' (Fortran)")
