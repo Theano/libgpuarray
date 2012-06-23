@@ -5,9 +5,11 @@ import numpy
 import pygpu_ndarray as gpu_ndarray
 
 # Run the tests for cuda
-#gpu_ndarray.set_kind_context("cuda", gpu_ndarray.init("cuda", 0))
+kind = "cuda"
 # Run the tests for opencl
-gpu_ndarray.set_kind_context("opencl", gpu_ndarray.init("opencl", 0))
+kind = "opencl"
+
+ctx = gpu_ndarray.init(kind, 0)
 
 enable_double = True
 enable_double = False
@@ -33,7 +35,7 @@ if enable_double:
 
 
 def check_flags(x, y):
-    assert isinstance(x, gpu_ndarray.GpuArray) 
+    assert isinstance(x, gpu_ndarray.GpuArray)
     assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
     if not (skip_single_f and x.shape == ()):
         # Numpy below 1.6.0 does not have a consistent hangling of
@@ -82,7 +84,7 @@ def gen_gpu_nd_array(shape_orig, dtype='float32', offseted_outer=False,
     assert order in ['c', 'f']
     if order == 'f' and len(shape) > 0:
         a = numpy.asfortranarray(a)
-    b = gpu_ndarray.array(a)
+    b = gpu_ndarray.array(a, context=ctx, kind=kind)
     if order == 'f' and len(shape) > 0 and b.size > 1:
         assert b.flags['F_CONTIGUOUS']
 
@@ -145,7 +147,7 @@ def test_transfer_not_contiguous():
         for dtype in dtypes_all:
             a = numpy.random.rand(*shp) * 10
             a = a[::-1]
-            b = gpu_ndarray.array(a)
+            b = gpu_ndarray.array(a, context=ctx, kind=kind)
             c = numpy.asarray(b)
 
             assert numpy.allclose(c, a)
@@ -164,7 +166,7 @@ def test_transfer_fortran():
             if len(shp) > 1:
                 assert a_.strides != a.strides
             a = a_
-            b = gpu_ndarray.array(a)
+            b = gpu_ndarray.array(a, context=ctx, kind=kind)
             c = numpy.asarray(b)
 
             assert a.shape == b.shape == c.shape
@@ -257,15 +259,17 @@ def test_zeros():
                 (4, 8, 9), (1, 8, 9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
-                x = gpu_ndarray.zeros(shp, dtype, order)
+                x = gpu_ndarray.zeros(shp, dtype, order, context=ctx,
+                                      kind=kind)
                 y = numpy.zeros(shp, dtype, order)
                 check_all(x, y)
-    x = gpu_ndarray.zeros(())  # no dtype and order param
+    # no dtype and order param
+    x = gpu_ndarray.zeros((), context=ctx, kind=kind)
     y = numpy.zeros(())
     check_meta(x, y)
 
     try:
-        gpu_ndarray.zeros()
+        gpu_ndarray.zeros(context=ctx, kind=kind)
         assert False
     except TypeError:
         pass
@@ -278,14 +282,15 @@ def test_empty():
                 (4, 8, 9), (1, 8, 9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
-                x = gpu_ndarray.empty(shp, dtype, order)
+                x = gpu_ndarray.empty(shp, dtype, order, context=ctx,
+                                      kind=kind)
                 y = numpy.empty(shp, dtype, order)
                 check_meta(x, y)
-    x = gpu_ndarray.empty(())# no dtype and order param
+    x = gpu_ndarray.empty((), context=ctx, kind=kind)# no dtype and order param
     y = numpy.empty(())
     check_meta(x, y)
     try:
-        gpu_ndarray.empty()
+        gpu_ndarray.empty(context=ctx, kind=kind)
         assert False
     except TypeError:
         pass
