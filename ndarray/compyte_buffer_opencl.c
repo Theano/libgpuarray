@@ -247,17 +247,17 @@ static void cl_free(gpudata *b) {
 
 static int cl_share(gpudata *a, gpudata *b, int *ret) {
 #ifdef CL_VERSION_1_1
-  cl_mem ab, bb;
+  cl_mem aa, bb;
 #endif
   if (a->buf == b->buf) return 1;
 #ifdef CL_VERSION_1_1
-  err = clGetMemObjectInfo(a->buf, CL_MEM_ASSOCIATED_MEMOBJECT, sizeof(ab), &ab, NULL);
+  err = clGetMemObjectInfo(a->buf, CL_MEM_ASSOCIATED_MEMOBJECT, sizeof(aa), &aa, NULL);
   CHKFAIL(-1);
   err = clGetMemObjectInfo(a->buf, CL_MEM_ASSOCIATED_MEMOBJECT, sizeof(bb), &bb, NULL);
   CHKFAIL(-1);
-  if (ab == NULL) ab = a->buf;
+  if (aa == NULL) aa = a->buf;
   if (bb == NULL) bb = b->buf;
-  if (ab == bb) return 1;
+  if (aa == bb) return 1;
 #endif
   return 0;
 }
