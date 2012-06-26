@@ -397,7 +397,7 @@ def may_share_memory(GpuArray a not None, GpuArray b not None):
     return array_share(a, b)
 
 def from_gpudata(size_t data, dtype, shape, kind=None, context=None,
-                 strides=None, writable=True):
+                 strides=None, writable=True, base=None):
     cdef GpuArray res
     cdef compyte_buffer_ops *ops
     cdef void *ctx
@@ -442,6 +442,7 @@ def from_gpudata(size_t data, dtype, shape, kind=None, context=None,
         res = new_GpuArray(ctx)
         array_fromdata(res, ops, <gpudata *>data, typecode, nd, cdims,
                        cstrides, (1 if writable else 0))
+        res.base = base
     finally:
         free(cdims)
         free(cstrides)
