@@ -91,12 +91,10 @@ def gen_gpu_nd_array(shape_orig, dtype='float32', offseted_outer=False,
     if offseted_outer and len(shape) > 0:
         b = b[1:]
         a = a[1:]
-        assert b.offset != 0
     if offseted_inner and len(shape) > 0:
         # The b[..., 1:] act as the test for this subtensor case.
         b = b[..., 1:]
         a = a[..., 1:]
-        assert b.offset != 0
     if sliced != 1 and len(shape) > 0:
         a = a[::sliced]
         b = b[::sliced]
