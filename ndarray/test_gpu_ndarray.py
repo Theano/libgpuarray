@@ -44,7 +44,10 @@ def check_flags(x, y):
     else:
         assert x.flags["F_CONTIGUOUS"]
     assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"]
-    assert x.flags["OWNDATA"] == y.flags["OWNDATA"]
+    # Don't check for OWNDATA after indexing since GpuArray do own it
+    # and ndarrays don't.  It's an implementation detail anyway.
+    if y.base is None:
+        assert x.flags["OWNDATA"] == y.flags["OWNDATA"]
     assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
     assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
 
