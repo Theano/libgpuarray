@@ -53,7 +53,8 @@ def check_meta(x, y):
     assert isinstance(x, gpu_ndarray.GpuArray)
     assert x.shape == y.shape
     assert x.dtype == y.dtype
-    assert x.strides == y.strides
+    if y.size != 0:
+        assert x.strides == y.strides
     check_flags(x, y)
 
 
