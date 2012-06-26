@@ -32,7 +32,7 @@ typedef struct _compyte_buffer_ops {
   int (*buffer_share)(gpudata *, gpudata *, int *ret);
   
   /* device to device copy, no overlap */
-  int (*buffer_move)(gpudata *dst, gpudata *src);
+  int (*buffer_move)(gpudata *dst, gpudata *src, size_t sz);
   /* device to host */
   int (*buffer_read)(void *dst, gpudata *src, size_t sz);
   /* host to device */

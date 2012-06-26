@@ -262,7 +262,7 @@ static int cl_share(gpudata *a, gpudata *b, int *ret) {
   return 0;
 }
 
-static int cl_move(gpudata *dst, gpudata *src) {
+static int cl_move(gpudata *dst, gpudata *src, size_t sz) {
   cl_event ev;
   size_t dst_sz, src_sz;
   
@@ -279,13 +279,13 @@ static int cl_move(gpudata *dst, gpudata *src) {
   dst_sz = get_realsz(dst_sz - dst->offset);
   src_sz = get_realsz(src_sz - src->offset);
 
-  if (dst_sz != src_sz) return GA_VALUE_ERROR;
+  if (dst_sz < sz || src_sz < sz) return GA_VALUE_ERROR;
 
-  if (dst_sz == 0) return GA_NO_ERROR;
+  if (sz == 0) return GA_NO_ERROR;
 
   if ((err = clEnqueueCopyBuffer(dst->q, src->buf, dst->buf,
-				 src->offset, dst->offset,
-				 dst_sz, 0, NULL, &ev)) != CL_SUCCESS) {
+				 src->offset, dst->offset, sz, 0,
+                                 NULL, &ev)) != CL_SUCCESS) {
     return GA_IMPL_ERROR;
   }
 

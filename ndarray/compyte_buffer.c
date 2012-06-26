@@ -217,19 +217,24 @@ int GpuArray_share(GpuArray *a, GpuArray *b) {
 }
 
 int GpuArray_move(GpuArray *dst, GpuArray *src) {
+  size_t sz;
+  unsigned int i;
   if (dst->ops != src->ops)
     return GA_INVALID_ERROR;
   if (!GpuArray_ISWRITEABLE(dst))
     return GA_VALUE_ERROR;
   if (!GpuArray_ISONESEGMENT(dst) || !GpuArray_ISONESEGMENT(src) ||
       GpuArray_ISFORTRAN(dst) != GpuArray_ISFORTRAN(src) ||
-      dst->typecode != src->typecode) {
+      dst->typecode != src->typecode ||
+      dst->nd != src->nd) {
     return dst->ops->buffer_elemwise(src->data, dst->data, src->typecode,
 				     dst->typecode, "=", src->nd,
 				     src->dimensions, src->strides, dst->nd,
 				     dst->dimensions, dst->strides);
   }
-  return dst->ops->buffer_move(dst->data, src->data);
+  sz = compyte_get_elsize(dst->typecode);
+  for (i = 0; i < dst->nd; i++) sz *= dst->dimensions[i];
+  return dst->ops->buffer_move(dst->data, src->data, sz);
 }
 
 int GpuArray_write(GpuArray *dst, void *src, size_t src_sz) {

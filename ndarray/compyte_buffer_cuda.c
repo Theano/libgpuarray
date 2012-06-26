@@ -211,13 +211,13 @@ static int cuda_share(gpudata *a, gpudata *b, int *ret) {
             (b->ptr <= a->ptr && b->ptr + b->sz > a->ptr));
 }
 
-static int cuda_move(gpudata *dst, gpudata *src)
+static int cuda_move(gpudata *dst, gpudata *src, size_t sz)
 {
-    if (dst->sz != src->sz)
+    if (dst->sz < sz || src->sz < sz)
         return GA_VALUE_ERROR;
-    if (dst->sz == 0) return GA_NO_ERROR;
+    if (sz == 0) return GA_NO_ERROR;
 
-    err = cuMemcpyDtoD(dst->ptr, src->ptr, dst->sz);
+    err = cuMemcpyDtoD(dst->ptr, src->ptr, sz);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
