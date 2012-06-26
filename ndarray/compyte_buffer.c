@@ -117,7 +117,7 @@ int GpuArray_fromdata(GpuArray *a, compyte_buffer_ops *ops, gpudata *data,
   a->dimensions = calloc(nd, sizeof(size_t));
   a->strides = calloc(nd, sizeof(ssize_t));
   /* XXX: We assume that the buffer is aligned */
-  a->flags = (writeable ? GA_WRITEABLE : 0)|GA_ALIGNED;
+  a->flags = GA_OWNDATA|(writeable ? GA_WRITEABLE : 0)|GA_ALIGNED;
   if (a->dimensions == NULL || a->strides == NULL) {
     GpuArray_clear(a);
     return GA_MEMORY_ERROR;
