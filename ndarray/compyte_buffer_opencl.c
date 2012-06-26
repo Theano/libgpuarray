@@ -26,6 +26,10 @@
 /* To work around the lack of byte addressing */
 #define MIN_SIZE_INCR 4
 
+static inline size_t get_realsz(size_t sz) {
+  return (sz % MIN_SIZE_INCR ? sz - (sz % MIN_SIZE_INCR) : sz - MIN_SIZE_INCR);
+}
+
 struct _gpudata {
   cl_mem buf;
   cl_command_queue q;
@@ -272,8 +276,8 @@ static int cl_move(gpudata *dst, gpudata *src) {
     return GA_IMPL_ERROR;
   }
 
-  dst_sz -= dst->offset;
-  src_sz -= src->offset;
+  dst_sz = get_realsz(dst_sz - dst->offset);
+  src_sz = get_realsz(src_sz - src->offset);
 
   if (dst_sz != src_sz) return GA_VALUE_ERROR;
 
@@ -335,13 +339,7 @@ static int cl_memset(gpudata *dst, int data) {
     return GA_IMPL_ERROR;
   }
 
-  bytes -= dst->offset;
-  /* undo alloc size fudging (while remaining in 4 bytes chunks) */
-  if (bytes % MIN_SIZE_INCR) {
-    bytes -= (bytes % MIN_SIZE_INCR);
-  } else {
-    bytes -= MIN_SIZE_INCR;
-  }
+  bytes = get_realsz(bytes - dst->offset);
 
   if (bytes == 0) return GA_NO_ERROR;
 
