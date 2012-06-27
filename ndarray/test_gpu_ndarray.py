@@ -11,8 +11,12 @@ kind = "opencl"
 
 ctx = gpu_ndarray.init(kind, 0)
 
+# Not all devices support doubles or "small" types. If you see
+# "Device does not support operation" as an error for some tests
+# try to disable some of the features below and run the tests
+# again.
 enable_double = True
-enable_double = False
+enable_small = True
 
 if numpy.__version__ < '1.6.0':
     skip_single_f = True
@@ -20,15 +24,18 @@ else:
     skip_single_f = False
 
 dtypes_all = ["float32",
-              "int8", "int16", "int32", "int64",
-              "uint8", "uint16", "uint32", "uint64",
+              "int32", "int64", "uint32", "uint64",
               "complex64",
               ]
 
 dtypes_no_complex = ["float32",
-                     "int8", "int16", "int32", "int64",
-                     "uint8", "uint16", "uint32", "uint64",
+                     "int32", "int64", "uint32", "uint64",
                      ]
+
+if enable_small:
+    dtypes_all += ["int8", "int16", "uint8", "uint16"]
+    dtypes_no_complex += ["int8", "int16", "uint8", "uint16"]
+
 if enable_double:
     dtypes_all += ["float64", "complex128"]
     dtypes_no_complex += ["float64"]
