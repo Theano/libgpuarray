@@ -509,11 +509,9 @@ static int cl_elemwise(gpudata *input, gpudata *output, int intype,
   unsigned int count = 0;
   int res = GA_SYS_ERROR;
   unsigned int i;
-
-
-  if ((err = clGetCommandQueueInfo(input->q, CL_QUEUE_CONTEXT, sizeof(ctx),
-				   &ctx, NULL)) != CL_SUCCESS)
-    return GA_IMPL_ERROR;
+  cl_device_id dev;
+  size_t sz;
+  char *exts;
 
   nEls = 1;
   for (i = 0; i < a_nd; i++) {
@@ -522,17 +520,49 @@ static int cl_elemwise(gpudata *input, gpudata *output, int intype,
 
   if (nEls == 0) return GA_NO_ERROR;
 
+  if ((err = clGetCommandQueueInfo(input->q, CL_QUEUE_CONTEXT, sizeof(ctx),
+				   &ctx, NULL)) != CL_SUCCESS)
+    return GA_IMPL_ERROR;
+
+  if ((err = clGetCommandQueueInfo(input->q, CL_QUEUE_DEVICE, sizeof(dev),
+                                   &dev, NULL)) != CL_SUCCESS)
+    return GA_IMPL_ERROR;
+
+  err = clGetDeviceInfo(dev, CL_DEVICE_EXTENSIONS, 0, NULL, &sz);
+  if (err != CL_SUCCESS) return GA_IMPL_ERROR;
+
+  exts = malloc(sz);
+  if (exts == NULL) return GA_SYS_ERROR;
+
+  err = clGetDeviceInfo(dev, CL_DEVICE_EXTENSIONS, sz, exts, NULL);
+  if (err != CL_SUCCESS) {
+    res = GA_IMPL_ERROR;
+    goto fail;
+  }
+
   if (outtype == GA_DOUBLE || intype == GA_DOUBLE) {
+    if (strstr(exts, "cl_khr_fp64") == NULL) {
+      res = GA_DEVSUP_ERROR;
+      goto fail;
+    }
     strs[count] = strdup("#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n");
     count++;
   }
 
   if (outtype == GA_HALF || intype == GA_HALF) {
+    if (strstr(exts, "cl_khr_fp16") == NULL) {
+      res = GA_DEVSUP_ERROR;
+      goto fail;
+    }
     strs[count] = strdup("#pragma OPENCL EXTENSION cl_khr_fp16 : enable\n");
     count++;
   }
 
   if (compyte_get_elsize(outtype) < 4 || compyte_get_elsize(intype) < 4) {
+    if (strstr(exts, "cl_khr_byte_addressable_store") == NULL) {
+      res = GA_DEVSUP_ERROR;
+      goto fail;
+    }
     strs[count] = strdup("#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable\n");
     count++;
   }
@@ -586,6 +616,7 @@ static int cl_elemwise(gpudata *input, gpudata *output, int intype,
  kfail:
   cl_freekernel(k);
  fail:
+  free(exts);
   for (i = 0; i< count; i++) {
     free(strs[i]);
   }
