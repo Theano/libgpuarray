@@ -213,7 +213,7 @@ def enable_cuda(arg):
         if arg is not None:
             print "at the specified location (%s)"%(arg,)
         else:
-            print "try specifying the cuda root (either as argument to --enable-cuda or by the envionnement variable CUDA_ROOT)"
+            print "try specifying the cuda root (either as argument to --with-cuda or by the envionnement variable CUDA_ROOT)"
         raise Exception("Could not find CUDA")
 
 def find_ocl_root():
