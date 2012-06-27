@@ -24,6 +24,7 @@ const char *Gpu_error(compyte_buffer_ops *o, int err) {
   case GA_UNSUPPORTED_ERROR: return "Unsupported operation";
   case GA_SYS_ERROR:         return strerror(errno);
   case GA_RUN_ERROR:         return "Could not execute helper program";
+  case GA_DEVSUP_ERROR:      return "Device does not support operation";
   default: return "Unknown GA error";
   }
 }
