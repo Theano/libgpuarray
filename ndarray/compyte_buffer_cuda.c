@@ -340,7 +340,7 @@ void *call_compiler_impl(const char *src, size_t len, int *ret) {
         assert(arch_arg != NULL);
     }
 
-    for (i = 0; i < sizeof(TMP_VAR_NAMES); i++) {
+    for (i = 0; i < sizeof(TMP_VAR_NAMES)/sizeof(TMP_VAR_NAMES[0]); i++) {
         tmpdir = getenv(TMP_VAR_NAMES[i]);
         if (tmpdir != NULL) break;
     }
