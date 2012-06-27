@@ -273,52 +273,41 @@ static int cuda_offset(gpudata *buf, ssize_t off) {
     return GA_NO_ERROR;
 }
 
-static const char *arch_arg = NULL;
-
-static int detect_arch(void) {
+static const char *detect_arch(int *ret) {
     CUdevice dev;
     int major, minor;
     err = cuCtxGetDevice(&dev);
-    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+    if (err != CUDA_SUCCESS) FAIL(NULL, GA_IMPL_ERROR);
     err = cuDeviceComputeCapability(&major, &minor, dev);
-    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+    if (err != CUDA_SUCCESS) FAIL(NULL, GA_IMPL_ERROR);
     switch (major) {
     case 1:
         switch (minor) {
         case 0:
-            arch_arg = "sm_10";
-            break;
+            return "sm_10";
         case 1:
-            arch_arg = "sm_11";
-            break;
+            return "sm_11";
         case 2:
-            arch_arg = "sm_12";
-            break;
+            return "sm_12";
         case 3:
         default:
-            arch_arg = "sm_13";
+            return "sm_13";
         }
-        break;
     case 2:
         switch (minor) {
         case 0:
-            arch_arg = "sm_20";
-            break;
+            return "sm_20";
         case 1:
-            arch_arg = "sm_21";
-            break;
+            return "sm_21";
         case 2:
-            arch_arg = "sm_22";
-            break;
+            return "sm_22";
         case 3:
         default:
-            arch_arg = "sm_23";
+            return "sm_23";
         }
-        break;
     default:
-        arch_arg = "sm_23";
+        return "sm_23";
     }
-    return GA_NO_ERROR;
 }
 
 void *call_compiler(const char *src, size_t len, int *ret);
@@ -329,6 +318,7 @@ void *call_compiler_impl(const char *src, size_t len, int *ret) {
     char namebuf[PATH_MAX];
     char outbuf[PATH_MAX];
     char *tmpdir;
+    const char *arch_arg;
     struct stat st;
     ssize_t s;
 #ifndef _WIN32
@@ -340,11 +330,8 @@ void *call_compiler_impl(const char *src, size_t len, int *ret) {
     char *buf;
     int res;
 
-    if (arch_arg == NULL) {
-        res = detect_arch();
-        if (res != GA_NO_ERROR) FAIL(NULL, res);
-        assert(arch_arg != NULL);
-    }
+    arch_arg = detect_arch(&res);
+    if (arch_arg == NULL) FAIL(NULL, res);
 
     for (i = 0; i < sizeof(TMP_VAR_NAMES)/sizeof(TMP_VAR_NAMES[0]); i++) {
         tmpdir = getenv(TMP_VAR_NAMES[i]);
