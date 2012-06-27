@@ -383,13 +383,19 @@ void *call_compiler_impl(const char *src, size_t len, int *ret) {
         execlp(NVCC_BIN, NVCC_ARGS, NULL);
         exit(1);
     }
-    unlink(namebuf);
-    if (p == -1)
+    if (p == -1) {
+        unlink(namebuf);
         FAIL(NULL, GA_SYS_ERROR);
+    }
 
+    /* We need to wait until after the waitpid for the unlink because otherwise
+       we might delete the input file before nvcc is finished with it. */
     if (waitpid(p, &sys_err, 0) == -1) {
+        unlink(namebuf);
         unlink(outbuf);
         FAIL(NULL, GA_SYS_ERROR);
+    } else {
+        unlink(namebuf);
     }
 
     if (WIFSIGNALED(sys_err) || WEXITSTATUS(sys_err) != 0) {
