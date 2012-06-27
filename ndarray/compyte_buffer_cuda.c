@@ -171,10 +171,12 @@ static gpudata *cuda_alloc(void *ctx /* IGNORED */, size_t size, int *ret) {
     res->base = NULL;
     res->refcnt = 1;
     
-    err = cuMemAlloc(&res->ptr, size);
-    if (err != CUDA_SUCCESS) {
-        free(res);
-        FAIL(NULL, GA_IMPL_ERROR);
+    if (size != 0) {
+        err = cuMemAlloc(&res->ptr, size);
+        if (err != CUDA_SUCCESS) {
+            free(res);
+            FAIL(NULL, GA_IMPL_ERROR);
+        }
     }
     return res;
 }
@@ -198,8 +200,10 @@ static gpudata *cuda_dup(gpudata *b, int *ret) {
 static void cuda_free(gpudata *d) {
     d->refcnt -= 1;
     if (d->refcnt == 0) {
-        if (d->base == NULL)
-            cuMemFree(d->ptr);
+        if (d->base == NULL) {
+            if (d->sz != 0)
+                cuMemFree(d->ptr);
+        }
         else if (d->base != DONTFREE)
             cuda_free(d->base);
         free(d);
@@ -207,8 +211,9 @@ static void cuda_free(gpudata *d) {
 }
 
 static int cuda_share(gpudata *a, gpudata *b, int *ret) {
-    return ((a->ptr <= b->ptr && a->ptr + a->sz > b->ptr) ||
-            (b->ptr <= a->ptr && b->ptr + b->sz > a->ptr));
+    return (a->sz != 0 && b->sz != 0 &&
+            ((a->ptr <= b->ptr && a->ptr + a->sz > b->ptr) ||
+             (b->ptr <= a->ptr && b->ptr + b->sz > a->ptr)));
 }
 
 static int cuda_move(gpudata *dst, gpudata *src, size_t sz)
@@ -226,7 +231,7 @@ static int cuda_move(gpudata *dst, gpudata *src, size_t sz)
 
 static int cuda_read(void *dst, gpudata *src, size_t sz)
 {
-    if (sz > src->sz)
+    if (src->sz < sz)
         return GA_VALUE_ERROR;
     if (sz == 0) return GA_NO_ERROR;
 
@@ -239,7 +244,7 @@ static int cuda_read(void *dst, gpudata *src, size_t sz)
 
 static int cuda_write(gpudata *dst, const void *src, size_t sz)
 {
-    if (dst->sz != sz)
+    if (dst->sz < sz)
         return GA_VALUE_ERROR;
     if (sz == 0) return GA_NO_ERROR;
 
@@ -261,7 +266,8 @@ static int cuda_memset(gpudata *dst, int data) {
 }
 
 static int cuda_offset(gpudata *buf, ssize_t off) {
-    /* XXX: this does not check for overflow */
+    /* This only check that you don't wrap around through the bottom */
+    if (off > buf->sz) return GA_VALUE_ERROR;
     buf->ptr += off;
     buf->sz -= off;
     return GA_NO_ERROR;
