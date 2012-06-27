@@ -20,7 +20,7 @@ const char *Gpu_error(compyte_buffer_ops *o, int err) {
   case GA_MEMORY_ERROR:      return "Out of memory";
   case GA_VALUE_ERROR:       return "Value out of range";
   case GA_IMPL_ERROR:        return o->buffer_error();
-  case GA_INVALID_ERROR:     return "Invalid value";
+  case GA_INVALID_ERROR:     return "Invalid value or operation";
   case GA_UNSUPPORTED_ERROR: return "Unsupported operation";
   case GA_SYS_ERROR:         return strerror(errno);
   case GA_RUN_ERROR:         return "Could not execute helper program";
