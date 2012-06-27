@@ -522,6 +522,21 @@ static int cl_elemwise(gpudata *input, gpudata *output, int intype,
 
   if (nEls == 0) return GA_NO_ERROR;
 
+  if (outtype == GA_DOUBLE || intype == GA_DOUBLE) {
+    strs[count] = strdup("#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n");
+    count++;
+  }
+
+  if (outtype == GA_HALF || intype == GA_HALF) {
+    strs[count] = strdup("#pragma OPENCL EXTENSION cl_khr_fp16 : enable\n");
+    count++;
+  }
+
+  if (compyte_get_elsize(outtype) < 4 || compyte_get_elsize(intype) < 4) {
+    strs[count] = strdup("#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable\n");
+    count++;
+  }
+
   if (asprintf(&strs[count], ELEM_HEADER,
 	       compyte_get_type(intype)->cl_name,
 	       compyte_get_type(outtype)->cl_name,
