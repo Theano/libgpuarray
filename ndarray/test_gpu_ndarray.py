@@ -17,6 +17,7 @@ ctx = gpu_ndarray.init(kind, 0)
 # again.
 enable_double = True
 enable_small = True
+enable_complex = False
 
 if numpy.__version__ < '1.6.0':
     skip_single_f = True
@@ -24,21 +25,23 @@ else:
     skip_single_f = False
 
 dtypes_all = ["float32",
-              "int32", "int64", "uint32", "uint64",
-              "complex64",
-              ]
+              "int32", "int64", "uint32", "uint64"]
 
 dtypes_no_complex = ["float32",
-                     "int32", "int64", "uint32", "uint64",
-                     ]
+                     "int32", "int64", "uint32", "uint64"]
 
 if enable_small:
     dtypes_all += ["int8", "int16", "uint8", "uint16"]
     dtypes_no_complex += ["int8", "int16", "uint8", "uint16"]
 
+if enable_complex:
+    dtypes_all += ["complex64"]
+
 if enable_double:
-    dtypes_all += ["float64", "complex128"]
+    dtypes_all += ["float64"]
     dtypes_no_complex += ["float64"]
+    if enable_complex:
+        dtypes_all += ["complex128"]
 
 
 def check_flags(x, y):
