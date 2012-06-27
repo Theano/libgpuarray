@@ -34,10 +34,7 @@ typedef struct _uint128 {
     } value;
 } uint128_t;
 
-typedef struct _cfloat {
-  float r;
-  float i;
-} cfloat_t;
+typedef uint16_t half_t;
 
 typedef struct _cdouble {
   double r;
@@ -49,9 +46,20 @@ typedef struct _clongdouble {
  long double i;
 } clongdouble_t;
 
-typedef uint16_t half_t;
+typedef struct _cfloat {
+  float r;
+  float i;
+} cfloat_t;
 
-const char CL_HEAD[] = "";
+
+const char CL_HEAD[] = ""
+ "\n"
+ "typedef struct _cfloat {\n"
+ "  float r;\n"
+ "  float i;\n"
+ "} cfloat_t;\n"
+ "\n"
+;
 const char CUDA_HEAD[] = ""
  "\n"
  "#ifdef _MSC_VER\n"
@@ -85,10 +93,7 @@ const char CUDA_HEAD[] = ""
  "    } value;\n"
  "} uint128_t;\n"
  "\n"
- "typedef struct _cfloat {\n"
- "  float r;\n"
- "  float i;\n"
- "} cfloat_t;\n"
+ "typedef uint16_t half_t;\n"
  "\n"
  "typedef struct _cdouble {\n"
  "  double r;\n"
@@ -100,7 +105,11 @@ const char CUDA_HEAD[] = ""
  " long double i;\n"
  "} clongdouble_t;\n"
  "\n"
- "typedef uint16_t half_t;\n"
+ "typedef struct _cfloat {\n"
+ "  float r;\n"
+ "  float i;\n"
+ "} cfloat_t;\n"
+ "\n"
 ;
 
 typedef struct {char c; uint8_t x; } st_bool;
@@ -155,8 +164,8 @@ compyte_type scalar_types[] = {
   {"float", "float", 4, FLOAT_ALIGN, GA_FLOAT},
   {"double", "double", 8, DOUBLE_ALIGN, GA_DOUBLE},
   {"quad", "long double", 16, LONGDOUBLE_ALIGN, GA_LONGDOUBLE},
-  {"complex float", "cfloat_t", 8, CFLOAT_ALIGN, GA_CFLOAT},
-  {"complex double", "cdouble_t", 16, CDOUBLE_ALIGN, GA_CDOUBLE},
+  {"cfloat_t", "cfloat_t", 8, CFLOAT_ALIGN, GA_CFLOAT},
+  {"cdouble_t", "cdouble_t", 16, CDOUBLE_ALIGN, GA_CDOUBLE},
   {"complex quad", "clongdouble_t", 32, CLONGDOUBLE_ALIGN, GA_CLONGDOUBLE},
   {NULL, NULL, 0, 0, -1},
   {NULL, NULL, 0, 0, -1},
