@@ -23,7 +23,7 @@ import numpy as np
 
 # These are always there
 srcs = ['compyte_types.c', 'compyte_util.c', 'compyte_buffer.c']
-macros = []
+macros = [('_GNU_SOURCE', '1')]
 cython_env = {'WITH_CUDA': False, 'WITH_OPENCL': False}
 include_dirs = [np.get_include(), '.']
 lib_dirs = []
@@ -44,7 +44,7 @@ def has_function(cc, func_call, includes=None, include_dirs=None,
     if libraries is None:
         libraries = []
     if library_dirs is None:
-        libraries = []
+        library_dirs = []
     if macros is None:
         macros = []
     fd, fname, = tempfile.mkstemp(".c", 'configtest', text=True)
@@ -87,20 +87,16 @@ def has_function(cc, func_call, includes=None, include_dirs=None,
 if not has_function(cc, 'strlcat((char *)NULL, "aaa", 3)',
                     includes=['string.h']):
     srcs.append('compyte_strl.c')
-    macros.append(('NO_STRL', ''))
+    macros.append(('NO_STRL', '1'))
 
 if not has_function(cc, 'asprintf((char **)NULL, "aaa", "b", 1.0, 2)',
-                       includes=['stdio.h']):
-    if has_function(cc, 'asprintf((char **)NULL, "aaa", "b", 1.0, 2)',
-                       includes=['stdio.h'], macros=[('_GNU_SOURCE', '')]):
-        macros.append(('_GNU_SOURCE', ''))
-    else:
-        srcs.append('compyte_asprintf.c')
-	macros.append(('NO_ASPRINTF', ''))
+                       includes=['stdio.h'], macros=macros):
+    srcs.append('compyte_asprintf.c')
+    macros.append(('NO_ASPRINTF', '1'))
 
 if not has_function(cc, 'mkstemp((char *)NULL)', includes=['stdlib.h']):
     srcs.append('compyte_mkstemp.c')
-    macros.append(('NO_MKSTEMP', ''))
+    macros.append(('NO_MKSTEMP', '1'))
 
 fnull = open(os.devnull, 'r+')
 
