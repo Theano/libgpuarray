@@ -193,7 +193,7 @@ static gpudata *cuda_dup(gpudata *b, int *ret) {
         res->base = res->base->base;
     res->refcnt = 1;
     if (res->base != DONTFREE)
-        b->refcnt += 1;
+        res->base->refcnt += 1;
     return res;
 }
 
