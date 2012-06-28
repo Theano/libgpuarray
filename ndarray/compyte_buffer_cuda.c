@@ -431,21 +431,24 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     gpukernel *res;
     size_t tot_len;
     unsigned int i;
+    int ptx_mode = 0;
 
     if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
     
     descr = calloc(count+1, sizeof(*descr));
     if (descr == NULL) FAIL(NULL, GA_SYS_ERROR);
 
-#ifdef CUDA_PTX
-    descr[0].iov_base = "";
-    descr[0].iov_len = 0;
-    tot_len = 0;
-#else
-    descr[0].iov_base = (void *)CUDA_HEAD;
-    descr[0].iov_len = strlen(CUDA_HEAD);
+    if ((!lengths || lengths[0] > 3) && strcmp(strings[0], "PTX") == 0) {
+        ptx_mode = 1;
+        descr[0].iov_base = "";
+        descr[0].iov_len = 0;
+        /* skip the first string (since it's a marker) */
+        strings++; count--;
+    } else {
+        descr[0].iov_base = (void *)CUDA_HEAD;
+        descr[0].iov_len = strlen(CUDA_HEAD);
+    }
     tot_len = descr[0].iov_len;
-#endif
 
     if (lengths == NULL) {
         for (i = 0; i < count; i++) {
@@ -461,9 +464,8 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
         }
     }
 
-#ifdef CUDA_PTX
-    tot_len += 1;
-#endif
+    if (ptx_mode) tot_len += 1;
+
     buf = malloc(tot_len);
     if (buf == NULL) {
         free(descr);
@@ -475,19 +477,19 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
         memcpy(p, descr[i].iov_base, descr[i].iov_len);
         p += descr[i].iov_len;
     }
-#ifdef CUDA_PTX
-    p[0] = '\0';
-#endif
+
+    if (ptx_mode) p[0] = '\0';
+
     free(descr);
 
-#ifdef CUDA_PTX
-    p = buf;
-#else
-    p = call_compiler(buf, tot_len, ret);
-    free(buf);
-    if (p == NULL)
-        return NULL;
-#endif
+    if (ptx_mode) {
+        p = buf;
+    } else {
+        p = call_compiler(buf, tot_len, ret);
+        free(buf);
+        if (p == NULL)
+            return NULL;
+    }
 
     res = malloc(sizeof(*res));
     if (res == NULL)
@@ -747,6 +749,12 @@ static int cuda_elemwise(gpudata *input, gpudata *output, int intype,
     if (nEls == 0) return GA_NO_ERROR;
 
 #ifdef CUDA_PTX
+    // This is a marker to let the newkernel function know that we are
+    // providing a PTX kernel rather than a C one.
+    strs[0] = strdup("PTX");
+    if (strs[0] == NULL) goto fail;
+    count = 1;
+
     if (asprintf(&strs[count], ELEM_HEADER_PTX, arch,
                  bits, bits, bits, in_t, out_t, nEls) == -1)
 #else
