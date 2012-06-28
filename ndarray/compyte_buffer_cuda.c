@@ -437,9 +437,15 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     descr = calloc(count+1, sizeof(*descr));
     if (descr == NULL) FAIL(NULL, GA_SYS_ERROR);
 
+#ifdef CUDA_PTX
+    descr[0].iov_base = "";
+    descr[0].iov_len = 0;
+    tot_len = 0;
+#else
     descr[0].iov_base = (void *)CUDA_HEAD;
     descr[0].iov_len = strlen(CUDA_HEAD);
     tot_len = descr[0].iov_len;
+#endif
 
     if (lengths == NULL) {
         for (i = 0; i < count; i++) {
@@ -455,6 +461,9 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
         }
     }
 
+#ifdef CUDA_PTX
+    tot_len += 1;
+#endif
     buf = malloc(tot_len);
     if (buf == NULL) {
         free(descr);
@@ -466,12 +475,19 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
         memcpy(p, descr[i].iov_base, descr[i].iov_len);
         p += descr[i].iov_len;
     }
+#ifdef CUDA_PTX
+    p[0] = '\0';
+#endif
     free(descr);
 
+#ifdef CUDA_PTX
+    p = buf;
+#else
     p = call_compiler(buf, tot_len, ret);
     free(buf);
     if (p == NULL)
         return NULL;
+#endif
 
     res = malloc(sizeof(*res));
     if (res == NULL)
@@ -587,6 +603,109 @@ static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
 
 static const char ELEM_FOOTER[] = "}}}\n";
 
+#ifdef CUDA_PTX
+static const char ELEM_HEADER_PTX[] = ".version 3.0\n.target %s\n\n"
+    ".entry elemk (\n"
+    ".param .u%u a_data,\n"
+    ".param .u%u b_data ) {\n"
+    ".reg .u16 rh1, rh2;\n"
+    ".reg .u32 numThreads;\n"
+    ".reg .u32 i;\n"
+    ".reg .u32 ai, bi;\n"
+    ".reg .u32 a, b;\n"
+    ".reg .u32 r1;\n"
+    ".reg .u%u rp1, rp2;\n"
+    ".reg .%s tmpa;\n"
+    ".reg .%s tmpb;\n"
+    ".reg .pred p;\n"
+    "mov.u16 rh1, %%ntid.x;\n"
+    "mov.u16 rh2, %%ctaid.x;\n"
+    "mul.wide.u16 i, rh1, rh2;\n"
+    "mov.u32 r1, %%tid.x;\n"
+    "add.u32 i, i, r1;\n"
+    "mov.u16 rh2, %%nctaid.x;\n"
+    "mul.wide.u16 numThreads, rh2, rh1;\n"
+    "setp.ge.u32 p, i, %" SPREFIX "uU;\n"
+    "@p bra $end;\n"
+    "$loop_begin:\n"
+    "mov.u32 a, 0U;\n"
+    "mov.u32 b, 0U;\n";
+
+static inline ssize_t ssabs(ssize_t v) {
+    return (v < 0 ? -v : v);
+}
+
+static int cuda_perdim_ptx(char *strs[], unsigned int *count, unsigned int nd,
+                           const size_t *dims, const ssize_t *str,
+                           const char *id, ssize_t elemsize) {
+    int i;
+
+    if (nd > 0) {
+        if (asprintf(&strs[*count], "mov.u32 %si, i;\n", id) == -1)
+            return -1;
+        (*count)++;
+
+        for (i = nd-1; i > 0; i--) {
+            assert(str[i]%elemsize == 0);
+            if (asprintf(&strs[*count], "rem.u32 r1, %si, %" SPREFIX "uU;\n"
+                         "mul.lo.u32 r1, r1, %" SPREFIX "d;\n"
+                         "%s.u32 %s, %s, r1;\n"
+                         "div.u32 %si, %si, %" SPREFIX "uU;\n",
+                         id, dims[i], ssabs(str[i]),
+                         (str[i] < 0 ? "sub" : "add"), id, id, id, id,
+                         dims[i]) == -1)
+                return -1;
+            (*count)++;
+        }
+
+        assert(str[0]%elemsize == 0);
+        if (asprintf(&strs[*count], "mul.lo.u32 r1, %si, %" SPREFIX "d;\n"
+                     "%s.u32 %s, %s, r1;\n", id, ssabs(str[0]),
+                     (str[0] < 0 ? "sub" : "add"), id, id) == -1)
+            return -1;
+        (*count)++;
+    }
+    return 0;
+}
+
+static const char ELEM_FOOTER_PTX[] = "add.u32 i, i, numThreads;\n"
+    "setp.lt.u32 p, i, %" SPREFIX "uU;\n"
+    "@p bra $loop_begin;\n"
+    "$end:\n"
+    "}\n";
+
+static inline const char *map_t(int typecode) {
+    switch (typecode) {
+    case GA_BYTE:
+        return "s8";
+    case GA_BOOL:
+    case GA_UBYTE:
+        return "u8";
+    case GA_SHORT:
+        return "s16";
+    case GA_USHORT:
+        return "u16";
+    case GA_INT:
+        return "s32";
+    case GA_UINT:
+        return "u32";
+    case GA_LONG:
+        return "s64";
+    case GA_ULONG:
+        return "u64";
+    case GA_FLOAT:
+        return "f32";
+    case GA_DOUBLE:
+        return "f64";
+    case GA_HALF:
+        return "f16";
+    default:
+        return NULL;
+    }
+}
+
+#endif
+
 static inline unsigned int xmin(unsigned long a, unsigned long b) {
     return (unsigned int)((a < b) ? a : b);
 }
@@ -605,39 +724,72 @@ static int cuda_elemwise(gpudata *input, gpudata *output, int intype,
     unsigned int i;
     unsigned int gx, bx;
 
+#ifdef CUDA_PTX
+    unsigned int bits = sizeof(void *)*8;
+    const char *in_t;
+    const char *out_t;
+    const char *arch;
+
+    if (strlen(op) != 1) return GA_UNSUPPORTED_ERROR;
+    if (op[0] != '=') return GA_UNSUPPORTED_ERROR;
+    in_t = map_t(intype);
+    out_t = map_t(outtype);
+    if (in_t == NULL || out_t == NULL) return GA_UNSUPPORTED_ERROR;
+    arch = detect_arch(&res);
+    if (arch == NULL) return res;
+#define compyte_elem_perdim cuda_perdim_ptx
+#endif
+
     for (i = 0; i < a_nd; i++) {
         nEls *= a_dims[i];
     }
 
     if (nEls == 0) return GA_NO_ERROR;
 
+#ifdef CUDA_PTX
+    if (asprintf(&strs[count], ELEM_HEADER_PTX, arch,
+                 bits, bits, bits, in_t, out_t, nEls) == -1)
+#else
     if (asprintf(&strs[count], ELEM_HEADER,
                  compyte_get_type(intype)->cuda_name,
                  compyte_get_type(outtype)->cuda_name,
                  nEls) == -1)
+#endif
         goto fail;
     count++;
 
-    if (0) { /* contiguous case */
-        if (asprintf(&strs[count], "b[i] %s a[i];", op) == -1)
-            goto fail;
-        count++;
-    } else {
-        /* XXX: does cuda does C-style pointer manip? */
-        if (compyte_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a",
-                                compyte_get_elsize(intype)) == -1)
-            goto fail;
-        if (compyte_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b",
-                                compyte_get_elsize(outtype)) == -1)
-            goto fail;
+    /* XXX: does cuda do C-style pointer manip? */
+    if (compyte_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a",
+                            compyte_get_elsize(intype)) == -1)
+        goto fail;
+    if (compyte_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b",
+                            compyte_get_elsize(outtype)) == -1)
+        goto fail;
 
-        if (asprintf(&strs[count], "b[0] %s a[0];", op) == -1)
-            goto fail;
-        count++;
-    }
+#ifdef CUDA_PTX
+    if (asprintf(&strs[count], "ld.param.u%u rp1, [a_data];\n"
+                 "cvt.u32.u32 rp2, a;\n"
+                 "add.u%u rp1, rp1, rp2;\n"
+                 "ld.global.%s tmpa, [rp1];\n"
+                 "cvt.%s.%s tmpb, tmpa;\n"
+                 "ld.param.u%u rp1, [b_data];\n"
+                 "cvt.u32.u32 rp2, b;\n"
+                 "add.u%u rp1, rp1, rp2;\n"
+                 "st.global.%s [rp1], tmpb;\n", bits, bits, in_t,
+                 out_t, in_t, bits, bits, out_t) == -1)
+#else
+    if (asprintf(&strs[count], "b[0] %s a[0];", op) == -1)
+#endif
+        goto fail;
+    count++;
 
+#ifdef CUDA_PTX
+    if (asprintf(&strs[count], ELEM_FOOTER_PTX, nEls) == -1)
+        goto fail;
+#else
     strs[count] = strdup(ELEM_FOOTER);
     if (strs[count] == NULL) goto fail;
+#endif
     count++;
     
     assert(count < (sizeof(strs)/sizeof(strs[0])));
