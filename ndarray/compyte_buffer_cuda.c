@@ -289,7 +289,6 @@ static const char *detect_arch(int *ret) {
             return "sm_11";
         case 2:
             return "sm_12";
-        case 3:
         default:
             return "sm_13";
         }
@@ -297,16 +296,11 @@ static const char *detect_arch(int *ret) {
         switch (minor) {
         case 0:
             return "sm_20";
-        case 1:
-            return "sm_21";
-        case 2:
-            return "sm_22";
-        case 3:
         default:
-            return "sm_23";
+            return "sm_21";
         }
     default:
-        return "sm_23";
+        return "sm_30";
     }
 }
 
