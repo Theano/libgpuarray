@@ -96,7 +96,7 @@ static CUresult err;
 static const char *get_error_string(CUresult err) {
     switch (err) {
     case CUDA_SUCCESS:                 return "Success!";
-    case CUDA_ERROR_INVALID_VALUE:     return "Invalid value";
+    case CUDA_ERROR_INVALID_VALUE:     return "Invalid cuda value";
     case CUDA_ERROR_OUT_OF_MEMORY:     return "Out of host memory";
     case CUDA_ERROR_NOT_INITIALIZED:   return "API not initialized";
     case CUDA_ERROR_DEINITIALIZED:     return "Driver is shutting down";
