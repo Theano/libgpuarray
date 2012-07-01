@@ -4,9 +4,11 @@ import theano
 
 import pygpu_ndarray as gpu_ndarray
 # Run the tests for cuda
-#gpu_ndarray.set_kind_context("cuda", gpu_ndarray.init("cuda", 0))
+kind = "cuda"
 # Run the tests for opencl
-gpu_ndarray.set_kind_context("opencl", gpu_ndarray.init("opencl", 0))
+#kind = "opencl"
+
+ctx = gpu_ndarray.init(kind, 0)
 
 from gen_elemwise import MyGpuNdArray, elemwise_collapses
 from test_gpu_ndarray import (dtypes_all, enable_double,
@@ -402,7 +404,8 @@ def test_sum():
               [['f', 'c']])):
 
             cpu_val, gpu_val = gen_gpu_nd_array(shape, dtype, off_o,
-                                                off_i, sliced, order)
+                                                off_i, sliced, order,
+                                                kind=kind, ctx=ctx)
 
             if len(shape) > 4 and not (gpu_val.flags["C_CONTIGUOUS"] or
                                        gpu_val.flags["F_CONTIGUOUS"]):

@@ -78,7 +78,8 @@ def check_all(x, y):
 
 
 def gen_gpu_nd_array(shape_orig, dtype='float32', offseted_outer=False,
-                     offseted_inner=False, sliced=1, order='c'):
+                     offseted_inner=False, sliced=1, order='c',
+                     kind=None, ctx=None):
     if sliced is True:
         sliced = 2
     elif sliced is False:
@@ -140,7 +141,8 @@ def test_transfer():
     for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             for offseted in [True, False]:
-                a, b = gen_gpu_nd_array(shp, dtype, offseted)
+                a, b = gen_gpu_nd_array(shp, dtype, offseted,
+                                        kind=kind, ctx=ctx)
                 c = numpy.asarray(b)
 
                 assert numpy.allclose(c, a)
@@ -200,7 +202,8 @@ def test_ascontiguousarray():
                             #print sliced, order
                             cpu, gpu = gen_gpu_nd_array(shp, dtype, offseted_o,
                                                         offseted_i,
-                                                        sliced, order)
+                                                        sliced, order,
+                                                        kind=kind, ctx=ctx)
 
                             a = numpy.ascontiguousarray(cpu)
                             b = gpu_ndarray.ascontiguousarray(gpu)
@@ -236,7 +239,8 @@ def test_asfortranarray():
                                                         offseted_outer,
                                                         offseted_inner,
                                                         sliced,
-                                                        order)
+                                                        order,
+                                                        kind=kind, ctx=ctx)
 
                             a = numpy.asfortranarray(cpu)
                             b = gpu_ndarray.asfortranarray(gpu)
@@ -312,7 +316,8 @@ def test_mapping_getitem_ellipsis():
     for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             for offseted in [True, False]:
-                a, a_gpu = gen_gpu_nd_array(shp, dtype, offseted)
+                a, a_gpu = gen_gpu_nd_array(shp, dtype, offseted,
+                                            kind=kind, ctx=ctx)
 
                 b = a_gpu[...]
                 assert b.gpudata == a_gpu.gpudata
@@ -349,7 +354,8 @@ def test_copy_view():
                         #print shp, dtype, offseted, order1, order2
                         #TODO test copy unbroadcast!
                         a, b = gen_gpu_nd_array(shp, dtype, offseted,
-                                                order=order1)
+                                                order=order1,
+                                                kind=kind, ctx=ctx)
 
                         assert numpy.allclose(a, numpy.asarray(b))
                         check_flags(b, a)
@@ -384,7 +390,8 @@ def test_len():
     for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             for offseted in [True, False]:
-                a, a_gpu = gen_gpu_nd_array(shp, dtype, offseted)
+                a, a_gpu = gen_gpu_nd_array(shp, dtype, offseted,
+                                            kind=kind, ctx=ctx)
                 assert len(a_gpu) == shp[0]
 
 def test_mapping_getitem_w_int():
@@ -460,7 +467,8 @@ def test_mapping_getitem_w_int():
         for offseted in [True, False]:
             # test vector
             dim = (2,)
-            a, _a = gen_gpu_nd_array(dim, dtype, offseted)
+            a, _a = gen_gpu_nd_array(dim, dtype, offseted,
+                                     kind=kind, ctx=ctx)
 
             import sys
             init_ref_count = sys.getrefcount(_a)
@@ -480,14 +488,16 @@ def test_mapping_getitem_w_int():
 
             # test scalar
             dim = ()
-            a, _a = gen_gpu_nd_array(dim, dtype, offseted)
+            a, _a = gen_gpu_nd_array(dim, dtype, offseted,
+                                     kind=kind, ctx=ctx)
             _cmp(_a[...], a[...])
             _cmpf(_a, 0)
             _cmpf(_a, slice(1))
 
             # test 4d-tensor
             dim = (5, 4, 3, 2)
-            a, _a = gen_gpu_nd_array(dim, dtype, offseted)
+            a, _a = gen_gpu_nd_array(dim, dtype, offseted,
+                                     kind=kind, ctx=ctx)
             _cmpf(_a, slice(-1), slice(-1), 10, -10)
             _cmpf(_a, slice(-1), slice(-1), -10, slice(-1))
             _cmpf(_a, 0, slice(0, -1, -20), -10)
