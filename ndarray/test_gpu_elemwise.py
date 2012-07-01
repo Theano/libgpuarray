@@ -29,7 +29,7 @@ def speed_elemwise_collapse():
     """ used to time if the collapse of ccontiguous dims are useful """
 
     shape = (30,40,50,600)
-    a = gpu_ndarray.GpuArray(numpy.asarray(numpy.random.rand(*shape),dtype='float32'))
+    a = gpu_ndarray.array(numpy.asarray(numpy.random.rand(*shape),dtype='float32'))
     a = numpy.asarray(numpy.random.rand(*shape),dtype='float32')
     a2 = tcn.shared_constructor(a, 'a')
     a3 = a2[:,::2,:,:]
@@ -80,7 +80,7 @@ def test_elemwise_collapse():
         for dtype2 in ["int16", "float32", "int8"]:
 
             scalar_cpu = rand((1,1,1,1),dtype=dtype1)
-            scalar_gpu = gpu_ndarray.GpuArray(scalar_cpu)
+            scalar_gpu = gpu_ndarray.array(scalar_cpu)
             scalar_gpu1 = MyGpuNdArray(scalar_gpu)
 
             for shape1_, shape2_, expected in [
@@ -117,7 +117,7 @@ def test_elemwise_collapse():
                 ((1, 1, 1, 1), (4, 5, 6, 1), 1),
                 ]:
                 scalar_cpu = rand((1,) * len(shape1_), dtype=dtype1)
-                scalar_gpu = gpu_ndarray.GpuNdArrayObject(scalar_cpu)
+                scalar_gpu = gpu_ndarray.array(scalar_cpu)
                 scalar_gpu1 = MyGpuNdArray(scalar_gpu)
                 for shape1, shape2 in [(shape1_, shape2_), (shape2_, shape1_)]:
                     a_cpu = rand(shape1, dtype=dtype1)
