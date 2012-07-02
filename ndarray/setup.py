@@ -180,6 +180,7 @@ def try_cuda(arg):
         return
 
     print "Found nvcc at:", nvcc_bin
+    nvcc_bin = nvcc_bin.replace("\\", "\\\\")
 
     res = find_cuda_lib(cuda_root)
     if res is None:
