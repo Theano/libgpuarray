@@ -521,6 +521,17 @@ static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
 
 static const char ELEM_FOOTER[] = "}}\n";
 
+static int enable_extension(char **strs, unsigned int *count, const char *name,
+			    char *exts) {
+    if (strstr(exts, name) == NULL) return GA_DEVSUP_ERROR;
+
+    if (asprintf(&strs[*count], "#pragma OPENCL EXTENSION %s : enable\n",
+		 name) == -1) return GA_SYS_ERROR;
+    (*count)++;
+
+   return GA_NO_ERROR;
+}
+
 static int cl_elemwise(gpudata *input, gpudata *output, int intype,
 		       int outtype, const char *op, unsigned int a_nd,
 		       const size_t *a_dims, const ssize_t *a_str,
@@ -565,30 +576,19 @@ static int cl_elemwise(gpudata *input, gpudata *output, int intype,
   }
 
   if (outtype == GA_DOUBLE || intype == GA_DOUBLE) {
-    if (strstr(exts, "cl_khr_fp64") == NULL) {
-      res = GA_DEVSUP_ERROR;
-      goto fail;
-    }
-    strs[count] = strdup("#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n");
-    count++;
+    res = enable_extension(strs, &count, "cl_khr_fp64", exts);
+    if (res != GA_NO_ERROR) goto fail;
   }
 
   if (outtype == GA_HALF || intype == GA_HALF) {
-    if (strstr(exts, "cl_khr_fp16") == NULL) {
-      res = GA_DEVSUP_ERROR;
-      goto fail;
-    }
-    strs[count] = strdup("#pragma OPENCL EXTENSION cl_khr_fp16 : enable\n");
-    count++;
+    res = enable_extension(strs, &count, "cl_khr_fp16", exts);
+    if (res != GA_NO_ERROR) goto fail;
   }
 
   if (compyte_get_elsize(outtype) < 4 || compyte_get_elsize(intype) < 4) {
-    if (strstr(exts, "cl_khr_byte_addressable_store") == NULL) {
-      res = GA_DEVSUP_ERROR;
-      goto fail;
-    }
-    strs[count] = strdup("#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable\n");
-    count++;
+    res = enable_extension(strs, &count, "cl_khr_byte_addressable_store",
+			   exts);
+    if (res != GA_NO_ERROR) goto fail;
   }
 
   if (asprintf(&strs[count], ELEM_HEADER,
