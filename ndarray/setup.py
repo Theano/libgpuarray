@@ -105,9 +105,9 @@ def find_cuda_root():
     if root is not None:
         return root
     for loc in ('/usr/local/cuda',
-                'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v4.2'
-                'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v4.1'
-                'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v4.0'
+                'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v4.2',
+                'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v4.1',
+                'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v4.0',
                 'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v3.2'):
         if os.path.isdir(loc):
             return loc
