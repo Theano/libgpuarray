@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include "compyte_compat.h"
 
 #include <sys/types.h>
@@ -28,6 +29,8 @@
 #define unlink _unlink
 #define fstat _fstat
 #define stat _stat
+#define open _open
+#define strdup _strdup
 #else
 #include <unistd.h>
 #endif
@@ -267,7 +270,7 @@ static int cuda_memset(gpudata *dst, int data) {
 
 static int cuda_offset(gpudata *buf, ssize_t off) {
     /* This only check that you don't wrap around through the bottom */
-    if (off > buf->sz) return GA_VALUE_ERROR;
+    if (off > 0 && (size_t)off > buf->sz) return GA_VALUE_ERROR;
     buf->ptr += off;
     buf->sz -= off;
     return GA_NO_ERROR;

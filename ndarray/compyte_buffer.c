@@ -46,7 +46,7 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
   if (ord != GA_C_ORDER && ord != GA_F_ORDER)
     return GA_VALUE_ERROR;
 
-  for (i = 0; i < nd; i++) {
+  for (i = 0; (unsigned)i < nd; i++) {
     size_t d = dims[i];
     if ((d >= MUL_NO_OVERFLOW || size >= MUL_NO_OVERFLOW) &&
 	d > 0 && SIZE_MAX / d < size)
@@ -81,7 +81,7 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
     a->flags |= GA_C_CONTIGUOUS;
     break;
   case GA_F_ORDER:
-    for (i = 0; i < nd; i++) {
+    for (i = 0; (unsigned)i < nd; i++) {
       a->strides[i] = size;
       size *= a->dimensions[i];
     }

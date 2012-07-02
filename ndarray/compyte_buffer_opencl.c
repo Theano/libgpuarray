@@ -1,6 +1,4 @@
-#ifdef _MSC_VER
 #define _CRT_SECURE_NO_WARNINGS
-#endif
 
 #include "compyte_compat.h"
 #include "compyte_buffer.h"
@@ -20,6 +18,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+
+#ifdef _MSC_VER
+#define strdup _strdup
+#endif
 
 #define SSIZE_MIN (-SSIZE_MAX-1)
 
@@ -188,7 +190,7 @@ static void *cl_init(int devno, int *ret) {
   err = clGetPlatformIDs(0, NULL, &nump);
   CHKFAIL(NULL);
 
-  if (platno >= nump || platno < 0) FAIL(NULL, GA_VALUE_ERROR);
+  if ((unsigned int)platno >= nump || platno < 0) FAIL(NULL, GA_VALUE_ERROR);
 
   ps = calloc(sizeof(*ps), nump);
   if (ps == NULL) FAIL(NULL, GA_MEMORY_ERROR);
@@ -202,7 +204,7 @@ static void *cl_init(int devno, int *ret) {
   err = clGetDeviceIDs(p, CL_DEVICE_TYPE_ALL, 0, NULL, &numd);
   CHKFAIL(NULL);
 
-  if (devno >= numd || devno < 0) FAIL(NULL, GA_VALUE_ERROR);
+  if ((unsigned int)devno >= numd || devno < 0) FAIL(NULL, GA_VALUE_ERROR);
 
   ds = calloc(sizeof(*ds), numd);
   if (ds == NULL) FAIL(NULL, GA_MEMORY_ERROR);
@@ -396,7 +398,7 @@ static int cl_offset(gpudata *b, ssize_t off) {
   if (off < 0) {
     /* negative */
     if (((off == SSIZE_MIN) && (b->offset <= SSIZE_MAX)) ||
-	(-off > b->offset)) {
+	(((size_t)-off) > b->offset)) {
       return GA_VALUE_ERROR;
     }
   } else {
