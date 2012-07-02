@@ -143,7 +143,7 @@ static cl_command_queue make_q(cl_context ctx, int *ret) {
 
   err = clGetContextInfo(ctx, CL_CONTEXT_DEVICES, 0, NULL, &sz);
   CHKFAIL(NULL);
-  
+
   ids = malloc(sz);
   if (ids == NULL) FAIL(NULL, GA_MEMORY_ERROR);
   
@@ -170,25 +170,49 @@ errcb(const char *errinfo, const void *pi, size_t cb, void *u) {
 }
 
 static void *cl_init(int devno, int *ret) {
-  cl_device_id ds[16];
+  int platno;
+  cl_device_id *ds;
+  cl_device_id d;
+  cl_platform_id *ps;
   cl_platform_id p;
-  cl_uint numd;
+  cl_uint nump, numd;
   cl_context_properties props[3] = {
     CL_CONTEXT_PLATFORM, 0,
     0,
   };
   cl_context ctx;
 
-  err = clGetPlatformIDs(1, &p, NULL);
+  platno = devno >> 16;
+  devno &= 0xFFFF;
+
+  err = clGetPlatformIDs(0, NULL, &nump);
   CHKFAIL(NULL);
 
-  err = clGetDeviceIDs(p, CL_DEVICE_TYPE_ALL, 16, ds, &numd);
+  if (platno >= nump || platno < 0) FAIL(NULL, GA_VALUE_ERROR);
+
+  ps = calloc(sizeof(*ps), nump);
+  if (ps == NULL) FAIL(NULL, GA_MEMORY_ERROR);
+  err = clGetPlatformIDs(nump, ps, NULL);
+  /* We may get garbage on failure here but it won't matter as we will
+     not use it */
+  p = ps[platno];
+  free(ps);
+  CHKFAIL(NULL);
+
+  err = clGetDeviceIDs(p, CL_DEVICE_TYPE_ALL, 0, NULL, &numd);
   CHKFAIL(NULL);
 
   if (devno >= numd || devno < 0) FAIL(NULL, GA_VALUE_ERROR);
-  props[1] = (cl_context_properties)p;
 
-  ctx = clCreateContext(props, 1, &ds[devno], errcb, NULL, &err);
+  ds = calloc(sizeof(*ds), numd);
+  if (ds == NULL) FAIL(NULL, GA_MEMORY_ERROR);
+  err = clGetDeviceIDs(p, CL_DEVICE_TYPE_ALL, numd, ds, NULL);
+  d = ds[devno];
+  free(ds);
+  CHKFAIL(NULL);
+
+  props[1] = (cl_context_properties)p;
+  ctx = clCreateContext(props, 1, &d, errcb, NULL, &err);
   CHKFAIL(NULL);
 
   return ctx;
