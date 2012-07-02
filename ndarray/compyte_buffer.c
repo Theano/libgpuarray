@@ -37,6 +37,9 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
   int i;
   int res = GA_NO_ERROR;
 
+  if (ops == NULL)
+    return GA_INVALID_ERROR;
+
   if (ord == GA_ANY_ORDER)
     ord = GA_C_ORDER;
 
