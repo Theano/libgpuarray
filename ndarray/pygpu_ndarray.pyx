@@ -3,6 +3,12 @@ include "defs.pxi"
 cimport libc.stdio
 from libc.stdlib cimport malloc, calloc, free
 
+# This is used in a hack to silence some over-eager warnings.
+cdef extern from *:
+    ctypedef object slice_object "PySliceObject *"
+    ctypedef char **const_char_pp "const char **"
+    ctypedef char *const_char_p "const char *"
+
 cdef extern from "stdlib.h":
     void *memcpy(void *dst, void *src, size_t n)
 
@@ -21,7 +27,7 @@ cdef object PyArray_Empty(int a, np.npy_intp *b, np.dtype c, int d):
     return _PyArray_Empty(a, b, c, d)
 
 cdef extern from "Python.h":
-    cdef int PySlice_GetIndicesEx(slice slice, Py_ssize_t length,
+    cdef int PySlice_GetIndicesEx(slice_object slice, Py_ssize_t length,
                                   Py_ssize_t *start, Py_ssize_t *stop,
                                   Py_ssize_t *step,
                                   Py_ssize_t *slicelength) except -1
@@ -290,7 +296,8 @@ cdef array_memset(GpuArray a, int data):
         raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef kernel_init(GpuKernel k, compyte_buffer_ops *ops, void *ctx,
-                 unsigned int count, char **strs, size_t *len, char *name):
+                 unsigned int count, const_char_pp strs, size_t *len,
+                 char *name):
     cdef int err
     with nogil:
         # The C compiler warning about argument 5 is ok.  It's a const thing.
@@ -581,8 +588,8 @@ cdef class GpuArray:
         if isinstance(key, slice):
             # C compiler complains about argument 1 (key) because it's
             # declared as a PyObject.  But we know it's a slice so it's ok.
-            PySlice_GetIndicesEx(key, self.ga.dimensions[i], start, stop,
-                                 step, &dummy)
+            PySlice_GetIndicesEx(<slice_object>key, self.ga.dimensions[i],
+                                 start, stop, step, &dummy)
             if stop[0] < start[0] and step[0] > 0:
                 stop[0] = start[0]
         elif key is Ellipsis:
@@ -783,7 +790,7 @@ cdef class GpuKernel:
         kernel_clear(self)
 
     def __cinit__(self, source, name, kind=None, context=None, *a, **kwa):
-        cdef char *s[1]
+        cdef const_char_p s[1]
         cdef size_t l
         cdef compyte_buffer_ops *ops
         
