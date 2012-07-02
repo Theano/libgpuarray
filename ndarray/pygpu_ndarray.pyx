@@ -811,8 +811,10 @@ cdef class GpuKernel:
 
         # This is required under CUDA otherwise the function is compiled
         # as a C++ mangled name and is irretriveable
-        # XXX: I don't know if it works in OpenCL, and can't test for now.
-        ss = 'extern "C" {%s}'%(source,)
+        if kind == "cuda":
+            ss = 'extern "C" {%s}'%(source,)
+        else:
+            ss = source
 
         s[0] = ss
         l = len(ss)
