@@ -329,7 +329,7 @@ cdef kernel_call(GpuKernel k, unsigned int gx, unsigned int gy,
 cdef compyte_buffer_ops *GpuArray_ops
 cdef void *GpuArray_ctx
 
-cdef compyte_buffer_ops *get_ops(kind):
+cdef compyte_buffer_ops *get_ops(kind) except NULL:
     IF WITH_OPENCL:
         if kind == "opencl":
             return &opencl_ops
