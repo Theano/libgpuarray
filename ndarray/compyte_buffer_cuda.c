@@ -307,11 +307,9 @@ static const char *detect_arch(int *ret) {
     }
 }
 
-void *call_compiler(const char *src, size_t len, int *ret);
-
 static const char *TMP_VAR_NAMES[] = {"COMPYTE_TMPDIR", "TMPDIR", "TEMP", "TMP"};
 
-void *call_compiler_impl(const char *src, size_t len, int *ret) {
+static void *call_compiler_impl(const char *src, size_t len, int *ret) {
     char namebuf[PATH_MAX];
     char outbuf[PATH_MAX];
     char *tmpdir;
@@ -425,6 +423,8 @@ void *call_compiler_impl(const char *src, size_t len, int *ret) {
     return buf;
 }
 
+void *(*cuda_call_compiler)(const char *src, size_t len, int *ret) = call_compiler_impl;
+
 static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
                                  const char **strings, const size_t *lengths,
                                  const char *fname, int *ret) {
@@ -488,7 +488,7 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     if (ptx_mode) {
         p = buf;
     } else {
-        p = call_compiler(buf, tot_len, ret);
+        p = cuda_call_compiler(buf, tot_len, ret);
         free(buf);
         if (p == NULL)
             return NULL;

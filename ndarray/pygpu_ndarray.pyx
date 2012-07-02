@@ -79,7 +79,7 @@ cdef extern from "compyte_buffer.h":
 
     cdef enum ga_error:
         GA_NO_ERROR, GA_MEMORY_ERROR, GA_VALUE_ERROR, GA_IMPL_ERROR,
-        GA_INVALID_ERROR, GA_UNSUPPORTED_ERROR, GA_SYS_ERROR
+        GA_INVALID_ERROR, GA_UNSUPPORTED_ERROR, GA_SYS_ERROR, GA_RUN_ERROR
 
     enum COMPYTE_TYPES:
         GA_BOOL,
@@ -138,39 +138,41 @@ cdef extern from "compyte_buffer.h":
     int GpuKernel_call(_GpuKernel *, unsigned int gx, unsigned int gy,
                        unsigned int gz, unsigned int lx, unsigned int ly,
                        unsigned int lz) nogil
+    void *(*cuda_call_compiler)(char *src, size_t sz, int *ret)
+
 
 IF WITH_CUDA:
-    cdef object call_compiler = None
-    cdef extern void *call_compiler_impl(char *src, size_t len, int *ret)
+    cdef object call_compiler_fn = None
+    cdef void *(*call_compiler_default)(char *src, size_t sz, int *ret)
+    call_compiler_default = cuda_call_compiler
 
-    cdef public void *call_compiler_python(char *src, size_t sz,
-                                           int *ret) with gil:
+    cdef void *call_compiler_python(char *src, size_t sz,
+                                    int *ret) with gil:
         cdef bytes res
         cdef void *buf
         cdef char *tmp
-        if call_compiler is None:
-            return call_compiler_impl(src, sz, ret)
-        else:
-            try:
-                res = call_compiler(src[:sz])
-                buf = malloc(len(res))
-                if buf == NULL:
-                    if ret != NULL:
-                        ret[0] = GA_SYS_ERROR
-                    return NULL
-                tmp = res
-                memcpy(buf, tmp, len(res))
-                return buf
-            except:
-                # This would correspond to an unknown error
-                # XXX: maybe should store the exception somewhere
+        try:
+            res = call_compiler_fn(src[:sz])
+            buf = malloc(len(res))
+            if buf == NULL:
                 if ret != NULL:
-                    ret[0] = -1
+                    ret[0] = GA_SYS_ERROR
                 return NULL
+            tmp = res
+            memcpy(buf, tmp, len(res))
+            return buf
+        except:
+            # XXX: maybe should store the exception somewhere
+            if ret != NULL:
+                ret[0] = GA_RUN_ERROR
+            return NULL
 
     def set_compiler_fn(fn):
-        if callable(fn) or fn is None:
-            call_compiler = fn
+        if callable(fn):
+            call_compiler_fn = fn
+            cuda_call_compiler = call_compiler_python
+        elif fn is None:
+            cuda_call_compiler = call_compiler_default
         else:
             raise ValueError("need a callable")
 

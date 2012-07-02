@@ -193,7 +193,6 @@ def try_cuda(arg):
         macros.append(('NVCC_BIN', '\\"'+nvcc_bin+'\\"'))
     else:
         macros.append(('NVCC_BIN', '"'+nvcc_bin+'"'))
-    macros.append(('call_compiler', 'call_compiler_python'))
     srcs.append('compyte_buffer_cuda.c')
     
     ext_link_args.extend(res.pop('extra_link_args', []))

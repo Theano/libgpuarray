@@ -77,6 +77,7 @@ typedef struct _compyte_buffer_ops {
 
 #ifdef WITH_CUDA
 extern compyte_buffer_ops cuda_ops;
+void *(*cuda_call_compiler)(const char *src, size_t len, int *ret);
 #ifdef CUDA_VERSION
 gpudata *cuda_make_buf(CUdeviceptr p, size_t sz);
 #endif
