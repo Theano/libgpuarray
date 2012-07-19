@@ -467,12 +467,6 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
     cdef void *ctx
     cdef ga_order ord
 
-    if isinstance(proto, (list, tuple)):
-        if len(proto) < ndmin:
-            proto = ((1,) * (ndmin - len(proto))) + tuple(proto)
-        return GpuArray(proto, dtype=dtype, order=order, kind=kind,
-                        context=context)
-
     if isinstance(proto, GpuArray):
         if kind is not None or context is not None:
             raise ValueError("cannot copy GpuArray to a different context")
