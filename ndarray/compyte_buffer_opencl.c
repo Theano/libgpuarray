@@ -521,7 +521,7 @@ static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
   "__global const DTYPEA *a = a_data;"
   "__global DTYPEB *b = b_data;";
 
-static const char ELEM_FOOTER[] = "}}\n";
+static const char ELEM_FOOTER[] = "b[0] = a[0];}}\n";
 
 static int enable_extension(char **strs, unsigned int *count, const char *name,
 			    char *exts) {
@@ -534,11 +534,11 @@ static int enable_extension(char **strs, unsigned int *count, const char *name,
    return GA_NO_ERROR;
 }
 
-static int cl_elemwise(gpudata *input, gpudata *output, int intype,
-		       int outtype, const char *op, unsigned int a_nd,
-		       const size_t *a_dims, const ssize_t *a_str,
-		       unsigned int b_nd, const size_t *b_dims,
-		       const ssize_t *b_str) {
+static int cl_extcopy(gpudata *input, gpudata *output, int intype,
+                      int outtype, unsigned int a_nd,
+                      const size_t *a_dims, const ssize_t *a_str,
+                      unsigned int b_nd, const size_t *b_dims,
+                      const ssize_t *b_str) {
   char *strs[64];
   size_t nEls;
   cl_context ctx;
@@ -602,22 +602,13 @@ static int cl_elemwise(gpudata *input, gpudata *output, int intype,
     goto fail;
   count++;
   
-  if (0) { /* contiguous case */
-    if (asprintf(&strs[count], "b[i] %s a[i];", op) == -1)
-      goto fail;
-    count++;
-  } else {
-    if (compyte_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a",
-			    compyte_get_elsize(intype)) == -1)
-      goto fail;
-    if (compyte_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b",
-			    compyte_get_elsize(outtype)) == -1)
-      goto fail;
+  if (compyte_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a",
+                          compyte_get_elsize(intype)) == -1)
+    goto fail;
+  if (compyte_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b",
+                          compyte_get_elsize(outtype)) == -1)
+    goto fail;
 
-    if (asprintf(&strs[count], "b[0] %s a[0];", op) == -1)
-      goto fail;
-    count++;
-  }
   strs[count] = strdup(ELEM_FOOTER);
   if (strs[count] == NULL) 
     goto fail;
@@ -633,11 +624,8 @@ static int cl_elemwise(gpudata *input, gpudata *output, int intype,
   res = cl_setkernelargbuf(k, 1, output);
   if (res != GA_NO_ERROR) goto kfail;
 
-  /* XXX: this call really sucks because:
-     a) nEls is a size_t that we assign to an int
-     b) the scheduling sucks
-  */
-  res = cl_callkernel(k, nEls, 1, 1, 0, 0, 0);
+  assert(nEls < UINT_MAX);
+  res = cl_callkernel(k, (unsigned int)nEls, 1, 1, 0, 0, 0);
 
  kfail:
   cl_freekernel(k);
@@ -654,19 +642,19 @@ static const char *cl_error(void) {
 }
 
 compyte_buffer_ops opencl_ops = {cl_init,
-				 cl_alloc,
-				 cl_dup,
-				 cl_free,
-				 cl_share,
-				 cl_move,
-				 cl_read,
-				 cl_write,
-				 cl_memset,
-				 cl_offset,
-				 cl_newkernel,
-				 cl_freekernel,
-				 cl_setkernelarg,
-				 cl_setkernelargbuf,
-				 cl_callkernel,
-				 cl_elemwise,
-				 cl_error};
+                                 cl_alloc,
+                                 cl_dup,
+                                 cl_free,
+                                 cl_share,
+                                 cl_move,
+                                 cl_read,
+                                 cl_write,
+                                 cl_memset,
+                                 cl_offset,
+                                 cl_newkernel,
+                                 cl_freekernel,
+                                 cl_setkernelarg,
+                                 cl_setkernelargbuf,
+                                 cl_callkernel,
+                                 cl_extcopy,
+                                 cl_error};

@@ -231,10 +231,10 @@ int GpuArray_move(GpuArray *dst, GpuArray *src) {
       GpuArray_ISFORTRAN(dst) != GpuArray_ISFORTRAN(src) ||
       dst->typecode != src->typecode ||
       dst->nd != src->nd) {
-    return dst->ops->buffer_elemwise(src->data, dst->data, src->typecode,
-				     dst->typecode, "=", src->nd,
-				     src->dimensions, src->strides, dst->nd,
-				     dst->dimensions, dst->strides);
+    return dst->ops->buffer_extcopy(src->data, dst->data, src->typecode,
+                                    dst->typecode, src->nd,
+                                    src->dimensions, src->strides, dst->nd,
+                                    dst->dimensions, dst->strides);
   }
   sz = compyte_get_elsize(dst->typecode);
   for (i = 0; i < dst->nd; i++) sz *= dst->dimensions[i];

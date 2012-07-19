@@ -606,7 +606,7 @@ static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
     "const DTYPEA *a = a_data;"
     "DTYPEB *b = b_data;";
 
-static const char ELEM_FOOTER[] = "}}}\n";
+static const char ELEM_FOOTER[] = "b[0] = a[0];}}}\n";
 
 #ifdef CUDA_PTX
 static const char ELEM_HEADER_PTX[] = ".version 3.0\n.target %s\n\n"
@@ -715,11 +715,11 @@ static inline unsigned int xmin(unsigned long a, unsigned long b) {
     return (unsigned int)((a < b) ? a : b);
 }
 
-static int cuda_elemwise(gpudata *input, gpudata *output, int intype,
-                         int outtype, const char *op, unsigned int a_nd,
-                         const size_t *a_dims, const ssize_t *a_str,
-                         unsigned int b_nd, const size_t *b_dims,
-                         const ssize_t *b_str) {
+static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
+                        int outtype, unsigned int a_nd,
+                        const size_t *a_dims, const ssize_t *a_str,
+                        unsigned int b_nd, const size_t *b_dims,
+                        const ssize_t *b_str) {
     char *strs[64];
     unsigned int count = 0;
     int res = GA_SYS_ERROR;
@@ -735,8 +735,6 @@ static int cuda_elemwise(gpudata *input, gpudata *output, int intype,
     const char *out_t;
     const char *arch;
 
-    if (strlen(op) != 1) return GA_UNSUPPORTED_ERROR;
-    if (op[0] != '=') return GA_UNSUPPORTED_ERROR;
     in_t = map_t(intype);
     out_t = map_t(outtype);
     if (in_t == NULL || out_t == NULL) return GA_UNSUPPORTED_ERROR;
@@ -769,7 +767,6 @@ static int cuda_elemwise(gpudata *input, gpudata *output, int intype,
         goto fail;
     count++;
 
-    /* XXX: does cuda do C-style pointer manip? */
     if (compyte_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a",
                             compyte_get_elsize(intype)) == -1)
         goto fail;
@@ -788,21 +785,19 @@ static int cuda_elemwise(gpudata *input, gpudata *output, int intype,
                  "add.u%u rp1, rp1, rp2;\n"
                  "st.global.%s [rp1], tmpb;\n", bits, bits, in_t,
                  out_t, in_t, bits, bits, out_t) == -1)
-#else
-    if (asprintf(&strs[count], "b[0] %s a[0];", op) == -1)
-#endif
         goto fail;
     count++;
 
-#ifdef CUDA_PTX
     if (asprintf(&strs[count], ELEM_FOOTER_PTX, nEls) == -1)
         goto fail;
+    count++;
 #else
     strs[count] = strdup(ELEM_FOOTER);
-    if (strs[count] == NULL) goto fail;
-#endif
+    if (strs[count] == NULL)
+        goto fail;
     count++;
-    
+#endif
+
     assert(count < (sizeof(strs)/sizeof(strs[0])));
 
     k = cuda_newkernel(NULL, count, (const char **)strs, NULL, "elemk", &res);
@@ -848,7 +843,7 @@ compyte_buffer_ops cuda_ops = {cuda_init,
                                cuda_setkernelarg,
                                cuda_setkernelargbuf,
                                cuda_callkernel,
-                               cuda_elemwise,
+                               cuda_extcopy,
                                cuda_error};
 
 /*

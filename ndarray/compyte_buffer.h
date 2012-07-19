@@ -64,11 +64,11 @@ typedef struct _compyte_buffer_ops {
 			   unsigned int lz);
 
   /* Function to facilitate copy and cast operations*/
-  int (*buffer_elemwise)(gpudata *input, gpudata *output, int intype,
-			 int outtype, const char *op, unsigned int a_nd,
-			 const size_t *a_dims, const ssize_t *a_str,
-			 unsigned int b_nd, const size_t *b_dims,
-			 const ssize_t *b_str);
+  int (*buffer_extcopy)(gpudata *input, gpudata *output, int intype,
+                        int outtype, unsigned int a_nd,
+                        const size_t *a_dims, const ssize_t *a_str,
+                        unsigned int b_nd, const size_t *b_dims,
+                        const ssize_t *b_str);
 
   /* Get a string describing the last error that happened 
      (may change if you make other api calls) */
