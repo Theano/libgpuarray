@@ -22,7 +22,7 @@ static inline ssize_t ssabs(ssize_t v) {
 
 int compyte_elem_perdim(char *strs[], unsigned int *count, unsigned int nd,
 			const size_t *dims, const ssize_t *str,
-			const char *id, ssize_t elemsize) {
+			const char *id) {
   int i;
 
   if (nd > 0) {
@@ -31,18 +31,16 @@ int compyte_elem_perdim(char *strs[], unsigned int *count, unsigned int nd,
     (*count)++;
 
     for (i = nd-1; i > 0; i--) {
-      assert(str[i]%elemsize == 0);
-      if (asprintf(&strs[*count], "%s %c= ((%si %% %" SPREFIX "u) * %" SPREFIX
-		   "d);%si = %si / %" SPREFIX "u;", id,
+      if (asprintf(&strs[*count], "%s %c= ((%si %% %" SPREFIX "u) * "
+                   "%" SPREFIX "d);%si = %si / %" SPREFIX "u;", id,
 		   (str[i] < 0 ? '-' : '+'), id, dims[i],
-		   ssabs(str[i]/elemsize), id, id, dims[i]) == -1)
+		   ssabs(str[i]), id, id, dims[i]) == -1)
 	return -1;
       (*count)++;
     }
  
-    assert(str[0]%elemsize == 0);
     if (asprintf(&strs[*count], "%s %c= (%si * %" SPREFIX "d);", id,
-		 (str[0] < 0 ? '-' : '+'), id, ssabs(str[0]/elemsize)) == -1)
+		 (str[0] < 0 ? '-' : '+'), id, ssabs(str[0])) == -1)
       return -1;
     (*count)++;
   }

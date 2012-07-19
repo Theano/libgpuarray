@@ -518,10 +518,13 @@ static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
   "const int idx = get_global_id(0);"
   "const int numThreads = get_global_size(0);"
   "for (int i = idx; i < %" SPREFIX "u; i+= numThreads) {"
-  "__global const DTYPEA *a = a_data;"
-  "__global DTYPEB *b = b_data;";
+  "__global const char *a_p = (__global const char *)a_data;"
+  "__global char *b_p = (__global char *)b_data;";
 
-static const char ELEM_FOOTER[] = "b[0] = a[0];}}\n";
+static const char ELEM_FOOTER[] =
+  "__global const DTYPEA *a = (__global const DTYPEA *)a_p;"
+  "__global DTYPEB *b = (__global DTYPEB *)b_p;"
+  "b[0] = a[0];}}\n";
 
 static int enable_extension(char **strs, unsigned int *count, const char *name,
 			    char *exts) {
@@ -602,11 +605,9 @@ static int cl_extcopy(gpudata *input, gpudata *output, int intype,
     goto fail;
   count++;
   
-  if (compyte_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a",
-                          compyte_get_elsize(intype)) == -1)
+  if (compyte_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a_p") == -1)
     goto fail;
-  if (compyte_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b",
-                          compyte_get_elsize(outtype)) == -1)
+  if (compyte_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b_p") == -1)
     goto fail;
 
   strs[count] = strdup(ELEM_FOOTER);

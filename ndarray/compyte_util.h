@@ -17,7 +17,7 @@ size_t compyte_get_elsize(int typecode);
 
 int compyte_elem_perdim(char *strs[], unsigned int *count, unsigned int nd, 
 			const size_t *dims, const ssize_t *str,
-			const char *id, ssize_t elemsize);
+			const char *id);
 
 #ifdef __cplusplus
 }

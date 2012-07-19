@@ -603,10 +603,13 @@ static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
     "const int idx = blockIdx.x * blockDim.x + threadIdx.x;"
     "const int numThreads = blockDim.x * gridDim.x;"
     "for (int i = idx; i < %" SPREFIX "u; i += numThreads) {"
-    "const DTYPEA *a = a_data;"
-    "DTYPEB *b = b_data;";
+    "const char *a_p = (const char *)a_data;"
+    "char *b_p = (char *)b_data;";
 
-static const char ELEM_FOOTER[] = "b[0] = a[0];}}}\n";
+static const char ELEM_FOOTER[] =
+    "const DTYPEA *a = (const DTYPEA *)a_p;"
+    "DTYPEB *b = (DTYPEB *)b_p;"
+    "b[0] = a[0];}}}\n";
 
 #ifdef CUDA_PTX
 static const char ELEM_HEADER_PTX[] = ".version 3.0\n.target %s\n\n"
@@ -617,7 +620,7 @@ static const char ELEM_HEADER_PTX[] = ".version 3.0\n.target %s\n\n"
     ".reg .u32 numThreads;\n"
     ".reg .u32 i;\n"
     ".reg .u32 ai, bi;\n"
-    ".reg .u32 a, b;\n"
+    ".reg .u32 a_p, b_p;\n"
     ".reg .u32 r1;\n"
     ".reg .u%u rp1, rp2;\n"
     ".reg .%s tmpa;\n"
@@ -633,8 +636,8 @@ static const char ELEM_HEADER_PTX[] = ".version 3.0\n.target %s\n\n"
     "setp.ge.u32 p, i, %" SPREFIX "uU;\n"
     "@p bra $end;\n"
     "$loop_begin:\n"
-    "mov.u32 a, 0U;\n"
-    "mov.u32 b, 0U;\n";
+    "mov.u32 a_p, 0U;\n"
+    "mov.u32 b_p, 0U;\n";
 
 static inline ssize_t ssabs(ssize_t v) {
     return (v < 0 ? -v : v);
@@ -642,7 +645,7 @@ static inline ssize_t ssabs(ssize_t v) {
 
 static int cuda_perdim_ptx(char *strs[], unsigned int *count, unsigned int nd,
                            const size_t *dims, const ssize_t *str,
-                           const char *id, ssize_t elemsize) {
+                           const char *id) {
     int i;
 
     if (nd > 0) {
@@ -651,7 +654,6 @@ static int cuda_perdim_ptx(char *strs[], unsigned int *count, unsigned int nd,
         (*count)++;
 
         for (i = nd-1; i > 0; i--) {
-            assert(str[i]%elemsize == 0);
             if (asprintf(&strs[*count], "rem.u32 r1, %si, %" SPREFIX "uU;\n"
                          "mul.lo.u32 r1, r1, %" SPREFIX "d;\n"
                          "%s.u32 %s, %s, r1;\n"
@@ -663,7 +665,6 @@ static int cuda_perdim_ptx(char *strs[], unsigned int *count, unsigned int nd,
             (*count)++;
         }
 
-        assert(str[0]%elemsize == 0);
         if (asprintf(&strs[*count], "mul.lo.u32 r1, %si, %" SPREFIX "d;\n"
                      "%s.u32 %s, %s, r1;\n", id, ssabs(str[0]),
                      (str[0] < 0 ? "sub" : "add"), id, id) == -1)
@@ -767,21 +768,19 @@ static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
         goto fail;
     count++;
 
-    if (compyte_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a",
-                            compyte_get_elsize(intype)) == -1)
+    if (compyte_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a_p") == -1)
         goto fail;
-    if (compyte_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b",
-                            compyte_get_elsize(outtype)) == -1)
+    if (compyte_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b_p") == -1)
         goto fail;
 
 #ifdef CUDA_PTX
     if (asprintf(&strs[count], "ld.param.u%u rp1, [a_data];\n"
-                 "cvt.u32.u32 rp2, a;\n"
+                 "cvt.u32.u32 rp2, a_p;\n"
                  "add.u%u rp1, rp1, rp2;\n"
                  "ld.global.%s tmpa, [rp1];\n"
                  "cvt.%s.%s tmpb, tmpa;\n"
                  "ld.param.u%u rp1, [b_data];\n"
-                 "cvt.u32.u32 rp2, b;\n"
+                 "cvt.u32.u32 rp2, b_p;\n"
                  "add.u%u rp1, rp1, rp2;\n"
                  "st.global.%s [rp1], tmpb;\n", bits, bits, in_t,
                  out_t, in_t, bits, bits, out_t) == -1)
