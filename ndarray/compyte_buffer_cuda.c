@@ -555,13 +555,60 @@ static int cuda_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
     return cuda_setkernelarg(k, index, GA_DELIM, &b->ptr);
 }
 
+static int do_sched(gpukernel *k, size_t n, unsigned int *bc,
+                    unsigned int *tpb) {
+    CUdevice dev;
+    int min_t;
+    int max_t;
+    int max_b;
+    unsigned int grp;
+
+    err = cuCtxGetDevice(&dev);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+    err = cuDeviceGetAttribute(&min_t, CU_DEVICE_ATTRIBUTE_WARP_SIZE, dev);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+    err = cuDeviceGetAttribute(&max_t, CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_X,
+                               dev);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+    err = cuDeviceGetAttribute(&max_b, CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_X,
+                               dev);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+
+    if (n < (unsigned)(max_b * min_t)) {
+        *bc = (n + min_t - 1) / min_t;
+        *tpb = min_t;
+    } else if (n < (unsigned)(max_b * max_t)) {
+        *bc = max_b;
+        grp = (n + min_t - 1) / min_t;
+        *tpb = ((grp + max_b - 1) / max_b) * min_t;
+/*
+ *bc = (n + max_t - 1) / max_t;
+ *tpb = max_t;
+*/
+    } else if (n == (unsigned)(max_b * max_t)) {
+        *bc = max_b;
+        *tpb = max_t;
+    } else {
+        /* Too many elements */
+        return GA_VALUE_ERROR;
+    }
+    return GA_NO_ERROR;
+}
+
 #define ALIGN_UP(offset, align) ((offset) + (align) - 1) & ~((align) - 1)
 
-static int cuda_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
-                           unsigned int gz, unsigned int bx, unsigned int by,
-                           unsigned int bz) {
+static int cuda_callkernel(gpukernel *k, size_t n) {
+    int res;
+    unsigned int block_count;
+    unsigned int threads_per_block;
+
+    res = do_sched(k, n, &block_count, &threads_per_block);
+    if (res != GA_NO_ERROR)
+        return res;
+
 #if CUDA_VERSION >= 4000
-    err = cuLaunchKernel(k->k, gx, gy, gz, bx, by, bz, 0, NULL, k->args, NULL);
+    err = cuLaunchKernel(k->k, block_count, 1, 1, threads_per_block, 1, 1,
+                         0, NULL, k->args, NULL);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
@@ -584,9 +631,9 @@ static int cuda_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
     }
     err = cuParamSetSize(k->k, total);
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-    err = cuFuncSetBlockShape(k->k, (int)bx, (int)by, (int)bz);
+    err = cuFuncSetBlockShape(k->k, threads_per_block, 1, 1);
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-    err = cuLaunchGrid(k->k, (int)gx, (int)gz*gy);
+    err = cuLaunchGrid(k->k, block_count, 1);
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
 #endif
     err = cuCtxSynchronize();
@@ -728,7 +775,6 @@ static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
     size_t nEls = 1;
     gpukernel *k;
     unsigned int i;
-    unsigned int gx, bx;
 
 #ifdef CUDA_PTX
     unsigned int bits = sizeof(void *)*8;
@@ -806,13 +852,7 @@ static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
     res = cuda_setkernelargbuf(k, 1, output);
     if (res != GA_NO_ERROR) goto failk;
 
-    /* XXX: Revise this crappy block/grid assigment */
-    bx = xmin(32, nEls);
-    gx = xmin((nEls/bx)+((nEls % bx != 0)?1:0), 60);
-    if (bx*gx < nEls)
-        bx = xmin(nEls/gx, 512);
-
-    res = cuda_callkernel(k, gx, 1, 1, bx, 1, 1);
+    res = cuda_callkernel(k, nEls);
 
 failk:
     cuda_freekernel(k);

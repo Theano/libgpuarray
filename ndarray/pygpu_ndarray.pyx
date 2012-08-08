@@ -135,9 +135,7 @@ cdef extern from "compyte_buffer.h":
                          void *arg) nogil
     int GpuKernel_setbufarg(_GpuKernel *k, unsigned int index,
                             _GpuArray *a) nogil
-    int GpuKernel_call(_GpuKernel *, unsigned int gx, unsigned int gy,
-                       unsigned int gz, unsigned int lx, unsigned int ly,
-                       unsigned int lz) nogil
+    int GpuKernel_call(_GpuKernel *, size_t n) nogil
     void *(*cuda_call_compiler)(char *src, size_t sz, int *ret)
 
 
@@ -325,12 +323,10 @@ cdef kernel_setbufarg(GpuKernel k, unsigned int index, GpuArray a):
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(k.k.ops, err))
 
-cdef kernel_call(GpuKernel k, unsigned int gx, unsigned int gy,
-                 unsigned int gz, unsigned int lx, unsigned int ly,
-                 unsigned int lz):
+cdef kernel_call(GpuKernel k, size_t n):
     cdef int err
     with nogil:
-        err = GpuKernel_call(&k.k, gx, gy, gz, lx, ly, lz)
+        err = GpuKernel_call(&k.k, n)
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(k.k.ops, err))
 
@@ -816,30 +812,13 @@ cdef class GpuKernel:
         l = len(ss)
         kernel_init(self, ops, self.ctx, 1, s, &l, name);
 
-    def __call__(self, *args, grid=None, block=None):
-        if block is None:
-            raise ValueError("Must specify block")
-        if grid is None:
-            raise ValueError("Must specify grid")
-
-        block = tuple(block)
-        grid = tuple(grid)
-
-        if len(block) < 3:
-            block = block + (1,) * (3 - len(block))
-        if len(grid) < 3:
-            grid = grid + (1,) * (3 - len(grid))
-
-        if len(block) != 3:
-            raise ValueError("len(block) != 3")
-        if len(grid) != 3:
-            raise ValueError("len(grid) != 3")
-
+    def __call__(self, *args, n=None):
+        if n is None:
+            raise ValueError("Must specify size (n)")
         # Work backwards to avoid a lot of reallocations in the argument code.
         for i in range(len(args)-1, -1, -1):
             self.setarg(i, args[i])
-
-        self.call(*(grid+block))
+        self.call(n)
         
     def setarg(self, unsigned int index, o):
         if isinstance(o, GpuArray):
@@ -881,6 +860,5 @@ cdef class GpuKernel:
         else:
             raise ValueError("Can't set argument of this type")
 
-    def call(self, unsigned int gx, unsigned int gy, unsigned int gz,
-             unsigned int lx, unsigned int ly, unsigned int lz):
-        kernel_call(self, gx, gy, gz, lx, ly, lz)
+    cpdef call(self, size_t n):
+        kernel_call(self, n)

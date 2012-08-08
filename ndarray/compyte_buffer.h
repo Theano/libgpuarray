@@ -59,9 +59,7 @@ typedef struct _compyte_buffer_ops {
   
   /* Call the kernel with the previously specified arguments
      (this is synchronous only for now, might make async later) */
-  int (*buffer_callkernel)(gpukernel *k, unsigned int gx, unsigned int gy,
-			   unsigned int gz, unsigned int lx, unsigned int ly,
-			   unsigned int lz);
+  int (*buffer_callkernel)(gpukernel *k, size_t n);
 
   /* Function to facilitate copy and cast operations*/
   int (*buffer_extcopy)(gpudata *input, gpudata *output, int intype,
@@ -195,9 +193,7 @@ void GpuKernel_clear(GpuKernel *);
 int GpuKernel_setarg(GpuKernel *, unsigned int index, int typecode, void *arg);
 int GpuKernel_setbufarg(GpuKernel *, unsigned int index, GpuArray *);
 
-int GpuKernel_call(GpuKernel *, unsigned int gx, unsigned int gy,
-		   unsigned int gz, unsigned int lx, unsigned int ly,
-		   unsigned int lz);
+int GpuKernel_call(GpuKernel *, size_t n);
 
 #ifdef __cplusplus
 }

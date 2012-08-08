@@ -345,8 +345,6 @@ int GpuKernel_setbufarg(GpuKernel *k, unsigned int index, GpuArray *a) {
   return k->ops->buffer_setkernelargbuf(k->k, index, a->data);
 }
 
-int GpuKernel_call(GpuKernel *k, unsigned int gx, unsigned int gy,
-                   unsigned int gz, unsigned int lx, unsigned int ly,
-                   unsigned int lz) {
-  return k->ops->buffer_callkernel(k->k, gx, gy, gz, lx, ly, lz);
+int GpuKernel_call(GpuKernel *k, size_t n) {
+  return k->ops->buffer_callkernel(k->k, n);
 }

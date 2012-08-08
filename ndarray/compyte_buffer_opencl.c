@@ -77,9 +77,7 @@ static int cl_setkernelarg(gpukernel *k, unsigned int index,
 			   int typecode, const void *val);
 static int cl_setkernelargbuf(gpukernel *k, unsigned int index,
 			      gpudata *b);
-static int cl_callkernel(gpukernel *k, unsigned int, unsigned int,
-			 unsigned int, unsigned int, unsigned int,
-			 unsigned int);
+static int cl_callkernel(gpukernel *k, size_t);
 
 static const char *get_error_string(cl_int err) {
   /* OpenCL 1.0 error codes */
@@ -386,7 +384,7 @@ static int cl_memset(gpudata *dst, int data) {
   res = cl_setkernelargbuf(m, 0, dst);
   if (res != GA_NO_ERROR) goto fail;
   
-  res = cl_callkernel(m, bytes/MIN_SIZE_INCR, 1, 1, 0, 0, 0);
+  res = cl_callkernel(m, bytes/MIN_SIZE_INCR);
 
  fail:
   cl_freekernel(m);
@@ -484,23 +482,10 @@ static int cl_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
   return cl_setkernelarg(k, index, GA_DELIM, &b->buf);
 }
 
-static int cl_callkernel(gpukernel *k, unsigned int gx, unsigned int gy,
-			 unsigned int gz, unsigned int lx, unsigned int ly,
-			 unsigned int lz) {
-  size_t gs[3], ls[3];
+static int cl_callkernel(gpukernel *k, size_t n) {
   cl_event ev;
-  size_t *lsp;
 
-  gs[0] = gx, gs[1] = gy, gs[2] = gz;
-
-  if ((lx == 0) && (lx == ly) && (lx == lz)) {
-    lsp = NULL;
-  } else {
-    ls[0] = lx, ls[1] = ly, ls[2] = lz;
-    lsp = ls;
-  }
-
-  err = clEnqueueNDRangeKernel(k->q, k->k, 3, NULL, gs, lsp, 0, NULL, &ev);
+  err = clEnqueueNDRangeKernel(k->q, k->k, 1, NULL, &n, NULL, 0, NULL, &ev);
   if (err != CL_SUCCESS) return GA_IMPL_ERROR;
 
   err = clWaitForEvents(1, &ev);
@@ -626,7 +611,7 @@ static int cl_extcopy(gpudata *input, gpudata *output, int intype,
   if (res != GA_NO_ERROR) goto kfail;
 
   assert(nEls < UINT_MAX);
-  res = cl_callkernel(k, (unsigned int)nEls, 1, 1, 0, 0, 0);
+  res = cl_callkernel(k, nEls);
 
  kfail:
   cl_freekernel(k);
