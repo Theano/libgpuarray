@@ -137,15 +137,15 @@ cdef extern from "compyte_buffer.h":
     int GpuKernel_setbufarg(_GpuKernel *k, unsigned int index,
                             _GpuArray *a) nogil
     int GpuKernel_call(_GpuKernel *, size_t n) nogil
-    void *(*cuda_call_compiler)(char *src, size_t sz, int *ret)
+    void *(*cuda_call_compiler)(const_char_p src, size_t sz, int *ret)
 
 
 IF WITH_CUDA:
     cdef object call_compiler_fn = None
-    cdef void *(*call_compiler_default)(char *src, size_t sz, int *ret)
+    cdef void *(*call_compiler_default)(const_char_p src, size_t sz, int *ret)
     call_compiler_default = cuda_call_compiler
 
-    cdef void *call_compiler_python(char *src, size_t sz,
+    cdef void *call_compiler_python(const_char_p src, size_t sz,
                                     int *ret) with gil:
         cdef bytes res
         cdef void *buf
