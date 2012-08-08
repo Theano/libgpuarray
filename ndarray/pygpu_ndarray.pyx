@@ -44,6 +44,7 @@ cdef extern from "compyte_buffer.h":
     ctypedef struct compyte_buffer_ops:
         void *buffer_init(int devno, int *ret)
         char *buffer_error()
+        char *buffer_preamble
 
     compyte_buffer_ops cuda_ops
     compyte_buffer_ops opencl_ops
@@ -351,6 +352,9 @@ cdef ops_kind(compyte_buffer_ops *ops):
         if ops == &cuda_ops:
             return "cuda"
     raise RuntimeError("Unknown ops vector")
+
+def get_preamble(kind):
+    return get_ops(kind).buffer_preamble
 
 cdef void *get_ctx(size_t ctx):
     return <void*>ctx

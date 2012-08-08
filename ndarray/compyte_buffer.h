@@ -71,6 +71,7 @@ typedef struct _compyte_buffer_ops {
   /* Get a string describing the last error that happened 
      (may change if you make other api calls) */
   const char *(*buffer_error)(void);
+  const char *buffer_preamble;
 } compyte_buffer_ops;
 
 #ifdef WITH_CUDA

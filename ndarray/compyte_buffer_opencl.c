@@ -627,6 +627,27 @@ static const char *cl_error(void) {
   return get_error_string(err);
 }
 
+static const char CL_PREAMBLE[] =
+  "#define local_barrier() barrier(CLK_LOCAL_MEM_FENCE)\n"
+  "#define WHITHIN_KERNEL /* empty */\n"
+  "#define KERNEL __kernel\n"
+  "#define GLOBAL_MEM __global\n"
+  "#define LOCAL_MEM __local\n"
+  "#define LOCAL_MEM_ARG __local\n"
+  "#define REQD_WG_SIZE(x, y, z) __attribute__((reqd_work_group_size(x, y, z)))\n"
+  "#define LID_0 get_local_id(0)\n"
+  "#define LID_1 get_local_id(1)\n"
+  "#define LID_2 get_local_id(2)\n"
+  "#define LDIM_0 get_local_size(0)\n"
+  "#define LDIM_1 get_local_size(1)\n"
+  "#define LDIM_2 get_local_size(2)\n"
+  "#define GID_0 get_group_id(0)\n"
+  "#define GID_1 get_group_id(1)\n"
+  "#define GID_2 get_group_id(2)\n"
+  "#define GDIM_0 get_num_groups(0)\n"
+  "#define GDIM_1 get_num_groups(1)\n"
+  "#define GDIM_2 get_num_groups(2)\n";
+
 compyte_buffer_ops opencl_ops = {cl_init,
                                  cl_alloc,
                                  cl_dup,
@@ -643,4 +664,5 @@ compyte_buffer_ops opencl_ops = {cl_init,
                                  cl_setkernelargbuf,
                                  cl_callkernel,
                                  cl_extcopy,
-                                 cl_error};
+                                 cl_error,
+                                 CL_PREAMBLE};
