@@ -561,36 +561,27 @@ static int do_sched(gpukernel *k, size_t n, unsigned int *bc,
     int min_t;
     int max_t;
     int max_b;
-    unsigned int grp;
 
     err = cuCtxGetDevice(&dev);
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
     err = cuDeviceGetAttribute(&min_t, CU_DEVICE_ATTRIBUTE_WARP_SIZE, dev);
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-    err = cuDeviceGetAttribute(&max_t, CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_X,
-                               dev);
+    err = cuFuncGetAttribute(&max_t, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK,
+                             k->k);
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
     err = cuDeviceGetAttribute(&max_b, CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_X,
                                dev);
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
 
-    if (n < (unsigned)(max_b * min_t)) {
+    if (n < (unsigned)(max_t)) {
         *bc = (n + min_t - 1) / min_t;
         *tpb = min_t;
     } else if (n < (unsigned)(max_b * max_t)) {
-        *bc = max_b;
-        grp = (n + min_t - 1) / min_t;
-        *tpb = ((grp + max_b - 1) / max_b) * min_t;
-/*
- *bc = (n + max_t - 1) / max_t;
- *tpb = max_t;
-*/
-    } else if (n == (unsigned)(max_b * max_t)) {
-        *bc = max_b;
+        *bc = (n + max_t - 1) / max_t;
         *tpb = max_t;
     } else {
-        /* Too many elements */
-        return GA_VALUE_ERROR;
+        *bc = max_b;
+        *tpb = max_t;
     }
     return GA_NO_ERROR;
 }
