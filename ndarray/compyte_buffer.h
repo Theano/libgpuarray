@@ -47,7 +47,7 @@ typedef struct _compyte_buffer_ops {
      be NUL-terminated.  Otherwise, it doesn't matter. */
   gpukernel *(*buffer_newkernel)(void *ctx, unsigned int count, 
 				 const char **strings, const size_t *lengths,
-				 const char *fname, int *ret);
+				 const char *fname, int flags, int *ret);
   /* Free the kernel and all associated memory (including argument buffers) */
   void (*buffer_freekernel)(gpukernel *k);
   
@@ -71,7 +71,6 @@ typedef struct _compyte_buffer_ops {
   /* Get a string describing the last error that happened 
      (may change if you make other api calls) */
   const char *(*buffer_error)(void);
-  const char *buffer_preamble;
 } compyte_buffer_ops;
 
 #ifdef WITH_CUDA
@@ -128,6 +127,18 @@ typedef enum _ga_order {
   GA_C_ORDER=0,
   GA_F_ORDER=1
 } ga_order;
+
+typedef enum _ga_usefl {
+  GA_USE_CLUDA =      0x01,
+  GA_USE_SMALL =      0x02,
+  GA_USE_DOUBLE =     0x04,
+  GA_USE_COMPLEX =    0x08,
+  GA_USE_HALF =       0x10,
+  /* If you add a new flag, don't forget to update both
+     compyte_buffer_{cuda,opencl}.c with the implementation of your flag */
+  GA_USE_PTX =      0x1000,
+} ga_usefl;
+#define GA_USEFL_COUNT 5
 
 enum ga_error {
   GA_NO_ERROR = 0,
@@ -187,7 +198,7 @@ int GpuArray_is_f_contiguous(const GpuArray *a);
 
 int GpuKernel_init(GpuKernel *, compyte_buffer_ops *ops, void *ctx,
 		   unsigned int count, const char **strs, size_t *lens,
-		   const char *name);
+		   const char *name, int flags);
 
 void GpuKernel_clear(GpuKernel *);
 

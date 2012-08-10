@@ -321,11 +321,11 @@ int GpuArray_is_f_contiguous(const GpuArray *a) {
 
 int GpuKernel_init(GpuKernel *k, compyte_buffer_ops *ops, void *ctx,
 		   unsigned int count, const char **strs, size_t *lens,
-		   const char *name) {
+		   const char *name, int flags) {
   int res = GA_NO_ERROR;
 
   k->ops = ops;
-  k->k = k->ops->buffer_newkernel(ctx, count, strs, lens, name, &res);
+  k->k = k->ops->buffer_newkernel(ctx, count, strs, lens, name, flags, &res);
   return res;
 }
 

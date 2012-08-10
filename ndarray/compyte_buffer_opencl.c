@@ -71,13 +71,34 @@ static cl_int err;
 
 static gpukernel *cl_newkernel(void *ctx, unsigned int count,
 			       const char **strings, const size_t *lengths,
-			       const char *fname, int *ret);
+			       const char *fname, int flags, int *ret);
 static void cl_freekernel(gpukernel *k);
 static int cl_setkernelarg(gpukernel *k, unsigned int index,
 			   int typecode, const void *val);
 static int cl_setkernelargbuf(gpukernel *k, unsigned int index,
 			      gpudata *b);
 static int cl_callkernel(gpukernel *k, size_t);
+
+static const char CL_PREAMBLE[] =
+  "#define local_barrier() barrier(CLK_LOCAL_MEM_FENCE)\n"
+  "#define WHITHIN_KERNEL /* empty */\n"
+  "#define KERNEL __kernel\n"
+  "#define GLOBAL_MEM __global\n"
+  "#define LOCAL_MEM __local\n"
+  "#define LOCAL_MEM_ARG __local\n"
+  "#define REQD_WG_SIZE(x, y, z) __attribute__((reqd_work_group_size(x, y, z)))\n"
+  "#define LID_0 get_local_id(0)\n"
+  "#define LID_1 get_local_id(1)\n"
+  "#define LID_2 get_local_id(2)\n"
+  "#define LDIM_0 get_local_size(0)\n"
+  "#define LDIM_1 get_local_size(1)\n"
+  "#define LDIM_2 get_local_size(2)\n"
+  "#define GID_0 get_group_id(0)\n"
+  "#define GID_1 get_group_id(1)\n"
+  "#define GID_2 get_group_id(2)\n"
+  "#define GDIM_0 get_num_groups(0)\n"
+  "#define GDIM_1 get_num_groups(1)\n"
+  "#define GDIM_2 get_num_groups(2)\n";
 
 static const char *get_error_string(cl_int err) {
   /* OpenCL 1.0 error codes */
@@ -379,11 +400,11 @@ static int cl_memset(gpudata *dst, int data) {
   sz = strlen(local_kern);
   rlk[0] = local_kern;
 
-  m = cl_newkernel(ctx, 1, rlk, &sz, "kmemset", &res);
+  m = cl_newkernel(ctx, 1, rlk, &sz, "kmemset", 0, &res);
   if (m == NULL) return res;
   res = cl_setkernelargbuf(m, 0, dst);
   if (res != GA_NO_ERROR) goto fail;
-  
+
   res = cl_callkernel(m, bytes/MIN_SIZE_INCR);
 
  fail:
@@ -409,16 +430,62 @@ static int cl_offset(gpudata *b, ssize_t off) {
   return GA_NO_ERROR;
 }
 
+#define PRAGMA "#pragma OPENCL EXTENSION "
+#define ENABLE " : enable\n"
+#define CL_SMALL "cl_khr_byte_addressable_store"
+#define CL_DOUBLE "cl_khr_fp64"
+#define CL_HALF "cl_khr_fp16"
+
+static int cl_check_extensions(const char **preamble, unsigned int *count,
+                               int flags, const char *exts) {
+  if (flags & GA_USE_CLUDA) {
+    preamble[*count] = CL_PREAMBLE;
+    (*count)++;
+  }
+  if (flags & GA_USE_SMALL) {
+    if (strstr(exts, CL_SMALL) == NULL)
+      return GA_DEVSUP_ERROR;
+    preamble[*count] = PRAGMA CL_SMALL ENABLE;
+    (*count)++;
+  }
+  if (flags & GA_USE_DOUBLE) {
+    if (strstr(exts, CL_DOUBLE) == NULL)
+      return GA_DEVSUP_ERROR;
+    preamble[*count] = PRAGMA CL_DOUBLE ENABLE;
+    (*count)++;
+  }
+  if (flags & GA_USE_COMPLEX) {
+    return GA_DEVSUP_ERROR; // for now
+  }
+  if (flags & GA_USE_HALF) {
+    if (strstr(exts, CL_HALF) == NULL)
+      return GA_DEVSUP_ERROR;
+    preamble[*count] = PRAGMA CL_HALF ENABLE;
+    (*count)++;
+  }
+  if (flags & GA_USE_PTX) {
+    return GA_DEVSUP_ERROR;
+  }
+  return GA_NO_ERROR;
+}
+
 static gpukernel *cl_newkernel(void *ctx, unsigned int count, 
 			       const char **strings, const size_t *lengths,
-			       const char *fname, int *ret) {
+			       const char *fname, int flags, int *ret) {
   gpukernel *res;
   cl_device_id dev;
+  char *exts;
+  size_t sz;
+  const char *preamble[GA_USEFL_COUNT];
+  size_t *newl;
+  const char **news;
+  unsigned int n = 0;
+  int error;
 
   if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
 
   res = malloc(sizeof(*res));
-  if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
+  if (res == NULL) FAIL(NULL, GA_MEMORY_ERROR);
   res->q = NULL;
   res->k = NULL;
   res->p = NULL;
@@ -428,15 +495,56 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
     cl_freekernel(res);
     return NULL;
   }
-  
-  err = clGetCommandQueueInfo(res->q,CL_QUEUE_DEVICE,sizeof(dev),&dev,NULL);
+
+  err = clGetCommandQueueInfo(res->q, CL_QUEUE_DEVICE, sizeof(dev), &dev,
+                              NULL);
   if (err != CL_SUCCESS) {
     cl_freekernel(res);
     FAIL(NULL, GA_IMPL_ERROR);
   }
-  
-  res->p = clCreateProgramWithSource((cl_context)ctx, count, strings,
-				     lengths, &err);
+
+  err = clGetDeviceInfo(dev, CL_DEVICE_EXTENSIONS, 0, NULL, &sz);
+  CHKFAIL(NULL);
+
+  exts = malloc(sz);
+  if (exts == NULL) FAIL(NULL, GA_MEMORY_ERROR);
+
+  err = clGetDeviceInfo(dev, CL_DEVICE_EXTENSIONS, sz, exts, NULL);
+  if (err != CL_SUCCESS) {
+    free(exts);
+    FAIL(NULL, GA_IMPL_ERROR);
+  }
+
+  error = cl_check_extensions(preamble, &n, flags, exts);
+  free(exts);
+  if (error != GA_NO_ERROR) FAIL(NULL, error);
+
+  if (n != 0) {
+    news = calloc(count+n, sizeof(const char *));
+    if (news == NULL) FAIL(NULL, GA_SYS_ERROR);
+    memcpy(news, preamble, n*sizeof(const char *));
+    memcpy(news+n, strings, count*sizeof(const char *));
+    if (lengths == NULL) {
+      newl = NULL;
+    } else {
+      newl = calloc(count+n, sizeof(size_t));
+      if (newl == NULL) {
+        free(news);
+        FAIL(NULL, GA_MEMORY_ERROR);
+      }
+      memcpy(newl+n, lengths, count*sizeof(size_t));
+    }
+  } else {
+    news = strings;
+    newl = (size_t *)lengths;
+  }
+
+  res->p = clCreateProgramWithSource((cl_context)ctx, count+n, news,
+				     newl, &err);
+  if (n != 0) {
+    free(news);
+    free(newl);
+  }
   if (err != CL_SUCCESS) {
     cl_freekernel(res);
     FAIL(NULL, GA_IMPL_ERROR);
@@ -453,7 +561,7 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
     cl_freekernel(res);
     FAIL(NULL, GA_IMPL_ERROR);
   }
-  
+
   return res;
 }
 
@@ -511,17 +619,6 @@ static const char ELEM_FOOTER[] =
   "__global DTYPEB *b = (__global DTYPEB *)b_p;"
   "b[0] = a[0];}}\n";
 
-static int enable_extension(char **strs, unsigned int *count, const char *name,
-			    char *exts) {
-    if (strstr(exts, name) == NULL) return GA_DEVSUP_ERROR;
-
-    if (asprintf(&strs[*count], "#pragma OPENCL EXTENSION %s : enable\n",
-		 name) == -1) return GA_SYS_ERROR;
-    (*count)++;
-
-   return GA_NO_ERROR;
-}
-
 static int cl_extcopy(gpudata *input, gpudata *output, int intype,
                       int outtype, unsigned int a_nd,
                       const size_t *a_dims, const ssize_t *a_str,
@@ -535,8 +632,7 @@ static int cl_extcopy(gpudata *input, gpudata *output, int intype,
   int res = GA_SYS_ERROR;
   unsigned int i;
   cl_device_id dev;
-  size_t sz;
-  char *exts;
+  int flags = 0;
 
   nEls = 1;
   for (i = 0; i < a_nd; i++) {
@@ -553,32 +649,23 @@ static int cl_extcopy(gpudata *input, gpudata *output, int intype,
                                    &dev, NULL)) != CL_SUCCESS)
     return GA_IMPL_ERROR;
 
-  err = clGetDeviceInfo(dev, CL_DEVICE_EXTENSIONS, 0, NULL, &sz);
-  if (err != CL_SUCCESS) return GA_IMPL_ERROR;
-
-  exts = malloc(sz);
-  if (exts == NULL) return GA_SYS_ERROR;
-
-  err = clGetDeviceInfo(dev, CL_DEVICE_EXTENSIONS, sz, exts, NULL);
-  if (err != CL_SUCCESS) {
-    res = GA_IMPL_ERROR;
-    goto fail;
-  }
-
-  if (outtype == GA_DOUBLE || intype == GA_DOUBLE) {
-    res = enable_extension(strs, &count, "cl_khr_fp64", exts);
-    if (res != GA_NO_ERROR) goto fail;
+  if (outtype == GA_DOUBLE || intype == GA_DOUBLE ||
+      outtype == GA_CDOUBLE || intype == GA_CDOUBLE) {
+    flags |= GA_USE_DOUBLE;
   }
 
   if (outtype == GA_HALF || intype == GA_HALF) {
-    res = enable_extension(strs, &count, "cl_khr_fp16", exts);
-    if (res != GA_NO_ERROR) goto fail;
+    flags |= GA_USE_HALF;
   }
 
   if (compyte_get_elsize(outtype) < 4 || compyte_get_elsize(intype) < 4) {
-    res = enable_extension(strs, &count, "cl_khr_byte_addressable_store",
-			   exts);
-    if (res != GA_NO_ERROR) goto fail;
+    /* Should check for non-mod4 strides too */
+    flags |= GA_USE_SMALL;
+  }
+
+  if (outtype == GA_CFLOAT || intype == GA_CFLOAT ||
+      outtype == GA_CDOUBLE || intype == GA_CDOUBLE) {
+    flags |= GA_USE_COMPLEX;
   }
 
   if (asprintf(&strs[count], ELEM_HEADER,
@@ -603,7 +690,7 @@ static int cl_extcopy(gpudata *input, gpudata *output, int intype,
   assert(count < (sizeof(strs)/sizeof(strs[0])));
 
   k = cl_newkernel(ctx, count, (const char **)strs, NULL, "elemk",
-				   &res);
+                   flags, &res);
   if (k == NULL) goto fail;
   res = cl_setkernelargbuf(k, 0, input);
   if (res != GA_NO_ERROR) goto kfail;
@@ -616,7 +703,6 @@ static int cl_extcopy(gpudata *input, gpudata *output, int intype,
  kfail:
   cl_freekernel(k);
  fail:
-  free(exts);
   for (i = 0; i< count; i++) {
     free(strs[i]);
   }
@@ -626,27 +712,6 @@ static int cl_extcopy(gpudata *input, gpudata *output, int intype,
 static const char *cl_error(void) {
   return get_error_string(err);
 }
-
-static const char CL_PREAMBLE[] =
-  "#define local_barrier() barrier(CLK_LOCAL_MEM_FENCE)\n"
-  "#define WHITHIN_KERNEL /* empty */\n"
-  "#define KERNEL __kernel\n"
-  "#define GLOBAL_MEM __global\n"
-  "#define LOCAL_MEM __local\n"
-  "#define LOCAL_MEM_ARG __local\n"
-  "#define REQD_WG_SIZE(x, y, z) __attribute__((reqd_work_group_size(x, y, z)))\n"
-  "#define LID_0 get_local_id(0)\n"
-  "#define LID_1 get_local_id(1)\n"
-  "#define LID_2 get_local_id(2)\n"
-  "#define LDIM_0 get_local_size(0)\n"
-  "#define LDIM_1 get_local_size(1)\n"
-  "#define LDIM_2 get_local_size(2)\n"
-  "#define GID_0 get_group_id(0)\n"
-  "#define GID_1 get_group_id(1)\n"
-  "#define GID_2 get_group_id(2)\n"
-  "#define GDIM_0 get_num_groups(0)\n"
-  "#define GDIM_1 get_num_groups(1)\n"
-  "#define GDIM_2 get_num_groups(2)\n";
 
 compyte_buffer_ops opencl_ops = {cl_init,
                                  cl_alloc,
@@ -664,5 +729,4 @@ compyte_buffer_ops opencl_ops = {cl_init,
                                  cl_setkernelargbuf,
                                  cl_callkernel,
                                  cl_extcopy,
-                                 cl_error,
-                                 CL_PREAMBLE};
+                                 cl_error};

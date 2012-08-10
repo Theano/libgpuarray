@@ -96,6 +96,27 @@ struct _gpukernel {
 
 static CUresult err;
 
+static const char CUDA_PREAMBLE[] =
+    "#define local_barrier() __syncthreads()\n"
+    "#define WITHIN_KERNEL __device__\n"
+    "#define KERNEL extern \"C\" __global__\n"
+    "#define GLOBAL_MEM /* empty */\n"
+    "#define LOCAL_MEM __shared__\n"
+    "#define LOCAL_MEM_ARG /* empty */\n"
+    "#define REQD_WG_SIZE(X,Y,Z) __launch_bounds__(X*Y*Z, 1)\n"
+    "#define LID_0 threadIdx.x\n"
+    "#define LID_1 threadIdx.y\n"
+    "#define LID_2 threadIdx.z\n"
+    "#define LDIM_0 blockDim.x\n"
+    "#define LDIM_1 blockDim.y\n"
+    "#define LDIM_2 blockDim.z\n"
+    "#define GID_0 blockIdx.x\n"
+    "#define GID_1 blockIdx.y\n"
+    "#define GID_2 blockIdx.z\n"
+    "#define GDIM_0 gridDim.x\n"
+    "#define GDIM_1 gridDim.y\n"
+    "#define GDIM_2 gridDim.z\n";
+
 static const char *get_error_string(CUresult err) {
     switch (err) {
     case CUDA_SUCCESS:                 return "Success!";
@@ -427,43 +448,67 @@ void *(*cuda_call_compiler)(const char *src, size_t len, int *ret) = call_compil
 
 static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
                                  const char **strings, const size_t *lengths,
-                                 const char *fname, int *ret) {
+                                 const char *fname, int flags, int *ret) {
     struct iovec *descr;
     char *buf;
     char *p;
     gpukernel *res;
     size_t tot_len;
+    CUdevice dev;
     unsigned int i;
+    unsigned int pre;
     int ptx_mode = 0;
+    int major, minor;
 
     if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
-    
-    descr = calloc(count+1, sizeof(*descr));
+
+    err = cuCtxGetDevice(&dev);
+    if (err != CUDA_SUCCESS) FAIL(NULL, GA_IMPL_ERROR);
+    err = cuDeviceComputeCapability(&major, &minor, dev);
+    if (err != CUDA_SUCCESS) FAIL(NULL, GA_IMPL_ERROR);
+
+    // GA_USE_CLUDA is done later
+    // GA_USE_SMALL will always work
+    if (flags & GA_USE_DOUBLE) {
+        if (major < 1 || (major == 1 && minor < 3))
+            FAIL(NULL, GA_DEVSUP_ERROR);
+    }
+    if (flags & GA_USE_COMPLEX) {
+        // just for now since it is most likely broken
+        FAIL(NULL, GA_DEVSUP_ERROR);
+    }
+    // GA_USE_HALF should always work
+
+    pre = 1;
+    if (flags & GA_USE_CLUDA) pre++;
+    descr = calloc(count+pre, sizeof(*descr));
     if (descr == NULL) FAIL(NULL, GA_SYS_ERROR);
 
-    if ((!lengths || lengths[0] > 3) && strcmp(strings[0], "PTX") == 0) {
+    if (flags & GA_USE_PTX) {
         ptx_mode = 1;
-        descr[0].iov_base = "";
-        descr[0].iov_len = 0;
-        /* skip the first string (since it's a marker) */
-        strings++; count--;
     } else {
         descr[0].iov_base = (void *)CUDA_HEAD;
         descr[0].iov_len = strlen(CUDA_HEAD);
     }
     tot_len = descr[0].iov_len;
 
+    if (flags & GA_USE_CLUDA) {
+        descr[1].iov_base = (void *)CUDA_PREAMBLE;
+        descr[1].iov_len = strlen(CUDA_PREAMBLE);
+    }
+    tot_len += descr[1].iov_len;
+
     if (lengths == NULL) {
         for (i = 0; i < count; i++) {
-            descr[i+1].iov_base = (void *)strings[i];
-            descr[i+1].iov_len = strlen(strings[i]);
-            tot_len += descr[i+1].iov_len;
+            descr[i+pre].iov_base = (void *)strings[i];
+            descr[i+pre].iov_len = strlen(strings[i]);
+            tot_len += descr[i+pre].iov_len;
         }
     } else {
         for (i = 0; i < count; i++) {
-            descr[i+1].iov_base = (void *)strings[i];
-            descr[i+1].iov_len = lengths[i]?lengths[i]:strlen(strings[i]);
-            tot_len += descr[i+1].iov_len;
+            descr[i+pre].iov_base = (void *)strings[i];
+            descr[i+pre].iov_len = lengths[i]?lengths[i]:strlen(strings[i]);
+            tot_len += descr[i+pre].iov_len;
         }
     }
 
@@ -766,6 +811,7 @@ static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
     size_t nEls = 1;
     gpukernel *k;
     unsigned int i;
+    int flags = 0;
 
 #ifdef CUDA_PTX
     unsigned int bits = sizeof(void *)*8;
@@ -778,6 +824,7 @@ static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
     if (in_t == NULL || out_t == NULL) return GA_UNSUPPORTED_ERROR;
     arch = detect_arch(&res);
     if (arch == NULL) return res;
+    flags |= GA_USE_PTX;
 #define compyte_elem_perdim cuda_perdim_ptx
 #endif
 
@@ -788,12 +835,6 @@ static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
     if (nEls == 0) return GA_NO_ERROR;
 
 #ifdef CUDA_PTX
-    // This is a marker to let the newkernel function know that we are
-    // providing a PTX kernel rather than a C one.
-    strs[0] = strdup("PTX");
-    if (strs[0] == NULL) goto fail;
-    count = 1;
-
     if (asprintf(&strs[count], ELEM_HEADER_PTX, arch,
                  bits, bits, bits, in_t, out_t, nEls) == -1)
 #else
@@ -836,7 +877,27 @@ static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
 
     assert(count < (sizeof(strs)/sizeof(strs[0])));
 
-    k = cuda_newkernel(NULL, count, (const char **)strs, NULL, "elemk", &res);
+    if (intype == GA_DOUBLE || outtype == GA_DOUBLE ||
+        intype == GA_CDOUBLE || outtype == GA_CDOUBLE) {
+        flags |= GA_USE_DOUBLE;
+    }
+
+    if (outtype == GA_HALF || intype == GA_HALF) {
+        flags |= GA_USE_HALF;
+    }
+
+    if (compyte_get_elsize(outtype) < 4 || compyte_get_elsize(intype) < 4) {
+        /* Should check for non-mod4 strides too */
+        flags |= GA_USE_SMALL;
+    }
+
+    if (outtype == GA_CFLOAT || intype == GA_CFLOAT ||
+        outtype == GA_CDOUBLE || intype == GA_CDOUBLE) {
+        flags |= GA_USE_COMPLEX;
+    }
+
+    k = cuda_newkernel(NULL, count, (const char **)strs, NULL, "elemk",
+                       flags, &res);
     if (k == NULL) goto fail;
     res = cuda_setkernelargbuf(k, 0, input);
     if (res != GA_NO_ERROR) goto failk;
@@ -858,27 +919,6 @@ static const char *cuda_error(void) {
     return get_error_string(err);
 }
 
-static const char CUDA_PREAMBLE[] =
-    "#define local_barrier() __syncthreads()\n"
-    "#define WITHIN_KERNEL __device__\n"
-    "#define KERNEL extern \"C\" __global__\n"
-    "#define GLOBAL_MEM /* empty */\n"
-    "#define LOCAL_MEM __shared__\n"
-    "#define LOCAL_MEM_ARG /* empty */\n"
-    "#define REQD_WG_SIZE(X,Y,Z) __launch_bounds__(X*Y*Z, 1)\n"
-    "#define LID_0 threadIdx.x\n"
-    "#define LID_1 threadIdx.y\n"
-    "#define LID_2 threadIdx.z\n"
-    "#define LDIM_0 blockDim.x\n"
-    "#define LDIM_1 blockDim.y\n"
-    "#define LDIM_2 blockDim.z\n"
-    "#define GID_0 blockIdx.x\n"
-    "#define GID_1 blockIdx.y\n"
-    "#define GID_2 blockIdx.z\n"
-    "#define GDIM_0 gridDim.x\n"
-    "#define GDIM_1 gridDim.y\n"
-    "#define GDIM_2 gridDim.z\n";
-
 compyte_buffer_ops cuda_ops = {cuda_init,
                                cuda_alloc,
                                cuda_dup,
@@ -895,8 +935,7 @@ compyte_buffer_ops cuda_ops = {cuda_init,
                                cuda_setkernelargbuf,
                                cuda_callkernel,
                                cuda_extcopy,
-                               cuda_error,
-                               CUDA_PREAMBLE};
+                               cuda_error};
 
 /*
   Local Variables:

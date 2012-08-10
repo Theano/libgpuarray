@@ -44,7 +44,6 @@ cdef extern from "compyte_buffer.h":
     ctypedef struct compyte_buffer_ops:
         void *buffer_init(int devno, int *ret)
         char *buffer_error()
-        char *buffer_preamble
 
     compyte_buffer_ops cuda_ops
     compyte_buffer_ops opencl_ops
@@ -81,6 +80,9 @@ cdef extern from "compyte_buffer.h":
     cdef enum ga_error:
         GA_NO_ERROR, GA_MEMORY_ERROR, GA_VALUE_ERROR, GA_IMPL_ERROR,
         GA_INVALID_ERROR, GA_UNSUPPORTED_ERROR, GA_SYS_ERROR, GA_RUN_ERROR
+
+    cdef enum ga_usefl:
+        GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF
 
     enum COMPYTE_TYPES:
         GA_BOOL,
@@ -130,7 +132,7 @@ cdef extern from "compyte_buffer.h":
 
     int GpuKernel_init(_GpuKernel *k, compyte_buffer_ops *ops, void *ctx,
                        unsigned int count, char **strs, size_t *lens,
-                       char *name) nogil
+                       char *name, int flags) nogil
     void GpuKernel_clear(_GpuKernel *k) nogil
     int GpuKernel_setarg(_GpuKernel *k, unsigned int index, int typecode,
                          void *arg) nogil
@@ -298,11 +300,10 @@ cdef array_memset(GpuArray a, int data):
 
 cdef kernel_init(GpuKernel k, compyte_buffer_ops *ops, void *ctx,
                  unsigned int count, const_char_pp strs, size_t *len,
-                 char *name):
+                 char *name, int flags):
     cdef int err
     with nogil:
-        # The C compiler warning about argument 5 is ok.  It's a const thing.
-        err = GpuKernel_init(&k.k, ops, ctx, count, strs, len, name)
+        err = GpuKernel_init(&k.k, ops, ctx, count, strs, len, name, flags)
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(ops, err))
 
@@ -352,9 +353,6 @@ cdef ops_kind(compyte_buffer_ops *ops):
         if ops == &cuda_ops:
             return "cuda"
     raise RuntimeError("Unknown ops vector")
-
-def get_preamble(kind):
-    return get_ops(kind).buffer_preamble
 
 cdef void *get_ctx(size_t ctx):
     return <void*>ctx
@@ -785,10 +783,13 @@ cdef class GpuKernel:
     def __dealloc__(self):
         kernel_clear(self)
 
-    def __cinit__(self, source, name, kind=None, context=None, *a, **kwa):
+    def __cinit__(self, source, name, kind=None, context=None, cluda=True,
+                  have_double=False, have_small=False, have_complex=False,
+                  have_half=False, *a, **kwa):
         cdef const_char_p s[1]
         cdef size_t l
         cdef compyte_buffer_ops *ops
+        cdef int flags = 0
         
         if not isinstance(source, (str, unicode)):
             raise TypeError("Expected a string for the kernel source")
@@ -805,6 +806,17 @@ cdef class GpuKernel:
         else:
             self.ctx = get_ctx(context)
 
+        if cluda:
+            flags |= GA_USE_CLUDA
+        if have_double:
+            flags |= GA_USE_DOUBLE
+        if have_small:
+            flags |= GA_USE_SMALL
+        if have_complex:
+            flags |= GA_USE_COMPLEX
+        if have_half:
+            flags |= GA_USE_HALF
+
         # This is required under CUDA otherwise the function is compiled
         # as a C++ mangled name and is irretriveable
         if kind == "cuda":
@@ -814,7 +826,7 @@ cdef class GpuKernel:
 
         s[0] = ss
         l = len(ss)
-        kernel_init(self, ops, self.ctx, 1, s, &l, name);
+        kernel_init(self, ops, self.ctx, 1, s, &l, name, flags);
 
     def __call__(self, *args, n=None):
         if n is None:

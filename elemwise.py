@@ -152,32 +152,20 @@ class ElemwiseKernelBase(object):
                 "functions that have at least one "
                 "vector argument")
 
-        extra_preamble = []
-        have_bytestore_pragma = False
-        have_double_pragma = False
+        have_small = False
+        have_double = False
+        have_complex = False
         for arg in self.arguments:
-            # Revise this so that we just pass a parameter and let the
-            # backend fuss over the details
-            if arg.dtype.itemsize < 4 and type(arg) == ArrayArg \
-                    and kind == 'opencl':
-                # XXX: On ATI cards we must check that the device
-                #      actually supports these options otherwise it
-                #      will silently not work
-                if not have_bytestore_pragma:
-                    extra_preamble.append(
-                        "#pragma OPENCL EXTENSION cl_khr_byte_addressable_store: enable")
-
-                    have_bytestore_pragma = True
+            if arg.dtype.itemsize < 4 and type(arg) == ArrayArg:
+                have_small = True
             if arg.dtype in [numpy.float64, numpy.complex128]:
-                if not have_double_pragma:
-                    extra_preamble.append("#define COMPYTE_DEFINE_CDOUBLE")
-                    if kind == 'opencl':
-                        extra_preamble.append(
-                            "#pragma OPENCL EXTENSION cl_khr_fp64: enable")
-                    have_double_pragma = True
+                have_double = True
+            if arg.dtype in [numpy.complex64, numpy.complex128]:
+                have_complex = True
 
-        self.preamble = '\n'.join(extra_preamble) + '\n' + preamble + '\n' \
-            + gpuarray.get_preamble(kind)
+        self.flags = dict(have_small=have_small, have_double=have_double,
+                          have_complex=have_complex)
+        self.preamble = preamble
         self.setup()
 
     def setup(self):
@@ -197,9 +185,11 @@ class ElemwiseKernelBasic(ElemwiseKernelBase):
             src = basic_kernel.render(preamble=self.preamble, name="elemk",
                                       nd=nd, arguments=self.arguments,
                                       expression=self.expression)
-            self._cache[nd] = gpuarray.GpuKernel(src, "elemk",
+            self._cache[nd] = gpuarray.GpuKernel(src, "elemk", cluda=True,
                                                  kind=self.kind,
-                                                 context=self.context)
+                                                 context=self.context,
+                                                 **self.flags)
+
         return self._cache[nd]
 
     def prepare_args(self, args):
@@ -237,9 +227,10 @@ class ElemwiseKernelSpecialized(ElemwiseKernelBase):
                                             dim=dims, strs=strs,
                                             arguments=self.arguments,
                                             expression=self.expression)
-            self._cache[key] = gpuarray.GpuKernel(src, "elemk",
+            self._cache[key] = gpuarray.GpuKernel(src, "elemk", cluda=True,
                                                   kind=self.kind,
-                                                  context=self.context)
+                                                  context=self.context,
+                                                  **self.flags)
         return self._cache[key]
 
     def prepare_args(self, args):
@@ -268,7 +259,8 @@ class ElemwiseKernelContig(ElemwiseKernelBase):
                                        arguments=self.arguments,
                                        expression=self.operation)
         self.k = gpuarray.GpuKernel(src, "elemk", kind=self.kind,
-                                    context=self.context)
+                                    context=self.context, cluda=True,
+                                    **self.flags)
 
     def compile(self, args):
         n = None
