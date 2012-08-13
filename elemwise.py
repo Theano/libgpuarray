@@ -16,11 +16,13 @@ KERNEL void ${name}(const unsigned int n
                     , const unsigned int dim${d}
 % endfor
 % for arg in arguments:
-                    , ${arg.decltype()} ${arg.name}_data
     % if arg.isarray():
+                    , ${arg.decltype()} ${arg.name}_data
         % for d in range(nd):
-                        , const int ${arg.name}_str_${d}
+                    , const int ${arg.name}_str_${d}
         % endfor
+    % else:
+                    , ${arg.decltype()} ${arg.name}
     % endif
 % endfor
 ) {
@@ -76,6 +78,7 @@ KERNEL void ${name}(const unsigned int n
 }
 """)
 
+
 # arguments: preamble, name, arguments, n, nd, dim, strs, expression
 specialized_kernel = Template("""
 ${preamble}
@@ -85,7 +88,11 @@ KERNEL void ${name}(
     % if i != 0:
     ,
     % endif
+    % if arg.isarray():
     ${arg.decltype()} ${arg.name}_data
+    % else:
+    ${arg.decltype()} ${arg.name}
+    % endif
 % endfor
 ) {
   const unsigned int idx = LDIM_0 * GID_0 + LID_0;
