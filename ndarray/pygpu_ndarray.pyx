@@ -831,11 +831,14 @@ cdef class GpuKernel:
     def __call__(self, *args, n=None):
         if n is None:
             raise ValueError("Must specify size (n)")
+        self.setargs(args)
+        self.call(n)
+
+    cpdef setargs(self, args):
         # Work backwards to avoid a lot of reallocations in the argument code.
         for i in range(len(args)-1, -1, -1):
             self.setarg(i, args[i])
-        self.call(n)
-        
+
     def setarg(self, unsigned int index, o):
         if isinstance(o, GpuArray):
             self.setbufarg(index, o)
