@@ -4,126 +4,21 @@ import numpy
 
 import pygpu_ndarray as gpu_ndarray
 
-# Run the tests for cuda
-kind = "cuda"
-# Run the tests for opencl
-kind = "opencl"
-
-ctx = gpu_ndarray.init(kind, 0)
-
-# Not all devices support doubles or "small" types. If you see
-# "Device does not support operation" as an error for some tests
-# try to disable some of the features below and run the tests
-# again.
-enable_double = True
-enable_small = True
-enable_complex = False
+from ..tests.support import (guard_devsup, check_meta, check_flags, check_all,
+                             gen_gpuarray, kind, context as ctx)
 
 if numpy.__version__ < '1.6.0':
     skip_single_f = True
 else:
     skip_single_f = False
 
-dtypes_all = ["float32",
+dtypes_all = ["float32", "float64", "complex64", "complex128",
+              "int8", "int16", "uint8", "uint16",
               "int32", "int64", "uint32", "uint64"]
 
-dtypes_no_complex = ["float32",
+dtypes_no_complex = ["float32", "float64",
+                     "int8", "int16", "uint8", "uint16",
                      "int32", "int64", "uint32", "uint64"]
-
-if enable_small:
-    dtypes_all += ["int8", "int16", "uint8", "uint16"]
-    dtypes_no_complex += ["int8", "int16", "uint8", "uint16"]
-
-if enable_complex:
-    dtypes_all += ["complex64"]
-
-if enable_double:
-    dtypes_all += ["float64"]
-    dtypes_no_complex += ["float64"]
-    if enable_complex:
-        dtypes_all += ["complex128"]
-
-
-def check_flags(x, y):
-    assert isinstance(x, gpu_ndarray.GpuArray)
-    assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
-    if not (skip_single_f and x.shape == ()):
-        # Numpy below 1.6.0 does not have a consistent hangling of
-        # f-contiguous for 0-d arrays
-        assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
-    else:
-        assert x.flags["F_CONTIGUOUS"]
-    assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"]
-    # Don't check for OWNDATA after indexing since GpuArray do own it
-    # and ndarrays don't.  It's an implementation detail anyway.
-    if y.base is None:
-        assert x.flags["OWNDATA"] == y.flags["OWNDATA"]
-    assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
-    assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
-
-
-def check_meta(x, y):
-    assert isinstance(x, gpu_ndarray.GpuArray)
-    assert x.shape == y.shape
-    assert x.dtype == y.dtype
-    if y.size != 0:
-        assert x.strides == y.strides
-    check_flags(x, y)
-
-
-def check_all(x, y):
-    assert isinstance(x, gpu_ndarray.GpuArray)
-    check_meta(x, y)
-    assert numpy.allclose(numpy.asarray(x), numpy.asarray(y))
-
-
-def gen_gpu_nd_array(shape_orig, dtype='float32', offseted_outer=False,
-                     offseted_inner=False, sliced=1, order='c',
-                     kind=None, ctx=None):
-    if sliced is True:
-        sliced = 2
-    elif sliced is False:
-        sliced = 1
-    shape = numpy.asarray(shape_orig).copy()
-    if sliced != 1 and len(shape) > 0:
-        shape[0] *= numpy.absolute(sliced)
-    if offseted_outer and len(shape) > 0:
-        shape[0] += 1
-    if offseted_inner and len(shape) > 0:
-        shape[-1] += 1
-
-    a = numpy.random.rand(*shape) * 10
-    if dtype.startswith("u"):
-        a = numpy.absolute(a)
-    a = numpy.asarray(a, dtype=dtype)
-    assert order in ['c', 'f']
-    if order == 'f' and len(shape) > 0:
-        a = numpy.asfortranarray(a)
-    b = gpu_ndarray.array(a, context=ctx, kind=kind)
-    if order == 'f' and len(shape) > 0 and b.size > 1:
-        assert b.flags['F_CONTIGUOUS']
-
-    if offseted_outer and len(shape) > 0:
-        b = b[1:]
-        a = a[1:]
-    if offseted_inner and len(shape) > 0:
-        # The b[..., 1:] act as the test for this subtensor case.
-        b = b[..., 1:]
-        a = a[..., 1:]
-    if sliced != 1 and len(shape) > 0:
-        a = a[::sliced]
-        b = b[::sliced]
-
-    if False and shape_orig == ():
-        assert a.shape == (1,)
-        assert b.shape == (1,)
-    else:
-        assert a.shape == shape_orig, (a.shape, shape_orig)
-        assert b.shape == shape_orig, (b.shape, shape_orig)
-
-    assert numpy.allclose(a, numpy.asarray(b))
-
-    return a, b
 
 
 def product(*args, **kwds):
@@ -141,15 +36,19 @@ def test_transfer():
     for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             for offseted in [True, False]:
-                a, b = gen_gpu_nd_array(shp, dtype, offseted,
-                                        kind=kind, ctx=ctx)
-                c = numpy.asarray(b)
+                yield transfer, shp, dtype, offseted
 
-                assert numpy.allclose(c, a)
-                assert a.shape == b.shape == c.shape
-                assert a.strides == b.strides == c.strides
-                assert a.dtype == b.dtype == c.dtype == dtype
-                assert c.flags.c_contiguous
+
+def transfer(shp, dtype, offseted):
+    a, b = gen_gpuarray(shp, dtype, offseted,
+                        kind=kind, ctx=ctx)
+    c = numpy.asarray(b)
+
+    assert numpy.allclose(c, a)
+    assert a.shape == b.shape == c.shape
+    assert a.strides == b.strides == c.strides
+    assert a.dtype == b.dtype == c.dtype == dtype
+    assert c.flags.c_contiguous
 
 
 def test_transfer_not_contiguous():
@@ -159,36 +58,46 @@ def test_transfer_not_contiguous():
     """
     for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
-            a = numpy.random.rand(*shp) * 10
-            a = a[::-1]
-            b = gpu_ndarray.array(a, context=ctx, kind=kind)
-            c = numpy.asarray(b)
+            yield transfer_not_contiguous, shp, dtype
 
-            assert numpy.allclose(c, a)
-            assert a.shape == b.shape == c.shape
-            # We copy a to a c contiguous array before the transfer
-            assert (-a.strides[0],) + a.strides[1:] == b.strides == c.strides
-            assert a.dtype == b.dtype == c.dtype
-            assert c.flags.c_contiguous
+
+@guard_devsup
+def transfer_not_contiguous(shp, dtype):
+    a = numpy.random.rand(*shp) * 10
+    a = a[::-1]
+    b = gpu_ndarray.array(a, context=ctx, kind=kind)
+    c = numpy.asarray(b)
+
+    assert numpy.allclose(c, a)
+    assert a.shape == b.shape == c.shape
+    # We copy a to a c contiguous array before the transfer
+    assert (-a.strides[0],) + a.strides[1:] == b.strides == c.strides
+    assert a.dtype == b.dtype == c.dtype
+    assert c.flags.c_contiguous
 
 
 def test_transfer_fortran():
     for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
-            a = numpy.random.rand(*shp) * 10
-            a_ = numpy.asfortranarray(a)
-            if len(shp) > 1:
-                assert a_.strides != a.strides
-            a = a_
-            b = gpu_ndarray.array(a, context=ctx, kind=kind)
-            c = numpy.asarray(b)
+            yield transfer_fortran, shp, dtype
 
-            assert a.shape == b.shape == c.shape
-            assert a.dtype == b.dtype == c.dtype
-            assert a.flags.f_contiguous
-            assert c.flags.f_contiguous
-            assert a.strides == b.strides == c.strides
-            assert numpy.allclose(c, a)
+
+@guard_devsup
+def transfer_fortran(shp, dtype):
+    a = numpy.random.rand(*shp) * 10
+    a_ = numpy.asfortranarray(a)
+    if len(shp) > 1:
+        assert a_.strides != a.strides
+    a = a_
+    b = gpu_ndarray.array(a, context=ctx, kind=kind)
+    c = numpy.asarray(b)
+
+    assert a.shape == b.shape == c.shape
+    assert a.dtype == b.dtype == c.dtype
+    assert a.flags.f_contiguous
+    assert c.flags.f_contiguous
+    assert a.strides == b.strides == c.strides
+    assert numpy.allclose(c, a)
 
 
 def test_ascontiguousarray():
@@ -198,33 +107,34 @@ def test_ascontiguousarray():
                 for offseted_i in [True, True]:
                     for sliced in [1, 2, -1, -2]:
                         for order in ['f', 'c']:
-                            #print shp, dtype, offseted_o, offseted_i,
-                            #print sliced, order
-                            cpu, gpu = gen_gpu_nd_array(shp, dtype, offseted_o,
-                                                        offseted_i,
-                                                        sliced, order,
-                                                        kind=kind, ctx=ctx)
+                            yield ascontiguousarray, shp, dtype, offseted_o, \
+                                offseted_i, sliced, order
 
-                            a = numpy.ascontiguousarray(cpu)
-                            b = gpu_ndarray.ascontiguousarray(gpu)
 
-                            # numpy upcast with a view to 1d scalar.
-                            if (sliced != 1 or shp == () or
-                                (offseted_i and len(shp) > 1)):
-                                assert b is not gpu
-                                if sliced == 1 and not offseted_i:
-                                    assert ((a.data is cpu.data) ==
-                                            (b.bytes is gpu.bytes))
-                            else:
-                                assert b is gpu
+@guard_devsup
+def ascontiguousarray(shp, dtype, offseted_o, offseted_i, sliced, order):
+    cpu, gpu = gen_gpuarray(shp, dtype, offseted_o, offseted_i, sliced, order,
+                            kind=kind, ctx=ctx)
 
-                            assert a.shape == b.shape
-                            assert a.dtype == b.dtype
-                            assert a.flags.c_contiguous
-                            assert b.flags['C_CONTIGUOUS']
-                            assert a.strides == b.strides
-                            assert numpy.allclose(cpu, a)
-                            assert numpy.allclose(cpu, b)
+    a = numpy.ascontiguousarray(cpu)
+    b = gpu_ndarray.ascontiguousarray(gpu)
+
+    # numpy upcast with a view to 1d scalar.
+    if (sliced != 1 or shp == () or
+        (offseted_i and len(shp) > 1)):
+        assert b is not gpu
+        if sliced == 1 and not offseted_i:
+            assert (a.data is cpu.data) == (b.bytes is gpu.bytes)
+    else:
+        assert b is gpu
+
+    assert a.shape == b.shape
+    assert a.dtype == b.dtype
+    assert a.flags.c_contiguous
+    assert b.flags['C_CONTIGUOUS']
+    assert a.strides == b.strides
+    assert numpy.allclose(cpu, a)
+    assert numpy.allclose(cpu, b)
 
 
 def test_asfortranarray():
@@ -234,38 +144,36 @@ def test_asfortranarray():
                 for offseted_inner in [True, False]:
                     for sliced in [1, 2, -1, -2]:
                         for order in ['f', 'c']:
-#print shp, dtype, offseted_outer, offseted_inner, sliced, order
-                            cpu, gpu = gen_gpu_nd_array(shp, dtype,
-                                                        offseted_outer,
-                                                        offseted_inner,
-                                                        sliced,
-                                                        order,
-                                                        kind=kind, ctx=ctx)
+                            yield asfortranarray, shp, dtype, offseted_outer, \
+                                offseted_inner, sliced, order
 
-                            a = numpy.asfortranarray(cpu)
-                            b = gpu_ndarray.asfortranarray(gpu)
 
-                            # numpy upcast with a view to 1d scalar.
-                            if (sliced != 1 or shp == () or
-                                (offseted_outer and len(shp) > 1) or
-                                (order != 'f' and len(shp) > 1)):
-                                assert b is not gpu
-                                if (sliced == 1 and not offseted_outer and
-                                    order != 'c'):
-                                    assert ((a.data is cpu.data) ==
-                                            (b.gpudata == gpu.gpudata))
-                            else:
-                                assert b is gpu
-                                pass
+@guard_devsup
+def asfortranarray(shp, dtype, offseted_outer, offseted_inner, sliced, order):
+    cpu, gpu = gen_gpuarray(shp, dtype, offseted_outer, offseted_inner, sliced,
+                            order, kind=kind, ctx=ctx)
 
-                            assert a.shape == b.shape
-                            assert a.dtype == b.dtype
-                            assert a.flags.f_contiguous
-                            if shp != ():
-                                assert b.flags['F_CONTIGUOUS']
-                            assert a.strides == b.strides
-                            assert numpy.allclose(cpu, a)
-                            assert numpy.allclose(cpu, b)
+    a = numpy.asfortranarray(cpu)
+    b = gpu_ndarray.asfortranarray(gpu)
+
+    # numpy upcast with a view to 1d scalar.
+    if (sliced != 1 or shp == () or (offseted_outer and len(shp) > 1) or
+        (order != 'f' and len(shp) > 1)):
+        assert b is not gpu
+        if (sliced == 1 and not offseted_outer and order != 'c'):
+            assert ((a.data is cpu.data) ==
+                    (b.gpudata == gpu.gpudata))
+    else:
+        assert b is gpu
+
+    assert a.shape == b.shape
+    assert a.dtype == b.dtype
+    assert a.flags.f_contiguous
+    if shp != ():
+        assert b.flags['F_CONTIGUOUS']
+    assert a.strides == b.strides
+    assert numpy.allclose(cpu, a)
+    assert numpy.allclose(cpu, b)
 
 
 def test_zeros():
@@ -275,17 +183,26 @@ def test_zeros():
                 (4, 8, 9), (1, 8, 9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
-                x = gpu_ndarray.zeros(shp, dtype, order, context=ctx,
-                                      kind=kind)
-                y = numpy.zeros(shp, dtype, order)
-                check_all(x, y)
+                yield zeros, shp, order, dtype
+
+
+def zeros(shp, order, dtype):
+    x = gpu_ndarray.zeros(shp, dtype, order, context=ctx,
+                          kind=kind)
+    y = numpy.zeros(shp, dtype, order)
+    check_all(x, y)
+
+
+def test_zeros_no_dtype():
     # no dtype and order param
     x = gpu_ndarray.zeros((), context=ctx, kind=kind)
     y = numpy.zeros(())
     check_meta(x, y)
 
+
+def test_zero_noparam():
     try:
-        gpu_ndarray.zeros(context=ctx, kind=kind)
+        gpu_ndarray.zeros()
         assert False
     except TypeError:
         pass
@@ -298,15 +215,25 @@ def test_empty():
                 (4, 8, 9), (1, 8, 9)]:
         for order in ["C", "F"]:
             for dtype in dtypes_all:
-                x = gpu_ndarray.empty(shp, dtype, order, context=ctx,
-                                      kind=kind)
-                y = numpy.empty(shp, dtype, order)
-                check_meta(x, y)
+                yield empty, shp, order, dtype
+
+
+def empty(shp, order, dtype):
+    x = gpu_ndarray.empty(shp, dtype, order, context=ctx,
+                          kind=kind)
+    y = numpy.empty(shp, dtype, order)
+    check_meta(x, y)
+
+
+def test_empty_no_dtype():
     x = gpu_ndarray.empty((), context=ctx, kind=kind)# no dtype and order param
     y = numpy.empty(())
     check_meta(x, y)
+
+
+def test_empty_no_params():
     try:
-        gpu_ndarray.empty(context=ctx, kind=kind)
+        gpu_ndarray.empty()
         assert False
     except TypeError:
         pass
@@ -316,34 +243,21 @@ def test_mapping_getitem_ellipsis():
     for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             for offseted in [True, False]:
-                a, a_gpu = gen_gpu_nd_array(shp, dtype, offseted,
-                                            kind=kind, ctx=ctx)
+                yield mapping_getitem_ellipsis, shp, dtype, offseted
 
-                b = a_gpu[...]
-                assert b.gpudata == a_gpu.gpudata
-                assert b.strides == a.strides
-                assert b.shape == a.shape
-                b_cpu = numpy.asarray(b)
-                assert numpy.allclose(a, b_cpu)
+
+def mapping_getitem_ellipsis(shp, dtype, offseted):
+    a, a_gpu = gen_gpuarray(shp, dtype, offseted,
+                            kind=kind, ctx=ctx)
+    b = a_gpu[...]
+    assert b.gpudata == a_gpu.gpudata
+    assert b.strides == a.strides
+    assert b.shape == a.shape
+    b_cpu = numpy.asarray(b)
+    assert numpy.allclose(a, b_cpu)
 
 
 def test_copy_view():
-
-    def check_memory_region(a, a_op, b, b_op):
-        assert numpy.may_share_memory(a, a_op) == \
-            gpu_ndarray.may_share_memory(b, b_op)
-
-        if a_op.base is None:
-            assert b_op.base is None
-        else:
-            assert a_op.base is a
-            if b.base:
-                # We avoid having a series of object connected by base.
-                # This is to don't bloc the garbage collection.
-                assert b_op.base is b.base
-            else:
-                assert b_op.base is b
-
     for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             for offseted in [False, True]:
@@ -351,184 +265,213 @@ def test_copy_view():
                 for order1 in ['c', 'f']:
                     # order2 is the order wanted after copy
                     for order2 in ['c', 'f']:
-                        #print shp, dtype, offseted, order1, order2
-                        #TODO test copy unbroadcast!
-                        a, b = gen_gpu_nd_array(shp, dtype, offseted,
-                                                order=order1,
-                                                kind=kind, ctx=ctx)
+                        yield copy_view, shp, dtype, offseted, order1, order2
 
-                        assert numpy.allclose(a, numpy.asarray(b))
-                        check_flags(b, a)
 
-                        c = b.copy(order2)
-                        assert numpy.allclose(a, numpy.asarray(c))
-                        check_flags(c, a.copy(order2))
-                        check_memory_region(a, a.copy(order2), b, c)
+def check_memory_region(a, a_op, b, b_op):
+    assert numpy.may_share_memory(a, a_op) == \
+        gpu_ndarray.may_share_memory(b, b_op)
 
-                        d = copy.copy(b)
-                        assert numpy.allclose(a, numpy.asarray(d))
-                        check_flags(d, copy.copy(a))
-                        check_memory_region(a, copy.copy(a), b, d)
+    if a_op.base is None:
+        assert b_op.base is None
+    else:
+        assert a_op.base is a
+        if b.base:
+            # We avoid having a series of object connected by base.
+            # This is to don't bloc the garbage collection.
+            assert b_op.base is b.base
+        else:
+            assert b_op.base is b
 
-                        e = b.view()
-                        assert numpy.allclose(a, numpy.asarray(e))
-                        check_flags(e, a.view())
-                        check_memory_region(a, a.view(), b, e)
 
-                        f = copy.deepcopy(b)
-                        assert numpy.allclose(a, numpy.asarray(f))
-                        check_flags(f, copy.deepcopy(a))
-                        check_memory_region(a, copy.deepcopy(a), b, f)
+@guard_devsup
+def copy_view(shp, dtype, offseted, order1, order2):
+    #TODO test copy unbroadcast!
+    a, b = gen_gpuarray(shp, dtype, offseted, order=order1,
+                        kind=kind, ctx=ctx)
 
-                        g = copy.copy(b.view())
-                        assert numpy.allclose(a, numpy.asarray(g))
-                        check_memory_region(a, copy.copy(a.view()), b, g)
-                        check_flags(g, copy.copy(a.view()))
+    assert numpy.allclose(a, numpy.asarray(b))
+    check_flags(b, a)
+
+    c = b.copy(order2)
+    assert numpy.allclose(a, numpy.asarray(c))
+    check_flags(c, a.copy(order2))
+    check_memory_region(a, a.copy(order2), b, c)
+
+    d = copy.copy(b)
+    assert numpy.allclose(a, numpy.asarray(d))
+    check_flags(d, copy.copy(a))
+    check_memory_region(a, copy.copy(a), b, d)
+
+    e = b.view()
+    assert numpy.allclose(a, numpy.asarray(e))
+    check_flags(e, a.view())
+    check_memory_region(a, a.view(), b, e)
+
+    f = copy.deepcopy(b)
+    assert numpy.allclose(a, numpy.asarray(f))
+    check_flags(f, copy.deepcopy(a))
+    check_memory_region(a, copy.deepcopy(a), b, f)
+
+    g = copy.copy(b.view())
+    assert numpy.allclose(a, numpy.asarray(g))
+    check_memory_region(a, copy.copy(a.view()), b, g)
+    check_flags(g, copy.copy(a.view()))
 
 
 def test_len():
     for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             for offseted in [True, False]:
-                a, a_gpu = gen_gpu_nd_array(shp, dtype, offseted,
-                                            kind=kind, ctx=ctx)
-                assert len(a_gpu) == shp[0]
+                yield len_, shp, dtype, offseted
+
+
+def len_(shp, dtype, offseted):
+    a, a_gpu = gen_gpuarray(shp, dtype, offseted, kind=kind, ctx=ctx)
+    assert len(a_gpu) == shp[0]
+
 
 def test_mapping_getitem_w_int():
-    def _cmp(x,y):
-        assert isinstance(x, gpu_ndarray.GpuArray)
-        assert x.shape == y.shape
-        assert x.dtype == y.dtype
-        assert x.strides == y.strides
-        assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
-        if not (skip_single_f and y.shape == ()):
-            assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
-        else:
-            assert x.flags["F_CONTIGUOUS"]
-        # GpuArrays always own their data after indexing
-        assert x.flags["OWNDATA"]
-        # we don't check for y.flags["OWNDATA"] since the logic
-        # is a bit twisty and this is not a testsuite for numpy.
-        if x.flags["WRITEABLE"] != y.flags["WRITEABLE"]:
-            assert x.ndim == 0
-        assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
-        assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
-        x = numpy.asarray(x)
-        assert x.shape == y.shape
-        assert x.dtype == y.dtype
-        assert x.strides == y.strides
-        if not numpy.all(x == y):
-            print x
-            print y
-        assert numpy.all(x == y), (x, y)
-
-    def _cmpNs(x, y):
-        """
-        Don't compare the stride after the transfer
-        There is a copy that have been made on the gpu before the transfer
-        """
-        assert x.shape == y.shape
-        assert x.dtype == y.dtype
-        assert x.strides == y.strides
-        assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
-        assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
-        assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"]
-        assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
-        # GpuArrays always own their data after indexing
-        assert x.flags["OWNDATA"]
-        # we don't check for y.flags["OWNDATA"] since the logic
-        # is a bit twisty and this is not a testsuite for numpy.
-        assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
-        x_ = numpy.asarray(x)
-        assert x_.shape == y.shape
-        assert x_.dtype == y.dtype
-        assert numpy.all(x_ == y), (x_, y)
-
-    def _cmpf(x, *y):
-        try:
-            x.__getitem__(y)
-        except IndexError:
-            pass
-        else:
-            raise Exception("Did not generate out or bound error")
-
-    def _cmpfV(x, *y):
-        try:
-            if len(y) == 1:
-                x.__getitem__(*y)
-            else:
-                x.__getitem__(y)
-        except ValueError:
-            pass
-        else:
-            raise Exception("Did not generate value error")
-
     for dtype in dtypes_all:
         for offseted in [True, False]:
-            # test vector
-            dim = (2,)
-            a, _a = gen_gpu_nd_array(dim, dtype, offseted,
-                                     kind=kind, ctx=ctx)
+            yield mapping_getitem_w_int, dtype, offseted
 
-            import sys
-            init_ref_count = sys.getrefcount(_a)
-            _cmp(_a[...], a[...])
-            _cmp(_a[...], a[...])
-            _cmp(_a[...], a[...])
-            _cmp(_a[...], a[...])
-            _cmp(_a[...], a[...])
 
-            _cmp(_a[-1], a[-1])
-            _cmp(_a[1], a[1])
-            _cmp(_a[0], a[0])
-            _cmp(_a[::1], a[::1])
-            _cmpNs(_a[::-1], a[::-1])
-            _cmp(_a[...], a[...])
-            _cmpf(_a, 2)
+@guard_devsup
+def mapping_getitem_w_int(dtype, offseted):
+    # test vector
+    dim = (2,)
+    a, _a = gen_gpuarray(dim, dtype, offseted, kind=kind, ctx=ctx)
 
-            # test scalar
-            dim = ()
-            a, _a = gen_gpu_nd_array(dim, dtype, offseted,
-                                     kind=kind, ctx=ctx)
-            _cmp(_a[...], a[...])
-            _cmpf(_a, 0)
-            _cmpf(_a, slice(1))
+    import sys
+    init_ref_count = sys.getrefcount(_a)
+    _cmp(_a[...], a[...])
+    _cmp(_a[...], a[...])
+    _cmp(_a[...], a[...])
+    _cmp(_a[...], a[...])
+    _cmp(_a[...], a[...])
 
-            # test 4d-tensor
-            dim = (5, 4, 3, 2)
-            a, _a = gen_gpu_nd_array(dim, dtype, offseted,
-                                     kind=kind, ctx=ctx)
-            _cmpf(_a, slice(-1), slice(-1), 10, -10)
-            _cmpf(_a, slice(-1), slice(-1), -10, slice(-1))
-            _cmpf(_a, 0, slice(0, -1, -20), -10)
-            _cmpf(_a, 10)
-            _cmpf(_a, (10, 0, 0, 0))
-            _cmpf(_a, -10)
+    _cmp(_a[-1], a[-1])
+    _cmp(_a[1], a[1])
+    _cmp(_a[0], a[0])
+    _cmp(_a[::1], a[::1])
+    _cmpNs(_a[::-1], a[::-1])
+    _cmp(_a[...], a[...])
+    _cmpf(_a, 2)
 
-            #test with integer
-            _cmp(_a[1], a[1])
-            _cmp(_a[-1], a[-1])
-            _cmp(_a[numpy.int64(1)], a[numpy.int64(1)])
-            _cmp(_a[numpy.int64(-1)], a[numpy.int64(-1)])
+    # test scalar
+    dim = ()
+    a, _a = gen_gpuarray(dim, dtype, offseted, kind=kind, ctx=ctx)
+    _cmp(_a[...], a[...])
+    _cmpf(_a, 0)
+    _cmpf(_a, slice(1))
 
-            #test with slice
-            _cmp(_a[1:], a[1:])
-            _cmp(_a[1:2], a[1:2])
-            _cmp(_a[-1:1], a[-1:1])
+    # test 4d-tensor
+    dim = (5, 4, 3, 2)
+    a, _a = gen_gpuarray(dim, dtype, offseted, kind=kind, ctx=ctx)
+    _cmpf(_a, slice(-1), slice(-1), 10, -10)
+    _cmpf(_a, slice(-1), slice(-1), -10, slice(-1))
+    _cmpf(_a, 0, slice(0, -1, -20), -10)
+    _cmpf(_a, 10)
+    _cmpf(_a, (10, 0, 0, 0))
+    _cmpf(_a, -10)
 
-            #test with tuple (mix slice, integer, numpy.int64)
-            _cmpNs(_a[0, 0, ::numpy.int64(-1), ::-1], a[0, 0, ::-1, ::-1])
-            _cmpNs(_a[:, :, ::numpy.int64(-1), ::-1], a[:, :, ::-1, ::-1])
-            _cmpNs(_a[:, :, numpy.int64(1), -1], a[:, :, 1, -1])
-            _cmpNs(_a[:, :, ::-1, ::-1], a[:, :, ::-1, ::-1])
-            _cmpNs(_a[:, :, ::-10, ::-10], a[:, :, ::-10, ::-10])
-            _cmpNs(_a[:, :, 1, -1], a[:, :, 1, -1])
-            _cmpNs(_a[:, :, -1, :], a[:, :, -1, :])
-            _cmpNs(_a[:, ::-2, -1, :], a[:, ::-2, -1, :])
-            _cmpNs(_a[:, ::-20, -1, :], a[:, ::-20, -1, :])
-            _cmpNs(_a[:, ::-2, -1], a[:, ::-2, -1])
-            _cmpNs(_a[0, ::-2, -1], a[0, ::-2, -1])
-            _cmp(_a[-1, -1, -1, -2], a[-1, -1, -1, -2])
+    #test with integer
+    _cmp(_a[1], a[1])
+    _cmp(_a[-1], a[-1])
+    _cmp(_a[numpy.int64(1)], a[numpy.int64(1)])
+    _cmp(_a[numpy.int64(-1)], a[numpy.int64(-1)])
 
-            #test ellipse
-            _cmp(_a[...], a[...])
+    #test with slice
+    _cmp(_a[1:], a[1:])
+    _cmp(_a[1:2], a[1:2])
+    _cmp(_a[-1:1], a[-1:1])
+
+    #test with tuple (mix slice, integer, numpy.int64)
+    _cmpNs(_a[0, 0, ::numpy.int64(-1), ::-1], a[0, 0, ::-1, ::-1])
+    _cmpNs(_a[:, :, ::numpy.int64(-1), ::-1], a[:, :, ::-1, ::-1])
+    _cmpNs(_a[:, :, numpy.int64(1), -1], a[:, :, 1, -1])
+    _cmpNs(_a[:, :, ::-1, ::-1], a[:, :, ::-1, ::-1])
+    _cmpNs(_a[:, :, ::-10, ::-10], a[:, :, ::-10, ::-10])
+    _cmpNs(_a[:, :, 1, -1], a[:, :, 1, -1])
+    _cmpNs(_a[:, :, -1, :], a[:, :, -1, :])
+    _cmpNs(_a[:, ::-2, -1, :], a[:, ::-2, -1, :])
+    _cmpNs(_a[:, ::-20, -1, :], a[:, ::-20, -1, :])
+    _cmpNs(_a[:, ::-2, -1], a[:, ::-2, -1])
+    _cmpNs(_a[0, ::-2, -1], a[0, ::-2, -1])
+    _cmp(_a[-1, -1, -1, -2], a[-1, -1, -1, -2])
+
+    #test ellipse
+    _cmp(_a[...], a[...])
+
+
+def _cmp(x,y):
+    assert isinstance(x, gpu_ndarray.GpuArray)
+    assert x.shape == y.shape
+    assert x.dtype == y.dtype
+    assert x.strides == y.strides
+    assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
+    if not (skip_single_f and y.shape == ()):
+        assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
+    else:
+        assert x.flags["F_CONTIGUOUS"]
+    # GpuArrays always own their data after indexing
+    assert x.flags["OWNDATA"]
+    # we don't check for y.flags["OWNDATA"] since the logic
+    # is a bit twisty and this is not a testsuite for numpy.
+    if x.flags["WRITEABLE"] != y.flags["WRITEABLE"]:
+        assert x.ndim == 0
+    assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
+    assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
+    x = numpy.asarray(x)
+    assert x.shape == y.shape
+    assert x.dtype == y.dtype
+    assert x.strides == y.strides
+    if not numpy.all(x == y):
+        print x
+        print y
+    assert numpy.all(x == y), (x, y)
+
+
+def _cmpNs(x, y):
+    """
+    Don't compare the stride after the transfer
+    There is a copy that have been made on the gpu before the transfer
+    """
+    assert x.shape == y.shape
+    assert x.dtype == y.dtype
+    assert x.strides == y.strides
+    assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
+    assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
+    assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"]
+    assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
+    # GpuArrays always own their data after indexing
+    assert x.flags["OWNDATA"]
+    # we don't check for y.flags["OWNDATA"] since the logic
+    # is a bit twisty and this is not a testsuite for numpy.
+    assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
+    x_ = numpy.asarray(x)
+    assert x_.shape == y.shape
+    assert x_.dtype == y.dtype
+    assert numpy.all(x_ == y), (x_, y)
+
+
+def _cmpf(x, *y):
+    try:
+        x.__getitem__(y)
+    except IndexError:
+        pass
+    else:
+        raise Exception("Did not generate out or bound error")
+
+
+def _cmpfV(x, *y):
+    try:
+        if len(y) == 1:
+            x.__getitem__(*y)
+        else:
+            x.__getitem__(y)
+    except ValueError:
+        pass
+    else:
+        raise Exception("Did not generate value error")
