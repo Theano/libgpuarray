@@ -50,6 +50,23 @@ def transfer(shp, dtype, offseted):
     assert a.dtype == b.dtype == c.dtype == dtype
     assert c.flags.c_contiguous
 
+def test_cast():
+    for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
+        for dtype1 in dtypes_all:
+            for dtype2 in dtypes_all:
+                    yield cast, shp, dtype1, dtype2
+
+@guard_devsup
+def cast(shp, dtype1, dtype2):
+    a, b = gen_gpuarray(shp, dtype1, False, kind=kind, ctx=ctx)
+    ac = a.astype(dtype2)
+    bc = b.astype(dtype2)
+
+    print ac.dtype, bc.dtype
+    assert ac.dtype == bc.dtype
+    assert ac.shape == bc.shape
+    assert numpy.allclose(a, numpy.asarray(b))
+
 
 def test_transfer_not_contiguous():
     """
