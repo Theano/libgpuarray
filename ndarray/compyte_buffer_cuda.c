@@ -793,6 +793,45 @@ static inline const char *map_t(int typecode) {
     }
 }
 
+static inline const char *get_rmod(int intype, int outtype) {
+    switch (intype) {
+    case GA_DOUBLE:
+        if (outtype == GA_HALF || outtype == GA_FLOAT) return ".rn";
+    case GA_FLOAT:
+        if (outtype == GA_HALF) return ".rn";
+    case GA_HALF:
+        switch (outtype) {
+        case GA_BYTE:
+        case GA_UBYTE:
+        case GA_BOOL:
+        case GA_SHORT:
+        case GA_USHORT:
+        case GA_INT:
+        case GA_UINT:
+        case GA_LONG:
+        case GA_ULONG:
+            return ".rni";
+        }
+        break;
+    case GA_BYTE:
+    case GA_UBYTE:
+    case GA_BOOL:
+    case GA_SHORT:
+    case GA_USHORT:
+    case GA_INT:
+    case GA_UINT:
+    case GA_LONG:
+    case GA_ULONG:
+        switch (outtype) {
+        case GA_HALF:
+        case GA_FLOAT:
+        case GA_DOUBLE:
+            return ".rn";
+        }
+    }
+    return "";
+}
+
 #endif
 
 static inline unsigned int xmin(unsigned long a, unsigned long b) {
@@ -817,11 +856,13 @@ static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
     unsigned int bits = sizeof(void *)*8;
     const char *in_t;
     const char *out_t;
+    const char *rmod;
     const char *arch;
 
     in_t = map_t(intype);
     out_t = map_t(outtype);
-    if (in_t == NULL || out_t == NULL) return GA_UNSUPPORTED_ERROR;
+    rmod = get_rmod(intype, outtype);
+    if (in_t == NULL || out_t == NULL) return GA_DEVSUP_ERROR;
     arch = detect_arch(&res);
     if (arch == NULL) return res;
     flags |= GA_USE_PTX;
@@ -856,11 +897,11 @@ static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
                  "cvt.u32.u32 rp2, a_p;\n"
                  "add.u%u rp1, rp1, rp2;\n"
                  "ld.global.%s tmpa, [rp1];\n"
-                 "cvt.%s.%s tmpb, tmpa;\n"
+                 "cvt%s.%s.%s tmpb, tmpa;\n"
                  "ld.param.u%u rp1, [b_data];\n"
                  "cvt.u32.u32 rp2, b_p;\n"
                  "add.u%u rp1, rp1, rp2;\n"
-                 "st.global.%s [rp1], tmpb;\n", bits, bits, in_t,
+                 "st.global.%s [rp1], tmpb;\n", bits, bits, in_t, rmod,
                  out_t, in_t, bits, bits, out_t) == -1)
         goto fail;
     count++;

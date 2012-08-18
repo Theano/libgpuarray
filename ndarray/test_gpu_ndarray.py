@@ -52,8 +52,8 @@ def transfer(shp, dtype, offseted):
 
 def test_cast():
     for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
-        for dtype1 in dtypes_all:
-            for dtype2 in dtypes_all:
+        for dtype1 in dtypes_no_complex:
+            for dtype2 in dtypes_no_complex:
                     yield cast, shp, dtype1, dtype2
 
 @guard_devsup
