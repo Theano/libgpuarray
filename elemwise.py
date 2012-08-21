@@ -6,7 +6,6 @@ from dtypes import parse_c_arg_backend
 import numpy
 from ndarray import pygpu_ndarray as gpuarray
 
-
 # parameters: preamble, name, nd, arguments, expression
 basic_kernel = Template("""
 ${preamble}
@@ -139,8 +138,10 @@ INDEX_RE = re.compile('([a-zA-Z_][a-zA-Z0-9_]*)\[i\]')
 def massage_op(operation):
     return INDEX_RE.sub('\g<1>[0]', operation)
 
-class ElemwiseKernelBase(object):
-    def __init__(self, kind, context, arguments, operation, preamble=""):
+
+class ElemwiseKernel(object):
+    def __init__(self, kind, context, arguments, operation, preamble="",
+                 spec_limit=3):
         self._cache = dict()
 
         if isinstance(arguments, str):
@@ -152,6 +153,7 @@ class ElemwiseKernelBase(object):
         self.expression = massage_op(operation)
         self.kind = kind
         self.context = context
+        self._spec_limit = spec_limit
 
         if not any(isinstance(arg, ArrayArg) for arg in self.arguments):
             raise RuntimeError(
@@ -173,42 +175,36 @@ class ElemwiseKernelBase(object):
         self.flags = dict(have_small=have_small, have_double=have_double,
                           have_complex=have_complex)
         self.preamble = preamble
-        self.setup()
 
-    def setup(self):
-        pass
+        src = contiguous_kernel.render(preamble=self.preamble,
+                                       name="elemk",
+                                       arguments=self.arguments,
+                                       expression=self.operation)
+        self.contig_k = gpuarray.GpuKernel(src, "elemk", kind=self.kind,
+                                           context=self.context, cluda=True,
+                                           **self.flags)
 
-    def compile(self, args):
-        raise NotImplementedError()
+    def prepare_args_contig(self, args):
+        self.kernel_args = list(args)
+        self.kernel_args.insert(0, numpy.asarray(n, 'uint32'))
 
-    def __call__(self, *args):
-        k = self.compile(args)
-        k(*self.kernel_args, n=self.n)
-
-class ElemwiseKernelBasic(ElemwiseKernelBase):
-    def compile(self, args):
-        nd = self.prepare_args(args)
-        if nd not in self._cache:
+    def get_basic(self, args, nd, dims):
+        self._prepare_args_basic(args, dims)
+        if nd not in self._cache_basic:
             src = basic_kernel.render(preamble=self.preamble, name="elemk",
                                       nd=nd, arguments=self.arguments,
                                       expression=self.expression)
-            self._cache[nd] = gpuarray.GpuKernel(src, "elemk", cluda=True,
-                                                 kind=self.kind,
-                                                 context=self.context,
-                                                 **self.flags)
+            self._cache_basic[nd] = gpuarray.GpuKernel(src, "elemk",
+                                                        cluda=True,
+                                                        kind=self.kind,
+                                                        context=self.context,
+                                                        **self.flags)
+        return self._cache_basic[nd]
 
-        return self._cache[nd]
-
-    def prepare_args(self, args):
-        n = 0
-        nd = 0
-        dims = None
+    def prepare_args_basic(cls, args, dims):
         kernel_args = []
         for arg in args:
             if isinstance(arg, gpuarray.GpuArray):
-                n = arg.size
-                nd = arg.ndim
-                dims = arg.shape
                 kernel_args.append(arg),
                 kernel_args.extend(numpy.asarray(s, dtype='int32') \
                                        for s in arg.strides)
@@ -218,70 +214,92 @@ class ElemwiseKernelBasic(ElemwiseKernelBase):
         for d in reversed(dims):
             kernel_args.insert(0, numpy.asarray(d, dtype='uint32'))
 
-        kernel_args.insert(0, numpy.asarray(n, dtype='uint32'))
+        kernel_args.insert(0, numpy.asarray(self.n, dtype='uint32'))
 
-        self.n = n
         self.kernel_args = kernel_args
         return nd
 
-class ElemwiseKernelSpecialized(ElemwiseKernelBase):
-    def compile(self, args):
-        nd, dims, strs = self.prepare_args(args)
-        key = nd, dims, tuple(strs)
-        if key not in self._cache:
-            src = specialized_kernel.render(preamble=self.preamble,
-                                            name="elemk", n=self.n, nd=nd,
-                                            dim=dims, strs=strs,
-                                            arguments=self.arguments,
-                                            expression=self.expression)
-            self._cache[key] = gpuarray.GpuKernel(src, "elemk", cluda=True,
-                                                  kind=self.kind,
-                                                  context=self.context,
-                                                  **self.flags)
-        return self._cache[key]
+    def get_specialized(self, args, nd, dims, str):
+        self.prepare_args_specialized(args)
+        src = specialized_kernel.render(preamble=self.preamble,
+                                        name="elemk", n=self.n, nd=nd,
+                                        dim=dims, strs=strs,
+                                        arguments=self.arguments,
+                                        expression=self.expression)
+        return gpuarray.GpuKernel(src, "elemk", kind=self.kind,
+                                  context=self.context, cluda=True,
+                                  **self.flags)
 
-    def prepare_args(self, args):
-        n = 0
-        nd = 0
-        dims = None
-        kernel_args = []
-        strs = []
-        for arg in args:
-            if isinstance(arg, gpuarray.GpuArray):
-                n = arg.size
-                nd = arg.ndim
-                dims = arg.shape
-                kernel_args.append(arg)
-                strs.append(arg.strides)
-            else:
-                kernel_args.append(arg)
-                strs.append(None)
+    def prepare_args_specialized(self, args):
+        self.kernel_args = args
+
+    def check_args(self, args):
+        arrays = [arg for arg in args if isinstance(arg, gpuarray.GpuArray)]
+        if len(arrays) < 1:
+            raise ArugmentError("No arrays in kernel arguments, " \
+                                    "something is wrong")
+        n = array[0].size
+        nd = array[0].ndim
+        dims = array[0].shape
+        strs = [None]*len(args)
+        c_contig = True
+        f_contig = True
+        for arg in arrays[1:]:
+            if dims != arg.shape:
+                raise ValueError("Some array differs from the others in shape")
+            strs.append(arg.strides)
+            c_contig = c_contig and arg.flags['C_CONTIGUOUS']
+            f_contig = f_contig and arg.flags['F_CONTIGUOUS']
+
         self.n = n
-        self.kernel_args = kernel_args
-        return nd, dims, strs
+        return nd, dims, strs, c_contig or f_contig
 
-class ElemwiseKernelContig(ElemwiseKernelBase):
-    def setup(self):
-        src = contiguous_kernel.render(preamble=self.preamble, name="elemk",
-                                       arguments=self.arguments,
-                                       expression=self.operation)
-        self.k = gpuarray.GpuKernel(src, "elemk", kind=self.kind,
-                                    context=self.context, cluda=True,
-                                    **self.flags)
+    def select_kernel(self, args):
+        nd, dims, strs, contig = self.check_args(args)
+        if contig:
+            self.prepare_args_contig(args)
+            return self.contig_k
 
-    def compile(self, args):
-        n = None
-        kernel_args = []
-        for arg in args:
-            if isinstance(arg, gpuarray.GpuArray):
-                n = arg.size
-                kernel_args.append(arg),
+        # If you call self._spec_limit times (default: 3) in a row
+        # with the same (or compatible) arguments then we will compile
+        # a specialized kernel and use it otherwise we just note the
+        # fact and use the basic one.
+        key = nd, dims, strs
+        if key == self._speckey:
+            if self._speck:
+                self.prepare_args_specialized(args)
+                return self._speck
             else:
-                kernel_args.append(arg)
+                self._numcall += 1
+                if self._numcall == self._spec_limit:
+                    self._speck = self.get_specialized(args, nd, dims, strs)
+                    return self._speck
+        else:
+            self._speckey = key
+            self._speck = None
+            self._numcall = 1
 
-        kernel_args.insert(0, numpy.asarray(n, dtype='uint32'))
+        if nd not in self._cache:
+            k = self.get_basic(args, nd, dims)
+            self._cache[nd] = k
+            return k
+        self.prepare_args_basic(args, dims)
+        return self._cache[nd]
 
-        self.kernel_args = kernel_args
-        self.n = n
+    def prepare(self, *args):
+        nd, dims, strs, contig = self.check_args(args)
+        if contig:
+            self.prepare_args_contig(args)
+            self._prepare_k = self.contig_k
+        else:
+            self.prepare_args_specialized(args)
+            self._prepare_k = self.get_specialized(args, nd, dims, strs)
 
-        return self.k
+        self._prepare_k.setargs(self.kernel_args)
+
+    def prepared_call(self):
+        self._prepare_k.call(self.n)
+
+    def __call__(self, *args):
+        k = self.select_kernel(args)
+        k(*self.kernel_args, n=self.n)
