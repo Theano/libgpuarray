@@ -95,7 +95,9 @@ static const char CL_PREAMBLE[] =
   "#define GID_2 get_group_id(2)\n"
   "#define GDIM_0 get_num_groups(0)\n"
   "#define GDIM_1 get_num_groups(1)\n"
-  "#define GDIM_2 get_num_groups(2)\n";
+  "#define GDIM_2 get_num_groups(2)\n"
+  "#define floorf(x) floor(x)\n"
+  "#define fmodf(a, b) fmod(a, b)\n";
 
 static const char *get_error_string(cl_int err) {
   /* OpenCL 1.0 error codes */

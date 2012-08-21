@@ -74,7 +74,7 @@ def check_all(x, y):
     assert numpy.allclose(numpy.asarray(x), numpy.asarray(y))
 
 def gen_gpuarray(shape_orig, dtype='float32', offseted_outer=False,
-                 offseted_inner=False, sliced=1, order='c',
+                 offseted_inner=False, sliced=1, order='c', nozeros=False,
                  kind=None, ctx=None):
     if sliced is True:
         sliced = 2
@@ -88,9 +88,12 @@ def gen_gpuarray(shape_orig, dtype='float32', offseted_outer=False,
     if offseted_inner and len(shape) > 0:
         shape[-1] += 1
 
-    a = numpy.random.rand(*shape) * 10
-    if dtype.startswith("u"):
-        a = numpy.absolute(a)
+    low = 0.0
+    if nozeros:
+        low = 1.0
+
+    a = numpy.random.uniform(low, 10.0, shape)
+
     a = numpy.asarray(a, dtype=dtype)
     assert order in ['c', 'f']
     if order == 'f' and len(shape) > 0:

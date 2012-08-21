@@ -529,6 +529,43 @@ cdef new_GpuArray(void *ctx):
     res.ctx = ctx
     return res
 
+from ..array import get_common_dtype
+from ..tools import ArrayArg, ScalarArg, as_argument
+
+def elemwise2(a, op, b, out_dtype=None, op_tmpl="res[i] = %(a)s %(op)s %(b)s",
+              oper=None):
+    from ..elemwise import ElemwiseKernel
+    cdef GpuArray ary
+    if isinstance(a, GpuArray):
+        ary = a
+        if isinstance(b, GpuArray):
+            if b.shape != a.shape:
+                raise ValueError("shape mismatch")
+    elif isinstance(b, GpuArray):
+        ary = b
+    # ary always be a or b since one of them is always a GpuArray
+    shp = ary.shape
+    if out_dtype is None:
+        odtype = get_common_dtype(a, b, True)
+    else:
+        odtype = out_dtype
+    kind = ops_kind(ary.ga.ops)
+
+    a_arg = as_argument(a, 'a')
+    b_arg = as_argument(b, 'b')
+
+    args = [ArrayArg(odtype, 'res'), a_arg, b_arg]
+
+    res = GpuArray(a.shape, dtype=odtype, kind=kind,
+                   context=ctx_object(ary.ctx))
+
+    if oper is None:
+        oper = op_tmpl%{'a':a_arg.expr(), 'op':op, 'b':b_arg.expr()}
+
+    k = ElemwiseKernel(kind, ctx_object(ary.ctx), args, oper)
+    k(res, a, b)
+    return res
+
 cdef class GpuArray:
     cdef _GpuArray ga
     cdef void  *ctx
@@ -731,6 +768,53 @@ cdef class GpuArray:
             free(stops)
             free(steps)
         return res
+
+    def __add__(self, other):
+        return elemwise2(self, '+', other)
+
+    def __mul__(self, other):
+        return elemwise2(self, '*', other)
+
+    def __truediv__(self, other):
+        # truediv has weird type handling
+        try:
+            zero1 = numpy.ones(1, dtype=self.dtype)
+        except:
+            zero1 = numpy.asarray(self)
+        try:
+            zero2 = numpy.ones(1, dtype=other.dtype)
+        except:
+            zero2 = numpy.asarray(other)
+
+        res = (zero1.__truediv__(zero2)).dtype
+
+        if res == numpy.float32:
+            op_tmpl = "res[i] = ((float)%(a)s) / ((float)%(b)s)"
+        elif res == numpy.float64:
+            op_tmpl = "res[i] = ((double)%(a)s) / ((double)%(b)s)"
+        else:
+            raise RuntimeError("failed to cast properly")
+
+        return elemwise2(self, '/', other, out_dtype=res, op_tmpl=op_tmpl)
+
+    def __floordiv__(self, other):
+        out_dtype = get_common_dtype(self, other, True)
+        kw = {}
+        if out_dtype == numpy.float32:
+            kw['op_tmpl'] = "res[i] = floorf((float)%(a)s %(op)s (float)%(b)s)"
+        if out_dtype == numpy.float64:
+            kw['op_tmpl'] = "res[i] = floor((double)%(a)s %(op)s (double)%(b)s)"
+
+        return elemwise2(self, '/', other, out_dtype=out_dtype, **kw)
+
+    def __mod__(self, other):
+        out_dtype = get_common_dtype(self, other, True)
+        kw = {}
+        if out_dtype == numpy.float32:
+            kw['op_tmpl'] = "res[i] = fmodf((float)%(a)s, (float)%(b)s)"
+        if out_dtype == numpy.float64:
+            kw['op_tmpl'] = "res[i] = fmod((double)%(a)s, (double)%(b)s)"
+        return elemwise2(self, '%', other, out_dtype=out_dtype, **kw)
 
     property shape:
         "shape of this ndarray (tuple)"
