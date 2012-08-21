@@ -5,20 +5,8 @@ import numpy
 import pygpu_ndarray as gpu_ndarray
 
 from ..tests.support import (guard_devsup, check_meta, check_flags, check_all,
-                             gen_gpuarray, kind, context as ctx)
-
-if numpy.__version__ < '1.6.0':
-    skip_single_f = True
-else:
-    skip_single_f = False
-
-dtypes_all = ["float32", "float64", "complex64", "complex128",
-              "int8", "int16", "uint8", "uint16",
-              "int32", "int64", "uint32", "uint64"]
-
-dtypes_no_complex = ["float32", "float64",
-                     "int8", "int16", "uint8", "uint16",
-                     "int32", "int64", "uint32", "uint64"]
+                             gen_gpuarray, kind, context as ctx, dtypes_all,
+                             dtypes_no_complex, skip_single_f)
 
 
 def product(*args, **kwds):
