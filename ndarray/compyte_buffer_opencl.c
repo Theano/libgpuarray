@@ -23,14 +23,7 @@
 #define strdup _strdup
 #endif
 
-#define SSIZE_MIN (-SSIZE_MAX-1)
-
-/* To work around the lack of byte addressing */
-#define MIN_SIZE_INCR 4
-
-static inline size_t get_realsz(size_t sz) {
-  return (sz % MIN_SIZE_INCR ? sz - (sz % MIN_SIZE_INCR) : sz - MIN_SIZE_INCR);
-}
+#define SSIZE_MIN (-(SSIZE_MAX-1))
 
 static cl_int err;
 
@@ -39,7 +32,6 @@ static cl_int err;
 
 struct _gpudata {
   cl_mem buf;
-  /* Use subbuffers in OpenCL 1.1 to work around the need for an offset */
   size_t offset;
 };
 
@@ -67,6 +59,12 @@ size_t cl_get_offset(gpudata *g) { return g->offset; }
 struct _gpukernel {
   cl_kernel k;
 };
+
+#define PRAGMA "#pragma OPENCL EXTENSION "
+#define ENABLE " : enable\n"
+#define CL_SMALL "cl_khr_byte_addressable_store"
+#define CL_DOUBLE "cl_khr_fp64"
+#define CL_HALF "cl_khr_fp16"
 
 static gpukernel *cl_newkernel(void *ctx, unsigned int count,
 			       const char **strings, const size_t *lengths,
@@ -206,6 +204,37 @@ static cl_command_queue get_a_q(cl_context ctx, int *ret) {
   return res;
 }
 
+static int check_ext(cl_context ctx, const char *name) {
+  static cl_context last_context = NULL;
+  static char *exts = NULL;
+  cl_device_id dev;
+  size_t sz;
+  int res = 0;
+
+  if (ctx != last_context) {
+    last_context = NULL;
+    free(exts);
+
+    dev = get_dev(ctx, &res);
+    if (dev == NULL) return res;
+
+    err = clGetDeviceInfo(dev, CL_DEVICE_EXTENSIONS, 0, NULL, &sz);
+    if (err != CL_SUCCESS) return GA_IMPL_ERROR;
+
+    exts = malloc(sz);
+    if (exts == NULL) return GA_MEMORY_ERROR;
+
+    err = clGetDeviceInfo(dev, CL_DEVICE_EXTENSIONS, sz, exts, NULL);
+    if (err != CL_SUCCESS) {
+      free(exts);
+      exts = NULL;
+      return GA_IMPL_ERROR;
+    }
+    last_context = ctx;
+  }
+  return (strstr(exts, name) == NULL) ? -1 : 0;
+}
+
 static void
 #ifdef _MSC_VER
 __stdcall
@@ -263,27 +292,27 @@ static void *cl_init(int devno, int *ret) {
   return ctx;
 }
 
-static gpudata *cl_alloc(void *ctx, size_t size, int *ret)
-{
+static gpudata *cl_alloc(void *ctx, size_t size, int *ret) {
   gpudata *res;
 
-  /* OpenCL does not always support byte addressing
-     so fudge size to work around that */
-  if (size % MIN_SIZE_INCR)
-    size += MIN_SIZE_INCR-(size % MIN_SIZE_INCR);
-  /* make sure that all valid offset values will leave at least 4 bytes of
-     addressable space */
-  size += MIN_SIZE_INCR;
-  
+  if ((size % 4) != 0 && check_ext((cl_context)ctx, CL_SMALL))
+    FAIL(NULL, GA_DEVSUP_ERROR);
+
   res = malloc(sizeof(*res));
   if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
-  
+
+  res->offset = 0;
+  if (size == 0) {
+    /* Fake a zero-sized buffer since OpenCL doesn't like that */
+    size = 4;
+    res->offset = 4;
+  }
+
   res->buf = clCreateBuffer((cl_context)ctx, CL_MEM_READ_WRITE, size, NULL, &err);
   if (err != CL_SUCCESS) {
     free(res);
     FAIL(NULL, GA_IMPL_ERROR);
   }
-  res->offset = 0;
 
   return res;
 }
@@ -331,6 +360,8 @@ static int cl_move(gpudata *dst, gpudata *src, size_t sz) {
   size_t dst_sz, src_sz;
   int res;
   
+  if (sz == 0) return GA_NO_ERROR;
+
   if ((err = clGetMemObjectInfo(dst->buf, CL_MEM_SIZE, sizeof(size_t),
 				&dst_sz, NULL)) != CL_SUCCESS) {
     return GA_IMPL_ERROR;
@@ -341,12 +372,10 @@ static int cl_move(gpudata *dst, gpudata *src, size_t sz) {
     return GA_IMPL_ERROR;
   }
 
-  dst_sz = get_realsz(dst_sz - dst->offset);
-  src_sz = get_realsz(src_sz - src->offset);
+  dst_sz -= dst->offset;
+  src_sz -= src->offset;
 
   if (dst_sz < sz || src_sz < sz) return GA_VALUE_ERROR;
-
-  if (sz == 0) return GA_NO_ERROR;
 
   err = clGetMemObjectInfo(dst->buf, CL_MEM_CONTEXT, sizeof(ctx), &ctx, NULL);
   if (err != CL_SUCCESS) return GA_IMPL_ERROR;
@@ -417,23 +446,24 @@ static int cl_write(gpudata *dst, const void *src, size_t sz) {
 }
 
 static int cl_memset(gpudata *dst, int data) {
-  char local_kern[92];
+  char local_kern[128];
   const char *rlk[1];
-  size_t sz, bytes;
+  size_t sz, bytes, n;
   gpukernel *m;
   int r, res = GA_IMPL_ERROR;
 
   cl_context ctx;
 
   unsigned char val = (unsigned)data;
-  unsigned int pattern = (unsigned int)val & (unsigned int)val >> 8 & (unsigned int)val >> 16 & (unsigned int)val >> 24;
+  cl_uint pattern = (cl_uint)val & (cl_uint)val >> 8 & \
+    (cl_uint)val >> 16 & (cl_uint)val >> 24;
 
   if ((err = clGetMemObjectInfo(dst->buf, CL_MEM_SIZE, sizeof(bytes), &bytes,
 				NULL)) != CL_SUCCESS) {
     return GA_IMPL_ERROR;
   }
 
-  bytes = get_realsz(bytes - dst->offset);
+  bytes -= dst->offset;
 
   if (bytes == 0) return GA_NO_ERROR;
 
@@ -441,8 +471,34 @@ static int cl_memset(gpudata *dst, int data) {
                                 &ctx, NULL)) != CL_SUCCESS)
     return GA_IMPL_ERROR;
 
-  r = snprintf(local_kern, sizeof(local_kern),
-	       "__kernel void kmemset(__global unsigned int *mem) { mem[get_global_id(0)] = %u; }", pattern);
+  /* XXX: Full of fail, we need a loop or big array will have only
+          part of them memsetted */
+
+  if ((bytes % 16) == 0) {
+    r = snprintf(local_kern, sizeof(local_kern),
+                 "__kernel void kmemset(__global uint4 *mem)"
+                 "{ mem[get_global_id(0)] = (uint4)(%u,%u,%u,%u); }",
+                 pattern, pattern, pattern, pattern);
+    n = bytes/16;
+  } else if ((bytes % 8) == 0) {
+    r = snprintf(local_kern, sizeof(local_kern),
+                 "__kernel void kmemset(__global uint2 *mem)"
+                 "{ mem[get_global_id(0)] = (uint2)(%u,%u); }",
+                 pattern, pattern);
+    n = bytes/8;
+  } else if ((bytes % 4) == 0) {
+    r = snprintf(local_kern, sizeof(local_kern),
+                 "__kernel void kmemset(__global unsigned int *mem)"
+                 "{ mem[get_global_id(0)] = %u; }", pattern);
+    n = bytes/4;
+  } else {
+    if (check_ext(ctx, CL_SMALL))
+      return GA_DEVSUP_ERROR;
+    r = snprintf(local_kern, sizeof(local_kern),
+                 "__kernel void kmemset(__global unsigned char *mem)"
+                 "{ mem[get_global_id(0)] = %u; }", val);
+    n = bytes;
+  }
   /* If this assert fires, increase the size of local_kern above. */
   assert(r <= sizeof(local_kern));
 
@@ -454,7 +510,7 @@ static int cl_memset(gpudata *dst, int data) {
   res = cl_setkernelargbuf(m, 0, dst);
   if (res != GA_NO_ERROR) goto fail;
 
-  res = cl_callkernel(m, bytes/MIN_SIZE_INCR);
+  res = cl_callkernel(m, n);
 
  fail:
   cl_freekernel(m);
@@ -479,27 +535,19 @@ static int cl_offset(gpudata *b, ssize_t off) {
   return GA_NO_ERROR;
 }
 
-#define PRAGMA "#pragma OPENCL EXTENSION "
-#define ENABLE " : enable\n"
-#define CL_SMALL "cl_khr_byte_addressable_store"
-#define CL_DOUBLE "cl_khr_fp64"
-#define CL_HALF "cl_khr_fp16"
-
 static int cl_check_extensions(const char **preamble, unsigned int *count,
-                               int flags, const char *exts) {
+                               int flags, cl_context ctx) {
   if (flags & GA_USE_CLUDA) {
     preamble[*count] = CL_PREAMBLE;
     (*count)++;
   }
   if (flags & GA_USE_SMALL) {
-    if (strstr(exts, CL_SMALL) == NULL)
-      return GA_DEVSUP_ERROR;
+    if (check_ext(ctx, CL_SMALL)) return GA_DEVSUP_ERROR;
     preamble[*count] = PRAGMA CL_SMALL ENABLE;
     (*count)++;
   }
   if (flags & GA_USE_DOUBLE) {
-    if (strstr(exts, CL_DOUBLE) == NULL)
-      return GA_DEVSUP_ERROR;
+    if (check_ext(ctx, CL_DOUBLE)) return GA_DEVSUP_ERROR;
     preamble[*count] = PRAGMA CL_DOUBLE ENABLE;
     (*count)++;
   }
@@ -507,8 +555,7 @@ static int cl_check_extensions(const char **preamble, unsigned int *count,
     return GA_DEVSUP_ERROR; // for now
   }
   if (flags & GA_USE_HALF) {
-    if (strstr(exts, CL_HALF) == NULL)
-      return GA_DEVSUP_ERROR;
+    if (check_ext(ctx, CL_HALF)) return GA_DEVSUP_ERROR;
     preamble[*count] = PRAGMA CL_HALF ENABLE;
     (*count)++;
   }
@@ -524,8 +571,6 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
   gpukernel *res;
   cl_device_id dev;
   cl_program p;
-  char *exts;
-  size_t sz;
   const char *preamble[GA_USEFL_COUNT];
   size_t *newl;
   const char **news;
@@ -537,20 +582,7 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
   dev = get_dev((cl_context)ctx, ret);
   if (dev == NULL) return NULL;
 
-  err = clGetDeviceInfo(dev, CL_DEVICE_EXTENSIONS, 0, NULL, &sz);
-  CHKFAIL(NULL);
-
-  exts = malloc(sz);
-  if (exts == NULL) FAIL(NULL, GA_MEMORY_ERROR);
-
-  err = clGetDeviceInfo(dev, CL_DEVICE_EXTENSIONS, sz, exts, NULL);
-  if (err != CL_SUCCESS) {
-    free(exts);
-    FAIL(NULL, GA_IMPL_ERROR);
-  }
-
-  error = cl_check_extensions(preamble, &n, flags, exts);
-  free(exts);
+  error = cl_check_extensions(preamble, &n, flags, (cl_context)ctx);
   if (error != GA_NO_ERROR) FAIL(NULL, error);
 
   res = malloc(sizeof(*res));
@@ -635,6 +667,8 @@ static int cl_callkernel(gpukernel *k, size_t n) {
   cl_event ev;
   cl_context ctx;
   cl_command_queue q;
+  cl_device_id dev;
+  size_t n_max;
   int res;
 
   err = clGetKernelInfo(k->k, CL_KERNEL_CONTEXT, sizeof(ctx), &ctx, NULL);
@@ -642,6 +676,15 @@ static int cl_callkernel(gpukernel *k, size_t n) {
 
   q = get_a_q(ctx, &res);
   if (q == NULL) return res;
+
+  dev = get_dev(ctx, &res);
+  if (dev == NULL) return res;
+
+  err = clGetKernelWorkGroupInfo(k->k, dev, CL_KERNEL_WORK_GROUP_SIZE,
+                                 sizeof(n_max), &n_max, NULL);
+  if (err != CL_SUCCESS) return GA_IMPL_ERROR;
+
+  if (n > n_max) n = n_max;
 
   err = clEnqueueNDRangeKernel(q, k->k, 1, NULL, &n, NULL, 0, NULL, &ev);
   if (err != CL_SUCCESS) return GA_IMPL_ERROR;
