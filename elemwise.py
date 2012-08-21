@@ -185,8 +185,11 @@ class ElemwiseKernel(object):
                                            **self.flags)
 
     def prepare_args_contig(self, args):
+        _, _, _, contig = self.check_args(args)
+        if not contig:
+            raise RuntimeError("Contig call on not contiguous arrays! halp!")
         self.kernel_args = list(args)
-        self.kernel_args.insert(0, numpy.asarray(n, 'uint32'))
+        self.kernel_args.insert(0, numpy.asarray(self.n, 'uint32'))
 
     def get_basic(self, args, nd, dims):
         self._prepare_args_basic(args, dims)
@@ -238,9 +241,9 @@ class ElemwiseKernel(object):
         if len(arrays) < 1:
             raise ArugmentError("No arrays in kernel arguments, " \
                                     "something is wrong")
-        n = array[0].size
-        nd = array[0].ndim
-        dims = array[0].shape
+        n = arrays[0].size
+        nd = arrays[0].ndim
+        dims = arrays[0].shape
         strs = [None]*len(args)
         c_contig = True
         f_contig = True
