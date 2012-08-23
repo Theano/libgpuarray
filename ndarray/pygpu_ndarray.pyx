@@ -33,7 +33,7 @@ cdef extern from "Python.h":
                                   Py_ssize_t *slicelength) except -1
 
 cdef extern from "compyte_util.h":
-     size_t compyte_get_elsize(int typecode)
+    size_t compyte_get_elsize(int typecode)
 
 cdef extern from "compyte_buffer.h":
     ctypedef struct gpudata:
@@ -58,8 +58,8 @@ cdef extern from "compyte_buffer.h":
         int typecode
 
     ctypedef struct _GpuKernel "GpuKernel":
-       gpukernel *k
-       compyte_buffer_ops *ops
+        gpukernel *k
+        compyte_buffer_ops *ops
 
     cdef int GA_C_CONTIGUOUS
     cdef int GA_F_CONTIGUOUS
@@ -125,7 +125,7 @@ cdef extern from "compyte_buffer.h":
     int GpuArray_memset(_GpuArray *a, int data) nogil
 
     char *GpuArray_error(_GpuArray *a, int err) nogil
-    
+
     void GpuArray_fprintf(libc.stdio.FILE *fd, _GpuArray *a) nogil
     int GpuArray_is_c_contiguous(_GpuArray *a) nogil
     int GpuArray_is_f_contiguous(_GpuArray *a) nogil
@@ -193,7 +193,7 @@ cdef dict NP_TO_TYPE = {
     np.dtype('float64'): GA_DOUBLE,
     np.dtype('complex64'): GA_CFLOAT,
     np.dtype('complex128'): GA_CDOUBLE,
-    }
+}
 
 cdef dict TYPE_TO_NP = dict((v, k) for k, v in NP_TO_TYPE.iteritems())
 
@@ -228,7 +228,7 @@ cdef bint py_ISONESEGMENT(GpuArray a):
     return GpuArray_ISONESEGMENT(&a.ga)
 
 cdef array_empty(GpuArray a, compyte_buffer_ops *ops, void *ctx, int typecode,
-            unsigned int nd, size_t *dims, ga_order ord):
+                 unsigned int nd, size_t *dims, ga_order ord):
     cdef int err
     with nogil:
         err = GpuArray_empty(&a.ga, ops, ctx, typecode, nd, dims, ord)
@@ -238,12 +238,12 @@ cdef array_empty(GpuArray a, compyte_buffer_ops *ops, void *ctx, int typecode,
 cdef array_fromdata(GpuArray a, compyte_buffer_ops *ops, gpudata *data,
                     int typecode, unsigned int nd, size_t *dims,
                     ssize_t *strides, int writeable):
-   cdef int err
-   with nogil:
-       err = GpuArray_fromdata(&a.ga, ops, data, typecode, nd, dims, strides,
-                               writeable)
-   if err != GA_NO_ERROR:
-       raise GpuArrayException(GpuArray_error(&a.ga, err))
+    cdef int err
+    with nogil:
+        err = GpuArray_fromdata(&a.ga, ops, data, typecode, nd, dims, strides,
+                                writeable)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef array_view(GpuArray v, GpuArray a):
     cdef int err
@@ -253,7 +253,7 @@ cdef array_view(GpuArray v, GpuArray a):
         raise GpuArrayException(GpuArray_error(&a.ga, err))
 
 cdef array_index(GpuArray r, GpuArray a, ssize_t *starts, ssize_t *stops,
-            ssize_t *steps):
+                 ssize_t *steps):
     cdef int err
     with nogil:
         err = GpuArray_index(&r.ga, &a.ga, starts, stops, steps)
@@ -267,7 +267,7 @@ cdef array_clear(GpuArray a):
 cdef bint array_share(GpuArray a, GpuArray b):
     cdef int res
     with nogil:
-        res = GpuArray_share(&a.ga, &b.ga);
+        res = GpuArray_share(&a.ga, &b.ga)
     return res
 
 cdef array_move(GpuArray a, GpuArray src):
@@ -473,9 +473,9 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
         if not copy and \
                 (dtype is None or np.dtype(dtype) == arg.dtype) and \
                 (arg.ga.nd >= ndmin) and \
-                (order is None or order == 'A' or \
-                     (order == 'C' and py_CHKFLAGS(arg, GA_C_CONTIGUOUS)) or \
-                     (order == 'F' and py_CHKFLAGS(arg, GA_F_CONTIGUOUS))):
+                (order is None or order == 'A' or
+                 (order == 'C' and py_CHKFLAGS(arg, GA_C_CONTIGUOUS)) or
+                 (order == 'F' and py_CHKFLAGS(arg, GA_F_CONTIGUOUS))):
             return arg
         shp = arg.shape
         if len(shp) < ndmin:
@@ -560,7 +560,7 @@ def elemwise2(a, op, b, out_dtype=None, op_tmpl="res[i] = %(a)s %(op)s %(b)s",
                    context=ctx_object(ary.ctx))
 
     if oper is None:
-        oper = op_tmpl%{'a':a_arg.expr(), 'op':op, 'b':b_arg.expr()}
+        oper = op_tmpl % {'a': a_arg.expr(), 'op': op, 'b': b_arg.expr()}
 
     k = ElemwiseKernel(kind, ctx_object(ary.ctx), args, oper)
     k(res, a, b)
@@ -568,7 +568,7 @@ def elemwise2(a, op, b, out_dtype=None, op_tmpl="res[i] = %(a)s %(op)s %(b)s",
 
 cdef class GpuArray:
     cdef _GpuArray ga
-    cdef void  *ctx
+    cdef void *ctx
     cdef readonly object base
 
     def __dealloc__(self):
@@ -589,7 +589,7 @@ cdef class GpuArray:
         else:
             self.ctx = get_ctx(context)
 
-        cdims = <size_t *>calloc(len(shape), sizeof(size_t));
+        cdims = <size_t *>calloc(len(shape), sizeof(size_t))
         if cdims == NULL:
             raise MemoryError("could not allocate cdims")
         try:
@@ -632,18 +632,18 @@ cdef class GpuArray:
 
     def __array__(self):
         cdef np.ndarray res
-        
+
         if not py_ISONESEGMENT(self):
             self = self.copy()
 
         res = PyArray_Empty(self.ga.nd, <np.npy_intp *>self.ga.dimensions,
                             self.dtype, py_CHKFLAGS(self, GA_F_CONTIGUOUS) \
                                 and not py_CHKFLAGS(self, GA_C_CONTIGUOUS))
-        
+
         array_read(np.PyArray_DATA(res),
                    np.PyArray_NBYTES(res),
                    self)
-        
+
         return res
 
     def copy(self, order='C'):
@@ -762,7 +762,7 @@ cdef class GpuArray:
                 steps[i] = 1
 
             res = new_GpuArray(self.ctx)
-            array_index(res, self, starts, stops, steps);
+            array_index(res, self, starts, stops, steps)
         finally:
             free(starts)
             free(stops)
@@ -845,12 +845,12 @@ cdef class GpuArray:
             for i in range(self.ga.nd):
                 res[i] = self.ga.strides[i]
             return tuple(res)
-        
+
     property ndim:
         "The number of dimensions in this object"
         def __get__(self):
             return self.ga.nd
-        
+
     property dtype:
         "The dtype of the element"
         def __get__(self):
@@ -864,7 +864,7 @@ cdef class GpuArray:
         "The size of the base element."
         def __get__(self):
             return compyte_get_elsize(self.ga.typecode)
-    
+
     property flags:
         "Return the flags as a dictionary"
         def __get__(self):
@@ -873,7 +873,7 @@ cdef class GpuArray:
             res["F_CONTIGUOUS"] = py_CHKFLAGS(self, GA_F_CONTIGUOUS)
             res["WRITEABLE"] = py_CHKFLAGS(self, GA_WRITEABLE)
             res["ALIGNED"] = py_CHKFLAGS(self, GA_ALIGNED)
-            res["UPDATEIFCOPY"] = False # Unsupported
+            res["UPDATEIFCOPY"] = False  # Unsupported
             res["OWNDATA"] = py_CHKFLAGS(self, GA_OWNDATA)
             return res
 
@@ -884,8 +884,8 @@ cdef class GpuArray:
 
 cdef class GpuKernel:
     cdef _GpuKernel k
-    cdef void  *ctx
-    
+    cdef void *ctx
+
     def __dealloc__(self):
         kernel_clear(self)
 
@@ -896,7 +896,7 @@ cdef class GpuKernel:
         cdef size_t l
         cdef compyte_buffer_ops *ops
         cdef int flags = 0
-        
+
         if not isinstance(source, (str, unicode)):
             raise TypeError("Expected a string for the kernel source")
         if not isinstance(name, (str, unicode)):
@@ -932,7 +932,7 @@ cdef class GpuKernel:
 
         s[0] = ss
         l = len(ss)
-        kernel_init(self, ops, self.ctx, 1, s, &l, name, flags);
+        kernel_init(self, ops, self.ctx, 1, s, &l, name, flags)
 
     def __call__(self, *args, n=None):
         if n is None:
