@@ -531,43 +531,90 @@ cdef new_GpuArray(void *ctx):
 
 from ..array import get_common_dtype, get_np_obj
 from ..tools import ArrayArg, ScalarArg, as_argument
+from ..dtypes import dtype_to_ctype
 
-def elemwise2(a, op, b, out_dtype=None, op_tmpl="res[i] = %(a)s %(op)s %(b)s",
-              oper=None):
+def elemwise1(a, op, oper=None, op_tmpl="res[i] = %(op)sa[i]"):
+    from ..elemwise import ElemwiseKernel
+    cdef GpuArray ary = a
+
+    a_arg = as_argument(a, 'a')
+
+    args = [ArrayArg(a.dtype, 'res'), a_arg]
+
+    res = ary._empty_like_me()
+
+    if oper is None:
+        oper = op_tmpl % {'op': op}
+
+    k = ElemwiseKernel(ary.kind, ary.context, args, oper)
+    k(res, a)
+    return res
+
+def ielemwise1(a, op, oper=None, op_tmpl="a[i] = %(op)sa[i]"):
+    from ..elemwise import ElemwiseKernel
+    cdef GpuArray ary = a
+
+    a_arg = as_argument(a, 'a')
+
+    args = [a_arg]
+
+    if oper is None:
+        oper = op_tmpl % {'op': op}
+
+    k = ElemwiseKernel(ary.kind, ary.context, args, oper)
+    k(a)
+    return a
+
+def elemwise2(a, op, b, out_dtype=None, oper=None,
+              op_tmpl="res[i] = (%(out_t)s)%(a)s %(op)s (%(out_t)s)%(b)s"):
     from ..elemwise import ElemwiseKernel
     cdef GpuArray ary
     if isinstance(a, GpuArray):
         ary = a
-        if isinstance(b, GpuArray):
-            if b.shape != a.shape:
-                raise ValueError("shape mismatch")
-        else:
+        if not isinstance(b, GpuArray):
             b = numpy.asarray(b)
     elif isinstance(b, GpuArray):
         ary = b
         a = numpy.asarray(a)
     # ary will always be a or b since one of them is always a GpuArray
-    shp = ary.shape
     if out_dtype is None:
         odtype = get_common_dtype(a, b, True)
     else:
         odtype = out_dtype
-    kind = ops_kind(ary.ga.ops)
 
     a_arg = as_argument(a, 'a')
     b_arg = as_argument(b, 'b')
 
     args = [ArrayArg(odtype, 'res'), a_arg, b_arg]
 
-    res = GpuArray(ary.shape, dtype=odtype, kind=kind,
-                   context=ctx_object(ary.ctx))
+    res = ary._empty_like_me(dtype=odtype)
 
     if oper is None:
-        oper = op_tmpl % {'a': a_arg.expr(), 'op': op, 'b': b_arg.expr()}
+        oper = op_tmpl % {'a': a_arg.expr(), 'op': op, 'b': b_arg.expr(),
+                          'out_t': dtype_to_ctype(odtype)}
 
-    k = ElemwiseKernel(kind, ctx_object(ary.ctx), args, oper)
+    k = ElemwiseKernel(ary.kind, ary.context, args, oper)
     k(res, a, b)
     return res
+
+def ielemwise2(a, op, b, oper=None,
+               op_tmpl="a[i] = a[i] %(op)s (%(a_t)s)%(b)s"):
+    from ..elemwise import ElemwiseKernel
+    if not isinstance(b, GpuArray):
+        b = numpy.asarray(b)
+
+    a_arg = as_argument(a, 'a')
+    b_arg = as_argument(b, 'b')
+
+    args = [a_arg, b_arg]
+
+    if oper is None:
+        oper = op_tmpl % {'op': op, 'b': b_arg.expr(),
+                          'a_t': dtype_to_ctype(a.dtype)}
+
+    k = ElemwiseKernel(a.kind, a.context, args, oper)
+    k(a, b)
+    return a
 
 cdef class GpuArray:
     cdef _GpuArray ga
@@ -647,6 +694,18 @@ cdef class GpuArray:
                    np.PyArray_NBYTES(res),
                    self)
 
+        return res
+
+    def _empty_like_me(self, dtype=None, order='C'):
+        cdef int typecode
+        cdef GpuArray res
+        if dtype is None:
+            typecode = self.ga.typecode
+        else:
+            typecode = dtype_to_typecode(dtype)
+        res = new_GpuArray(self.ctx)
+        array_empty(res, self.ga.ops, self.ctx, typecode,
+                    self.ga.nd, self.ga.dimensions, to_ga_order(order))
         return res
 
     def copy(self, order='C'):
@@ -810,6 +869,42 @@ cdef class GpuArray:
             kw['op_tmpl'] = "res[i] = fmod((double)%(a)s, (double)%(b)s)"
         return elemwise2(self, '%', other, out_dtype=out_dtype, **kw)
 
+    def __divmod__(a, b):
+        from ..elemwise import ElemwiseKernel
+        cdef GpuArray ary
+        if isinstance(a, GpuArray):
+            ary = a
+            if not isinstance(b, GpuArray):
+                b = numpy.asarray(b)
+        elif isinstance(b, GpuArray):
+            ary = b
+            a = numpy.asarray(a)
+        # ary always be a or b since one of them is always a GpuArray
+        odtype = get_common_dtype(a, b, True)
+
+        a_arg = as_argument(a, 'a')
+        b_arg = as_argument(b, 'b')
+        args = [ArrayArg(odtype, 'div'), ArrayArg(odtype, 'mod'), a_arg, b_arg]
+
+        div = ary._empty_like_me(dtype=odtype)
+        mod = ary._empty_like_me(dtype=odtype)
+
+        divpart = "div[i] = (%(out_t)s)%(a)s / (%(out_t)s)%(b)s"
+        modpart = "mod[i] = %(a)s %% %(b)s"
+        if odtype == numpy.float32:
+            divpart = "div[i] = floorf((float)%(a)s / (float)%(b)s)"
+            modpart = "mod[i] = fmodf((float)%(a)s, (float)%(b)s)"
+        if odtype == numpy.float64:
+            divpart = "div[i] = floor((double)%(a)s / (double)%(b)s)"
+            modpart = "mod[i] = fmod((double)%(a)s, (double)%(b)s)"
+        tmpl = divpart+","+modpart
+        ksrc = tmpl % {'a': a_arg.expr(), 'b': b_arg.expr(),
+                       'out_t': dtype_to_ctype(odtype)}
+
+        k = ElemwiseKernel(ary.kind, ary.context, args, ksrc)
+        k(div, mod, a, b)
+        return (div, mod)
+
     property shape:
         "shape of this ndarray (tuple)"
         def __get__(self):
@@ -875,6 +970,16 @@ cdef class GpuArray:
         "Return a pointer to the raw gpudata object."
         def __get__(self):
             return <size_t>self.ga.data
+
+    property kind:
+        "Return the kind string for the object backing this array."
+        def __get__(self):
+            return ops_kind(self.ga.ops)
+
+    property context:
+        "Return the context with which this array is associated."
+        def __get__(self):
+            return ctx_object(self.ctx)
 
 cdef class GpuKernel:
     cdef _GpuKernel k
