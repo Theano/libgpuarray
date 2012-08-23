@@ -135,6 +135,8 @@ def parse_c_args(arguments):
 
 import re
 INDEX_RE = re.compile('([a-zA-Z_][a-zA-Z0-9_]*)\[i\]')
+
+
 def massage_op(operation):
     return INDEX_RE.sub('\g<1>[0]', operation)
 
@@ -198,10 +200,10 @@ class ElemwiseKernel(object):
                                       nd=nd, arguments=self.arguments,
                                       expression=self.expression)
             self._cache_basic[nd] = gpuarray.GpuKernel(src, "elemk",
-                                                        cluda=True,
-                                                        kind=self.kind,
-                                                        context=self.context,
-                                                        **self.flags)
+                                                       cluda=True,
+                                                       kind=self.kind,
+                                                       context=self.context,
+                                                       **self.flags)
         return self._cache_basic[nd]
 
     def prepare_args_basic(cls, args, dims):
@@ -209,8 +211,8 @@ class ElemwiseKernel(object):
         for arg in args:
             if isinstance(arg, gpuarray.GpuArray):
                 kernel_args.append(arg),
-                kernel_args.extend(numpy.asarray(s, dtype='int32') \
-                                       for s in arg.strides)
+                kernel_args.extend(numpy.asarray(s, dtype='int32')
+                                   for s in arg.strides)
             else:
                 kernel_args.append(arg)
 
@@ -239,12 +241,12 @@ class ElemwiseKernel(object):
     def check_args(self, args):
         arrays = [arg for arg in args if isinstance(arg, gpuarray.GpuArray)]
         if len(arrays) < 1:
-            raise ArugmentError("No arrays in kernel arguments, " \
-                                    "something is wrong")
+            raise ArugmentError("No arrays in kernel arguments, "
+                                "something is wrong")
         n = arrays[0].size
         nd = arrays[0].ndim
         dims = arrays[0].shape
-        strs = [None]*len(args)
+        strs = [None] * len(args)
         c_contig = True
         f_contig = True
         for arg in arrays[1:]:
