@@ -48,20 +48,23 @@ class ArrayFlags:
         return self.f_contiguous or self.c_contiguous
 
 
+def get_np_obj(obj):
+    if isinstance(obj, np.ndarray) and obj.shape == ():
+        return obj
+    try:
+        return np.ones(1, dtype=obj.dtype)
+    except AttributeError:
+        return np.asarray(obj)
 
 
 def get_common_dtype(obj1, obj2, allow_double):
     # Yes, numpy behaves differently depending on whether
     # we're dealing with arrays or scalars.
 
-    zero1 = np.zeros(1, dtype=obj1.dtype)
+    np1 = get_np_obj(obj1)
+    np2 = get_np_obj(obj2)
 
-    try:
-        zero2 = np.zeros(1, dtype=obj2.dtype)
-    except AttributeError:
-        zero2 = obj2
-
-    result = (zero1 + zero2).dtype
+    result = (np1 + np2).dtype
 
     if not allow_double:
         if result == np.float64:
@@ -70,7 +73,6 @@ def get_common_dtype(obj1, obj2, allow_double):
             result = np.dtype(np.complex64)
 
     return result
-
 
 
 def bound(a):

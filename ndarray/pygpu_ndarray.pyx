@@ -529,7 +529,7 @@ cdef new_GpuArray(void *ctx):
     res.ctx = ctx
     return res
 
-from ..array import get_common_dtype
+from ..array import get_common_dtype, get_np_obj
 from ..tools import ArrayArg, ScalarArg, as_argument
 
 def elemwise2(a, op, b, out_dtype=None, op_tmpl="res[i] = %(a)s %(op)s %(b)s",
@@ -541,9 +541,12 @@ def elemwise2(a, op, b, out_dtype=None, op_tmpl="res[i] = %(a)s %(op)s %(b)s",
         if isinstance(b, GpuArray):
             if b.shape != a.shape:
                 raise ValueError("shape mismatch")
+        else:
+            b = numpy.asarray(b)
     elif isinstance(b, GpuArray):
         ary = b
-    # ary always be a or b since one of them is always a GpuArray
+        a = numpy.asarray(a)
+    # ary will always be a or b since one of them is always a GpuArray
     shp = ary.shape
     if out_dtype is None:
         odtype = get_common_dtype(a, b, True)
@@ -556,7 +559,7 @@ def elemwise2(a, op, b, out_dtype=None, op_tmpl="res[i] = %(a)s %(op)s %(b)s",
 
     args = [ArrayArg(odtype, 'res'), a_arg, b_arg]
 
-    res = GpuArray(a.shape, dtype=odtype, kind=kind,
+    res = GpuArray(ary.shape, dtype=odtype, kind=kind,
                    context=ctx_object(ary.ctx))
 
     if oper is None:
@@ -776,24 +779,15 @@ cdef class GpuArray:
         return elemwise2(self, '*', other)
 
     def __truediv__(self, other):
-        # truediv has weird type handling
-        try:
-            zero1 = numpy.ones(1, dtype=self.dtype)
-        except:
-            zero1 = numpy.asarray(self)
-        try:
-            zero2 = numpy.ones(1, dtype=other.dtype)
-        except:
-            zero2 = numpy.asarray(other)
+        np1 = get_np_obj(self)
+        np2 = get_np_obj(other)
 
-        res = (zero1.__truediv__(zero2)).dtype
+        res = (np1.__truediv__(np2)).dtype
 
         if res == numpy.float32:
             op_tmpl = "res[i] = ((float)%(a)s) / ((float)%(b)s)"
-        elif res == numpy.float64:
-            op_tmpl = "res[i] = ((double)%(a)s) / ((double)%(b)s)"
         else:
-            raise RuntimeError("failed to cast properly")
+            op_tmpl = "res[i] = ((double)%(a)s) / ((double)%(b)s)"
 
         return elemwise2(self, '/', other, out_dtype=res, op_tmpl=op_tmpl)
 
@@ -958,6 +952,10 @@ cdef class GpuKernel:
     cdef _setarg(self, unsigned int index, np.dtype t, object o):
         cdef float f
         cdef double d
+        cdef signed char b
+        cdef unsigned char ub
+        cdef short s
+        cdef unsigned short us
         cdef int i
         cdef unsigned int ui
         cdef long l
@@ -970,6 +968,18 @@ cdef class GpuKernel:
         elif typecode == GA_DOUBLE:
             d = o
             kernel_setarg(self, index, typecode, &d)
+        elif typecode == GA_BYTE:
+            b = o
+            kernel_setarg(self, index, typecode, &b)
+        elif typecode == GA_UBYTE:
+            ub = o
+            kernel_setarg(self, index, typecode, &ub)
+        elif typecode == GA_SHORT:
+            s = o
+            kernel_setarg(self, index, typecode, &s)
+        elif typecode == GA_USHORT:
+            us = o
+            kernel_setarg(self, index, typecode, &us)
         elif typecode == GA_INT:
             i = o
             kernel_setarg(self, index, typecode, &i)

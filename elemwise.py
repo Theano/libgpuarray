@@ -187,9 +187,6 @@ class ElemwiseKernel(object):
                                            **self.flags)
 
     def prepare_args_contig(self, args):
-        _, _, _, contig = self.check_args(args)
-        if not contig:
-            raise RuntimeError("Contig call on not contiguous arrays! halp!")
         self.kernel_args = list(args)
         self.kernel_args.insert(0, numpy.asarray(self.n, 'uint32'))
 
