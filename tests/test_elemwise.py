@@ -63,7 +63,7 @@ def ielemwise2_ops_array(op, dtype1, dtype2, shape):
 
 
 def test_elemwise_layouts():
-    for shape in [(20, 30), (50, 8, 9)]:
+    for shape in [(), (20, 30), (50, 8, 9)]:
         for offseted_outer in [True, False]:
             for offseted_inner in [True, False]:
                 for sliced in [1, 2]:
@@ -76,8 +76,9 @@ def test_elemwise_layouts():
 def elemwise_layouts(shape, offseted_outer, offseted_inner, sliced, order):
     ac, ag = gen_gpuarray(shape, dtype='float32', sliced=sliced, order=order,
                           offseted_outer=offseted_outer,
-                          offseted_inner=offseted_inner)
-    bc, bg = gen_gpuarray(shape, dtype='float32')
+                          offseted_inner=offseted_inner,
+                          kind=kind, ctx=context)
+    bc, bg = gen_gpuarray(shape, dtype='float32', kind=kind, ctx=context)
 
     outc = ac + bc
     outg = ag + bg
