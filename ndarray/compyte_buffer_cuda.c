@@ -425,14 +425,14 @@ static void *call_compiler_impl(const char *src, size_t len, int *ret) {
         FAIL(NULL, GA_SYS_ERROR);
     }
 
-    buf = malloc(st.st_size);
+    buf = malloc((size_t)st.st_size);
     if (buf == NULL) {
         close(fd);
         unlink(outbuf);
         FAIL(NULL, GA_SYS_ERROR);
     }
 
-    s = read(fd, buf, st.st_size);
+    s = read(fd, buf, (size_t)st.st_size);
     close(fd);
     unlink(outbuf);
     /* fd is not non-blocking; should have complete read */
@@ -619,10 +619,10 @@ static int do_sched(gpukernel *k, size_t n, unsigned int *bc,
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
 
     if (n < (unsigned)(max_t)) {
-        *bc = (n + min_t - 1) / min_t;
+        *bc = (unsigned)(n + min_t - 1) / min_t;
         *tpb = min_t;
     } else if (n < (unsigned)(max_b * max_t)) {
-        *bc = (n + max_t - 1) / max_t;
+        *bc = (unsigned)(n + max_t - 1) / max_t;
         *tpb = max_t;
     } else {
         *bc = max_b;
