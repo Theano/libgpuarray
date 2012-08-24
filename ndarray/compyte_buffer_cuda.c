@@ -521,7 +521,7 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     }
 
     p = buf;
-    for (i = 0; i < count+1; i++) {
+    for (i = 0; i < count+pre; i++) {
         memcpy(p, descr[i].iov_base, descr[i].iov_len);
         p += descr[i].iov_len;
     }
