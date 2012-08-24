@@ -21,16 +21,14 @@ def test_elemwise2_ops_array():
     for op in operators2:
         for dtype1 in dtypes_no_complex:
             for dtype2 in dtypes_no_complex:
-                for shape in [(500,), (50, 5), (5, 6, 7)]:
-                    yield elemwise2_ops_array, op, dtype1, dtype2, shape
+                    yield elemwise2_ops_array, op, dtype1, dtype2, (50,)
 
 
 def test_ielemwise2_ops_array():
     for op in ioperators2:
         for dtype1 in dtypes_no_complex:
             for dtype2 in dtypes_no_complex:
-                for shape in [(500,), (50, 5), (5, 6, 7)]:
-                    yield ielemwise2_ops_array, op, dtype1, dtype2, shape
+                    yield ielemwise2_ops_array, op, dtype1, dtype2, (50,)
 
 
 @guard_devsup
@@ -63,20 +61,43 @@ def ielemwise2_ops_array(op, dtype1, dtype2, shape):
     assert numpy.allclose(out_c, numpy.asarray(out_g))
 
 
+def test_elemwise_layouts():
+    for shape in [(20, 30), (50, 8, 9)]:
+        for offseted_outer in [True, False]:
+            for offseted_inner in [True, False]:
+                for sliced in [1, 2]:
+                    for order in ['c', 'f']:
+                        yield elemwise_layouts, shape, offseted_outer, \
+                            offseted_inner, sliced, order
+
+
+@guard_devsup
+def elemwise_layouts(shape, offseted_outer, offseted_inner, sliced, order):
+    ac, ag = gen_gpuarray(shape, dtype='float32', sliced=sliced, order=order,
+                          offseted_outer=offseted_outer,
+                          offseted_inner=offseted_inner)
+    bc, bg = gen_gpuarray(shape, dtype='float32')
+
+    outc = ac + bc
+    outg = ag + bg
+
+    assert outc.shape == outg.shape
+    assert outc.dtype == outg.dtype
+    assert numpy.allclose(outc, numpy.asarray(outg))
+
+
 def test_elemwise2_ops_mixed():
     for op in operators2:
         for dtype in dtypes_no_complex:
-            for shape in [(500,), (50, 5), (5, 6, 7)]:
-                for elem in elems:
-                    yield elemwise2_ops_mixed, op, dtype, shape, elem
+            for elem in elems:
+                yield elemwise2_ops_mixed, op, dtype, (50,), elem
 
 
 def test_ielemwise2_ops_mixed():
     for op in ioperators2:
         for dtype in dtypes_no_complex:
-            for shape in [(500,), (50, 5), (5, 6, 7)]:
-                for elem in elems:
-                    yield ielemwise2_ops_mixed, op, dtype, shape, elem
+            for elem in elems:
+                yield ielemwise2_ops_mixed, op, dtype, (50,), elem
 
 
 @guard_devsup
@@ -90,8 +111,7 @@ def elemwise2_ops_mixed(op, dtype, shape, elem):
     assert out_c.dtype == out_g.dtype
     assert numpy.allclose(out_c, numpy.asarray(out_g))
 
-    c, g = gen_gpuarray(shape, dtype, nozeros=True, incr=incr, kind=kind,
-                        ctx=context)
+    c, g = gen_gpuarray(shape, dtype, nozeros=True, kind=kind, ctx=context)
     out_c = op(elem, c)
     out_g = op(elem, g)
 
@@ -119,12 +139,10 @@ def ielemwise2_ops_mixed(op, dtype, shape, elem):
 def test_divmod():
     for dtype1 in dtypes_no_complex:
         for dtype2 in dtypes_no_complex:
-            for shape in [(500,), (50, 5), (5, 6, 7)]:
-                yield divmod_array, dtype1, dtype2, shape
+            yield divmod_array, dtype1, dtype2, (50,)
     for dtype in dtypes_no_complex:
-        for shape in [(500,), (50, 5), (5, 6, 7)]:
-            for elem in elems:
-                yield divmod_mixed, dtype, shape, elem
+        for elem in elems:
+            yield divmod_mixed, dtype, (50,), elem
 
 
 @guard_devsup
