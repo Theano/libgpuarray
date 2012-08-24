@@ -185,13 +185,15 @@ class ElemwiseKernel(object):
         self.contig_k = gpuarray.GpuKernel(src, "elemk", kind=self.kind,
                                            context=self.context, cluda=True,
                                            **self.flags)
+        self._speckey = None
+        self._cache_basic = {}
 
     def prepare_args_contig(self, args):
         self.kernel_args = list(args)
         self.kernel_args.insert(0, numpy.asarray(self.n, 'uint32'))
 
     def get_basic(self, args, nd, dims):
-        self._prepare_args_basic(args, dims)
+        self.prepare_args_basic(args, dims)
         if nd not in self._cache_basic:
             src = basic_kernel.render(preamble=self.preamble, name="elemk",
                                       nd=nd, arguments=self.arguments,
@@ -203,7 +205,7 @@ class ElemwiseKernel(object):
                                                        **self.flags)
         return self._cache_basic[nd]
 
-    def prepare_args_basic(cls, args, dims):
+    def prepare_args_basic(self, args, dims):
         kernel_args = []
         for arg in args:
             if isinstance(arg, gpuarray.GpuArray):
@@ -219,7 +221,6 @@ class ElemwiseKernel(object):
         kernel_args.insert(0, numpy.asarray(self.n, dtype='uint32'))
 
         self.kernel_args = kernel_args
-        return nd
 
     def get_specialized(self, args, nd, dims, str):
         self.prepare_args_specialized(args)
