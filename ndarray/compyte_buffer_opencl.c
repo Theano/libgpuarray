@@ -32,18 +32,24 @@ static cl_int err;
 
 struct _gpudata {
   cl_mem buf;
+#ifndef CL_VERSION_1_1
   size_t offset;
+#endif
 };
 
 gpudata *cl_make_buf(cl_mem buf, size_t offset) {
   gpudata *res;
+#ifdef CL_VERSION_1_1
+  if (offset != 0) return NULL;
+#endif
 
   res = malloc(sizeof(*res));
   if (res == NULL) return NULL;
 
   res->buf = buf;
+#ifndef CL_VERSION_1_1
   res->offset = offset;
-  
+#endif
   err = clRetainMemObject(buf);
   if (err != CL_SUCCESS) {
     free(res);
@@ -54,7 +60,9 @@ gpudata *cl_make_buf(cl_mem buf, size_t offset) {
 }
 
 cl_mem cl_get_buf(gpudata *g) { return g->buf; }
+#ifndef CL_VERSION_1_1
 size_t cl_get_offset(gpudata *g) { return g->offset; }
+#endif
 
 struct _gpukernel {
   cl_kernel k;
@@ -445,7 +453,7 @@ static int cl_write(gpudata *dst, const void *src, size_t sz) {
 }
 
 static int cl_memset(gpudata *dst, int data) {
-  char local_kern[128];
+  char local_kern[256];
   const char *rlk[1];
   size_t sz, bytes, n;
   gpukernel *m;
@@ -475,27 +483,61 @@ static int cl_memset(gpudata *dst, int data) {
 
   if ((bytes % 16) == 0) {
     r = snprintf(local_kern, sizeof(local_kern),
-                 "__kernel void kmemset(__global uint4 *mem)"
-                 "{ mem[get_global_id(0)] = (uint4)(%u,%u,%u,%u); }",
+                 "__kernel void kmemset(__global uint4 *mem) {"
+                 "unsigned int i;"
+#ifndef CL_VERSION_1_1
+                 "mem += %" SPREFIX "u;"
+#endif
+                 "for (i = get_global_id(0); i < n, i += get_global_size(0)) {"
+                 "mem[i] = (uint2)(%u,%u,%u,%u); }}",
+#ifndef CL_VERSION_1_1
+                 dst->offset,
+#endif
                  pattern, pattern, pattern, pattern);
     n = bytes/16;
   } else if ((bytes % 8) == 0) {
     r = snprintf(local_kern, sizeof(local_kern),
-                 "__kernel void kmemset(__global uint2 *mem)"
-                 "{ mem[get_global_id(0)] = (uint2)(%u,%u); }",
+                 "__kernel void kmemset(__global uint2 *mem) {"
+                 "unsigned int i;"
+#ifndef CL_VERSION_1_1
+                 "mem += %" SPREFIX "u;"
+#endif
+                 "for (i = get_global_id(0); i < n, i += get_global_size(0)) {"
+                 "mem[i] = (uint2)(%u,%u); }}",
+#ifndef CL_VERSION_1_1
+                 dst->offset,
+#endif
                  pattern, pattern);
     n = bytes/8;
   } else if ((bytes % 4) == 0) {
     r = snprintf(local_kern, sizeof(local_kern),
-                 "__kernel void kmemset(__global unsigned int *mem)"
-                 "{ mem[get_global_id(0)] = %u; }", pattern);
+                 "__kernel void kmemset(__global unsigned int *mem) {"
+                 "unsigned int i;"
+#ifndef CL_VERSION_1_1
+                 "mem += %" SPREFIX "u;"
+#endif
+                 "for (i = get_global_id(0); i < n, i += get_global_size(0)) {"
+                 "mem[i] = %u; }}",
+#ifndef CL_VERSION_1_1
+                 dst->offset,
+#endif
+                 pattern);
     n = bytes/4;
   } else {
     if (check_ext(ctx, CL_SMALL))
       return GA_DEVSUP_ERROR;
     r = snprintf(local_kern, sizeof(local_kern),
-                 "__kernel void kmemset(__global unsigned char *mem)"
-                 "{ mem[get_global_id(0)] = %u; }", val);
+                 "__kernel void kmemset(__global unsigned char *mem) {"
+                 "unsigned int i;"
+#ifndef CL_VERSION_1_1
+                 "mem += %" SPREFIX "u;"
+#endif
+                 "for (i = get_global_id(0); i < n, i += get_global_size(0)) {"
+                 "mem[i] = %u; }}",
+#ifndef CL_VERSION_1_1
+                 dst->offset,
+#endif
+                 val);
     n = bytes;
   }
   /* If this assert fires, increase the size of local_kern above. */
@@ -517,20 +559,27 @@ static int cl_memset(gpudata *dst, int data) {
 }
 
 static int cl_offset(gpudata *b, ssize_t off) {
-  /* check for overflow (ssize_t and size_t) */
-  if (off < 0) {
-    /* negative */
-    if (((off == SSIZE_MIN) && (b->offset <= SSIZE_MAX)) ||
-	(((size_t)-off) > b->offset)) {
-      return GA_VALUE_ERROR;
-    }
-  } else {
-    /* positive */
-    if ((SIZE_MAX - (size_t)off) < b->offset) {
-      return GA_VALUE_ERROR;
-    }
-  }
+#ifdef CL_VERSION_1_1
+  cl_mem buf;
+  cl_buffer_region r;
+  err = clGetMemObjectInfo(a->buf, CL_MEM_OFFSET, sizeof(r.origin), &r.origin,
+                           NULL);
+  if (err != CL_SUCCESS) return GA_IMPL_ERROR;
+  err = clGetMemObjectInfo(a->buf, CL_MEM_ASSOCIATED_MEMOBJECT, sizeof(buf),
+                           &buf, NULL);
+  if (err != CL_SUCCESS) return GA_IMPL_ERRROR;
+  if (buf == NULL) buf = b->buf;
+  err = clGetMemObjectInfo(buf, CL_MEM_SIZE, sizeof(r.size), &r.size, NULL);
+  if (err != CL_SUCCESS) return GA_IMPL_ERROR;
+
+  r.origin += off;
+
+  b->buf = clCreateSubBuffer(buf, CL_MEM_READ_WRITE,
+                             CL_BUFFER_CREATE_TYPE_REGION, &r, &err);
+  clReleaseBuffer(buf);
+#else
   b->offset += off;
+#endif
   return GA_NO_ERROR;
 }
 
@@ -659,6 +708,9 @@ static int cl_setkernelarg(gpukernel *k, unsigned int index, int typecode,
 }
 
 static int cl_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
+#ifndef CL_VERSION_1_1
+  if (b->offset != 0) return GA_DEVSUP_ERROR;
+#endif
   return cl_setkernelarg(k, index, GA_DELIM, &b->buf);
 }
 
