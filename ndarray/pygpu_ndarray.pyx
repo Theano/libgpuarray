@@ -598,7 +598,7 @@ def elemwise2(a, op, b, out_dtype=None, oper=None,
     return res
 
 def ielemwise2(a, op, b, oper=None,
-               op_tmpl="a[i] = a[i] %(op)s (%(a_t)s)%(b)s"):
+               op_tmpl="a[i] = a[i] %(op)s %(b)s"):
     from ..elemwise import ElemwiseKernel
     if not isinstance(b, GpuArray):
         b = numpy.asarray(b)
@@ -609,8 +609,7 @@ def ielemwise2(a, op, b, oper=None,
     args = [a_arg, b_arg]
 
     if oper is None:
-        oper = op_tmpl % {'op': op, 'b': b_arg.expr(),
-                          'a_t': dtype_to_ctype(a.dtype)}
+        oper = op_tmpl % {'op': op, 'b': b_arg.expr()}
 
     k = ElemwiseKernel(a.kind, a.context, args, oper)
     k(a, b)
@@ -834,31 +833,60 @@ cdef class GpuArray:
     def __add__(self, other):
         return elemwise2(self, '+', other)
 
+    def __iadd__(self, other):
+        return ielemwise2(self, '+', other)
+
+    def __sub__(self, other):
+        return elemwise2(self, '-', other)
+
+    def __isub__(self, other):
+        return ielemwise2(self, '-', other)
+
     def __mul__(self, other):
         return elemwise2(self, '*', other)
+
+    def __imul__(self, other):
+        return ielemwise2(self, '*', other)
+
+    def __div__(self, other):
+        return elemwise2(self, '/', other)
+
+    def __idiv__(self, other):
+        return ielemwise2(self, '/', other)
 
     def __truediv__(self, other):
         np1 = get_np_obj(self)
         np2 = get_np_obj(other)
-
         res = (np1.__truediv__(np2)).dtype
+        return elemwise2(self, '/', other, out_dtype=res)
 
-        if res == numpy.float32:
-            op_tmpl = "res[i] = ((float)%(a)s) / ((float)%(b)s)"
-        else:
-            op_tmpl = "res[i] = ((double)%(a)s) / ((double)%(b)s)"
-
-        return elemwise2(self, '/', other, out_dtype=res, op_tmpl=op_tmpl)
+    def __itruediv__(self, other):
+        np2 = get_np_obj(other)
+        kw = {}
+        if self.dtype == numpy.float32 or np2.dtype == numpy.float32:
+            kw['op_tmpl'] = "a[i] = (float)a[i] / (float)%(b)s"
+        if self.dtype == numpy.float64 or np2.dtype == numpy.float64:
+            kw['op_tmpl'] = "a[i] = (double)a[i] / (double)%(b)s"
+        return ielemwise2(self, '/', other, **kw)
 
     def __floordiv__(self, other):
         out_dtype = get_common_dtype(self, other, True)
         kw = {}
         if out_dtype == numpy.float32:
-            kw['op_tmpl'] = "res[i] = floorf((float)%(a)s %(op)s (float)%(b)s)"
+            kw['op_tmpl'] = "res[i] = floorf((float)%(a)s / (float)%(b)s)"
         if out_dtype == numpy.float64:
-            kw['op_tmpl'] = "res[i] = floor((double)%(a)s %(op)s (double)%(b)s)"
+            kw['op_tmpl'] = "res[i] = floor((double)%(a)s / (double)%(b)s)"
 
         return elemwise2(self, '/', other, out_dtype=out_dtype, **kw)
+
+    def __ifloordiv__(self, other):
+        out_dtype = self.dtype
+        kw = {}
+        if out_dtype == numpy.float32:
+            kw['op_tmpl'] = "a[i] = floorf((float)a[i] / (float)%(b)s)"
+        if out_dtype == numpy.float64:
+            kw['op_tmpl'] = "a[i] = floor((double)a[i] / (double)%(b)s)"
+        return ielemwise2(self, '/', other, **kw)
 
     def __mod__(self, other):
         out_dtype = get_common_dtype(self, other, True)
@@ -868,6 +896,15 @@ cdef class GpuArray:
         if out_dtype == numpy.float64:
             kw['op_tmpl'] = "res[i] = fmod((double)%(a)s, (double)%(b)s)"
         return elemwise2(self, '%', other, out_dtype=out_dtype, **kw)
+
+    def __imod__(self, other):
+        out_dtype = get_common_dtype(self, other, self.dtype == numpy.float64)
+        kw = {}
+        if out_dtype == numpy.float32:
+            kw['op_tmpl'] = "a[i] = fmodf((float)a[i], (float)%(b)s)"
+        if out_dtype == numpy.float64:
+            kw['op_tmpl'] = "a[i] = fmod((double)a[i], (double)%(b)s)"
+        return ielemwise2(self, '%', other, **kw)
 
     def __divmod__(a, b):
         from ..elemwise import ElemwiseKernel

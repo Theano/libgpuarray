@@ -10,7 +10,11 @@ from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
 
 operators2 = [operator.add, operator.sub, operator.div, operator.floordiv,
               operator.mod, operator.mul, operator.truediv]
-ioperators2 = [operator.iadd]
+ioperators2 = [operator.iadd, operator.isub, operator.idiv, operator.ifloordiv,
+               operator.imod, operator.imul, operator.itruediv]
+elems = [2, 0.3, numpy.asarray(3, dtype='int8'),
+         numpy.asarray(7, dtype='uint32'),
+         numpy.asarray(2.45, dtype='float32')]
 
 
 def test_elemwise2_ops_array():
@@ -44,7 +48,10 @@ def elemwise2_ops_array(op, dtype1, dtype2, shape):
 
 @guard_devsup
 def ielemwise2_ops_array(op, dtype1, dtype2, shape):
-    ac, ag = gen_gpuarray(shape, dtype1, kind=kind, ctx=context)
+    incr = 0
+    if op == operator.isub and dtype1[0] == 'u':
+        incr = 10
+    ac, ag = gen_gpuarray(shape, dtype1, incr=incr, kind=kind, ctx=context)
     bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, kind=kind, ctx=context)
 
     out_c = op(ac, bc)
@@ -60,9 +67,7 @@ def test_elemwise2_ops_mixed():
     for op in operators2:
         for dtype in dtypes_no_complex:
             for shape in [(500,), (50, 5), (5, 6, 7)]:
-                for elem in [2, 0.3, numpy.asarray(3, dtype='uint8'),
-                             numpy.asarray(7, dtype='uint32'),
-                             numpy.asarray(2.45, dtype='float32')]:
+                for elem in elems:
                     yield elemwise2_ops_mixed, op, dtype, shape, elem
 
 
@@ -70,15 +75,13 @@ def test_ielemwise2_ops_mixed():
     for op in ioperators2:
         for dtype in dtypes_no_complex:
             for shape in [(500,), (50, 5), (5, 6, 7)]:
-                for elem in [2, 0.3, numpy.asarray(3, dtype='uint8'),
-                             numpy.asarray(7, dtype='uint32'),
-                             numpy.asarray(2.45, dtype='float32')]:
+                for elem in elems:
                     yield ielemwise2_ops_mixed, op, dtype, shape, elem
 
 
 @guard_devsup
 def elemwise2_ops_mixed(op, dtype, shape, elem):
-    c, g = gen_gpuarray(shape, dtype, nozeros=True, kind=kind, ctx=context)
+    c, g = gen_gpuarray(shape, dtype, kind=kind, ctx=context)
 
     out_c = op(c, elem)
     out_g = op(g, elem)
@@ -87,6 +90,8 @@ def elemwise2_ops_mixed(op, dtype, shape, elem):
     assert out_c.dtype == out_g.dtype
     assert numpy.allclose(out_c, numpy.asarray(out_g))
 
+    c, g = gen_gpuarray(shape, dtype, nozeros=True, incr=incr, kind=kind,
+                        ctx=context)
     out_c = op(elem, c)
     out_g = op(elem, g)
 
@@ -97,7 +102,10 @@ def elemwise2_ops_mixed(op, dtype, shape, elem):
 
 @guard_devsup
 def ielemwise2_ops_mixed(op, dtype, shape, elem):
-    c, g = gen_gpuarray(shape, dtype, kind=kind, ctx=context)
+    incr = 0
+    if op == operator.isub and dtype[0] == 'u':
+        incr = 10
+    c, g = gen_gpuarray(shape, dtype, incr=incr, kind=kind, ctx=context)
 
     out_c = op(c, elem)
     out_g = op(g, elem)
@@ -109,16 +117,14 @@ def ielemwise2_ops_mixed(op, dtype, shape, elem):
 
 
 def test_divmod():
-    for dtype in dtypes_no_complex:
-        for shape in [(500,), (50, 5), (5, 6, 7)]:
-            for elem in [2, 0.3, numpy.asarray(3, dtype='uint8'),
-                         numpy.asarray(7, dtype='uint32'),
-                         numpy.asarray(2.45, dtype='float32')]:
-                yield divmod_mixed, dtype, shape, elem
     for dtype1 in dtypes_no_complex:
         for dtype2 in dtypes_no_complex:
             for shape in [(500,), (50, 5), (5, 6, 7)]:
                 yield divmod_array, dtype1, dtype2, shape
+    for dtype in dtypes_no_complex:
+        for shape in [(500,), (50, 5), (5, 6, 7)]:
+            for elem in elems:
+                yield divmod_mixed, dtype, shape, elem
 
 
 @guard_devsup
