@@ -48,6 +48,7 @@ def elemwise2_ops_array(op, dtype1, dtype2, shape):
 def ielemwise2_ops_array(op, dtype1, dtype2, shape):
     incr = 0
     if op == operator.isub and dtype1[0] == 'u':
+        # array elements are smaller than 10 by default, so we avoid underflow
         incr = 10
     ac, ag = gen_gpuarray(shape, dtype1, incr=incr, kind=kind, ctx=context)
     bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, kind=kind, ctx=context)
@@ -124,6 +125,7 @@ def elemwise2_ops_mixed(op, dtype, shape, elem):
 def ielemwise2_ops_mixed(op, dtype, shape, elem):
     incr = 0
     if op == operator.isub and dtype[0] == 'u':
+        # array elements are smaller than 10 by default, so we avoid underflow
         incr = 10
     c, g = gen_gpuarray(shape, dtype, incr=incr, kind=kind, ctx=context)
 
