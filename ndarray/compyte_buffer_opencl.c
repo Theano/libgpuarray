@@ -297,9 +297,6 @@ static void *cl_init(int devno, int *ret) {
 static gpudata *cl_alloc(void *ctx, size_t size, int *ret) {
   gpudata *res;
 
-  if ((size % 4) != 0 && check_ext((cl_context)ctx, CL_SMALL))
-    FAIL(NULL, GA_DEVSUP_ERROR);
-
   res = malloc(sizeof(*res));
   if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
 
