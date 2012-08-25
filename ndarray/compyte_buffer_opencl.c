@@ -513,13 +513,13 @@ static int cl_memset(gpudata *dst, int data) {
 
   if ((bytes % 16) == 0) {
     r = snprintf(local_kern, sizeof(local_kern),
-                 "__kernel void kmemset(__global uint4 *mem) {"
+                 "__kernel void kmemset(unsigned int n, __global uint4 *mem) {"
                  "unsigned int i;"
 #ifdef GA_OFFSET
                  "mem += %" SPREFIX "d;"
 #endif
-                 "for (i = get_global_id(0); i < n, i += get_global_size(0)) {"
-                 "mem[i] = (uint2)(%u,%u,%u,%u); }}",
+                 "for (i = get_global_id(0); i < n; i += get_global_size(0)) {"
+                 "mem[i] = (uint4)(%u,%u,%u,%u); }}",
 #ifdef GA_OFFSET
                  dst->offset,
 #endif
@@ -527,12 +527,12 @@ static int cl_memset(gpudata *dst, int data) {
     n = bytes/16;
   } else if ((bytes % 8) == 0) {
     r = snprintf(local_kern, sizeof(local_kern),
-                 "__kernel void kmemset(__global uint2 *mem) {"
+                 "__kernel void kmemset(unsigned int n, __global uint2 *mem) {"
                  "unsigned int i;"
 #ifdef GA_OFFSET
                  "mem += %" SPREFIX "d;"
 #endif
-                 "for (i = get_global_id(0); i < n, i += get_global_size(0)) {"
+                 "for (i = get_global_id(0); i < n; i += get_global_size(0)) {"
                  "mem[i] = (uint2)(%u,%u); }}",
 #ifdef GA_OFFSET
                  dst->offset,
@@ -541,12 +541,13 @@ static int cl_memset(gpudata *dst, int data) {
     n = bytes/8;
   } else if ((bytes % 4) == 0) {
     r = snprintf(local_kern, sizeof(local_kern),
-                 "__kernel void kmemset(__global unsigned int *mem) {"
+                 "__kernel void kmemset(unsigned int n,"
+                 "__global unsigned int *mem) {"
                  "unsigned int i;"
 #ifdef GA_OFFSET
                  "mem += %" SPREFIX "d;"
 #endif
-                 "for (i = get_global_id(0); i < n, i += get_global_size(0)) {"
+                 "for (i = get_global_id(0); i < n; i += get_global_size(0)) {"
                  "mem[i] = %u; }}",
 #ifdef GA_OFFSET
                  dst->offset,
@@ -557,12 +558,13 @@ static int cl_memset(gpudata *dst, int data) {
     if (check_ext(ctx, CL_SMALL))
       return GA_DEVSUP_ERROR;
     r = snprintf(local_kern, sizeof(local_kern),
-                 "__kernel void kmemset(__global unsigned char *mem) {"
+                 "__kernel void kmemset(unsigned int n,"
+                 "__global unsigned char *mem) {"
                  "unsigned int i;"
 #ifdef GA_OFFSET
                  "mem += %" SPREFIX "d;"
 #endif
-                 "for (i = get_global_id(0); i < n, i += get_global_size(0)) {"
+                 "for (i = get_global_id(0); i < n; i += get_global_size(0)) {"
                  "mem[i] = %u; }}",
 #ifdef GA_OFFSET
                  dst->offset,
@@ -578,7 +580,8 @@ static int cl_memset(gpudata *dst, int data) {
 
   m = cl_newkernel(ctx, 1, rlk, &sz, "kmemset", 0, &res);
   if (m == NULL) return res;
-  res = cl_setkernelargbuf(m, 0, dst);
+  res = cl_setkernelarg(m, 0, GA_UINT, &n);
+  res = cl_setkernelargbuf(m, 1, dst);
   if (res != GA_NO_ERROR) goto fail;
 
   res = cl_callkernel(m, n);
