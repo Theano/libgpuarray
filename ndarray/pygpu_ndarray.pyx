@@ -424,7 +424,7 @@ def from_gpudata(size_t data, dtype, shape, kind=None, context=None,
     else:
         ctx = get_ctx(context)
 
-    nd = len(shape)
+    nd = <unsigned int>len(shape)
     if strides is not None and len(strides) != nd:
         raise ValueError("strides must be the same length as shape")
 
@@ -448,7 +448,7 @@ def from_gpudata(size_t data, dtype, shape, kind=None, context=None,
 
         res = new_GpuArray(ctx)
         array_fromdata(res, ops, <gpudata *>data, typecode, nd, cdims,
-                       cstrides, (1 if writable else 0))
+                       cstrides, <int>(1 if writable else 0))
         res.base = base
     finally:
         free(cdims)
@@ -645,7 +645,7 @@ cdef class GpuArray:
             for i, d in enumerate(shape):
                 cdims[i] = d
             array_empty(self, ops, self.ctx, dtype_to_typecode(dtype),
-                        len(shape), cdims, to_ga_order(order))
+                        <unsigned int>len(shape), cdims, to_ga_order(order))
         finally:
             free(cdims)
 
@@ -812,7 +812,7 @@ cdef class GpuArray:
                 for i in range(0, len(key)):
                     self.__index_helper(key[i], i, &starts[i], &stops[i],
                                         &steps[i])
-                d += len(key)
+                d += <unsigned int>len(key)
             else:
                 self.__index_helper(key, 0, starts, stops, steps)
                 d += 1
