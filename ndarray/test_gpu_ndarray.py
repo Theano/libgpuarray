@@ -50,7 +50,6 @@ def cast(shp, dtype1, dtype2):
     ac = a.astype(dtype2)
     bc = b.astype(dtype2)
 
-    print ac.dtype, bc.dtype
     assert ac.dtype == bc.dtype
     assert ac.shape == bc.shape
     assert numpy.allclose(a, numpy.asarray(b))
