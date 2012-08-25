@@ -362,7 +362,7 @@ static int cl_share(gpudata *a, gpudata *b, int *ret) {
 #ifdef CL_VERSION_1_1
   err = clGetMemObjectInfo(a->buf, CL_MEM_ASSOCIATED_MEMOBJECT, sizeof(aa), &aa, NULL);
   CHKFAIL(-1);
-  err = clGetMemObjectInfo(a->buf, CL_MEM_ASSOCIATED_MEMOBJECT, sizeof(bb), &bb, NULL);
+  err = clGetMemObjectInfo(b->buf, CL_MEM_ASSOCIATED_MEMOBJECT, sizeof(bb), &bb, NULL);
   CHKFAIL(-1);
   if (aa == NULL) aa = a->buf;
   if (bb == NULL) bb = b->buf;
