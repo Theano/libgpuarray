@@ -596,6 +596,7 @@ static int cl_offset(gpudata *b, ssize_t off) {
   b->offset += off;
 #else
   cl_mem buf;
+  int do_release = 0;
   cl_buffer_region r;
   err = clGetMemObjectInfo(b->buf, CL_MEM_OFFSET, sizeof(r.origin), &r.origin,
                            NULL);
@@ -605,14 +606,17 @@ static int cl_offset(gpudata *b, ssize_t off) {
   err = clGetMemObjectInfo(b->buf, CL_MEM_ASSOCIATED_MEMOBJECT, sizeof(buf),
                            &buf, NULL);
   if (err != CL_SUCCESS) return GA_IMPL_ERROR;
-  if (buf == NULL) buf = b->buf;
+  if (buf == NULL) {
+    buf = b->buf;
+    do_release = 1;
+  }
 
   r.size -= off;
   r.origin += off;
 
   b->buf = clCreateSubBuffer(buf, CL_MEM_READ_WRITE,
                              CL_BUFFER_CREATE_TYPE_REGION, &r, &err);
-  clReleaseMemObject(buf);
+  if (do_release) clReleaseMemObject(buf);
 #endif
   return GA_NO_ERROR;
 }
