@@ -550,21 +550,6 @@ def elemwise1(a, op, oper=None, op_tmpl="res[i] = %(op)sa[i]"):
     k(res, a)
     return res
 
-def ielemwise1(a, op, oper=None, op_tmpl="a[i] = %(op)sa[i]"):
-    from ..elemwise import ElemwiseKernel
-    cdef GpuArray ary = a
-
-    a_arg = as_argument(a, 'a')
-
-    args = [a_arg]
-
-    if oper is None:
-        oper = op_tmpl % {'op': op}
-
-    k = ElemwiseKernel(ary.kind, ary.context, args, oper)
-    k(a)
-    return a
-
 def elemwise2(a, op, b, out_dtype=None, oper=None,
               op_tmpl="res[i] = (%(out_t)s)%(a)s %(op)s (%(out_t)s)%(b)s"):
     from ..elemwise import ElemwiseKernel
@@ -940,6 +925,21 @@ cdef class GpuArray:
         k = ElemwiseKernel(ary.kind, ary.context, args, ksrc)
         k(div, mod, a, b)
         return (div, mod)
+
+    def __neg__(self):
+        return elemwise1(self, '-')
+
+    def __pos__(self):
+        return elemwise1(self, '+')
+
+    def __abs__(self):
+        if self.dtype.kind == 'u':
+            return self.copy()
+        if self.dtype.kind == 'f':
+            oper = "res[i] = fabs(a[i])"
+        else:
+            oper = "res[i] = abs(a[i])"
+        return elemwise1(self, None, oper=oper)
 
     property shape:
         "shape of this ndarray (tuple)"

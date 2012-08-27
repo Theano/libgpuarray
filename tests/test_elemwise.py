@@ -8,6 +8,7 @@ from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
                       kind, context, gen_gpuarray, dtypes_no_complex)
 
 
+operators1 = [operator.neg, operator.pos, operator.abs]
 operators2 = [operator.add, operator.sub, operator.div, operator.floordiv,
               operator.mod, operator.mul, operator.truediv,
               operator.eq, operator.ne, operator.lt, operator.le,
@@ -17,6 +18,23 @@ ioperators2 = [operator.iadd, operator.isub, operator.idiv, operator.ifloordiv,
 elems = [2, 0.3, numpy.asarray(3, dtype='int8'),
          numpy.asarray(7, dtype='uint32'),
          numpy.asarray(2.45, dtype='float32')]
+
+
+def test_elemwise1_ops_array():
+    for op in operators1:
+        for dtype in dtypes_no_complex:
+            yield elemwise1_ops_array, op, dtype
+
+
+def elemwise1_ops_array(op, dtype):
+    c, g = gen_gpuarray((50,), dtype, kind=kind, ctx=context)
+
+    out_c = op(c)
+    out_g = op(g)
+
+    assert out_c.shape == out_g.shape
+    assert out_c.dtype == out_g.dtype
+    assert numpy.allclose(out_c, numpy.asarray(out_g))
 
 
 def test_elemwise2_ops_array():
