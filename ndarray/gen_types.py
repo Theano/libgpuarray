@@ -8,7 +8,7 @@ def add_type(name, cl, cuda, sz):
     TYPEMAP[i] = (cl, cuda, sz), name
     i+=1
 
-add_type("bool", "bool", "uint8_t", 1)
+add_type("bool", "unsigned char", "uint8_t", 1)
 add_type("byte", "char", "int8_t", 1)
 add_type("ubyte", "unsigned char", "uint8_t", 1)
 

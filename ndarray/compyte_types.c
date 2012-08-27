@@ -150,7 +150,7 @@ typedef struct {char c; half_t x; } st_half;
 #define HALF_ALIGN (sizeof(st_half) - sizeof(half_t))
 
 compyte_type scalar_types[] = {
-  {"bool", "uint8_t", 1, BOOL_ALIGN, GA_BOOL},
+  {"unsigned char", "uint8_t", 1, BOOL_ALIGN, GA_BOOL},
   {"char", "int8_t", 1, BYTE_ALIGN, GA_BYTE},
   {"unsigned char", "uint8_t", 1, UBYTE_ALIGN, GA_UBYTE},
   {"short", "int16_t", 2, SHORT_ALIGN, GA_SHORT},
