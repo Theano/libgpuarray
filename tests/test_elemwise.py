@@ -9,7 +9,9 @@ from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
 
 
 operators2 = [operator.add, operator.sub, operator.div, operator.floordiv,
-              operator.mod, operator.mul, operator.truediv]
+              operator.mod, operator.mul, operator.truediv,
+              operator.eq, operator.ne, operator.lt, operator.le,
+              operator.gt, operator.ge]
 ioperators2 = [operator.iadd, operator.isub, operator.idiv, operator.ifloordiv,
                operator.imod, operator.imul, operator.itruediv]
 elems = [2, 0.3, numpy.asarray(3, dtype='int8'),

@@ -830,6 +830,12 @@ cdef class GpuArray:
             free(steps)
         return res
 
+    def __richcmp__(self, other, int op):
+        op_table = ['<', '<=', '==', '!=', '>', '>=']
+        return elemwise2(self, op_table[op], other,
+                         out_dtype=numpy.dtype('bool'),
+                         op_tmpl="res[i] = %(a)s %(op)s %(b)s")
+
     def __add__(self, other):
         return elemwise2(self, '+', other)
 
