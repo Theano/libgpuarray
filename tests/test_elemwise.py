@@ -41,14 +41,14 @@ def test_elemwise2_ops_array():
     for op in operators2:
         for dtype1 in dtypes_no_complex:
             for dtype2 in dtypes_no_complex:
-                    yield elemwise2_ops_array, op, dtype1, dtype2, (50,)
+                yield elemwise2_ops_array, op, dtype1, dtype2, (50,)
 
 
 def test_ielemwise2_ops_array():
     for op in ioperators2:
         for dtype1 in dtypes_no_complex:
             for dtype2 in dtypes_no_complex:
-                    yield ielemwise2_ops_array, op, dtype1, dtype2, (50,)
+                yield ielemwise2_ops_array, op, dtype1, dtype2, (50,)
 
 
 @guard_devsup
@@ -77,8 +77,6 @@ def ielemwise2_ops_array(op, dtype1, dtype2, shape):
     out_g = op(ag, bg)
 
     assert out_g is ag
-    assert out_c.shape == out_g.shape
-    assert out_c.dtype == out_g.dtype
     assert numpy.allclose(out_c, numpy.asarray(out_g))
 
 
