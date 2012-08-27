@@ -20,6 +20,16 @@ def product(*args, **kwds):
         yield tuple(prod)
 
 
+def test_hash():
+    g = gpu_ndarray.empty((2, 3), kind=kind, context=ctx)
+    exc = None
+    try:
+        h = hash(g)
+    except TypeError, e:
+        exc = e
+    assert exc is not None
+
+
 def test_transfer():
     for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
