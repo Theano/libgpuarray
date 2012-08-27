@@ -878,18 +878,15 @@ cdef class GpuArray:
     def __floordiv__(self, other):
         out_dtype = get_common_dtype(self, other, True)
         kw = {}
-        if out_dtype == numpy.float32:
-            kw['op_tmpl'] = "res[i] = floorf((float)%(a)s / (float)%(b)s)"
-        if out_dtype == numpy.float64:
-            kw['op_tmpl'] = "res[i] = floor((double)%(a)s / (double)%(b)s)"
-
+        if out_dtype.kind == 'f':
+            kw['op_tmpl'] = "res[i] = floor((%(out_t)s)%(a)s / (%(out_t)s)%(b)s)"
         return elemwise2(self, '/', other, out_dtype=out_dtype, **kw)
 
     def __ifloordiv__(self, other):
         out_dtype = self.dtype
         kw = {}
         if out_dtype == numpy.float32:
-            kw['op_tmpl'] = "a[i] = floorf((float)a[i] / (float)%(b)s)"
+            kw['op_tmpl'] = "a[i] = floor((float)a[i] / (float)%(b)s)"
         if out_dtype == numpy.float64:
             kw['op_tmpl'] = "a[i] = floor((double)a[i] / (double)%(b)s)"
         return ielemwise2(self, '/', other, **kw)
@@ -897,17 +894,15 @@ cdef class GpuArray:
     def __mod__(self, other):
         out_dtype = get_common_dtype(self, other, True)
         kw = {}
-        if out_dtype == numpy.float32:
-            kw['op_tmpl'] = "res[i] = fmodf((float)%(a)s, (float)%(b)s)"
-        if out_dtype == numpy.float64:
-            kw['op_tmpl'] = "res[i] = fmod((double)%(a)s, (double)%(b)s)"
+        if out_dtype.kind == 'f':
+            kw['op_tmpl'] = "res[i] = fmod((%(out_t)s)%(a)s, (%(out_t)s)%(b)s)"
         return elemwise2(self, '%', other, out_dtype=out_dtype, **kw)
 
     def __imod__(self, other):
         out_dtype = get_common_dtype(self, other, self.dtype == numpy.float64)
         kw = {}
         if out_dtype == numpy.float32:
-            kw['op_tmpl'] = "a[i] = fmodf((float)a[i], (float)%(b)s)"
+            kw['op_tmpl'] = "a[i] = fmod((float)a[i], (float)%(b)s)"
         if out_dtype == numpy.float64:
             kw['op_tmpl'] = "a[i] = fmod((double)a[i], (double)%(b)s)"
         return ielemwise2(self, '%', other, **kw)
@@ -932,14 +927,12 @@ cdef class GpuArray:
         div = ary._empty_like_me(dtype=odtype)
         mod = ary._empty_like_me(dtype=odtype)
 
-        divpart = "div[i] = (%(out_t)s)%(a)s / (%(out_t)s)%(b)s"
-        modpart = "mod[i] = %(a)s %% %(b)s"
-        if odtype == numpy.float32:
-            divpart = "div[i] = floorf((float)%(a)s / (float)%(b)s)"
-            modpart = "mod[i] = fmodf((float)%(a)s, (float)%(b)s)"
-        if odtype == numpy.float64:
-            divpart = "div[i] = floor((double)%(a)s / (double)%(b)s)"
-            modpart = "mod[i] = fmod((double)%(a)s, (double)%(b)s)"
+        if odtype.kind == 'f':
+            divpart = "div[i] = floor((%(out_t)s)%(a)s / (%(out_t)s)%(b)s)"
+            modpart = "mod[i] = fmod((%(out_t)s)%(a)s, (%(out_t)s)%(b)s)"
+        else:
+            divpart = "div[i] = (%(out_t)s)%(a)s / (%(out_t)s)%(b)s"
+            modpart = "mod[i] = %(a)s %% %(b)s"
         tmpl = divpart+","+modpart
         ksrc = tmpl % {'a': a_arg.expr(), 'b': b_arg.expr(),
                        'out_t': dtype_to_ctype(odtype)}
