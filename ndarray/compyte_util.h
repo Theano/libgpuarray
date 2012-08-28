@@ -12,6 +12,7 @@ extern "C" {
 
 #include "compyte_types.h"
 
+int compyte_register_type(compyte_type *t, int *ret);
 compyte_type *compyte_get_type(int typecode);
 size_t compyte_get_elsize(int typecode);
 

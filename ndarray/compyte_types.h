@@ -13,8 +13,7 @@ extern "C" {
 #endif
 
 typedef struct _compyte_type {
-  const char *cl_name;
-  const char *cuda_name;
+  const char *cluda_name;
   size_t size;
   size_t align;
   int typecode;
@@ -34,10 +33,10 @@ enum COMPYTE_TYPES {
   GA_ULONGLONG = 10,
   GA_FLOAT = 11,
   GA_DOUBLE = 12,
-  GA_LONGDOUBLE = 13,
+  GA_QUAD = 13,
   GA_CFLOAT = 14,
   GA_CDOUBLE = 15,
-  GA_CLONGDOUBLE = 16,
+  GA_CQUAD = 16,
   GA_HALF = 23,
   GA_NBASE = 24,
 
@@ -95,13 +94,12 @@ enum COMPYTE_TYPES {
   GA_HALF4,
   GA_HALF8,
   GA_HALF16,
+
+  GA_ENDVEC = 512
 };
 
 extern compyte_type scalar_types[];
 extern compyte_type vector_types[];
-
-extern const char CL_HEAD[];
-extern const char CUDA_HEAD[];
 
 #ifdef __cplusplus
 }

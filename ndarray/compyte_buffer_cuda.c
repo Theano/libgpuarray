@@ -116,7 +116,33 @@ static const char CUDA_PREAMBLE[] =
     "#define GID_2 blockIdx.z\n"
     "#define GDIM_0 gridDim.x\n"
     "#define GDIM_1 gridDim.y\n"
-    "#define GDIM_2 gridDim.z\n";
+    "#define GDIM_2 gridDim.z\n"
+    "#ifdef _MSC_VER\n"
+    "#define signed __int8 int8_t\n"
+    "#define unsigned __int8 uint8_t\n"
+    "#define signed __int16 int16_t\n"
+    "#define unsigned __int16 uint16_t\n"
+    "#define signed __int32 int32_t\n"
+    "#define unsigned __int32 uint32_t\n"
+    "#define signed __int64 int64_t\n"
+    "#define unsigned __int64 uint64_t\n"
+    "#else\n"
+    "#include <stdint.h>\n"
+    "#endif\n"
+    "#define ga_bool uint8_t\n"
+    "#define ga_byte int8_t\n"
+    "#define ga_ubyte uint8_t\n"
+    "#define ga_short int16_t\n"
+    "#define ga_ushort uint16_t\n"
+    "#define ga_int int32_t\n"
+    "#define ga_uint uint32_t\n"
+    "#define ga_long int64_t\n"
+    "#define ga_ulong uint64_t\n"
+    "#define ga_float float\n"
+    "#define ga_double double\n"
+    "#define ga_half uint16_t\n";
+/* XXX: add complex, quads, longlong */
+/* XXX: add vector types */
 
 static const char *get_error_string(CUresult err) {
     switch (err) {
@@ -480,24 +506,20 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     }
     // GA_USE_HALF should always work
 
-    pre = 1;
+    pre = 0;
     if (flags & GA_USE_CLUDA) pre++;
     descr = calloc(count+pre, sizeof(*descr));
     if (descr == NULL) FAIL(NULL, GA_SYS_ERROR);
 
     if (flags & GA_USE_PTX) {
         ptx_mode = 1;
-    } else {
-        descr[0].iov_base = (void *)CUDA_HEAD;
-        descr[0].iov_len = strlen(CUDA_HEAD);
     }
-    tot_len = descr[0].iov_len;
 
     if (flags & GA_USE_CLUDA) {
-        descr[1].iov_base = (void *)CUDA_PREAMBLE;
-        descr[1].iov_len = strlen(CUDA_PREAMBLE);
+        descr[0].iov_base = (void *)CUDA_PREAMBLE;
+        descr[0].iov_len = strlen(CUDA_PREAMBLE);
     }
-    tot_len += descr[1].iov_len;
+    tot_len = descr[0].iov_len;
 
     if (lengths == NULL) {
         for (i = 0; i < count; i++) {

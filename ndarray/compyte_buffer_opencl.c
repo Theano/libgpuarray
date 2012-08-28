@@ -108,7 +108,21 @@ static const char CL_PREAMBLE[] =
   "#define GID_2 get_group_id(2)\n"
   "#define GDIM_0 get_num_groups(0)\n"
   "#define GDIM_1 get_num_groups(1)\n"
-  "#define GDIM_2 get_num_groups(2)\n";
+  "#define GDIM_2 get_num_groups(2)\n"
+  "#define ga_bool uchar\n"
+  "#define ga_byte char\n"
+  "#define ga_ubyte uchar\n"
+  "#define ga_short short\n"
+  "#define ga_ushort ushort\n"
+  "#define ga_int int\n"
+  "#define ga_uint uint\n"
+  "#define ga_long long\n"
+  "#define ga_ulong ulong\n"
+  "#define ga_float float\n"
+  "#define ga_double double\n"
+  "#define ga_half half\n";
+/* XXX: add complex types, quad types, and longlong */
+/* XXX: add vector types */
 
 static const char *get_error_string(cl_int err) {
   /* OpenCL 1.0 error codes */
@@ -814,7 +828,7 @@ static int cl_extcopy(gpudata *input, gpudata *output, int intype,
   unsigned int count = 0;
   int res = GA_SYS_ERROR;
   unsigned int i;
-  int flags = 0;
+  int flags = GA_USE_CLUDA;
 
   nEls = 1;
   for (i = 0; i < a_nd; i++) {
@@ -847,8 +861,8 @@ static int cl_extcopy(gpudata *input, gpudata *output, int intype,
   }
 
   if (asprintf(&strs[count], ELEM_HEADER,
-	       compyte_get_type(intype)->cl_name,
-	       compyte_get_type(outtype)->cl_name,
+	       compyte_get_type(intype)->cluda_name,
+	       compyte_get_type(outtype)->cluda_name,
 #ifdef GA_OFFSET
 	       input->offset/compyte_get_elsize(intype),
 	       output->offset/compyte_get_elsize(outtype),
