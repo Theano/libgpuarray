@@ -35,6 +35,11 @@ cdef extern from "Python.h":
 cdef extern from "compyte_util.h":
     size_t compyte_get_elsize(int typecode)
 
+cdef extern from "compyte_error.h":
+    cdef enum ga_error:
+        GA_NO_ERROR, GA_MEMORY_ERROR, GA_VALUE_ERROR, GA_IMPL_ERROR,
+        GA_INVALID_ERROR, GA_UNSUPPORTED_ERROR, GA_SYS_ERROR, GA_RUN_ERROR
+
 cdef extern from "compyte_buffer.h":
     ctypedef struct gpudata:
         pass
@@ -48,6 +53,28 @@ cdef extern from "compyte_buffer.h":
     compyte_buffer_ops cuda_ops
     compyte_buffer_ops opencl_ops
 
+    cdef enum ga_usefl:
+        GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF
+
+    char *Gpu_error(compyte_buffer_ops *o, int err) nogil
+    void *(*cuda_call_compiler)(const_char_p src, size_t sz, int *ret)
+
+cdef extern from "compyte_kernel.h":
+    ctypedef struct _GpuKernel "GpuKernel":
+        gpukernel *k
+        compyte_buffer_ops *ops
+
+    int GpuKernel_init(_GpuKernel *k, compyte_buffer_ops *ops, void *ctx,
+                       unsigned int count, char **strs, size_t *lens,
+                       char *name, int flags) nogil
+    void GpuKernel_clear(_GpuKernel *k) nogil
+    int GpuKernel_setarg(_GpuKernel *k, unsigned int index, int typecode,
+                         void *arg) nogil
+    int GpuKernel_setbufarg(_GpuKernel *k, unsigned int index,
+                            _GpuArray *a) nogil
+    int GpuKernel_call(_GpuKernel *, size_t n) nogil
+
+cdef extern from "compyte_array.h":
     ctypedef struct _GpuArray "GpuArray":
         gpudata *data
         compyte_buffer_ops *ops
@@ -57,9 +84,6 @@ cdef extern from "compyte_buffer.h":
         int flags
         int typecode
 
-    ctypedef struct _GpuKernel "GpuKernel":
-        gpukernel *k
-        compyte_buffer_ops *ops
 
     cdef int GA_C_CONTIGUOUS
     cdef int GA_F_CONTIGUOUS
@@ -76,13 +100,6 @@ cdef extern from "compyte_buffer.h":
 
     ctypedef enum ga_order:
         GA_ANY_ORDER, GA_C_ORDER, GA_F_ORDER
-
-    cdef enum ga_error:
-        GA_NO_ERROR, GA_MEMORY_ERROR, GA_VALUE_ERROR, GA_IMPL_ERROR,
-        GA_INVALID_ERROR, GA_UNSUPPORTED_ERROR, GA_SYS_ERROR, GA_RUN_ERROR
-
-    cdef enum ga_usefl:
-        GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF
 
     enum COMPYTE_TYPES:
         GA_BOOL,
@@ -103,8 +120,6 @@ cdef extern from "compyte_buffer.h":
         GA_CDOUBLE,
         GA_CLONGDOUBLE,
         GA_NBASE
-
-    char *Gpu_error(compyte_buffer_ops *o, int err) nogil
 
     int GpuArray_empty(_GpuArray *a, compyte_buffer_ops *ops, void *ctx,
                        int typecode, int nd, size_t *dims, ga_order ord) nogil
@@ -129,17 +144,6 @@ cdef extern from "compyte_buffer.h":
     void GpuArray_fprintf(libc.stdio.FILE *fd, _GpuArray *a) nogil
     int GpuArray_is_c_contiguous(_GpuArray *a) nogil
     int GpuArray_is_f_contiguous(_GpuArray *a) nogil
-
-    int GpuKernel_init(_GpuKernel *k, compyte_buffer_ops *ops, void *ctx,
-                       unsigned int count, char **strs, size_t *lens,
-                       char *name, int flags) nogil
-    void GpuKernel_clear(_GpuKernel *k) nogil
-    int GpuKernel_setarg(_GpuKernel *k, unsigned int index, int typecode,
-                         void *arg) nogil
-    int GpuKernel_setbufarg(_GpuKernel *k, unsigned int index,
-                            _GpuArray *a) nogil
-    int GpuKernel_call(_GpuKernel *, size_t n) nogil
-    void *(*cuda_call_compiler)(const_char_p src, size_t sz, int *ret)
 
 
 IF WITH_CUDA:

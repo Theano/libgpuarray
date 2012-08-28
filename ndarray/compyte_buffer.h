@@ -8,8 +8,6 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include "compyte_util.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -88,46 +86,6 @@ extern gpudata *cl_make_buf(cl_mem buf, cl_command_queue q, size_t offset);
 #endif
 #endif
 
-typedef struct _GpuArray {
-  gpudata *data;
-  compyte_buffer_ops *ops;
-  size_t *dimensions;
-  ssize_t *strides;
-  unsigned int nd;
-  int flags;
-  int typecode;
-
-  /* Try to keep in sync with numpy values for now */
-#define GA_C_CONTIGUOUS   0x0001
-#define GA_F_CONTIGUOUS   0x0002
-#define GA_OWNDATA        0x0004
-#define GA_ENSURECOPY     0x0020
-#define GA_ALIGNED        0x0100
-#define GA_WRITEABLE      0x0400
-#define GA_BEHAVED        (GA_ALIGNED|GA_WRITEABLE)
-#define GA_CARRAY         (GA_C_CONTIGUOUS|GA_BEHAVED)
-#define GA_FARRAY         (GA_F_CONTIGUOUS|GA_BEHAVED)
-  /* Numpy flags that will not be supported at this level (and why):
-
-     NPY_NOTSWAPPED: data is alway native endian
-     NPY_FORCECAST: no casts
-     NPY_ENSUREARRAY: no inherited classes
-     NPY_UPDATEIFCOPY: cannot support without refcount (or somesuch)
-
-     Maybe will define other flags later */
-} GpuArray;
-
-typedef struct _GpuKernel {
-  gpukernel *k;
-  compyte_buffer_ops *ops;
-} GpuKernel;
-
-typedef enum _ga_order {
-  GA_ANY_ORDER=-1,
-  GA_C_ORDER=0,
-  GA_F_ORDER=1
-} ga_order;
-
 typedef enum _ga_usefl {
   GA_USE_CLUDA =      0x01,
   GA_USE_SMALL =      0x02,
@@ -140,72 +98,7 @@ typedef enum _ga_usefl {
 } ga_usefl;
 #define GA_USEFL_COUNT 5
 
-enum ga_error {
-  GA_NO_ERROR = 0,
-  GA_MEMORY_ERROR,
-  GA_VALUE_ERROR,
-  GA_IMPL_ERROR, /* call buffer_error() for more details */
-  GA_INVALID_ERROR,
-  GA_UNSUPPORTED_ERROR,
-  GA_SYS_ERROR, /* look at errno for more details */
-  GA_RUN_ERROR,
-  GA_DEVSUP_ERROR,
-  /* Add more error types if needed */
-  /* Don't forget to sync with Gpu_error() */
-};
-
 const char *Gpu_error(compyte_buffer_ops *o, int err);
-
-static inline int GpuArray_CHKFLAGS(GpuArray *a, int flags) {
-  return (a->flags & flags) == flags;
-}
-/* Add tests here when you need them */
-#define GpuArray_OWNSDATA(a) GpuArray_CHKFLAGS(a, GA_OWNDATA)
-#define GpuArray_ISWRITEABLE(a) GpuArray_CHKFLAGS(a, GA_WRITEABLE)
-#define GpuArray_ISALIGNED(a) GpuArray_CHKFLAGS(a, GA_ALIGNED)
-#define GpuArray_ISONESEGMENT(a) ((a)->flags & (GA_C_CONTIGUOUS|GA_F_CONTIGUOUS))
-#define GpuArray_ISFORTRAN(a) GpuArray_CHKFLAGS(a, GA_F_CONTIGUOUS)
-#define GpuArray_ITEMSIZE(a) compyte_get_elsize((a)->typecode)
-
-int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
-		   int typecode, unsigned int nd, size_t *dims, ga_order ord);
-int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
-		   int typecode, unsigned int nd, size_t *dims, ga_order ord);
-
-int GpuArray_fromdata(GpuArray *a, compyte_buffer_ops *ops, gpudata *data,
-                      int typecode, unsigned int nd, size_t *dims,
-                      ssize_t *strides, int writeable);
-
-int GpuArray_view(GpuArray *v, GpuArray *a);
-int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
-		   ssize_t *steps);
-
-void GpuArray_clear(GpuArray *a);
-
-int GpuArray_share(GpuArray *a, GpuArray *b);
-
-int GpuArray_move(GpuArray *dst, GpuArray *src);
-int GpuArray_write(GpuArray *dst, void *src, size_t src_sz);
-int GpuArray_read(void *dst, size_t dst_sz, GpuArray *src);
-
-int GpuArray_memset(GpuArray *a, int data);
-
-const char *GpuArray_error(GpuArray *a, int err);
-
-void GpuArray_fprintf(FILE *fd, const GpuArray *a);
-int GpuArray_is_c_contiguous(const GpuArray *a);
-int GpuArray_is_f_contiguous(const GpuArray *a);
-
-int GpuKernel_init(GpuKernel *, compyte_buffer_ops *ops, void *ctx,
-		   unsigned int count, const char **strs, size_t *lens,
-		   const char *name, int flags);
-
-void GpuKernel_clear(GpuKernel *);
-
-int GpuKernel_setarg(GpuKernel *, unsigned int index, int typecode, void *arg);
-int GpuKernel_setbufarg(GpuKernel *, unsigned int index, GpuArray *);
-
-int GpuKernel_call(GpuKernel *, size_t n);
 
 #ifdef __cplusplus
 }

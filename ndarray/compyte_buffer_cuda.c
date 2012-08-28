@@ -48,6 +48,7 @@
 
 #include "compyte_buffer.h"
 #include "compyte_util.h"
+#include "compyte_error.h"
 
 typedef struct {char c; CUdeviceptr x; } st_devptr;
 #define DEVPTR_ALIGN (sizeof(st_devptr) - sizeof(CUdeviceptr))

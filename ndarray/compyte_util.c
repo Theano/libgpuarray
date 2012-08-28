@@ -1,6 +1,7 @@
 #include <assert.h>
 
 #include "compyte_util.h"
+#include "compyte_error.h"
 
 compyte_type *compyte_get_type(int typecode) {
   if (typecode < GA_DELIM) {

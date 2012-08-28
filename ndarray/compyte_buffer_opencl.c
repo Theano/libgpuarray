@@ -2,7 +2,8 @@
 
 #include "compyte_compat.h"
 #include "compyte_buffer.h"
-
+#include "compyte_util.h"
+#include "compyte_error.h"
 
 #ifdef __APPLE__
 
