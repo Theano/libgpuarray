@@ -680,22 +680,6 @@ static int cuda_callkernel(gpukernel *k, size_t n) {
     return GA_NO_ERROR;
 }
 
-static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
-    "#define DTYPEB %s\n"
-    "extern \"C\" {"
-    "__global__ void elemk(const DTYPEA *a_data, DTYPEB *b_data) {"
-    "const int idx = blockIdx.x * blockDim.x + threadIdx.x;"
-    "const int numThreads = blockDim.x * gridDim.x;"
-    "for (int i = idx; i < %" SPREFIX "u; i += numThreads) {"
-    "const char *a_p = (const char *)a_data;"
-    "char *b_p = (char *)b_data;";
-
-static const char ELEM_FOOTER[] =
-    "const DTYPEA *a = (const DTYPEA *)a_p;"
-    "DTYPEB *b = (DTYPEB *)b_p;"
-    "b[0] = a[0];}}}\n";
-
-#ifdef CUDA_PTX
 static const char ELEM_HEADER_PTX[] = ".version 3.0\n.target %s\n\n"
     ".entry elemk (\n"
     ".param .u%u a_data,\n"
@@ -833,8 +817,6 @@ static inline const char *get_rmod(int intype, int outtype) {
     return "";
 }
 
-#endif
-
 static inline unsigned int xmin(unsigned long a, unsigned long b) {
     return (unsigned int)((a < b) ? a : b);
 }
@@ -853,7 +835,6 @@ static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
     unsigned int i;
     int flags = 0;
 
-#ifdef CUDA_PTX
     unsigned int bits = sizeof(void *)*8;
     const char *in_t;
     const char *out_t;
@@ -867,8 +848,6 @@ static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
     arch = detect_arch(&res);
     if (arch == NULL) return res;
     flags |= GA_USE_PTX;
-#define compyte_elem_perdim cuda_perdim_ptx
-#endif
 
     for (i = 0; i < a_nd; i++) {
         nEls *= a_dims[i];
@@ -876,24 +855,16 @@ static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
 
     if (nEls == 0) return GA_NO_ERROR;
 
-#ifdef CUDA_PTX
     if (asprintf(&strs[count], ELEM_HEADER_PTX, arch,
                  bits, bits, bits, in_t, out_t, nEls) == -1)
-#else
-    if (asprintf(&strs[count], ELEM_HEADER,
-                 compyte_get_type(intype)->cuda_name,
-                 compyte_get_type(outtype)->cuda_name,
-                 nEls) == -1)
-#endif
         goto fail;
     count++;
 
-    if (compyte_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a_p") == -1)
+    if (cuda_perdim_ptx(strs, &count, a_nd, a_dims, a_str, "a_p") == -1)
         goto fail;
-    if (compyte_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b_p") == -1)
+    if (cuda_perdim_ptx(strs, &count, b_nd, b_dims, b_str, "b_p") == -1)
         goto fail;
 
-#ifdef CUDA_PTX
     if (asprintf(&strs[count], "ld.param.u%u rp1, [a_data];\n"
                  "cvt.u32.u32 rp2, a_p;\n"
                  "add.u%u rp1, rp1, rp2;\n"
@@ -910,12 +881,6 @@ static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
     if (asprintf(&strs[count], ELEM_FOOTER_PTX, nEls) == -1)
         goto fail;
     count++;
-#else
-    strs[count] = strdup(ELEM_FOOTER);
-    if (strs[count] == NULL)
-        goto fail;
-    count++;
-#endif
 
     assert(count < (sizeof(strs)/sizeof(strs[0])));
 

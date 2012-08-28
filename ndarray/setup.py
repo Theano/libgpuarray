@@ -24,7 +24,7 @@ import numpy as np
 # These are always there
 srcs = ['compyte_types.c', 'compyte_util.c', 'compyte_buffer.c',
         'compyte_array.c', 'compyte_kernel.c']
-macros = [('_GNU_SOURCE', '1'), ('CUDA_PTX', '')]
+macros = [('_GNU_SOURCE', '1')]
 cython_env = {'WITH_CUDA': False, 'WITH_OPENCL': False}
 include_dirs = [np.get_include(), '.']
 lib_dirs = []
