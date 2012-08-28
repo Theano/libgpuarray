@@ -815,11 +815,34 @@ cdef class GpuArray:
             free(steps)
         return res
 
-    def __richcmp__(self, other, int op):
-        op_table = ['<', '<=', '==', '!=', '>', '>=']
-        return elemwise2(self, op_table[op], other,
-                         out_dtype=numpy.dtype('bool'),
-                         op_tmpl="res[i] = %(a)s %(op)s %(b)s")
+    def __richcmp__(a, b, int op):
+        from ..elemwise import ElemwiseKernel
+        cdef GpuArray ary
+        if isinstance(a, GpuArray):
+            ary = a
+            if not isinstance(b, GpuArray):
+                b = numpy.asarray(b)
+        elif isinstance(b, GpuArray):
+            ary = b
+            a = numpy.asarray(a)
+        # ary will always be a or b since one of them is always a GpuArray
+        odtype = get_common_dtype(a, b, a.dtype == numpy.float64 or \
+                                      b.dtype == numpy.float64)
+
+        a_arg = as_argument(a, 'a')
+        b_arg = as_argument(b, 'b')
+
+        args = [ArrayArg(numpy.dtype('bool'), 'res'), a_arg, b_arg]
+        res = ary._empty_like_me(dtype=numpy.dtype('bool'))
+        op_s = ['<', '<=', '==', '!=', '>', '>='][op]
+
+        oper = "res[i] = (%(out_t)s)%(a)s %(op)s (%(out_t)s)%(b)s" % \
+            {'a': a_arg.expr(), 'op': op_s, 'b': b_arg.expr(),
+             'out_t': dtype_to_ctype(odtype)}
+
+        k = ElemwiseKernel(ary.kind, ary.context, args, oper)
+        k(res, a, b)
+        return res
 
     def __add__(self, other):
         return elemwise2(self, '+', other)
