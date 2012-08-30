@@ -71,21 +71,6 @@ typedef struct _compyte_buffer_ops {
   const char *(*buffer_error)(void);
 } compyte_buffer_ops;
 
-#ifdef WITH_CUDA
-extern compyte_buffer_ops cuda_ops;
-extern void *(*cuda_call_compiler)(const char *src, size_t len, int *ret);
-#ifdef CUDA_VERSION
-extern gpudata *cuda_make_buf(CUdeviceptr p, size_t sz);
-#endif
-#endif
-
-#ifdef WITH_OPENCL
-extern compyte_buffer_ops opencl_ops;
-#ifdef CL_VERSION_1_0
-extern gpudata *cl_make_buf(cl_mem buf, cl_command_queue q, size_t offset);
-#endif
-#endif
-
 typedef enum _ga_usefl {
   GA_USE_CLUDA =      0x01,
   GA_USE_SMALL =      0x02,
@@ -99,6 +84,7 @@ typedef enum _ga_usefl {
 #define GA_USEFL_COUNT 5
 
 const char *Gpu_error(compyte_buffer_ops *o, int err);
+compyte_buffer_ops *compyte_get_ops(const char *name);
 
 #ifdef __cplusplus
 }

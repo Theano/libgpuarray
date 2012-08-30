@@ -1,5 +1,3 @@
-include "defs.pxi"
-
 cimport libc.stdio
 from libc.stdlib cimport malloc, calloc, free
 
@@ -75,14 +73,11 @@ cdef extern from "compyte_buffer.h":
         void *buffer_init(int devno, int *ret)
         char *buffer_error()
 
-    compyte_buffer_ops cuda_ops
-    compyte_buffer_ops opencl_ops
-
     cdef enum ga_usefl:
         GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF
 
     char *Gpu_error(compyte_buffer_ops *o, int err) nogil
-    void *(*cuda_call_compiler)(const_char_p src, size_t sz, int *ret)
+    compyte_buffer_ops *compyte_get_ops(const_char_p) nogil
 
 cdef extern from "compyte_kernel.h":
     ctypedef struct _GpuKernel "GpuKernel":
@@ -150,41 +145,46 @@ cdef extern from "compyte_array.h":
     int GpuArray_is_c_contiguous(_GpuArray *a) nogil
     int GpuArray_is_f_contiguous(_GpuArray *a) nogil
 
+cdef extern from "compyte_extension.h":
+    void *compyte_get_extension(const_char_p) nogil
 
-IF WITH_CUDA:
-    cdef object call_compiler_fn = None
-    cdef void *(*call_compiler_default)(const_char_p src, size_t sz, int *ret)
-    call_compiler_default = cuda_call_compiler
+cdef object call_compiler_fn = None
 
-    cdef void *call_compiler_python(const_char_p src, size_t sz,
-                                    int *ret) with gil:
-        cdef bytes res
-        cdef void *buf
-        cdef char *tmp
-        try:
-            res = call_compiler_fn(src[:sz])
-            buf = malloc(len(res))
-            if buf == NULL:
-                if ret != NULL:
-                    ret[0] = GA_SYS_ERROR
-                return NULL
-            tmp = res
-            memcpy(buf, tmp, len(res))
-            return buf
-        except:
-            # XXX: maybe should store the exception somewhere
+cdef void *call_compiler_python(const_char_p src, size_t sz,
+                                int *ret) with gil:
+    cdef bytes res
+    cdef void *buf
+    cdef char *tmp
+    try:
+        res = call_compiler_fn(src[:sz])
+        buf = malloc(len(res))
+        if buf == NULL:
             if ret != NULL:
-                ret[0] = GA_RUN_ERROR
+                ret[0] = GA_SYS_ERROR
             return NULL
+        tmp = res
+        memcpy(buf, tmp, len(res))
+        return buf
+    except:
+        # XXX: maybe should store the exception somewhere
+        if ret != NULL:
+            ret[0] = GA_RUN_ERROR
+        return NULL
 
-    def set_compiler_fn(fn):
-        if callable(fn):
-            call_compiler_fn = fn
-            cuda_call_compiler = call_compiler_python
-        elif fn is None:
-            cuda_call_compiler = call_compiler_default
-        else:
-            raise ValueError("need a callable")
+ctypedef void *(*comp_f)(const_char_p, size_t, int*)
+
+def set_cuda_compiler_fn(fn):
+    cdef void (*set_comp)(comp_f f)
+    set_comp = <void (*)(comp_f)>compyte_get_extension("cuda_set_compiler")
+    if set_comp == NULL:
+        raise RuntimeError("cannot set compiler, extension is absent")
+    if callable(fn):
+        call_compiler_fn = fn
+        set_comp(call_compiler_python)
+    elif fn is None:
+        set_comp(NULL)
+    else:
+        raise ValueError("needs a callable")
 
 import numpy
 
@@ -363,26 +363,21 @@ cdef kernel_call(GpuKernel k, size_t n):
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(k.k.ops, err))
 
-
 cdef compyte_buffer_ops *GpuArray_ops
 cdef void *GpuArray_ctx
 
 cdef compyte_buffer_ops *get_ops(kind) except NULL:
-    IF WITH_OPENCL:
-        if kind == "opencl":
-            return &opencl_ops
-    IF WITH_CUDA:
-        if kind == "cuda":
-            return &cuda_ops
-    raise RuntimeError("Unsupported kind: %s"%(kind,))
+    cdef compyte_buffer_ops *res
+    res = compyte_get_ops(kind)
+    if res == NULL:
+        raise RuntimeError("Unsupported kind: %s"%(kind,))
+    return res
 
 cdef ops_kind(compyte_buffer_ops *ops):
-    IF WITH_OPENCL:
-        if ops == &opencl_ops:
-            return "opencl"
-    IF WITH_CUDA:
-        if ops == &cuda_ops:
-            return "cuda"
+    if ops == compyte_get_ops("opencl"):
+        return "opencl"
+    if ops == compyte_get_ops("cuda"):
+        return "cuda"
     raise RuntimeError("Unknown ops vector")
 
 cdef void *get_ctx(size_t ctx):

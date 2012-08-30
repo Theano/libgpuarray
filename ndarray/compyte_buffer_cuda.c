@@ -49,6 +49,7 @@
 #include "compyte_buffer.h"
 #include "compyte_util.h"
 #include "compyte_error.h"
+#include "compyte_extension.h"
 
 typedef struct {char c; CUdeviceptr x; } st_devptr;
 #define DEVPTR_ALIGN (sizeof(st_devptr) - sizeof(CUdeviceptr))
@@ -471,7 +472,15 @@ static void *call_compiler_impl(const char *src, size_t len, int *ret) {
     return buf;
 }
 
-void *(*cuda_call_compiler)(const char *src, size_t len, int *ret) = call_compiler_impl;
+static void *(*call_compiler)(const char *src, size_t len, int *ret) = call_compiler_impl;
+
+void cuda_set_compiler(void *(*compiler_f)(const char *, size_t, int *)) {
+    if (compiler_f == NULL) {
+        call_compiler = call_compiler_impl;
+    } else {
+        call_compiler = compiler_f;
+    }
+}
 
 static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
                                  const char **strings, const size_t *lengths,
@@ -556,7 +565,7 @@ static gpukernel *cuda_newkernel(void *ctx /* IGNORED */, unsigned int count,
     if (ptx_mode) {
         p = buf;
     } else {
-        p = cuda_call_compiler(buf, tot_len, ret);
+        p = call_compiler(buf, tot_len, ret);
         free(buf);
         if (p == NULL)
             return NULL;

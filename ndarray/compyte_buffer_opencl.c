@@ -42,19 +42,16 @@ struct _gpudata {
 #endif
 };
 
-gpudata *cl_make_buf(cl_mem buf, size_t offset) {
+gpudata *cl_make_buf(cl_mem buf) {
   gpudata *res;
-#ifndef GA_OFFSET
-  if (offset != 0) return NULL;
-#endif
 
   res = malloc(sizeof(*res));
   if (res == NULL) return NULL;
 
-  res->buf = buf;
 #ifdef GA_OFFSET
-  res->offset = offset;
+  res->offset = 0;
 #endif
+  res->buf = buf;
   err = clRetainMemObject(buf);
   if (err != CL_SUCCESS) {
     free(res);
@@ -65,9 +62,6 @@ gpudata *cl_make_buf(cl_mem buf, size_t offset) {
 }
 
 cl_mem cl_get_buf(gpudata *g) { return g->buf; }
-#ifdef GA_OFFSET
-size_t cl_get_offset(gpudata *g) { return g->offset; }
-#endif
 
 struct _gpukernel {
   cl_kernel k;
