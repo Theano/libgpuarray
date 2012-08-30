@@ -47,10 +47,10 @@ cdef extern from "compyte_types.h":
         GA_UINT,
         GA_LONG,
         GA_ULONG,
-        GA_LONGLONG,
-        GA_ULONGLONG,
         GA_FLOAT,
         GA_DOUBLE,
+        GA_CFLOAT,
+        GA_CDOUBLE,
         GA_NBASE
 
 cdef extern from "compyte_util.h":
@@ -200,6 +200,8 @@ cdef dict NP_TO_TYPE = {
     np.dtype('uint64'): GA_ULONG,
     np.dtype('float32'): GA_FLOAT,
     np.dtype('float64'): GA_DOUBLE,
+    np.dtype('complex64'): GA_CFLOAT,
+    np.dtype('complex128'): GA_CDOUBLE,
 }
 
 cdef dict TYPE_TO_NP = dict((v, k) for k, v in NP_TO_TYPE.iteritems())
