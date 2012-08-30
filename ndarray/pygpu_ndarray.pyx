@@ -27,13 +27,38 @@ cdef object PyArray_Empty(int a, np.npy_intp *b, np.dtype c, int d):
     return _PyArray_Empty(a, b, c, d)
 
 cdef extern from "Python.h":
-    cdef int PySlice_GetIndicesEx(slice_object slice, Py_ssize_t length,
-                                  Py_ssize_t *start, Py_ssize_t *stop,
-                                  Py_ssize_t *step,
-                                  Py_ssize_t *slicelength) except -1
+    int PySlice_GetIndicesEx(slice_object slice, Py_ssize_t length,
+                             Py_ssize_t *start, Py_ssize_t *stop,
+                             Py_ssize_t *step,
+                             Py_ssize_t *slicelength) except -1
+
+cdef extern from "compyte_types.h":
+    ctypedef struct compyte_type:
+        const_char_p cluda_name
+        size_t size
+        size_t align
+        int typecode
+
+    enum COMPYTE_TYPES:
+        GA_BOOL,
+        GA_BYTE,
+        GA_UBYTE,
+        GA_SHORT,
+        GA_USHORT,
+        GA_INT,
+        GA_UINT,
+        GA_LONG,
+        GA_ULONG,
+        GA_LONGLONG,
+        GA_ULONGLONG,
+        GA_FLOAT,
+        GA_DOUBLE,
+        GA_NBASE
 
 cdef extern from "compyte_util.h":
+    int compyte_register_type(compyte_type *t, int *ret)
     size_t compyte_get_elsize(int typecode)
+    compyte_type *compyte_get_type(int typecode)
 
 cdef extern from "compyte_error.h":
     cdef enum ga_error:
@@ -100,26 +125,6 @@ cdef extern from "compyte_array.h":
 
     ctypedef enum ga_order:
         GA_ANY_ORDER, GA_C_ORDER, GA_F_ORDER
-
-    enum COMPYTE_TYPES:
-        GA_BOOL,
-        GA_BYTE,
-        GA_UBYTE,
-        GA_SHORT,
-        GA_USHORT,
-        GA_INT,
-        GA_UINT,
-        GA_LONG,
-        GA_ULONG,
-        GA_LONGLONG,
-        GA_ULONGLONG,
-        GA_FLOAT,
-        GA_DOUBLE,
-        GA_LONGDOUBLE,
-        GA_CFLOAT,
-        GA_CDOUBLE,
-        GA_CLONGDOUBLE,
-        GA_NBASE
 
     int GpuArray_empty(_GpuArray *a, compyte_buffer_ops *ops, void *ctx,
                        int typecode, int nd, size_t *dims, ga_order ord) nogil
@@ -195,11 +200,26 @@ cdef dict NP_TO_TYPE = {
     np.dtype('uint64'): GA_ULONG,
     np.dtype('float32'): GA_FLOAT,
     np.dtype('float64'): GA_DOUBLE,
-    np.dtype('complex64'): GA_CFLOAT,
-    np.dtype('complex128'): GA_CDOUBLE,
 }
 
 cdef dict TYPE_TO_NP = dict((v, k) for k, v in NP_TO_TYPE.iteritems())
+
+def register_dtype(np.dtype dtype, cname, size_t size, size_t align):
+    cdef compyte_type *t
+    cdef int typecode
+
+    t = <compyte_type *>malloc(sizeof(compyte_type))
+    if t == NULL:
+        raise MemoryError("Can't allocate new type")
+    t.cluda_name = cname
+    t.size = size
+    t.align = align
+    typecode = compyte_register_type(t, NULL)
+    if typecode == -1:
+        free(t)
+        raise RuntimeError("Could not register type")
+    NP_TO_TYPE[dtype] = typecode
+    TYPE_TO_NP[typecode] = dtype
 
 cdef int dtype_to_typecode(dtype) except -1:
     if isinstance(dtype, int):
@@ -211,6 +231,13 @@ cdef int dtype_to_typecode(dtype) except -1:
         if res is not None:
             return res
     raise ValueError("don't know how to convert to dtype: %s"%(dtype,))
+
+def dtype_to_ctype(dtype):
+    cdef int typecode = dtype_to_typecode(dtype)
+    cdef compyte_type *t = compyte_get_type(typecode)
+    if t.cluda_name == NULL:
+        raise ValueError("No mapping for %s"%(dtype,))
+    return t.cluda_name
 
 cdef ga_order to_ga_order(ord) except <ga_order>-2:
     if ord == "C" or ord == "c":
@@ -535,7 +562,6 @@ cdef new_GpuArray(void *ctx):
 
 from ..array import get_common_dtype, get_np_obj
 from ..tools import ArrayArg, ScalarArg, as_argument
-from ..dtypes import dtype_to_ctype
 
 def elemwise1(a, op, oper=None, op_tmpl="res[i] = %(op)sa[i]"):
     from ..elemwise import ElemwiseKernel
