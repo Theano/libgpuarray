@@ -718,7 +718,7 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
     FAIL(NULL, GA_IMPL_ERROR);
   }
 
-  err = clBuildProgram(p, 1, &dev, NULL, NULL, NULL);
+  err = clBuildProgram(p, 1, &dev, "-w", NULL, NULL);
   if (err != CL_SUCCESS) {
     free(res);
     clReleaseProgram(p);
