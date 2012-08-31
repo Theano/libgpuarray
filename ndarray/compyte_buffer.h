@@ -81,7 +81,6 @@ typedef enum _ga_usefl {
      compyte_buffer_{cuda,opencl}.c with the implementation of your flag */
   GA_USE_PTX =      0x1000,
 } ga_usefl;
-#define GA_USEFL_COUNT 5
 
 const char *Gpu_error(compyte_buffer_ops *o, int err);
 compyte_buffer_ops *compyte_get_ops(const char *name);

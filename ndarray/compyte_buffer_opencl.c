@@ -664,7 +664,9 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
   gpukernel *res;
   cl_device_id dev;
   cl_program p;
-  const char *preamble[GA_USEFL_COUNT];
+  // Sync this table size with the number of flags that can add stuff
+  // at the beginning
+  const char *preamble[4];
   size_t *newl;
   const char **news;
   unsigned int n = 0;
