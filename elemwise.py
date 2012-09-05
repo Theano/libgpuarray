@@ -222,7 +222,7 @@ class ElemwiseKernel(object):
 
         self.kernel_args = kernel_args
 
-    def get_specialized(self, args, nd, dims, str):
+    def get_specialized(self, args, nd, dims, strs):
         self.prepare_args_specialized(args)
         src = specialized_kernel.render(preamble=self.preamble,
                                         name="elemk", n=self.n, nd=nd,
@@ -237,22 +237,28 @@ class ElemwiseKernel(object):
         self.kernel_args = args
 
     def check_args(self, args):
-        arrays = [arg for arg in args if isinstance(arg, gpuarray.GpuArray)]
+        arrays = []
+        strs = []
+        for arg in args:
+            if isinstance(arg, gpuarray.GpuArray):
+                strs.append(arg.strides)
+                arrays.append(arg)
+            else:
+                strs.append(None)
+
         if len(arrays) < 1:
             raise ArugmentError("No arrays in kernel arguments, "
                                 "something is wrong")
         n = arrays[0].size
         nd = arrays[0].ndim
         dims = arrays[0].shape
-        strs = [None] * len(args)
         c_contig = True
         f_contig = True
-        for arg in arrays[1:]:
-            if dims != arg.shape:
+        for ary in arrays:
+            if dims != ary.shape:
                 raise ValueError("Some array differs from the others in shape")
-            strs.append(arg.strides)
-            c_contig = c_contig and arg.flags['C_CONTIGUOUS']
-            f_contig = f_contig and arg.flags['F_CONTIGUOUS']
+            c_contig = c_contig and ary.flags['C_CONTIGUOUS']
+            f_contig = f_contig and ary.flags['F_CONTIGUOUS']
 
         self.n = n
         return nd, dims, strs, c_contig or f_contig
@@ -274,7 +280,7 @@ class ElemwiseKernel(object):
                 return self._speck
             else:
                 self._numcall += 1
-                if self._numcall == self._spec_limit:
+                if self._numcall > self._spec_limit:
                     self._speck = self.get_specialized(args, nd, dims, strs)
                     return self._speck
         else:

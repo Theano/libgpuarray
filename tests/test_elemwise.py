@@ -98,12 +98,21 @@ def elemwise_layouts(shape, offseted_outer, offseted_inner, sliced, order):
                           kind=kind, ctx=context)
     bc, bg = gen_gpuarray(shape, dtype='float32', kind=kind, ctx=context)
 
-    outc = ac + bc
-    outg = ag + bg
+    outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
 
-    assert outc.shape == outg.shape
-    assert outc.dtype == outg.dtype
-    assert numpy.allclose(outc, numpy.asarray(outg))
+    k = ElemwiseKernel(kind, context, "float *a, float *b, float *c",
+                       "c[i] = a[i] + b[i]", spec_limit=1)
+
+    # first call should use the basic version is most cases
+    k(ag, bg, outg)
+    outc = ac + bc
+    if not numpy.allclose(numpy.asarray(outg), outc):
+        import pdb; pdb.set_trace()
+    assert numpy.allclose(numpy.asarray(outg), outc)
+    # second call should use the specialized version in most cases
+    outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
+    k(ag, bg, outg)
+    assert numpy.allclose(numpy.asarray(outg), outc)
 
 
 def test_elemwise2_ops_mixed():
