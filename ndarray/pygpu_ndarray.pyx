@@ -988,6 +988,15 @@ cdef class GpuArray:
             oper = "res[i] = abs(a[i])"
         return elemwise1(self, None, oper=oper)
 
+    def __nonzero__(self):
+        cdef int sz = self.size
+        if sz == 0:
+            return False
+        if sz == 1:
+            return bool(numpy.asarray(self))
+        else:
+            raise ValueError("Thruth value of array with more than one element is ambiguous")
+
     property shape:
         "shape of this ndarray (tuple)"
         def __get__(self):

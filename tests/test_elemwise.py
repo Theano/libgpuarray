@@ -214,3 +214,17 @@ def divmod_mixed(dtype, shape, elem):
     assert out_c[1].dtype == out_g[1].dtype
     assert numpy.allclose(out_c[0], numpy.asarray(out_g[0]))
     assert numpy.allclose(out_c[1], numpy.asarray(out_g[1]))
+
+
+def test_elemwise_bool():
+    a = gpuarray.empty((2,), kind=kind, context=context)
+    exc = None
+    try:
+        bool(a)
+    except ValueError, e:
+        exc = e
+    assert e is not None
+    a = gpuarray.zeros((1,), kind=kind, context=context)
+    assert bool(a) == False
+    a = gpuarray.empty((), kind=kind, context=context)
+    assert bool(a) == False
