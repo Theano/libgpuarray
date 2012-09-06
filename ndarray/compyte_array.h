@@ -49,32 +49,32 @@ static inline int GpuArray_CHKFLAGS(GpuArray *a, int flags) {
 #define GpuArray_ISFORTRAN(a) GpuArray_CHKFLAGS(a, GA_F_CONTIGUOUS)
 #define GpuArray_ITEMSIZE(a) compyte_get_elsize((a)->typecode)
 
-int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
+COMPYTE_PUBLIC int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
                    int typecode, unsigned int nd, size_t *dims, ga_order ord);
-int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
+COMPYTE_PUBLIC int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
                    int typecode, unsigned int nd, size_t *dims, ga_order ord);
 
-int GpuArray_fromdata(GpuArray *a, compyte_buffer_ops *ops, gpudata *data,
+COMPYTE_PUBLIC int GpuArray_fromdata(GpuArray *a, compyte_buffer_ops *ops, gpudata *data,
                       int typecode, unsigned int nd, size_t *dims,
                       ssize_t *strides, int writeable);
 
-int GpuArray_view(GpuArray *v, GpuArray *a);
-int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
+COMPYTE_PUBLIC int GpuArray_view(GpuArray *v, GpuArray *a);
+COMPYTE_PUBLIC int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
                    ssize_t *steps);
 
-void GpuArray_clear(GpuArray *a);
+COMPYTE_PUBLIC void GpuArray_clear(GpuArray *a);
 
-int GpuArray_share(GpuArray *a, GpuArray *b);
+COMPYTE_PUBLIC int GpuArray_share(GpuArray *a, GpuArray *b);
 
-int GpuArray_move(GpuArray *dst, GpuArray *src);
-int GpuArray_write(GpuArray *dst, void *src, size_t src_sz);
-int GpuArray_read(void *dst, size_t dst_sz, GpuArray *src);
+COMPYTE_PUBLIC int GpuArray_move(GpuArray *dst, GpuArray *src);
+COMPYTE_PUBLIC int GpuArray_write(GpuArray *dst, void *src, size_t src_sz);
+COMPYTE_PUBLIC int GpuArray_read(void *dst, size_t dst_sz, GpuArray *src);
 
-int GpuArray_memset(GpuArray *a, int data);
+COMPYTE_PUBLIC int GpuArray_memset(GpuArray *a, int data);
 
-const char *GpuArray_error(GpuArray *a, int err);
+COMPYTE_PUBLIC const char *GpuArray_error(GpuArray *a, int err);
 
-void GpuArray_fprintf(FILE *fd, const GpuArray *a);
-int GpuArray_is_c_contiguous(const GpuArray *a);
-int GpuArray_is_f_contiguous(const GpuArray *a);
+COMPYTE_PUBLIC void GpuArray_fprintf(FILE *fd, const GpuArray *a);
+COMPYTE_LOCAL int GpuArray_is_c_contiguous(const GpuArray *a);
+COMPYTE_LOCAL int GpuArray_is_f_contiguous(const GpuArray *a);
 #endif

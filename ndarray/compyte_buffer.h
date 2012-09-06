@@ -84,8 +84,8 @@ typedef enum _ga_usefl {
   GA_USE_PTX =      0x1000,
 } ga_usefl;
 
-const char *Gpu_error(compyte_buffer_ops *o, int err);
-compyte_buffer_ops *compyte_get_ops(const char *name);
+COMPYTE_PUBLIC const char *Gpu_error(compyte_buffer_ops *o, int err);
+COMPYTE_PUBLIC compyte_buffer_ops *compyte_get_ops(const char *name);
 
 #ifdef __cplusplus
 }

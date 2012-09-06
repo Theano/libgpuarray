@@ -1,6 +1,8 @@
 #ifndef COMPYTE_ERROR_H
 #define COMPYTE_ERROR_H
 
+#include "compyte_compat.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -22,7 +24,7 @@ enum ga_error {
   /* Don't forget to sync with Gpu_error() */
 };
 
-const char *compyte_error_str(int err);
+COMPYTE_PUBLIC const char *compyte_error_str(int err);
 
 #ifdef __cplusplus
 }

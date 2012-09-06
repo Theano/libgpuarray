@@ -4,6 +4,7 @@
 #cmakedefine HAVE_STRL
 #cmakedefine HAVE_ASPRINTF
 #cmakedefine HAVE_MKSTEMP
+#cmakedefine COMPYTE_SHARED
 
 #ifdef _MSC_VER
 #include <stddef.h>
@@ -13,6 +14,28 @@
 #else
 #include <sys/types.h>
 #include <stdint.h>
+#endif
+
+#ifdef COMPYTE_SHARED
+ #ifdef _WIN32
+  #ifdef COMPYTE_BUILDING_DLL
+   #define COMPYTE_PUBLIC __declspec(dllexport)
+  #else
+   #define COMPYTE_PUBLIC __declspec(dllimport)
+  #endif
+  #define COMPYTE_LOCAL
+ #else
+  #if __GNUC__ >= 4
+   #define COMPYTE_PUBLIC __attribute__((visibility ("default")))
+   #define COMPYTE_LOCAL  __attribute__((visibility ("hidden")))
+  #else
+   #define COMPYTE_PUBLIC
+   #define COMPYTE_LOCAL
+  #endif
+ #endif
+#else
+ #define COMPYTE_PUBLIC
+ #define COMPYTE_LOCAL
 #endif
 
 #ifdef _MSC_VER
@@ -28,11 +51,11 @@ struct iovec {
 #include <stdlib.h>
 
 #ifndef HAVE_ASPRINTF
-int asprintf(char **ret, const char *fmt, ...);
+COMPYTE_LOCAL int asprintf(char **ret, const char *fmt, ...);
 #endif
 
 #ifndef HAVE_MKSTEMP
-int mkstemp(char *path);
+COMPYTE_LOCAL int mkstemp(char *path);
 #endif
 
 #ifdef _MSC_VER
@@ -53,8 +76,8 @@ int mkstemp(char *path);
 
 #include <string.h>
 #ifndef HAVE_STRL
-size_t strlcpy(char *dst, const char *src, size_t size);
-size_t strlcat(char *dst, const char *src, size_t size);
+COMPYTE_LOCAL size_t strlcpy(char *dst, const char *src, size_t size);
+COMPYTE_LOCAL size_t strlcat(char *dst, const char *src, size_t size);
 #endif
 
 #endif

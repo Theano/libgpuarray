@@ -12,11 +12,11 @@ extern "C" {
 
 #include "compyte_types.h"
 
-int compyte_register_type(compyte_type *t, int *ret);
-compyte_type *compyte_get_type(int typecode);
-size_t compyte_get_elsize(int typecode);
+COMPYTE_PUBLIC int compyte_register_type(compyte_type *t, int *ret);
+COMPYTE_PUBLIC compyte_type *compyte_get_type(int typecode);
+COMPYTE_PUBLIC size_t compyte_get_elsize(int typecode);
 
-int compyte_elem_perdim(char *strs[], unsigned int *count, unsigned int nd, 
+COMPYTE_LOCAL int compyte_elem_perdim(char *strs[], unsigned int *count, unsigned int nd,
 			const size_t *dims, const ssize_t *str,
 			const char *id);
 

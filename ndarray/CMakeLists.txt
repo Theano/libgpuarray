@@ -4,8 +4,13 @@ include(CheckFunctionExists)
 
 cmake_minimum_required(VERSION 2.8)
 #set(CMAKE_VERBOSE_MAKEFILE true)
-
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} .)
+
+#################################################
+## Set this to False to build a static library ##
+#################################################
+set(COMPYTE_SHARED True)
+
 
 find_package(CUDA)
 find_package(OpenCL)
@@ -55,7 +60,12 @@ if(OPENCL_FOUND)
   include_directories("${OPENCL_INCLUDE_DIRS}")
 endif()
 
-ADD_LIBRARY(compyte STATIC ${COMPYTE_SRC})
+if(COMPYTE_SHARED)
+  add_definitions(-DCOMPYTE_BUILDING_DLL)
+  ADD_LIBRARY(compyte SHARED ${COMPYTE_SRC})
+else()
+  add_library(compyte STATIC ${COMPYTE_SRC})
+endif()
 
 if(CUDA_FOUND)
   target_link_libraries(compyte ${CUDA_CUDA_LIBRARY})
