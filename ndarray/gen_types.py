@@ -86,8 +86,8 @@ typedef struct _cdouble {
 } ga_cdouble;
 
 typedef struct _cquad {
- quad_t r;
- quad_t i;
+  ga_quad r;
+  ga_quad i;
 } ga_cquad;
 """
 ntypes = i
