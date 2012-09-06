@@ -4,7 +4,7 @@
 #include "compyte_error.h"
 
 static compyte_type **custom_types = NULL;
-static unsigned int n_types = 0;
+static int n_types = 0;
 static compyte_type no_type = {NULL, 0, 0, -1};
 
 int compyte_register_type(compyte_type *t, int *ret) {

@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#include "compyte_compat.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

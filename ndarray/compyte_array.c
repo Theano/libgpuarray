@@ -169,7 +169,7 @@ int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
 
   r_i = 0;
   for (i = 0; i < a->nd; i++) {
-    if (starts[i] >= a->dimensions[i]) {
+    if (starts[i] > 0 && (size_t)starts[i] >= a->dimensions[i]) {
       GpuArray_clear(r);
       return GA_VALUE_ERROR;
     }
