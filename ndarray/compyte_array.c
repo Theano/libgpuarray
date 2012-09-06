@@ -173,7 +173,11 @@ int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
       GpuArray_clear(r);
       return GA_VALUE_ERROR;
     }
-    r->ops->buffer_offset(r->data, starts[i] * a->strides[i]);
+    err = r->ops->buffer_offset(r->data, starts[i] * a->strides[i]);
+    if (err != GA_NO_ERROR) {
+        GpuArray_clear(r);
+        return err;
+    }
     if (steps[i] != 0) {
       r->strides[r_i] = steps[i] * a->strides[i];
       r->dimensions[r_i] = (stops[i]-starts[i]+steps[i]-

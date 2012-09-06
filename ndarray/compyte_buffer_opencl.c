@@ -627,6 +627,10 @@ static int cl_offset(gpudata *b, ssize_t off) {
 
   b->buf = clCreateSubBuffer(buf, CL_MEM_READ_WRITE,
                              CL_BUFFER_CREATE_TYPE_REGION, &r, &err);
+  if (err != CL_SUCCESS) {
+      b->buf = buf;
+      return GA_IMPL_ERROR;
+  }
   if (do_release) clReleaseMemObject(buf);
 #endif
   return GA_NO_ERROR;
