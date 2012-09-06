@@ -134,6 +134,10 @@ static const char *get_error_string(cl_int err) {
   case CL_IMAGE_FORMAT_NOT_SUPPORTED:     return "Image format not supported";
   case CL_BUILD_PROGRAM_FAILURE:          return "Program build failure";
   case CL_MAP_FAILURE:                    return "Map failure";
+#ifdef CL_VERSION_1_1
+  case CL_MISALIGNED_SUB_BUFFER_OFFSET:   return "Buffer offset improperly aligned";
+  case CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST: return "Event in wait list has an error status";
+#endif
   case CL_INVALID_VALUE:                  return "Invalid value";
   case CL_INVALID_DEVICE_TYPE:            return "Invalid device type";
   case CL_INVALID_PLATFORM:               return "Invalid platform";
