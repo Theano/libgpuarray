@@ -35,16 +35,7 @@
 #include <unistd.h>
 #endif
 
-
-#ifdef __APPLE__
-
-#include <CUDA/cuda.h>
-
-#else
-
 #include <cuda.h>
-
-#endif
 
 #include "compyte_buffer.h"
 #include "compyte_util.h"
@@ -190,6 +181,8 @@ static const char *get_error_string(CUresult err) {
     case CUDA_ERROR_PEER_ACCESS_NOT_ENABLED: return "Peer access not enabled";
     case CUDA_ERROR_PRIMARY_CONTEXT_ACTIVE: return "Primary context already initialized";
     case CUDA_ERROR_CONTEXT_IS_DESTROYED: return "Context has been destroyed (or not yet initialized)";
+#endif
+#if CUDA_VERSION >= 4020
     case CUDA_ERROR_ASSERT:            return "Kernel trigged an assert and destroyed the context";
     case CUDA_ERROR_TOO_MANY_PEERS:    return "Not enough ressoures to enable peer access";
     case CUDA_ERROR_HOST_MEMORY_ALREADY_REGISTERED: return "Memory range already registered";

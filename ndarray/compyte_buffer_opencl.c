@@ -363,12 +363,13 @@ static int cl_share(gpudata *a, gpudata *b, int *ret) {
   return 0;
 }
 
-static int cl_move(gpudata *dst, size_t srcoff, gpudata *src, size_t dstoff, size_t sz) {
+static int cl_move(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff,
+                   size_t sz) {
   cl_event ev;
   cl_context ctx;
   cl_command_queue q;
   int res;
-  
+
   if (sz == 0) return GA_NO_ERROR;
 
   err = clGetMemObjectInfo(dst->buf, CL_MEM_CONTEXT, sizeof(ctx), &ctx, NULL);
@@ -377,8 +378,8 @@ static int cl_move(gpudata *dst, size_t srcoff, gpudata *src, size_t dstoff, siz
   q = get_a_q(ctx, &res);
   if (q == NULL) return res;
 
-  err = clEnqueueCopyBuffer(q, src->buf, dst->buf, srcoff, dstoff,
-                            sz, 0, NULL, &ev);
+  err = clEnqueueCopyBuffer(q, src->buf, dst->buf, srcoff, dstoff, sz, 0,
+                            NULL, &ev);
   clReleaseCommandQueue(q);
   if (err != CL_SUCCESS) {
     return GA_IMPL_ERROR;
@@ -406,8 +407,8 @@ static int cl_read(void *dst, gpudata *src, size_t srcoff, size_t sz) {
   q = get_a_q(ctx, &res);
   if (q == NULL) return res;
 
-  err = clEnqueueReadBuffer(q, src->buf, CL_TRUE, srcoff,
-                            sz, dst, 0, NULL, NULL);
+  err = clEnqueueReadBuffer(q, src->buf, CL_TRUE, srcoff, sz, dst, 0, NULL,
+                            NULL);
   clReleaseCommandQueue(q);
   if (err != CL_SUCCESS) {
     return GA_IMPL_ERROR;
@@ -429,8 +430,8 @@ static int cl_write(gpudata *dst, size_t dstoff, const void *src, size_t sz) {
   q = get_a_q(ctx, &res);
   if (q == NULL) return res;
 
-  err = clEnqueueWriteBuffer(q, dst->buf, CL_TRUE, dstoff,
-                             sz, src, 0, NULL, NULL);
+  err = clEnqueueWriteBuffer(q, dst->buf, CL_TRUE, dstoff, sz, src, 0, NULL,
+                             NULL);
   clReleaseCommandQueue(q);
   if (err != CL_SUCCESS) {
     return GA_IMPL_ERROR;
@@ -705,8 +706,8 @@ static const char ELEM_FOOTER[] =
   "__global DTYPEB *b = (__global DTYPEB *)b_p;"
   "b[0] = a[0];}}\n";
 
-static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t ooff,
-                      int intype, int outtype, unsigned int a_nd,
+static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
+                      size_t ooff, int intype, int outtype, unsigned int a_nd,
                       const size_t *a_dims, const ssize_t *a_str,
                       unsigned int b_nd, const size_t *b_dims,
                       const ssize_t *b_str) {
@@ -752,7 +753,7 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t ooff,
   if (asprintf(&strs[count], ELEM_HEADER,
 	       compyte_get_type(intype)->cluda_name,
 	       compyte_get_type(outtype)->cluda_name,
-           ooff, ioff, nEls) == -1)
+               ioff, ooff, nEls) == -1)
     goto fail;
   count++;
   
