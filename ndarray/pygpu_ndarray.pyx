@@ -1059,6 +1059,11 @@ cdef class GpuArray:
             res["OWNDATA"] = py_CHKFLAGS(self, GA_OWNDATA)
             return res
 
+    property offset:
+        "Return the offset into the gpudata pointer for this array."
+        def __get__(self):
+            return self.ga.offset
+
     property gpudata:
         "Return a pointer to the raw gpudata object."
         def __get__(self):
