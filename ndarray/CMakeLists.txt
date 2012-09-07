@@ -37,6 +37,10 @@ check_function_exists(strlcat HAVE_STRL)
 check_function_exists(asprintf HAVE_ASPRINTF)
 check_function_exists(mkstemp HAVE_MKSTEMP)
 
+if(UNIX)
+  add_definitions(-D_GNU_SOURCE)
+endif()
+
 if(NOT HAVE_STRL)
   set(COMPYTE_SRC ${COMPYTE_SRC} compyte_strl.c)
 endif()
