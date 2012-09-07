@@ -200,6 +200,7 @@ def test_zeros():
                 yield zeros, shp, order, dtype
 
 
+@guard_devsup
 def zeros(shp, order, dtype):
     x = gpu_ndarray.zeros(shp, dtype, order, context=ctx,
                           kind=kind)
