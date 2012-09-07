@@ -8,6 +8,7 @@ typedef struct _GpuArray {
   compyte_buffer_ops *ops;
   size_t *dimensions;
   ssize_t *strides;
+  size_t offset;
   unsigned int nd;
   int flags;
   int typecode;
@@ -55,7 +56,7 @@ COMPYTE_PUBLIC int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ct
                    int typecode, unsigned int nd, size_t *dims, ga_order ord);
 
 COMPYTE_PUBLIC int GpuArray_fromdata(GpuArray *a, compyte_buffer_ops *ops, gpudata *data,
-                      int typecode, unsigned int nd, size_t *dims,
+                      size_t offset, int typecode, unsigned int nd, size_t *dims,
                       ssize_t *strides, int writeable);
 
 COMPYTE_PUBLIC int GpuArray_view(GpuArray *v, GpuArray *a);

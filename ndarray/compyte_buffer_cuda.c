@@ -268,60 +268,55 @@ static int cuda_share(gpudata *a, gpudata *b, int *ret) {
              (b->ptr <= a->ptr && b->ptr + b->sz > a->ptr)));
 }
 
-static int cuda_move(gpudata *dst, gpudata *src, size_t sz)
+static int cuda_move(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff, size_t sz)
 {
-    if (dst->sz < sz || src->sz < sz)
-        return GA_VALUE_ERROR;
     if (sz == 0) return GA_NO_ERROR;
 
-    err = cuMemcpyDtoD(dst->ptr, src->ptr, sz);
+    if ((dst->sz - dstoff) < sz || (src->sz -srcoff) < sz)
+        return GA_VALUE_ERROR;
+
+    err = cuMemcpyDtoD(dst->ptr + dstoff, src->ptr + srcoff, sz);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
     return GA_NO_ERROR;
 }
 
-static int cuda_read(void *dst, gpudata *src, size_t sz)
+static int cuda_read(void *dst, gpudata *src, size_t srcoff, size_t sz)
 {
-    if (src->sz < sz)
-        return GA_VALUE_ERROR;
     if (sz == 0) return GA_NO_ERROR;
 
-    err = cuMemcpyDtoH(dst, src->ptr, sz);
+    if ((src->sz - srcoff) < sz)
+        return GA_VALUE_ERROR;
+
+    err = cuMemcpyDtoH(dst, src->ptr + srcoff, sz);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
     return GA_NO_ERROR;
 }
 
-static int cuda_write(gpudata *dst, const void *src, size_t sz)
+static int cuda_write(gpudata *dst, size_t dstoff, const void *src, size_t sz)
 {
-    if (dst->sz < sz)
-        return GA_VALUE_ERROR;
     if (sz == 0) return GA_NO_ERROR;
 
-    err = cuMemcpyHtoD(dst->ptr, src, sz);
+    if ((dst->sz - dstoff) < sz)
+        return GA_VALUE_ERROR;
+
+    err = cuMemcpyHtoD(dst->ptr + dstoff, src, sz);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
     return GA_NO_ERROR;
 }
 
-static int cuda_memset(gpudata *dst, int data) {
-    if (dst->sz == 0) return GA_NO_ERROR;
+static int cuda_memset(gpudata *dst, size_t dstoff, int data) {
+    if ((dst->sz - dstoff) == 0) return GA_NO_ERROR;
 
-    err = cuMemsetD8(dst->ptr, data, dst->sz);
+    err = cuMemsetD8(dst->ptr + dstoff, data, dst->sz - dstoff);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
-    return GA_NO_ERROR;
-}
-
-static int cuda_offset(gpudata *buf, ssize_t off) {
-    /* This only check that you don't wrap around through the bottom */
-    if (off > 0 && (size_t)off > buf->sz) return GA_VALUE_ERROR;
-    buf->ptr += off;
-    buf->sz -= off;
     return GA_NO_ERROR;
 }
 
@@ -852,8 +847,8 @@ static inline unsigned int xmin(unsigned long a, unsigned long b) {
     return (unsigned int)((a < b) ? a : b);
 }
 
-static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
-                        int outtype, unsigned int a_nd,
+static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t ooff,
+                        int intype, int outtype, unsigned int a_nd,
                         const size_t *a_dims, const ssize_t *a_str,
                         unsigned int b_nd, const size_t *b_dims,
                         const ssize_t *b_str) {
@@ -864,7 +859,7 @@ static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
     size_t nEls = 1;
     gpukernel *k;
     unsigned int i;
-    int flags = 0;
+    int flags = GA_USE_PTX;
 
     unsigned int bits = sizeof(void *)*8;
     const char *in_t;
@@ -872,19 +867,17 @@ static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
     const char *rmod;
     const char *arch;
 
+    for (i = 0; i < a_nd; i++) {
+        nEls *= a_dims[i];
+    }
+    if (nEls == 0) return GA_NO_ERROR;
+
     in_t = map_t(intype);
     out_t = map_t(outtype);
     rmod = get_rmod(intype, outtype);
     if (in_t == NULL || out_t == NULL) return GA_DEVSUP_ERROR;
     arch = detect_arch(&res);
     if (arch == NULL) return res;
-    flags |= GA_USE_PTX;
-
-    for (i = 0; i < a_nd; i++) {
-        nEls *= a_dims[i];
-    }
-
-    if (nEls == 0) return GA_NO_ERROR;
 
     if (asprintf(&strs[count], ELEM_HEADER_PTX, arch,
                  bits, bits, bits, in_t, out_t, nEls) == -1)
@@ -937,9 +930,13 @@ static int cuda_extcopy(gpudata *input, gpudata *output, int intype,
     k = cuda_newkernel(NULL, count, (const char **)strs, NULL, "elemk",
                        flags, &res);
     if (k == NULL) goto fail;
+    input->ptr += ioff;
     res = cuda_setkernelargbuf(k, 0, input);
+    input->ptr -= ioff;
     if (res != GA_NO_ERROR) goto failk;
+    output->ptr += ooff;
     res = cuda_setkernelargbuf(k, 1, output);
+    output->ptr -= ooff;
     if (res != GA_NO_ERROR) goto failk;
 
     res = cuda_callkernel(k, nEls);
@@ -966,7 +963,6 @@ compyte_buffer_ops cuda_ops = {cuda_init,
                                cuda_read,
                                cuda_write,
                                cuda_memset,
-                               cuda_offset,
                                cuda_newkernel,
                                cuda_freekernel,
                                cuda_setkernelarg,

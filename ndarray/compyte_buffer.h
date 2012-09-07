@@ -1,5 +1,5 @@
 /**
- * This file contain the header for ALL code that depend on cuda or opencl.
+ * This file contain the header for ALL code that depends on cuda or opencl.
  */
 #ifndef COMPYTE_BUFFER_H
 #define COMPYTE_BUFFER_H
@@ -32,16 +32,13 @@ typedef struct _compyte_buffer_ops {
   int (*buffer_share)(gpudata *, gpudata *, int *ret);
   
   /* device to device copy, no overlap */
-  int (*buffer_move)(gpudata *dst, gpudata *src, size_t sz);
+  int (*buffer_move)(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff, size_t sz);
   /* device to host */
-  int (*buffer_read)(void *dst, gpudata *src, size_t sz);
+  int (*buffer_read)(void *dst, gpudata *src, size_t srcoff, size_t sz);
   /* host to device */
-  int (*buffer_write)(gpudata *dst, const void *src, size_t sz);
+  int (*buffer_write)(gpudata *dst, size_t dstoff, const void *src, size_t sz);
   /* Set buffer to a single-byte pattern (like C memset) */
-  int (*buffer_memset)(gpudata *dst, int data);
-  /* Add the specified offset into the buffer, 
-     must not go beyond the buffer limits */
-  int (*buffer_offset)(gpudata *buf, ssize_t offset);
+  int (*buffer_memset)(gpudata *dst, size_t dstoff, int data);
   /* Compile the kernel composed of the concatenated strings and return
      a callable kernel.  If lengths is NULL then all the strings must 
      be NUL-terminated.  Otherwise, it doesn't matter. */
@@ -62,8 +59,8 @@ typedef struct _compyte_buffer_ops {
   int (*buffer_callkernel)(gpukernel *k, size_t n);
 
   /* Function to facilitate copy and cast operations*/
-  int (*buffer_extcopy)(gpudata *input, gpudata *output, int intype,
-                        int outtype, unsigned int a_nd,
+  int (*buffer_extcopy)(gpudata *input, size_t ioff, gpudata *output, size_t ooff,
+                        int intype, int outtype, unsigned int a_nd,
                         const size_t *a_dims, const ssize_t *a_str,
                         unsigned int b_nd, const size_t *b_dims,
                         const ssize_t *b_str);

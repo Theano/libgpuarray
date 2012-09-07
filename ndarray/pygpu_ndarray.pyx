@@ -98,6 +98,7 @@ cdef extern from "compyte_array.h":
     ctypedef struct _GpuArray "GpuArray":
         gpudata *data
         compyte_buffer_ops *ops
+        size_t offset
         size_t *dimensions
         ssize_t *strides
         unsigned int nd
@@ -124,7 +125,7 @@ cdef extern from "compyte_array.h":
     int GpuArray_empty(_GpuArray *a, compyte_buffer_ops *ops, void *ctx,
                        int typecode, int nd, size_t *dims, ga_order ord) nogil
     int GpuArray_fromdata(_GpuArray *a, compyte_buffer_ops *ops, gpudata *data,
-                          int typecode, unsigned int nd, size_t *dims,
+                          size_t offset, int typecode, unsigned int nd, size_t *dims,
                           ssize_t *strides, int writable) nogil
     int GpuArray_view(_GpuArray *v, _GpuArray *a) nogil
     int GpuArray_index(_GpuArray *r, _GpuArray *a, ssize_t *starts,
@@ -268,12 +269,12 @@ cdef array_empty(GpuArray a, compyte_buffer_ops *ops, void *ctx, int typecode,
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err))
 
-cdef array_fromdata(GpuArray a, compyte_buffer_ops *ops, gpudata *data,
+cdef array_fromdata(GpuArray a, compyte_buffer_ops *ops, gpudata *data, size_t offset,
                     int typecode, unsigned int nd, size_t *dims,
                     ssize_t *strides, int writeable):
     cdef int err
     with nogil:
-        err = GpuArray_fromdata(&a.ga, ops, data, typecode, nd, dims, strides,
+        err = GpuArray_fromdata(&a.ga, ops, data, offset, typecode, nd, dims, strides,
                                 writeable)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err))
@@ -431,7 +432,7 @@ def asfortranarray(a, dtype=None, context=None, kind=None):
 def may_share_memory(GpuArray a not None, GpuArray b not None):
     return array_share(a, b)
 
-def from_gpudata(size_t data, dtype, shape, kind=None, context=None,
+def from_gpudata(size_t data, offset, dtype, shape, kind=None, context=None,
                  strides=None, writable=True, base=None):
     cdef GpuArray res
     cdef compyte_buffer_ops *ops
@@ -475,7 +476,7 @@ def from_gpudata(size_t data, dtype, shape, kind=None, context=None,
                 size *= cdims[i]
 
         res = new_GpuArray(ctx)
-        array_fromdata(res, ops, <gpudata *>data, typecode, nd, cdims,
+        array_fromdata(res, ops, <gpudata *>data, offset, typecode, nd, cdims,
                        cstrides, <int>(1 if writable else 0))
         res.base = base
     finally:

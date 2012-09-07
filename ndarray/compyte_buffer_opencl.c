@@ -20,10 +20,6 @@
 #include <string.h>
 #include <limits.h>
 
-#ifndef CL_VERSION_1_1
-#define GA_OFFSET
-#endif
-
 #ifdef _MSC_VER
 #define strdup _strdup
 #endif
@@ -37,9 +33,6 @@ static cl_int err;
 
 struct _gpudata {
   cl_mem buf;
-#ifdef GA_OFFSET
-  size_t offset;
-#endif
 };
 
 gpudata *cl_make_buf(cl_mem buf) {
@@ -48,9 +41,6 @@ gpudata *cl_make_buf(cl_mem buf) {
   res = malloc(sizeof(*res));
   if (res == NULL) return NULL;
 
-#ifdef GA_OFFSET
-  res->offset = 0;
-#endif
   res->buf = buf;
   err = clRetainMemObject(buf);
   if (err != CL_SUCCESS) {
@@ -323,15 +313,9 @@ static gpudata *cl_alloc(void *ctx, size_t size, int *ret) {
   res = malloc(sizeof(*res));
   if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
 
-#ifdef GA_OFFSET
-  res->offset = 0;
-#endif
   if (size == 0) {
     /* OpenCL doesn't like a zero-sized buffer */
     size = 1;
-#ifdef GA_OFFSET
-    res->offset = 1;
-#endif
   }
 
   res->buf = clCreateBuffer((cl_context)ctx, CL_MEM_READ_WRITE, size, NULL,
@@ -354,9 +338,6 @@ static gpudata *cl_dup(gpudata *b, int *ret) {
     free(res);
     FAIL(NULL, GA_IMPL_ERROR);
   }
-#ifdef GA_OFFSET
-  res->offset = b->offset;
-#endif
   return res;
 }
 
@@ -382,31 +363,13 @@ static int cl_share(gpudata *a, gpudata *b, int *ret) {
   return 0;
 }
 
-static int cl_move(gpudata *dst, gpudata *src, size_t sz) {
+static int cl_move(gpudata *dst, size_t srcoff, gpudata *src, size_t dstoff, size_t sz) {
   cl_event ev;
   cl_context ctx;
   cl_command_queue q;
-  size_t dst_sz, src_sz;
   int res;
   
   if (sz == 0) return GA_NO_ERROR;
-
-  if ((err = clGetMemObjectInfo(dst->buf, CL_MEM_SIZE, sizeof(size_t),
-				&dst_sz, NULL)) != CL_SUCCESS) {
-    return GA_IMPL_ERROR;
-  }
-
-  if ((err = clGetMemObjectInfo(src->buf, CL_MEM_SIZE, sizeof(size_t),
-				&src_sz, NULL)) != CL_SUCCESS) {
-    return GA_IMPL_ERROR;
-  }
-
-#ifdef GA_OFFSET
-  dst_sz -= dst->offset;
-  src_sz -= src->offset;
-#endif
-
-  if (dst_sz < sz || src_sz < sz) return GA_VALUE_ERROR;
 
   err = clGetMemObjectInfo(dst->buf, CL_MEM_CONTEXT, sizeof(ctx), &ctx, NULL);
   if (err != CL_SUCCESS) return GA_IMPL_ERROR;
@@ -414,12 +377,7 @@ static int cl_move(gpudata *dst, gpudata *src, size_t sz) {
   q = get_a_q(ctx, &res);
   if (q == NULL) return res;
 
-  err = clEnqueueCopyBuffer(q, src->buf, dst->buf,
-#ifdef GA_OFFSET
-                            src->offset, dst->offset,
-#else
-                            0, 0,
-#endif
+  err = clEnqueueCopyBuffer(q, src->buf, dst->buf, srcoff, dstoff,
                             sz, 0, NULL, &ev);
   clReleaseCommandQueue(q);
   if (err != CL_SUCCESS) {
@@ -435,7 +393,7 @@ static int cl_move(gpudata *dst, gpudata *src, size_t sz) {
   return GA_NO_ERROR;
 }
 
-static int cl_read(void *dst, gpudata *src, size_t sz) {
+static int cl_read(void *dst, gpudata *src, size_t srcoff, size_t sz) {
   cl_context ctx;
   cl_command_queue q;
   int res;
@@ -448,12 +406,7 @@ static int cl_read(void *dst, gpudata *src, size_t sz) {
   q = get_a_q(ctx, &res);
   if (q == NULL) return res;
 
-  err = clEnqueueReadBuffer(q, src->buf, CL_TRUE,
-#ifdef GA_OFFSET
-                            src->offset,
-#else
-                            0,
-#endif
+  err = clEnqueueReadBuffer(q, src->buf, CL_TRUE, srcoff,
                             sz, dst, 0, NULL, NULL);
   clReleaseCommandQueue(q);
   if (err != CL_SUCCESS) {
@@ -463,7 +416,7 @@ static int cl_read(void *dst, gpudata *src, size_t sz) {
   return GA_NO_ERROR;
 }
 
-static int cl_write(gpudata *dst, const void *src, size_t sz) {
+static int cl_write(gpudata *dst, size_t dstoff, const void *src, size_t sz) {
   cl_context ctx;
   cl_command_queue q;
   int res;
@@ -476,12 +429,7 @@ static int cl_write(gpudata *dst, const void *src, size_t sz) {
   q = get_a_q(ctx, &res);
   if (q == NULL) return res;
 
-  err = clEnqueueWriteBuffer(q, dst->buf, CL_TRUE,
-#ifdef GA_OFFSET
-                             dst->offset,
-#else
-                             0,
-#endif
+  err = clEnqueueWriteBuffer(q, dst->buf, CL_TRUE, dstoff,
                              sz, src, 0, NULL, NULL);
   clReleaseCommandQueue(q);
   if (err != CL_SUCCESS) {
@@ -491,7 +439,7 @@ static int cl_write(gpudata *dst, const void *src, size_t sz) {
   return GA_NO_ERROR;
 }
 
-static int cl_memset(gpudata *dst, int data) {
+static int cl_memset(gpudata *dst, size_t offset, int data) {
   char local_kern[256];
   const char *rlk[1];
   size_t sz, bytes, n;
@@ -509,9 +457,7 @@ static int cl_memset(gpudata *dst, int data) {
     return GA_IMPL_ERROR;
   }
 
-#ifdef GA_OFFSET
-  bytes -= dst->offset;
-#endif
+  bytes -= offset;
 
   if (bytes == 0) return GA_NO_ERROR;
 
@@ -519,51 +465,33 @@ static int cl_memset(gpudata *dst, int data) {
                                 &ctx, NULL)) != CL_SUCCESS)
     return GA_IMPL_ERROR;
 
-  /* XXX: Full of fail, we need a loop or big array will have only
-          part of them memsetted */
-
   if ((bytes % 16) == 0) {
     r = snprintf(local_kern, sizeof(local_kern),
                  "__kernel void kmemset(unsigned int n, __global uint4 *mem) {"
-                 "unsigned int i;"
-#ifdef GA_OFFSET
-                 "mem += %" SPREFIX "d;"
-#endif
+                 "unsigned int i; __global char *tmp = (__global char *)mem;"
+                 "tmp += %" SPREFIX "u; mem = (__global uint4 *)tmp;"
                  "for (i = get_global_id(0); i < n; i += get_global_size(0)) {"
                  "mem[i] = (uint4)(%u,%u,%u,%u); }}",
-#ifdef GA_OFFSET
-                 dst->offset,
-#endif
-                 pattern, pattern, pattern, pattern);
+                 offset, pattern, pattern, pattern, pattern);
     n = bytes/16;
   } else if ((bytes % 8) == 0) {
     r = snprintf(local_kern, sizeof(local_kern),
                  "__kernel void kmemset(unsigned int n, __global uint2 *mem) {"
-                 "unsigned int i;"
-#ifdef GA_OFFSET
-                 "mem += %" SPREFIX "d;"
-#endif
+                 "unsigned int i; __global char *tmp = (__global char *)mem;"
+                 "tmp += %" SPREFIX "u; mem = (__global uint2 *)tmp;"
                  "for (i = get_global_id(0); i < n; i += get_global_size(0)) {"
                  "mem[i] = (uint2)(%u,%u); }}",
-#ifdef GA_OFFSET
-                 dst->offset,
-#endif
-                 pattern, pattern);
+                 offset, pattern, pattern);
     n = bytes/8;
   } else if ((bytes % 4) == 0) {
     r = snprintf(local_kern, sizeof(local_kern),
                  "__kernel void kmemset(unsigned int n,"
                  "__global unsigned int *mem) {"
-                 "unsigned int i;"
-#ifdef GA_OFFSET
-                 "mem += %" SPREFIX "d;"
-#endif
+                 "unsigned int i; __global char *tmp = (__global char *)mem;"
+                 "tmp += %" SPREFIX "u; mem = (__global unsigned int *)tmp;"
                  "for (i = get_global_id(0); i < n; i += get_global_size(0)) {"
                  "mem[i] = %u; }}",
-#ifdef GA_OFFSET
-                 dst->offset,
-#endif
-                 pattern);
+                 offset, pattern);
     n = bytes/4;
   } else {
     if (check_ext(ctx, CL_SMALL))
@@ -571,16 +499,10 @@ static int cl_memset(gpudata *dst, int data) {
     r = snprintf(local_kern, sizeof(local_kern),
                  "__kernel void kmemset(unsigned int n,"
                  "__global unsigned char *mem) {"
-                 "unsigned int i;"
-#ifdef GA_OFFSET
-                 "mem += %" SPREFIX "d;"
-#endif
+                 "unsigned int i; mem += %" SPREFIX "u;"
                  "for (i = get_global_id(0); i < n; i += get_global_size(0)) {"
                  "mem[i] = %u; }}",
-#ifdef GA_OFFSET
-                 dst->offset,
-#endif
-                 val);
+                 offset, val);
     n = bytes;
   }
   /* If this assert fires, increase the size of local_kern above. */
@@ -600,40 +522,6 @@ static int cl_memset(gpudata *dst, int data) {
  fail:
   cl_freekernel(m);
   return res;
-}
-
-static int cl_offset(gpudata *b, ssize_t off) {
-#ifdef GA_OFFSET
-  b->offset += off;
-#else
-  cl_mem buf;
-  int do_release = 0;
-  cl_buffer_region r;
-  err = clGetMemObjectInfo(b->buf, CL_MEM_OFFSET, sizeof(r.origin), &r.origin,
-                           NULL);
-  if (err != CL_SUCCESS) return GA_IMPL_ERROR;
-  err = clGetMemObjectInfo(b->buf, CL_MEM_SIZE, sizeof(r.size), &r.size, NULL);
-  if (err != CL_SUCCESS) return GA_IMPL_ERROR;
-  err = clGetMemObjectInfo(b->buf, CL_MEM_ASSOCIATED_MEMOBJECT, sizeof(buf),
-                           &buf, NULL);
-  if (err != CL_SUCCESS) return GA_IMPL_ERROR;
-  if (buf == NULL) {
-    buf = b->buf;
-    do_release = 1;
-  }
-
-  r.size -= off;
-  r.origin += off;
-
-  b->buf = clCreateSubBuffer(buf, CL_MEM_READ_WRITE,
-                             CL_BUFFER_CREATE_TYPE_REGION, &r, &err);
-  if (err != CL_SUCCESS) {
-      b->buf = buf;
-      return GA_IMPL_ERROR;
-  }
-  if (do_release) clReleaseMemObject(buf);
-#endif
-  return GA_NO_ERROR;
 }
 
 static int cl_check_extensions(const char **preamble, unsigned int *count,
@@ -763,9 +651,6 @@ static int cl_setkernelarg(gpukernel *k, unsigned int index, int typecode,
 }
 
 static int cl_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
-#ifdef GA_OFFSET
-  if (b->offset != 0) return GA_DEVSUP_ERROR;
-#endif
   return cl_setkernelarg(k, index, GA_DELIM, &b->buf);
 }
 
@@ -806,11 +691,11 @@ static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
   "#define DTYPEB %s\n"
   "__kernel void elemk(__global const DTYPEA *a_data,"
   "                    __global DTYPEB *b_data){"
-#ifdef GA_OFFSET
-  "a_data += %" SPREFIX "d; b_data += %" SPREFIX "d;"
-#endif
   "const int idx = get_global_id(0);"
   "const int numThreads = get_global_size(0);"
+  "__global char *tmp; tmp = (__global char *)a_data; tmp += %" SPREFIX "u;"
+  "a_data = (__global const DTYPEA *)tmp; tmp = (__global char *)b_data;"
+  "tmp += %" SPREFIX "u; b_data = (__global DTYPEB *)tmp;"
   "for (int i = idx; i < %" SPREFIX "u; i+= numThreads) {"
   "__global const char *a_p = (__global const char *)a_data;"
   "__global char *b_p = (__global char *)b_data;";
@@ -820,8 +705,8 @@ static const char ELEM_FOOTER[] =
   "__global DTYPEB *b = (__global DTYPEB *)b_p;"
   "b[0] = a[0];}}\n";
 
-static int cl_extcopy(gpudata *input, gpudata *output, int intype,
-                      int outtype, unsigned int a_nd,
+static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t ooff,
+                      int intype, int outtype, unsigned int a_nd,
                       const size_t *a_dims, const ssize_t *a_str,
                       unsigned int b_nd, const size_t *b_dims,
                       const ssize_t *b_str) {
@@ -867,11 +752,7 @@ static int cl_extcopy(gpudata *input, gpudata *output, int intype,
   if (asprintf(&strs[count], ELEM_HEADER,
 	       compyte_get_type(intype)->cluda_name,
 	       compyte_get_type(outtype)->cluda_name,
-#ifdef GA_OFFSET
-	       input->offset/compyte_get_elsize(intype),
-	       output->offset/compyte_get_elsize(outtype),
-#endif
-	       nEls) == -1)
+           ooff, ioff, nEls) == -1)
     goto fail;
   count++;
   
@@ -920,7 +801,6 @@ compyte_buffer_ops opencl_ops = {cl_init,
                                  cl_read,
                                  cl_write,
                                  cl_memset,
-                                 cl_offset,
                                  cl_newkernel,
                                  cl_freekernel,
                                  cl_setkernelarg,
