@@ -3,7 +3,6 @@ PROJECT(compyte C)
 include(CheckFunctionExists)
 
 cmake_minimum_required(VERSION 2.8)
-#set(CMAKE_VERBOSE_MAKEFILE true)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} .)
 
 #################################################
@@ -11,6 +10,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} .)
 #################################################
 set(COMPYTE_SHARED True)
 
+set(CMAKE_OSX_ARCHITECTURES i386 x86_64)
+set(CMAKE_OSX_SYSROOT /)
 
 find_package(CUDA)
 find_package(OpenCL)
