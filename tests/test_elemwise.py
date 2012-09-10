@@ -26,6 +26,7 @@ def test_elemwise1_ops_array():
             yield elemwise1_ops_array, op, dtype
 
 
+@guard_devsup
 def elemwise1_ops_array(op, dtype):
     c, g = gen_gpuarray((50,), dtype, kind=kind, ctx=context)
 
