@@ -17,6 +17,7 @@ KERNEL void ${name}(const unsigned int n
 % for arg in arguments:
     % if arg.isarray():
                     , ${arg.decltype()} ${arg.name}_data
+                    , const unsigned int ${arg.name}_offset
         % for d in range(nd):
                     , const int ${arg.name}_str_${d}
         % endfor
@@ -28,6 +29,14 @@ KERNEL void ${name}(const unsigned int n
   const unsigned int idx = LDIM_0 * GID_0 + LID_0;
   const unsigned int numThreads = LDIM_0 * GDIM_0;
   unsigned int i;
+  char *tmp;
+
+% for arg in arguments:
+  % if arg.isarray():
+  tmp = (char *)${arg.name}_data; tmp += ${arg.name}_offset;
+  ${arg.name}_data = (${arg.decltype()})tmp;
+  % endif
+% endfor
 
   for (i = idx; i < n; i += numThreads) {
     int ii = i;
@@ -65,11 +74,22 @@ ${preamble}
 KERNEL void ${name}(const unsigned int n
 % for arg in arguments:
                     , ${arg.decltype()} ${arg.name}
+  % if arg.isarray():
+                    , const unsigned int ${arg.name}_offset
+  % endif
 % endfor
 ) {
   const unsigned int idx = LDIM_0 * GID_0 + LID_0;
   const unsigned int numThreads = LDIM_0 * GDIM_0;
   unsigned int i;
+  char *tmp;
+
+% for arg in arguments:
+  % if arg.isarray():
+  tmp = (char *)${arg.name}; tmp += ${arg.name}_offset;
+  ${arg.name} = (${arg.decltype()})tmp;
+  % endif
+% endfor
 
   for (i = idx; i < n; i += numThreads) {
     ${expression};
@@ -97,6 +117,14 @@ KERNEL void ${name}(
   const unsigned int idx = LDIM_0 * GID_0 + LID_0;
   const unsigned int numThreads = LDIM_0 * GDIM_0;
   unsigned int i;
+  char * tmp;
+
+% for i, arg in enumerate(arguments):
+  % if arg.isarray():
+  tmp = (char *)${arg.name}_data; tmp += ${offsets[i]};
+  ${arg.name}_data = (${arg.decltype()})tmp;
+  % endif
+% endfor
 
   for (i = idx; i < ${n}; i += numThreads) {
     int ii = i;
@@ -188,12 +216,17 @@ class ElemwiseKernel(object):
         self._speckey = None
         self._cache_basic = {}
 
-    def prepare_args_contig(self, args):
-        self.kernel_args = list(args)
-        self.kernel_args.insert(0, numpy.asarray(self.n, 'uint32'))
+    def prepare_args_contig(self, args, offsets):
+        kernel_args = []
+        for i, arg in enumerate(args):
+            kernel_args.append(arg)
+            if isinstance(arg, gpuarray.GpuArray):
+                kernel_args.append(numpy.asarray(offsets[i], dtype='uint32'))
+        self.kernel_args = kernel_args
+        self.kernel_args.insert(0, numpy.asarray(self.n, dtype='uint32'))
 
-    def get_basic(self, args, nd, dims):
-        self.prepare_args_basic(args, dims)
+    def get_basic(self, args, nd, dims, offsets):
+        self.prepare_args_basic(args, dims, offsets)
         if nd not in self._cache_basic:
             src = basic_kernel.render(preamble=self.preamble, name="elemk",
                                       nd=nd, arguments=self.arguments,
@@ -205,11 +238,12 @@ class ElemwiseKernel(object):
                                                        **self.flags)
         return self._cache_basic[nd]
 
-    def prepare_args_basic(self, args, dims):
+    def prepare_args_basic(self, args, dims, offsets):
         kernel_args = []
-        for arg in args:
+        for i, arg in enumerate(args):
             if isinstance(arg, gpuarray.GpuArray):
                 kernel_args.append(arg),
+                kernel_args.append(numpy.asarray(offsets[i], dtype='uint32'))
                 kernel_args.extend(numpy.asarray(s, dtype='int32')
                                    for s in arg.strides)
             else:
@@ -222,13 +256,14 @@ class ElemwiseKernel(object):
 
         self.kernel_args = kernel_args
 
-    def get_specialized(self, args, nd, dims, strs):
+    def get_specialized(self, args, nd, dims, strs, offsets):
         self.prepare_args_specialized(args)
         src = specialized_kernel.render(preamble=self.preamble,
                                         name="elemk", n=self.n, nd=nd,
                                         dim=dims, strs=strs,
                                         arguments=self.arguments,
-                                        expression=self.expression)
+                                        expression=self.expression,
+                                        offsets=offsets)
         return gpuarray.GpuKernel(src, "elemk", kind=self.kind,
                                   context=self.context, cluda=True,
                                   **self.flags)
@@ -239,12 +274,15 @@ class ElemwiseKernel(object):
     def check_args(self, args):
         arrays = []
         strs = []
+        offsets = []
         for arg in args:
             if isinstance(arg, gpuarray.GpuArray):
                 strs.append(arg.strides)
+                offsets.append(arg.offset)
                 arrays.append(arg)
             else:
                 strs.append(None)
+                offsets.append(None)
 
         if len(arrays) < 1:
             raise ArugmentError("No arrays in kernel arguments, "
@@ -261,12 +299,12 @@ class ElemwiseKernel(object):
             f_contig = f_contig and ary.flags['F_CONTIGUOUS']
 
         self.n = n
-        return nd, dims, strs, c_contig or f_contig
+        return nd, dims, strs, offsets, c_contig or f_contig
 
     def select_kernel(self, args):
-        nd, dims, strs, contig = self.check_args(args)
+        nd, dims, strs, offsets, contig = self.check_args(args)
         if contig:
-            self.prepare_args_contig(args)
+            self.prepare_args_contig(args, offsets)
             return self.contig_k
 
         # If you call self._spec_limit times (default: 3) in a row
@@ -281,7 +319,8 @@ class ElemwiseKernel(object):
             else:
                 self._numcall += 1
                 if self._numcall > self._spec_limit:
-                    self._speck = self.get_specialized(args, nd, dims, strs)
+                    self._speck = self.get_specialized(args, nd, dims, strs,
+                                                       offsets)
                     return self._speck
         else:
             self._speckey = key
@@ -289,10 +328,10 @@ class ElemwiseKernel(object):
             self._numcall = 1
 
         if nd not in self._cache:
-            k = self.get_basic(args, nd, dims)
+            k = self.get_basic(args, nd, dims, offsets)
             self._cache[nd] = k
             return k
-        self.prepare_args_basic(args, dims)
+        self.prepare_args_basic(args, dims, offsets)
         return self._cache[nd]
 
     def prepare(self, *args):
