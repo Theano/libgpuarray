@@ -54,9 +54,18 @@ if(NOT HAVE_MKSTEMP)
 endif()
 
 if(CUDA_FOUND)
+  if (APPLE)
+    FIND_LIBRARY(CUDADRV_LIBRARY CUDA)
+    FIND_PATH(CUDADRV_INCLUDE CUDA/cuda.h)
+  endif()
+  if(NOT CUDADRV_LIBRARY)
+    SET(CUDADRV_LIBRARY ${CUDA_CUDA_LIBRARY})
+    SET(CUDADRV_INCLUDE ${CUDA_TOOLKIT_INCLUDE})
+  endif()
+
   set(COMPYTE_SRC ${COMPYTE_SRC} compyte_buffer_cuda.c)
   add_definitions(-DNVCC_BIN="${CUDA_NVCC_EXECUTABLE}" -DWITH_CUDA)
-  include_directories("${CUDA_TOOLKIT_INCLUDE}")
+  include_directories("${CUDADRV_INCLUDE}")
 endif()
 
 if(OPENCL_FOUND)
@@ -73,7 +82,7 @@ else()
 endif()
 
 if(CUDA_FOUND)
-  target_link_libraries(compyte ${CUDA_CUDA_LIBRARY})
+  target_link_libraries(compyte ${CUDADRV_LIBRARY})
 endif()
 
 if(OPENCL_FOUND)

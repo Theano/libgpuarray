@@ -35,7 +35,11 @@
 #include <unistd.h>
 #endif
 
+#ifdef __APPLE__
+#include <CUDA/cuda.h>
+#else
 #include <cuda.h>
+#endif
 
 #include "compyte_buffer.h"
 #include "compyte_util.h"
