@@ -29,11 +29,11 @@ KERNEL void ${name}(const unsigned int n
   const unsigned int idx = LDIM_0 * GID_0 + LID_0;
   const unsigned int numThreads = LDIM_0 * GDIM_0;
   unsigned int i;
-  char *tmp;
+  GLOBAL_MEM char *tmp;
 
 % for arg in arguments:
   % if arg.isarray():
-  tmp = (char *)${arg.name}_data; tmp += ${arg.name}_offset;
+  tmp = (GLOBAL_MEM char *)${arg.name}_data; tmp += ${arg.name}_offset;
   ${arg.name}_data = (${arg.decltype()})tmp;
   % endif
 % endfor
@@ -82,11 +82,11 @@ KERNEL void ${name}(const unsigned int n
   const unsigned int idx = LDIM_0 * GID_0 + LID_0;
   const unsigned int numThreads = LDIM_0 * GDIM_0;
   unsigned int i;
-  char *tmp;
+  GLOBAL_MEM char *tmp;
 
 % for arg in arguments:
   % if arg.isarray():
-  tmp = (char *)${arg.name}; tmp += ${arg.name}_offset;
+  tmp = (GLOBAL_MEM char *)${arg.name}; tmp += ${arg.name}_offset;
   ${arg.name} = (${arg.decltype()})tmp;
   % endif
 % endfor
@@ -117,11 +117,11 @@ KERNEL void ${name}(
   const unsigned int idx = LDIM_0 * GID_0 + LID_0;
   const unsigned int numThreads = LDIM_0 * GDIM_0;
   unsigned int i;
-  char * tmp;
+  GLOBAL_MEM char *tmp;
 
 % for i, arg in enumerate(arguments):
   % if arg.isarray():
-  tmp = (char *)${arg.name}_data; tmp += ${offsets[i]};
+  tmp = (GLOBAL_MEM char *)${arg.name}_data; tmp += ${offsets[i]};
   ${arg.name}_data = (${arg.decltype()})tmp;
   % endif
 % endfor
