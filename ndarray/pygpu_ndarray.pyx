@@ -207,18 +207,23 @@ cdef dict NP_TO_TYPE = {
 
 cdef dict TYPE_TO_NP = dict((v, k) for k, v in NP_TO_TYPE.iteritems())
 
-def register_dtype(np.dtype dtype, cname, size_t size, size_t align):
+def register_dtype(np.dtype dtype, cname):
     cdef compyte_type *t
     cdef int typecode
 
     t = <compyte_type *>malloc(sizeof(compyte_type))
     if t == NULL:
         raise MemoryError("Can't allocate new type")
-    t.cluda_name = cname
-    t.size = size
-    t.align = align
+    t.cluda_name = <char *>malloc(len(cname)+1)
+    if t.cluda_name == NULL:
+        free(t)
+        raise MemoryError
+    memcpy(t.cluda_name, <char *>cname, len(cname)+1)
+    t.size = dtype.itemsize
+    t.align = dtype.alignment
     typecode = compyte_register_type(t, NULL)
     if typecode == -1:
+        free(t.cluda_name)
         free(t)
         raise RuntimeError("Could not register type")
     NP_TO_TYPE[dtype] = typecode
