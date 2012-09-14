@@ -637,6 +637,7 @@ cdef class GpuArray:
     cdef _GpuArray ga
     cdef void *ctx
     cdef readonly object base
+    cdef object __weakref__
 
     def __dealloc__(self):
         array_clear(self)
