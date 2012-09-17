@@ -76,7 +76,7 @@ def check_all(x, y):
 
 def gen_gpuarray(shape_orig, dtype='float32', offseted_outer=False,
                  offseted_inner=False, sliced=1, order='c', nozeros=False,
-                 incr=0, kind=None, ctx=None):
+                 incr=0, kind=None, ctx=None, cls=None):
     if sliced is True:
         sliced = 2
     elif sliced is False:
@@ -100,7 +100,7 @@ def gen_gpuarray(shape_orig, dtype='float32', offseted_outer=False,
     assert order in ['c', 'f']
     if order == 'f' and len(shape) > 0:
         a = numpy.asfortranarray(a)
-    b = gpuarray.array(a, context=ctx, kind=kind)
+    b = gpuarray.array(a, context=ctx, kind=kind, cls=cls)
     if order == 'f' and len(shape) > 0 and b.size > 1:
         assert b.flags['F_CONTIGUOUS']
 

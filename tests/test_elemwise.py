@@ -2,6 +2,7 @@ import operator
 import numpy
 
 from ..ndarray import pygpu_ndarray as gpuarray
+from ..array import gpuarray as elemary
 from ..elemwise import ElemwiseKernel
 
 from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
@@ -28,7 +29,7 @@ def test_elemwise1_ops_array():
 
 @guard_devsup
 def elemwise1_ops_array(op, dtype):
-    c, g = gen_gpuarray((50,), dtype, kind=kind, ctx=context)
+    c, g = gen_gpuarray((50,), dtype, kind=kind, ctx=context, cls=elemary)
 
     out_c = op(c)
     out_g = op(g)
@@ -54,8 +55,9 @@ def test_ielemwise2_ops_array():
 
 @guard_devsup
 def elemwise2_ops_array(op, dtype1, dtype2, shape):
-    ac, ag = gen_gpuarray(shape, dtype1, kind=kind, ctx=context)
-    bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, kind=kind, ctx=context)
+    ac, ag = gen_gpuarray(shape, dtype1, kind=kind, ctx=context, cls=elemary)
+    bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, kind=kind, ctx=context,
+                          cls=elemary)
 
     out_c = op(ac, bc)
     out_g = op(ag, bg)
@@ -71,8 +73,10 @@ def ielemwise2_ops_array(op, dtype1, dtype2, shape):
     if op == operator.isub and dtype1[0] == 'u':
         # array elements are smaller than 10 by default, so we avoid underflow
         incr = 10
-    ac, ag = gen_gpuarray(shape, dtype1, incr=incr, kind=kind, ctx=context)
-    bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, kind=kind, ctx=context)
+    ac, ag = gen_gpuarray(shape, dtype1, incr=incr, kind=kind, ctx=context,
+                          cls=elemary)
+    bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, kind=kind, ctx=context,
+                          cls=elemary)
 
     out_c = op(ac, bc)
     out_g = op(ag, bg)
@@ -107,8 +111,6 @@ def elemwise_layouts(shape, offseted_outer, offseted_inner, sliced, order):
     # first call should use the basic version is most cases
     k(ag, bg, outg)
     outc = ac + bc
-    if not numpy.allclose(numpy.asarray(outg), outc):
-        import pdb; pdb.set_trace()
     assert numpy.allclose(numpy.asarray(outg), outc)
     # second call should use the specialized version in most cases
     outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
@@ -132,7 +134,7 @@ def test_ielemwise2_ops_mixed():
 
 @guard_devsup
 def elemwise2_ops_mixed(op, dtype, shape, elem):
-    c, g = gen_gpuarray(shape, dtype, kind=kind, ctx=context)
+    c, g = gen_gpuarray(shape, dtype, kind=kind, ctx=context, cls=elemary)
 
     out_c = op(c, elem)
     out_g = op(g, elem)
@@ -141,7 +143,8 @@ def elemwise2_ops_mixed(op, dtype, shape, elem):
     assert out_c.dtype == out_g.dtype
     assert numpy.allclose(out_c, numpy.asarray(out_g))
 
-    c, g = gen_gpuarray(shape, dtype, nozeros=True, kind=kind, ctx=context)
+    c, g = gen_gpuarray(shape, dtype, nozeros=True, kind=kind, ctx=context,
+                        cls=elemary)
     out_c = op(elem, c)
     out_g = op(elem, g)
 
@@ -156,7 +159,8 @@ def ielemwise2_ops_mixed(op, dtype, shape, elem):
     if op == operator.isub and dtype[0] == 'u':
         # array elements are smaller than 10 by default, so we avoid underflow
         incr = 10
-    c, g = gen_gpuarray(shape, dtype, incr=incr, kind=kind, ctx=context)
+    c, g = gen_gpuarray(shape, dtype, incr=incr, kind=kind, ctx=context,
+                        cls=elemary)
 
     out_c = op(c, elem)
     out_g = op(g, elem)
@@ -178,8 +182,9 @@ def test_divmod():
 
 @guard_devsup
 def divmod_array(dtype1, dtype2, shape):
-    ac, ag = gen_gpuarray(shape, dtype1, kind=kind, ctx=context)
-    bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, kind=kind, ctx=context)
+    ac, ag = gen_gpuarray(shape, dtype1, kind=kind, ctx=context, cls=elemary)
+    bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, kind=kind, ctx=context,
+                          cls=elemary)
 
     out_c = divmod(ac, bc)
     out_g = divmod(ag, bg)
@@ -194,7 +199,8 @@ def divmod_array(dtype1, dtype2, shape):
 
 @guard_devsup
 def divmod_mixed(dtype, shape, elem):
-    c, g = gen_gpuarray(shape, dtype, nozeros=True, kind=kind, ctx=context)
+    c, g = gen_gpuarray(shape, dtype, nozeros=True, kind=kind, ctx=context,
+                        cls=elemary)
 
     out_c = divmod(c, elem)
     out_g = divmod(g, elem)
