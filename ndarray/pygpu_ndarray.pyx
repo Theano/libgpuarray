@@ -210,20 +210,22 @@ cdef dict TYPE_TO_NP = dict((v, k) for k, v in NP_TO_TYPE.iteritems())
 def register_dtype(np.dtype dtype, cname):
     cdef compyte_type *t
     cdef int typecode
+    cdef char *tmp
 
     t = <compyte_type *>malloc(sizeof(compyte_type))
     if t == NULL:
         raise MemoryError("Can't allocate new type")
-    t.cluda_name = <char *>malloc(len(cname)+1)
-    if t.cluda_name == NULL:
+    tmp = <char *>malloc(len(cname)+1)
+    if tmp == NULL:
         free(t)
         raise MemoryError
-    memcpy(t.cluda_name, <char *>cname, len(cname)+1)
+    memcpy(tmp, <char *>cname, len(cname)+1)
     t.size = dtype.itemsize
     t.align = dtype.alignment
+    t.cluda_name = tmp
     typecode = compyte_register_type(t, NULL)
     if typecode == -1:
-        free(t.cluda_name)
+        free(tmp)
         free(t)
         raise RuntimeError("Could not register type")
     NP_TO_TYPE[dtype] = typecode
@@ -532,7 +534,7 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
 
         if kind is not None and get_ops(kind) != arg.ga.ops:
             raise ValueError("cannot change the kind of an array")
-        if context is not None and get_ctx != arg.ctx:
+        if context is not None and get_ctx(context) != arg.ctx:
             raise ValueError("cannot copy an array to a different context")
 
         if (not copy
