@@ -1,6 +1,6 @@
 from mako.template import Template
 
-from tools import ScalarArg, ArrayArg
+from tools import ScalarArg, ArrayArg, as_argument
 from dtypes import parse_c_arg_backend
 
 import numpy
@@ -351,3 +351,61 @@ class ElemwiseKernel(object):
     def __call__(self, *args):
         k = self.select_kernel(args)
         k(*self.kernel_args, n=self.n)
+
+
+def elemwise1(a, op, oper=None, op_tmpl="res[i] = %(op)sa[i]"):
+    a_arg = as_argument(a, 'a')
+    args = [ArrayArg(a.dtype, 'res'), a_arg]
+    res = a._empty_like_me()
+
+    if oper is None:
+        oper = op_tmpl % {'op': op}
+
+    k = ElemwiseKernel(a.kind, a.context, args, oper)
+    k(res, a)
+    return res
+
+
+def elemwise2(a, op, b, ary, odtype=None, oper=None,
+              op_tmpl="res[i] = (%(out_t)s)%(a)s %(op)s (%(out_t)s)%(b)s"):
+    if not isinstance(a, gpuarray.GpuArray):
+        a = numpy.asarray(a)
+    if not isinstance(b, gpuarray.GpuArray):
+        b = numpy.asarray(b)
+    if out_dtype is None:
+        odtype = get_common_dtype(a, b, True)
+
+    a_arg = as_argument(a, 'a')
+    b_arg = as_argument(b, 'b')
+
+    args = [ArrayArg(odtype, 'res'), a_arg, b_arg]
+    res = ary._empty_like_me(dtype=odtype)
+
+    if oper is None:
+        oper = op_tmpl % {'a': a_arg.expr(), 'op': op, 'b': b_arg.expr(),
+                          'out_t': dtype_to_ctype(odtype)}
+
+    k = ElemwiseKernel(ary.kind, ary.context, args, oper)
+    k(res, a, b)
+    return res
+
+
+def ielemwise2(a, op, b, oper=None, op_tmpl="a[i] = a[i] %(op)s %(b)s"):
+    if not isintance(b, gpuarray.GpuArray):
+        b = numpy.asarray(b)
+
+    a_arg = as_argument(a, 'a')
+    b_arg = as_argument(b, 'b')
+
+    args = [a_arg, b_arg]
+
+    if oper is None:
+        oper = op_tmpl % {'op': op, 'b': b_arg.expr()}
+
+    k = ElemwiseKernel(a.kind, a.context, args, oper)
+    k(a, b)
+    return a
+
+def compare(a, op, b):
+    return elemwise2(a, op, b, a, out_dtype=numpy.dtype('bool'),
+                     op_tmpl="res[i] = (%(a)s %(op)s %(b)s)")
