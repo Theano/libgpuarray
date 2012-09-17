@@ -5,6 +5,7 @@ from dtypes import parse_c_arg_backend
 
 import numpy
 from ndarray import pygpu_ndarray as gpuarray
+from dtypes import dtype_to_ctype, get_np_obj, get_common_dtype
 
 # parameters: preamble, name, nd, arguments, expression
 basic_kernel = Template("""
@@ -372,7 +373,7 @@ def elemwise2(a, op, b, ary, odtype=None, oper=None,
         a = numpy.asarray(a)
     if not isinstance(b, gpuarray.GpuArray):
         b = numpy.asarray(b)
-    if out_dtype is None:
+    if odtype is None:
         odtype = get_common_dtype(a, b, True)
 
     a_arg = as_argument(a, 'a')
@@ -391,7 +392,7 @@ def elemwise2(a, op, b, ary, odtype=None, oper=None,
 
 
 def ielemwise2(a, op, b, oper=None, op_tmpl="a[i] = a[i] %(op)s %(b)s"):
-    if not isintance(b, gpuarray.GpuArray):
+    if not isinstance(b, gpuarray.GpuArray):
         b = numpy.asarray(b)
 
     a_arg = as_argument(a, 'a')
@@ -407,5 +408,5 @@ def ielemwise2(a, op, b, oper=None, op_tmpl="a[i] = a[i] %(op)s %(b)s"):
     return a
 
 def compare(a, op, b):
-    return elemwise2(a, op, b, a, out_dtype=numpy.dtype('bool'),
+    return elemwise2(a, op, b, a, odtype=numpy.dtype('bool'),
                      op_tmpl="res[i] = (%(a)s %(op)s %(b)s)")

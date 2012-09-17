@@ -80,9 +80,9 @@ def _fill_dtype_registry(respect_windows):
 
     # http://projects.scipy.org/numpy/ticket/2017
     if is_64_bit:
-        register_dtype(np.uintp, ["ga_ulong"], alias_ok=True)
+        register_dtype(np.uintp, ["ga_ulong"])
     else:
-        register_dtype(np.uintp, ["ga_uint"], alias_ok=True)
+        register_dtype(np.uintp, ["ga_uint"])
 
     register_dtype(np.float32, ["ga_float", "float"])
     register_dtype(np.float64, ["ga_double", "double"])
@@ -139,6 +139,31 @@ def parse_c_arg_backend(c_arg, scalar_arg_class, vec_arg_class):
 # }}}
 
 
+def get_np_obj(obj):
+    if isinstance(obj, np.ndarray) and obj.shape == ():
+        return obj
+    try:
+        return np.ones(1, dtype=obj.dtype)
+    except AttributeError:
+        return np.asarray(obj)
+
+
+def get_common_dtype(obj1, obj2, allow_double):
+    # Yes, numpy behaves differently depending on whether
+    # we're dealing with arrays or scalars.
+
+    np1 = get_np_obj(obj1)
+    np2 = get_np_obj(obj2)
+
+    result = (np1 + np2).dtype
+
+    if not allow_double:
+        if result == np.float64:
+            result = np.dtype(np.float32)
+        elif result == np.complex128:
+            result = np.dtype(np.complex64)
+
+    return result
 
 
 # vim: foldmethod=marker
