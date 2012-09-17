@@ -27,39 +27,30 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
+from ndarray import pygpu_ndarray as gpuarray
 import numpy as np
-
-
 
 
 # {{{ registry
 
-DTYPE_TO_NAME = {}
 NAME_TO_DTYPE = {}
 
-def register_dtype(dtype, c_names, alias_ok=False):
+def register_dtype(dtype, c_names):
     if isinstance(c_names, str):
         c_names = [c_names]
 
     dtype = np.dtype(dtype)
 
-    # check if pre-existing
+    # register if not already there
+    try:
+        gpuarray.dtype_to_ctype(dtype)
+    except ValueError:
+        gpuarray.register_dtype(dtype, c_names[0])
 
-    if not alias_ok and dtype in DTYPE_TO_NAME:
-        raise RuntimeError("dtype '%s' already registered (as '%s', new names '%s')" 
-                % (dtype, DTYPE_TO_NAME[dtype], ", ".join(c_names)))
     for nm in c_names:
         if nm in NAME_TO_DTYPE and NAME_TO_DTYPE[nm] != dtype:
             raise RuntimeError("name '%s' already registered" % nm)
-
-    for nm in c_names:
         NAME_TO_DTYPE[nm] = dtype
-
-    if not dtype in DTYPE_TO_NAME:
-        DTYPE_TO_NAME[dtype] = c_names[0]
-
-    if not str(dtype) in DTYPE_TO_NAME:
-        DTYPE_TO_NAME[str(dtype)] = c_names[0]
 
 def _fill_dtype_registry(respect_windows):
     from sys import platform
@@ -72,23 +63,26 @@ def _fill_dtype_registry(respect_windows):
     register_dtype(np.int32, ["ga_int", "int", "signed int"])
     register_dtype(np.uint32, ["ga_uint", "unsigned", "unsigned int"])
 
+    register_dtype(np.int64, ["ga_long"])
+    register_dtype(np.uint64, ["ga_ulong"])
     is_64_bit = tuple.__itemsize__ * 8 == 64
     if is_64_bit:
         if 'win32' in platform and respect_windows:
             i64_name = "long long"
         else:
             i64_name = "long"
-
-        register_dtype(np.int64, ["ga_long", i64_name, "%s int" % i64_name, "signed %s int" % i64_name,
-            "%s signed int" % i64_name])
-        register_dtype(np.uint64, ["ga_ulong", "unsigned %s" % i64_name, "unsigned %s int" % i64_name,
-            "%s unsigned int" % i64_name])
+        register_dtype(np.int64, [i64_name, "%s int" % i64_name,
+                                  "signed %s int" % i64_name,
+                                  "%s signed int" % i64_name])
+        register_dtype(np.uint64, ["unsigned %s" % i64_name,
+                                   "unsigned %s int" % i64_name,
+                                   "%s unsigned int" % i64_name])
 
     # http://projects.scipy.org/numpy/ticket/2017
     if is_64_bit:
-        register_dtype(np.uintp, ["ga_ulong", "unsigned %s" % i64_name], alias_ok=True)
+        register_dtype(np.uintp, ["ga_ulong"], alias_ok=True)
     else:
-        register_dtype(np.uintp, ["ga_uint", "unsigned"], alias_ok=True)
+        register_dtype(np.uintp, ["ga_uint"], alias_ok=True)
 
     register_dtype(np.float32, ["ga_float", "float"])
     register_dtype(np.float64, ["ga_double", "double"])
@@ -108,10 +102,7 @@ def dtype_to_ctype(dtype, with_fp_tex_hack=False):
         elif dtype == np.float64:
             return "fp_tex_double"
 
-    try:
-        return DTYPE_TO_NAME[dtype]
-    except KeyError:
-        raise ValueError, "unable to map dtype '%s'" % dtype
+    return gpuarray.dtype_to_ctype(dtype)
 
 # }}}
 
