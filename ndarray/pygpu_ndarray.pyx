@@ -413,14 +413,42 @@ def init(kind, int devno):
             raise GpuArrayException(ops.buffer_error())
     return <size_t>ctx
 
-def zeros(shape, dtype=GA_DOUBLE, order='A', context=None, kind=None):
-    res = empty(shape, dtype=dtype, order=order, context=context, kind=kind)
+def zeros(shape, dtype=GA_DOUBLE, order='A', context=None, kind=None,
+          cls=None):
+    res = empty(shape, dtype=dtype, order=order, context=context, kind=kind,
+                cls=cls)
     array_memset(res, 0)
     return res
 
-def empty(shape, dtype=GA_DOUBLE, order='A', context=None, kind=None):
-    return GpuArray(shape, dtype=dtype, order=order, context=context,
-                    kind=kind)
+def empty(shape, dtype=GA_DOUBLE, order='A', context=None, kind=None,
+          cls=None):
+    cdef void *ctx
+    cdef compyte_buffer_ops *ops
+    cdef size_t *cdims
+    cdef GpuArray res
+
+    if kind is None:
+        ops = GpuArray_ops
+    else:
+        ops = get_ops(kind)
+
+    if context is None:
+        ctx = GpuArray_ctx
+    else:
+        ctx = get_ctx(context)
+
+    cdims = <size_t *>calloc(len(shape), sizeof(size_t))
+    if cdims == NULL:
+        raise MemoryError("could not allocate cdims")
+    try:
+        for i, d in enumerate(shape):
+            cdims[i] = d
+        res = new_GpuArray(ctx, cls)
+        array_empty(res, ops, ctx, dtype_to_typecode(dtype),
+                    <unsigned int>len(shape), cdims, to_ga_order(order))
+    finally:
+        free(cdims)
+    return res
 
 def asarray(a, dtype=None, order=None, context=None, kind=None):
     return array(a, dtype=dtype, order=order, copy=False, context=context,
@@ -438,7 +466,7 @@ def may_share_memory(GpuArray a not None, GpuArray b not None):
     return array_share(a, b)
 
 def from_gpudata(size_t data, offset, dtype, shape, kind=None, context=None,
-                 strides=None, writable=True, base=None):
+                 strides=None, writable=True, base=None, cls=None):
     cdef GpuArray res
     cdef compyte_buffer_ops *ops
     cdef void *ctx
@@ -480,7 +508,7 @@ def from_gpudata(size_t data, offset, dtype, shape, kind=None, context=None,
                 strides[i] = size
                 size *= cdims[i]
 
-        res = new_GpuArray(ctx)
+        res = new_GpuArray(ctx, cls)
         array_fromdata(res, ops, <gpudata *>data, offset, typecode, nd, cdims,
                        cstrides, <int>(1 if writable else 0))
         res.base = base
@@ -490,7 +518,7 @@ def from_gpudata(size_t data, offset, dtype, shape, kind=None, context=None,
     return res
 
 def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
-          context=None):
+          context=None, cls=None):
     cdef GpuArray res
     cdef GpuArray arg
     cdef GpuArray tmp
@@ -500,16 +528,20 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
     cdef ga_order ord
 
     if isinstance(proto, GpuArray):
-        if kind is not None or context is not None:
-            raise ValueError("cannot copy GpuArray to a different context")
-
         arg = proto
-        if not copy and \
-                (dtype is None or np.dtype(dtype) == arg.dtype) and \
-                (arg.ga.nd >= ndmin) and \
-                (order is None or order == 'A' or
+
+        if kind is not None and get_ops(kind) != arg.ga.ops:
+            raise ValueError("cannot change the kind of an array")
+        if context is not None and get_ctx != arg.ctx:
+            raise ValueError("cannot copy an array to a different context")
+
+        if (not copy
+            and (dtype is None or np.dtype(dtype) == arg.dtype)
+            and (arg.ga.nd >= ndmin)
+            and (order is None or order == 'A' or
                  (order == 'C' and py_CHKFLAGS(arg, GA_C_CONTIGUOUS)) or
-                 (order == 'F' and py_CHKFLAGS(arg, GA_F_CONTIGUOUS))):
+                 (order == 'F' and py_CHKFLAGS(arg, GA_F_CONTIGUOUS)))
+            and (cls is None or proto.__class__ is cls)):
             return arg
         shp = arg.shape
         if len(shp) < ndmin:
@@ -520,8 +552,10 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
                 order = 'C'
             elif py_CHKFLAGS(arg, GA_F_CONTIGUOUS):
                 order = 'F'
-        res = GpuArray(shp, dtype=(dtype or arg.dtype), order=order,
-                       context=ctx_object(arg.ctx), kind=ops_kind(arg.ga.ops))
+        if cls is None:
+            cls = proto.__class__
+        res = empty(shp, dtype=(dtype or arg.dtype), order=order, cls=cls,
+                    kind=ops_kind(arg.ga.ops), context=ctx_object(arg.ctx))
         if len(shp) < ndmin:
             tmp = res[idx]
         else:
@@ -552,14 +586,18 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
     else:
         ord = GA_C_ORDER
 
-    res = new_GpuArray(ctx)
+    res = new_GpuArray(ctx, cls)
     array_empty(res, ops, ctx, dtype_to_typecode(a.dtype),
                 np.PyArray_NDIM(a), <size_t *>np.PyArray_DIMS(a), ord)
     array_write(res, np.PyArray_DATA(a), np.PyArray_NBYTES(a))
     return res
 
-cdef new_GpuArray(void *ctx):
-    cdef GpuArray res = GpuArray.__new__(GpuArray)
+cdef GpuArray new_GpuArray(void *ctx, cls):
+    cdef GpuArray res
+    if cls is None or cls is GpuArray:
+        res = GpuArray.__new__(GpuArray)
+    else:
+        res = GpuArray.__new__(cls)
     res.ctx = ctx
     return res
 
@@ -642,31 +680,9 @@ cdef class GpuArray:
     def __dealloc__(self):
         array_clear(self)
 
-    def __init__(self, shape, dtype=GA_DOUBLE, order='A', kind=None,
-                 context=None):
-        cdef size_t *cdims
-        cdef compyte_buffer_ops *ops
-
-        if kind is None:
-            ops = GpuArray_ops
-        else:
-            ops = get_ops(kind)
-
-        if context is None:
-            self.ctx = GpuArray_ctx
-        else:
-            self.ctx = get_ctx(context)
-
-        cdims = <size_t *>calloc(len(shape), sizeof(size_t))
-        if cdims == NULL:
-            raise MemoryError("could not allocate cdims")
-        try:
-            for i, d in enumerate(shape):
-                cdims[i] = d
-            array_empty(self, ops, self.ctx, dtype_to_typecode(dtype),
-                        <unsigned int>len(shape), cdims, to_ga_order(order))
-        finally:
-            free(cdims)
+    def __init__(self):
+        if type(self) is GpuArray:
+            raise RuntimeError("Called raw GpuArray.__init__")
 
     cdef __index_helper(self, key, unsigned int i, ssize_t *start,
                         ssize_t *stop, ssize_t *step):
@@ -717,21 +733,10 @@ cdef class GpuArray:
     def _empty_like_me(self, dtype=None, order='C'):
         cdef int typecode
         cdef GpuArray res
-        if dtype is None:
-            typecode = self.ga.typecode
-        else:
-            typecode = dtype_to_typecode(dtype)
-        res = new_GpuArray(self.ctx)
-        array_empty(res, self.ga.ops, self.ctx, typecode,
-                    self.ga.nd, self.ga.dimensions, to_ga_order(order))
-        return res
-
-    def copy(self, order='C'):
-        cdef GpuArray res = new_GpuArray(self.ctx)
         cdef ga_order ord = to_ga_order(order)
-        # XXX: support numpy order='K'
-        # (which means: exactly the same layout as the source)
 
+        # XXX: support numpy order='K'
+        # (which means: as close as possible to the layout of the source)
         if ord == GA_ANY_ORDER:
             if py_CHKFLAGS(self, GA_F_CONTIGUOUS) and \
                     not py_CHKFLAGS(self, GA_C_CONTIGUOUS):
@@ -739,8 +744,19 @@ cdef class GpuArray:
             else:
                 ord = GA_C_ORDER
 
-        array_empty(res, self.ga.ops, self.ctx, self.ga.typecode,
+        if dtype is None:
+            typecode = self.ga.typecode
+        else:
+            typecode = dtype_to_typecode(dtype)
+
+        res = new_GpuArray(self.ctx, self.__class__)
+        array_empty(res, self.ga.ops, self.ctx, typecode,
                     self.ga.nd, self.ga.dimensions, ord)
+        return res
+
+    def copy(self, order='C'):
+        cdef GpuArray res
+        res = self._empty_like_me(order=order)
         array_move(res, self)
         return res
 
@@ -753,8 +769,8 @@ cdef class GpuArray:
         else:
             return self.copy()
 
-    def view(self):
-        cdef GpuArray res = new_GpuArray(self.ctx)
+    def view(self, cls=None):
+        cdef GpuArray res = new_GpuArray(self.ctx, cls)
         array_view(res, self)
         base = self
         while base.base is not None:
@@ -767,21 +783,12 @@ cdef class GpuArray:
         cdef int typecode = dtype_to_typecode(dtype)
         cdef ga_order ord = to_ga_order(order)
 
-        if ord == GA_ANY_ORDER:
-            if py_CHKFLAGS(self, GA_F_CONTIGUOUS) and \
-                    not py_CHKFLAGS(self, GA_C_CONTIGUOUS):
-                ord = GA_F_ORDER
-            else:
-                ord = GA_C_ORDER
-
         if (not copy and typecode == self.ga.typecode and
             ((py_CHKFLAGS(self, GA_F_CONTIGUOUS) and ord == GA_F_ORDER) or
              (py_CHKFLAGS(self, GA_C_CONTIGUOUS) and ord == GA_C_ORDER))):
             return self
 
-        res = new_GpuArray(self.ctx)
-        array_empty(res, self.ga.ops, self.ctx, typecode,
-                    self.ga.nd, self.ga.dimensions, ord)
+        res = self._empty_like_me(dtype=typecode, order=order)
         array_move(res, self)
         return res
 
@@ -841,7 +848,7 @@ cdef class GpuArray:
                 stops[i] = self.ga.dimensions[i]
                 steps[i] = 1
 
-            res = new_GpuArray(self.ctx)
+            res = new_GpuArray(self.ctx, self.__class__)
             array_index(res, self, starts, stops, steps)
         finally:
             free(starts)
