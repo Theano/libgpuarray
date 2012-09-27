@@ -78,10 +78,14 @@ def _fill_dtype_registry(respect_windows):
                                    "unsigned %s int" % i64_name,
                                    "%s unsigned int" % i64_name])
 
+    # According to this uintp may not have the same hash as uint32:
     # http://projects.scipy.org/numpy/ticket/2017
+    # Failing tests tell me this is the case for intp too.
     if is_64_bit:
+        register_dtype(np.intp, ["ga_long"])
         register_dtype(np.uintp, ["ga_ulong"])
     else:
+        register_dtype(np.intp, ["ga_int"])
         register_dtype(np.uintp, ["ga_uint"])
 
     register_dtype(np.float32, ["ga_float", "float"])
