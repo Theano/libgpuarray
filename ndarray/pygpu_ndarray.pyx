@@ -788,6 +788,9 @@ cdef class GpuArray:
             free(steps)
         return res
 
+    def __hash__(self):
+        raise TypeError("unhashable type '%s'"%self.__class__)
+
     def __nonzero__(self):
         cdef int sz = self.size
         if sz == 0:
