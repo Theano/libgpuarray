@@ -233,5 +233,5 @@ def test_elemwise_bool():
     assert e is not None
     a = gpuarray.zeros((1,), kind=kind, context=context)
     assert bool(a) == False
-    a = gpuarray.empty((), kind=kind, context=context)
+    a = gpuarray.zeros((), kind=kind, context=context)
     assert bool(a) == False
