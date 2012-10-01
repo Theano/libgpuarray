@@ -12,9 +12,9 @@
 #include <string.h>
 #include <errno.h>
 
-#include "compyte_array.h"
-#include "compyte_error.h"
-#include "compyte_util.h"
+#include "compyte/array.h"
+#include "compyte/error.h"
+#include "compyte/util.h"
 
 #define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
 

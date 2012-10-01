@@ -1,7 +1,7 @@
 #ifndef COMPYTE_ARRAY_H
 #define COMPYTE_ARRAY_H
 
-#include "compyte_buffer.h"
+#include <compyte/buffer.h>
 
 typedef struct _GpuArray {
   gpudata *data;

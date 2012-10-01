@@ -4,7 +4,7 @@ from tools import ScalarArg, ArrayArg, as_argument
 from dtypes import parse_c_arg_backend
 
 import numpy
-from ndarray import pygpu_ndarray as gpuarray
+import gpuarray
 from dtypes import dtype_to_ctype, get_np_obj, get_common_dtype
 
 # parameters: preamble, name, nd, arguments, expression

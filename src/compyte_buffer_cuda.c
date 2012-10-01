@@ -1,5 +1,5 @@
 #define _CRT_SECURE_NO_WARNINGS
-#include "compyte_compat.h"
+#include "compyte/compat.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -41,10 +41,10 @@
 #include <cuda.h>
 #endif
 
-#include "compyte_buffer.h"
-#include "compyte_util.h"
-#include "compyte_error.h"
-#include "compyte_extension.h"
+#include "compyte/buffer.h"
+#include "compyte/util.h"
+#include "compyte/error.h"
+#include "compyte/extension.h"
 
 typedef struct {char c; CUdeviceptr x; } st_devptr;
 #define DEVPTR_ALIGN (sizeof(st_devptr) - sizeof(CUdeviceptr))

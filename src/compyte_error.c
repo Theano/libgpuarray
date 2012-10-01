@@ -1,5 +1,5 @@
 #define _CRT_SECURE_NO_WARNINGS
-#include "compyte_error.h"
+#include "compyte/error.h"
 
 #include <string.h>
 #include <errno.h>

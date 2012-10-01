@@ -1,7 +1,7 @@
 #include <assert.h>
 
-#include "compyte_util.h"
-#include "compyte_error.h"
+#include "compyte/util.h"
+#include "compyte/error.h"
 
 static compyte_type **custom_types = NULL;
 static int n_types = 0;

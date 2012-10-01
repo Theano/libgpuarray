@@ -5,9 +5,9 @@ import numpy as np
 from elemwise import elemwise1, elemwise2, ielemwise2, compare, ElemwiseKernel
 from dtypes import dtype_to_ctype, get_np_obj, get_common_dtype
 from tools import as_argument, ArrayArg
-from ndarray import pygpu_ndarray as gpundarray
+import gpuarray as array
 
-class gpuarray(gpundarray.GpuArray):
+class gpuarray(array.GpuArray):
     ### add
     def __add__(self, other):
         return elemwise2(self, '+', other, self)
@@ -120,7 +120,7 @@ class gpuarray(gpundarray.GpuArray):
 
     ### divmod
     def __divmod__(self, other):
-        if not isinstance(other, gpundarray.GpuArray):
+        if not isinstance(other, array.GpuArray):
             other = np.asarray(other)
         odtype = get_common_dtype(self, other, True)
 
@@ -146,7 +146,7 @@ class gpuarray(gpundarray.GpuArray):
         return (div, mod)
 
     def __rdivmod__(self, other):
-        if not isinstance(other, gpundarray.GpuArray):
+        if not isinstance(other, array.GpuArray):
             other = np.asarray(other)
         odtype = get_common_dtype(other, self, True)
 

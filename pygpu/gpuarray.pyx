@@ -30,7 +30,7 @@ cdef extern from "Python.h":
                              Py_ssize_t *step,
                              Py_ssize_t *slicelength) except -1
 
-cdef extern from "compyte_types.h":
+cdef extern from "compyte/types.h":
     ctypedef struct compyte_type:
         const_char_p cluda_name
         size_t size
@@ -53,17 +53,17 @@ cdef extern from "compyte_types.h":
         GA_CDOUBLE,
         GA_NBASE
 
-cdef extern from "compyte_util.h":
+cdef extern from "compyte/util.h":
     int compyte_register_type(compyte_type *t, int *ret)
     size_t compyte_get_elsize(int typecode)
     compyte_type *compyte_get_type(int typecode)
 
-cdef extern from "compyte_error.h":
+cdef extern from "compyte/error.h":
     cdef enum ga_error:
         GA_NO_ERROR, GA_MEMORY_ERROR, GA_VALUE_ERROR, GA_IMPL_ERROR,
         GA_INVALID_ERROR, GA_UNSUPPORTED_ERROR, GA_SYS_ERROR, GA_RUN_ERROR
 
-cdef extern from "compyte_buffer.h":
+cdef extern from "compyte/buffer.h":
     ctypedef struct gpudata:
         pass
     ctypedef struct gpukernel:
@@ -79,7 +79,7 @@ cdef extern from "compyte_buffer.h":
     char *Gpu_error(compyte_buffer_ops *o, int err) nogil
     compyte_buffer_ops *compyte_get_ops(const_char_p) nogil
 
-cdef extern from "compyte_kernel.h":
+cdef extern from "compyte/kernel.h":
     ctypedef struct _GpuKernel "GpuKernel":
         gpukernel *k
         compyte_buffer_ops *ops
@@ -94,7 +94,7 @@ cdef extern from "compyte_kernel.h":
                             _GpuArray *a) nogil
     int GpuKernel_call(_GpuKernel *, size_t n) nogil
 
-cdef extern from "compyte_array.h":
+cdef extern from "compyte/array.h":
     ctypedef struct _GpuArray "GpuArray":
         gpudata *data
         compyte_buffer_ops *ops
@@ -146,7 +146,7 @@ cdef extern from "compyte_array.h":
     int GpuArray_is_c_contiguous(_GpuArray *a) nogil
     int GpuArray_is_f_contiguous(_GpuArray *a) nogil
 
-cdef extern from "compyte_extension.h":
+cdef extern from "compyte/extension.h":
     void *compyte_get_extension(const_char_p) nogil
 
 cdef object call_compiler_fn = None

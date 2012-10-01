@@ -1,8 +1,8 @@
 #ifndef COMPYTE_KERNEL_H
 #define COMPYTE_KERNEL_H
 
-#include "compyte_buffer.h"
-#include "compyte_array.h"
+#include <compyte/buffer.h>
+#include <compyte/array.h>
 
 #ifdef __cplusplus
 extern "C" {

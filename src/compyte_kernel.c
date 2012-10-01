@@ -1,5 +1,5 @@
-#include "compyte_kernel.h"
-#include "compyte_error.h"
+#include "compyte/kernel.h"
+#include "compyte/error.h"
 
 int GpuKernel_init(GpuKernel *k, compyte_buffer_ops *ops, void *ctx,
 		   unsigned int count, const char **strs, size_t *lens,

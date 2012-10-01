@@ -8,7 +8,7 @@
 
 #ifdef _MSC_VER
 #include <stddef.h>
-#include "wincompat/stdint.h"
+#include <compyte/wincompat/stdint.h>
 #define ssize_t intptr_t
 #define SSIZE_MAX INTPTR_MAX
 #else

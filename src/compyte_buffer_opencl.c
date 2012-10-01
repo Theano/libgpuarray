@@ -1,9 +1,9 @@
 #define _CRT_SECURE_NO_WARNINGS
 
-#include "compyte_compat.h"
-#include "compyte_buffer.h"
-#include "compyte_util.h"
-#include "compyte_error.h"
+#include "compyte/compat.h"
+#include "compyte/buffer.h"
+#include "compyte/util.h"
+#include "compyte/error.h"
 
 #ifdef __APPLE__
 

@@ -31,9 +31,9 @@ for i in reversed(to_del):
 del to_del
 
 if have_cython:
-    srcs = ['pygpu_ndarray.pyx']
+    srcs = ['pygpu/gpuarray.pyx']
 else:
-    srcs = ['pygpu_ndarray.c']
+    srcs = ['pygpu/gpuarray.c']
 
 if sys.platform == 'win32':
     import shutil
@@ -42,10 +42,11 @@ if sys.platform == 'win32':
 
 setup(name='compyte',
       cmdclass = {'build_ext': build_ext},
-      ext_modules=[Extension('pygpu_ndarray',
+      packages = ['pygpu'],
+      ext_modules=[Extension('pygpu.gpuarray',
                              sources = srcs,
-                             include_dirs = [np.get_include(), '.'],
+                             include_dirs = [np.get_include(), 'src'],
                              libraries = ['compyte'],
-                             library_dirs = ['.']
+                             library_dirs = ['lib']
                              )
                    ])

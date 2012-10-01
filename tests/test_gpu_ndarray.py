@@ -2,11 +2,11 @@ import copy
 
 import numpy
 
-import pygpu_ndarray as gpu_ndarray
+import pygpu.gpuarray as gpu_ndarray
 
-from ..tests.support import (guard_devsup, check_meta, check_flags, check_all,
-                             gen_gpuarray, kind, context as ctx, dtypes_all,
-                             dtypes_no_complex, skip_single_f)
+from .support import (guard_devsup, check_meta, check_flags, check_all,
+                      gen_gpuarray, kind, context as ctx, dtypes_all,
+                      dtypes_no_complex, skip_single_f)
 
 
 def product(*args, **kwds):

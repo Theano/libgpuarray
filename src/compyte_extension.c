@@ -1,6 +1,6 @@
 #include <string.h>
 
-#include "compyte_extension.h"
+#include "compyte/extension.h"
 
 typedef struct _ext {
   const char *name;

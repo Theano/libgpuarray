@@ -1,9 +1,9 @@
 import operator
 import numpy
 
-from ..ndarray import pygpu_ndarray as gpuarray
-from ..array import gpuarray as elemary
-from ..elemwise import ElemwiseKernel
+from pygpu import gpuarray
+from pygpu.array import gpuarray as elemary
+from pygpu.elemwise import ElemwiseKernel
 
 from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
                       kind, context, gen_gpuarray, dtypes_no_complex)

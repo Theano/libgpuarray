@@ -27,7 +27,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from ndarray import pygpu_ndarray as gpuarray
+import gpuarray
 import numpy as np
 
 

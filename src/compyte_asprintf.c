@@ -2,7 +2,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
-#include "compyte_compat.h"
+#include "compyte/compat.h"
 
 #include <stdarg.h>
 #include <stdlib.h>

@@ -1,8 +1,8 @@
 #include <string.h>
 #include <errno.h>
 
-#include "compyte_buffer.h"
-#include "compyte_error.h"
+#include "compyte/buffer.h"
+#include "compyte/error.h"
 
 const char *Gpu_error(compyte_buffer_ops *o, int err) {
   if (err == GA_IMPL_ERROR)

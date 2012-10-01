@@ -1,7 +1,7 @@
 #ifndef COMPYTE_EXTENSIONS_H
 #define COMPYTE_EXTENSIONS_H
 
-#include "compyte_compat.h"
+#include <compyte/compat.h>
 
 #ifdef __cplusplus
 extern "C" {

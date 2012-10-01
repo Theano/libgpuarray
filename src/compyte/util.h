@@ -8,9 +8,8 @@ extern "C" {
 }
 #endif
 
-#include "compyte_compat.h"
-
-#include "compyte_types.h"
+#include <compyte/compat.h>
+#include <compyte/types.h>
 
 COMPYTE_PUBLIC int compyte_register_type(compyte_type *t, int *ret);
 COMPYTE_PUBLIC compyte_type *compyte_get_type(int typecode);

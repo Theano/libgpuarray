@@ -5,23 +5,19 @@ include(CheckFunctionExists)
 cmake_minimum_required(VERSION 2.8)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} .)
 
-#################################################
-## Set this to False to build a static library ##
-#################################################
-set(COMPYTE_SHARED True)
-
 set(CMAKE_OSX_ARCHITECTURES i386 x86_64)
 set(CMAKE_OSX_SYSROOT /)
+set(LIBRARY_OUTPUT_PATH ../lib)
 
 find_package(CUDA)
 find_package(OpenCL)
 
 configure_file(
-  ${PROJECT_SOURCE_DIR}/compyte_compat.h.in
-  ${PROJECT_BINARY_DIR}/compyte_compat.h
+  ${PROJECT_SOURCE_DIR}/compyte/compat.h.in
+  ${PROJECT_SOURCE_DIR}/compyte/compat.h
   )
 
-include_directories("${PROJECT_BINARY_DIR}")
+include_directories("${PROJECT_SOURCE_DIR}")
 
 SET(COMPYTE_SRC
 compyte_types.c
@@ -74,17 +70,19 @@ if(OPENCL_FOUND)
   include_directories("${OPENCL_INCLUDE_DIRS}")
 endif()
 
-if(COMPYTE_SHARED)
-  add_definitions(-DCOMPYTE_BUILDING_DLL)
-  ADD_LIBRARY(compyte SHARED ${COMPYTE_SRC})
-else()
-  add_library(compyte STATIC ${COMPYTE_SRC})
-endif()
+execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ../lib)
+
+add_library(compyte SHARED ${COMPYTE_SRC})
+set_target_properties(compyte PROPERTIES COMPILE_FLAGS -DCOMPYTE_BUILDING_DLL)
+
+add_library(compyte-static STATIC ${COMPYTE_SRC})
 
 if(CUDA_FOUND)
   target_link_libraries(compyte ${CUDADRV_LIBRARY})
+  target_link_libraries(compyte-static ${CUDADRV_LIBRARY})
 endif()
 
 if(OPENCL_FOUND)
   target_link_libraries(compyte ${OPENCL_LIBRARIES})
+  target_link_libraries(compyte-static ${OPENCL_LIBRARIES})
 endif()

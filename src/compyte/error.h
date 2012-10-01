@@ -1,7 +1,7 @@
 #ifndef COMPYTE_ERROR_H
 #define COMPYTE_ERROR_H
 
-#include "compyte_compat.h"
+#include <compyte/compat.h>
 
 #ifdef __cplusplus
 extern "C" {

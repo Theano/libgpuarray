@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include "compyte_compat.h"
+#include <compyte/compat.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -2,7 +2,7 @@ import numpy
 from nose.plugins.skip import SkipTest
 from nose.plugins import Plugin
 
-from ..ndarray import pygpu_ndarray as gpuarray
+from pygpu import gpuarray
 
 
 if numpy.__version__ < '1.6.0':

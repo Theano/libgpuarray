@@ -1,11 +1,11 @@
 import numpy
 from dtypes import dtype_to_ctype, _fill_dtype_registry
+from gpuarray import GpuArray
 
 _fill_dtype_registry(respect_windows=False)
 
 
 def as_argument(obj, name):
-    from ndarray.pygpu_ndarray import GpuArray
     if isinstance(obj, GpuArray):
         return ArrayArg(obj.dtype, name)
     else:
