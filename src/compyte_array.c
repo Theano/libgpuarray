@@ -155,9 +155,9 @@ int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
     if (steps[i] == 0) new_nd -= 1;
   }
   r->ops = a->ops;
-  r->data = a->ops->buffer_dup(a->data, &err);
+  r->data = a->data;
   r->typecode = a->typecode;
-  r->flags = a->flags;
+  r->flags = a->flags & ~GA_OWNDATA;
   r->nd = new_nd;
   r->offset = a->offset;
   if (r->data == NULL) {

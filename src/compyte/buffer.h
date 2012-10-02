@@ -27,7 +27,6 @@ typedef struct _compyte_buffer_ops {
   /* This allocates a buffer of size sz in context ctx */
   void *(*buffer_init)(int dev, int *ret);
   gpudata *(*buffer_alloc)(void *ctx, size_t sz, int *ret);
-  gpudata *(*buffer_dup)(gpudata *b, int *ret);
   void (*buffer_free)(gpudata *);
   int (*buffer_share)(gpudata *, gpudata *, int *ret);
   

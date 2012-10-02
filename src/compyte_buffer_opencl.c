@@ -328,19 +328,6 @@ static gpudata *cl_alloc(void *ctx, size_t size, int *ret) {
   return res;
 }
 
-static gpudata *cl_dup(gpudata *b, int *ret) {
-  gpudata *res;
-  res = malloc(sizeof(*res));
-  if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
-  res->buf = b->buf;
-  err = clRetainMemObject(res->buf);
-  if (err != CL_SUCCESS) {
-    free(res);
-    FAIL(NULL, GA_IMPL_ERROR);
-  }
-  return res;
-}
-
 static void cl_free(gpudata *b) {
   clReleaseMemObject(b->buf);
   free(b);
@@ -795,7 +782,6 @@ static const char *cl_error(void) {
 
 compyte_buffer_ops opencl_ops = {cl_init,
                                  cl_alloc,
-                                 cl_dup,
                                  cl_free,
                                  cl_share,
                                  cl_move,

@@ -291,7 +291,7 @@ def check_memory_region(a, a_op, b, b_op):
         assert b_op.base is None
     else:
         assert a_op.base is a
-        if b.base:
+        if b.base is not None:
             # We avoid having a series of object connected by base.
             # This is to don't bloc the garbage collection.
             assert b_op.base is b.base
@@ -430,10 +430,9 @@ def _cmp(x,y):
         assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
     else:
         assert x.flags["F_CONTIGUOUS"]
-    # GpuArrays always own their data after indexing
-    assert x.flags["OWNDATA"]
-    # we don't check for y.flags["OWNDATA"] since the logic
-    # is a bit twisty and this is not a testsuite for numpy.
+    # GpuArrays never own their data after indexing
+    if y.ndim != 0:
+        assert x.flags["OWNDATA"] == y.flags["OWNDATA"]
     if x.flags["WRITEABLE"] != y.flags["WRITEABLE"]:
         assert x.ndim == 0
     assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
@@ -460,8 +459,8 @@ def _cmpNs(x, y):
     assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
     assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"]
     assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
-    # GpuArrays always own their data after indexing
-    assert x.flags["OWNDATA"]
+    # GpuArrays never own their data after indexing
+    assert not x.flags["OWNDATA"]
     # we don't check for y.flags["OWNDATA"] since the logic
     # is a bit twisty and this is not a testsuite for numpy.
     assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]

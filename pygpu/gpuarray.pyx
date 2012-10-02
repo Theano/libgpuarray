@@ -540,7 +540,7 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
             raise ValueError("cannot copy an array to a different context")
 
         if (not copy
-            and (dtype is None or np.dtype(dtype) == arg.dtype)
+            and (dtype is None or dtype_to_typecode(dtype) == arg.typecode)
             and (arg.ga.nd >= ndmin)
             and (order is None or order == 'A' or
                  (order == 'C' and py_CHKFLAGS(arg, GA_C_CONTIGUOUS)) or
@@ -603,6 +603,7 @@ cdef GpuArray new_GpuArray(void *ctx, cls):
     else:
         res = GpuArray.__new__(cls)
     res.ctx = ctx
+    res.base = None
     return res
 
 cdef class GpuArray:
@@ -688,7 +689,7 @@ cdef class GpuArray:
                     self.ga.nd, self.ga.dimensions, ord)
         return res
 
-    def copy(self, order='C'):
+    cpdef copy(self, order='C'):
         cdef GpuArray res
         res = self._empty_like_me(order=order)
         array_move(res, self)
@@ -707,7 +708,7 @@ cdef class GpuArray:
         cdef GpuArray res = new_GpuArray(self.ctx, cls)
         array_view(res, self)
         base = self
-        while base.base is not None:
+        while hasattr(base, 'base') and base.base is not None:
             base = base.base
         res.base = base
         return res
@@ -782,8 +783,12 @@ cdef class GpuArray:
                 stops[i] = self.ga.dimensions[i]
                 steps[i] = 1
 
+            base = self
+            while hasattr(base, 'base') and base.base is not None:
+                base = base.base
             res = new_GpuArray(self.ctx, self.__class__)
             array_index(res, self, starts, stops, steps)
+            res.base = base
         finally:
             free(starts)
             free(stops)
@@ -845,6 +850,11 @@ cdef class GpuArray:
                 return res
             else:
                 raise NotImplementedError("TODO")
+
+    property typecode:
+        "The compyte typecode for the data type of the array"
+        def __get__(self):
+            return self.ga.typecode
 
     property itemsize:
         "The size of the base element."

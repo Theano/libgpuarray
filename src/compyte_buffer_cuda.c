@@ -49,14 +49,12 @@
 typedef struct {char c; CUdeviceptr x; } st_devptr;
 #define DEVPTR_ALIGN (sizeof(st_devptr) - sizeof(CUdeviceptr))
 
-static int DONTFREE_ADDR;
-#define DONTFREE ((gpudata *)&DONTFREE_ADDR)
+#define DONTFREE 0x1
 
 struct _gpudata {
     CUdeviceptr ptr;
     size_t sz;
-    gpudata *base;
-    unsigned int refcnt;
+    int flags;
 };
 
 gpudata *cuda_make_buf(CUdeviceptr p, size_t sz) {
@@ -66,8 +64,7 @@ gpudata *cuda_make_buf(CUdeviceptr p, size_t sz) {
 
     res->ptr = p;
     res->sz = sz;
-    res->base = DONTFREE;
-    res->refcnt = 1;
+    res->flags |= DONTFREE;
 
     return res;
 }
@@ -217,8 +214,7 @@ static gpudata *cuda_alloc(void *ctx /* IGNORED */, size_t size, int *ret) {
     if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
     
     res->sz = size;
-    res->base = NULL;
-    res->refcnt = 1;
+    res->flags = 0;
     
     if (size != 0) {
         err = cuMemAlloc(&res->ptr, size);
@@ -230,33 +226,10 @@ static gpudata *cuda_alloc(void *ctx /* IGNORED */, size_t size, int *ret) {
     return res;
 }
 
-static gpudata *cuda_dup(gpudata *b, int *ret) {
-    gpudata *res;
-    res = malloc(sizeof(*res));
-    if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
-    
-    res->ptr = b->ptr;
-    res->sz = b->sz;
-    res->base = b;
-    if (res->base->base != NULL)
-        res->base = res->base->base;
-    res->refcnt = 1;
-    if (res->base != DONTFREE)
-        res->base->refcnt += 1;
-    return res;
-}
-
 static void cuda_free(gpudata *d) {
-    d->refcnt -= 1;
-    if (d->refcnt == 0) {
-        if (d->base == NULL) {
-            if (d->sz != 0)
-                cuMemFree(d->ptr);
-        }
-        else if (d->base != DONTFREE)
-            cuda_free(d->base);
-        free(d);
-    }
+  if (!(d->flags & DONTFREE))
+    cuMemFree(d->ptr);
+  free(d);
 }
 
 static int cuda_share(gpudata *a, gpudata *b, int *ret) {
@@ -953,7 +926,6 @@ static const char *cuda_error(void) {
 
 compyte_buffer_ops cuda_ops = {cuda_init,
                                cuda_alloc,
-                               cuda_dup,
                                cuda_free,
                                cuda_share,
                                cuda_move,
