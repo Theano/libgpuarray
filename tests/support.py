@@ -28,7 +28,7 @@ def guard_devsup(func):
         try:
             func(*args, **kwargs)
         except gpuarray.GpuArrayException as e:
-            if e.args[0] == "Device does not support operation":
+            if e.errcode == 8:
                 raise SkipTest("operation not supported")
             raise
     return f

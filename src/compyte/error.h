@@ -20,7 +20,7 @@ enum ga_error {
   GA_SYS_ERROR, /* look at errno for more details */
   GA_RUN_ERROR,
   GA_DEVSUP_ERROR,
-  /* Add more error types if needed */
+  /* Add more error types if needed, but at the end */
   /* Don't forget to sync with Gpu_error() */
 };
 
