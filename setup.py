@@ -35,11 +35,6 @@ if have_cython:
 else:
     srcs = ['pygpu/gpuarray.c']
 
-if sys.platform == 'win32':
-    import shutil
-    shutil.copyfile('Release/compyte.lib', 'compyte.lib')
-    shutil.copyfile('Release/compyte.dll', 'compyte.dll')
-
 setup(name='compyte',
       cmdclass = {'build_ext': build_ext},
       packages = ['pygpu'],
