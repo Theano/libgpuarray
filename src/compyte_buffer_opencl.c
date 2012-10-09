@@ -33,6 +33,7 @@ static cl_int err;
 
 struct _gpudata {
   cl_mem buf;
+  cl_event ev;
 };
 
 gpudata *cl_make_buf(cl_mem buf) {
@@ -42,6 +43,7 @@ gpudata *cl_make_buf(cl_mem buf) {
   if (res == NULL) return NULL;
 
   res->buf = buf;
+  res->ev = NULL;
   err = clRetainMemObject(buf);
   if (err != CL_SUCCESS) {
     free(res);
@@ -55,6 +57,7 @@ cl_mem cl_get_buf(gpudata *g) { return g->buf; }
 
 struct _gpukernel {
   cl_kernel k;
+  gpudata **bs;
 };
 
 #define PRAGMA "#pragma OPENCL EXTENSION "
@@ -179,7 +182,7 @@ static cl_device_id get_dev(cl_context ctx, int *ret) {
 
   ids = malloc(sz);
   if (ids == NULL) FAIL(NULL, GA_MEMORY_ERROR);
-  
+
   err = clGetContextInfo(ctx, CL_CONTEXT_DEVICES, sz, ids, NULL);
   res = ids[0];
   free(ids);
@@ -190,6 +193,7 @@ static cl_device_id get_dev(cl_context ctx, int *ret) {
 static cl_command_queue get_a_q(cl_context ctx, int *ret) {
   static cl_context last_context = NULL;
   static cl_command_queue last_q;
+  cl_command_queue_properties qprop;
   cl_device_id id;
   cl_command_queue res;
 
@@ -202,11 +206,15 @@ static cl_command_queue get_a_q(cl_context ctx, int *ret) {
   id = get_dev(ctx, ret);
   if (id == NULL) return NULL;
 
-  res = clCreateCommandQueue(ctx, id, 0, &err);
-  if (err != CL_SUCCESS) {
-    free(res);
+  err = clGetDeviceInfo(id, CL_DEVICE_QUEUE_PROPERTIES, sizeof(qprop),
+                        &qprop, NULL);
+  CHKFAIL(NULL);
+
+  res = clCreateCommandQueue(ctx, id,
+                             qprop&CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE,
+                             &err);
+  if (res == NULL)
     FAIL(NULL, GA_IMPL_ERROR);
-  }
 
   if (last_context != NULL) {
     clReleaseContext(last_context);
@@ -320,6 +328,7 @@ static gpudata *cl_alloc(void *ctx, size_t size, int *ret) {
 
   res->buf = clCreateBuffer((cl_context)ctx, CL_MEM_READ_WRITE, size, NULL,
                             &err);
+  res->ev = NULL;
   if (err != CL_SUCCESS) {
     free(res);
     FAIL(NULL, GA_IMPL_ERROR);
@@ -330,6 +339,8 @@ static gpudata *cl_alloc(void *ctx, size_t size, int *ret) {
 
 static void cl_free(gpudata *b) {
   clReleaseMemObject(b->buf);
+  if (b->ev != NULL)
+    clReleaseEvent(b->ev);
   free(b);
 }
 
@@ -353,30 +364,43 @@ static int cl_share(gpudata *a, gpudata *b, int *ret) {
 static int cl_move(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff,
                    size_t sz) {
   cl_event ev;
+  cl_event evw[2];
+  cl_event *evl = NULL;
   cl_context ctx;
   cl_command_queue q;
   int res;
+  cl_uint num_ev = 0;
 
   if (sz == 0) return GA_NO_ERROR;
 
   err = clGetMemObjectInfo(dst->buf, CL_MEM_CONTEXT, sizeof(ctx), &ctx, NULL);
   if (err != CL_SUCCESS) return GA_IMPL_ERROR;
 
+  if (src->ev != NULL)
+    evw[num_ev++] = src->ev;
+  if (dst->ev != NULL)
+    evw[num_ev++] = dst->ev;
+
+  if (num_ev > 0)
+    evl = evw;
+
   q = get_a_q(ctx, &res);
   if (q == NULL) return res;
 
-  err = clEnqueueCopyBuffer(q, src->buf, dst->buf, srcoff, dstoff, sz, 0,
-                            NULL, &ev);
+  err = clEnqueueCopyBuffer(q, src->buf, dst->buf, srcoff, dstoff, sz, num_ev,
+                            evl, &ev);
   clReleaseCommandQueue(q);
   if (err != CL_SUCCESS) {
     return GA_IMPL_ERROR;
   }
+  if (src->ev != NULL)
+    clReleaseEvent(src->ev);
+  if (dst->ev != NULL)
+    clReleaseEvent(dst->ev);
 
-  err = clWaitForEvents(1, &ev);
-  clReleaseEvent(ev);
-  if (err != CL_SUCCESS) {
-    return GA_IMPL_ERROR;
-  }
+  src->ev = ev;
+  dst->ev = ev;
+  clRetainEvent(ev);
 
   return GA_NO_ERROR;
 }
@@ -384,6 +408,9 @@ static int cl_move(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff,
 static int cl_read(void *dst, gpudata *src, size_t srcoff, size_t sz) {
   cl_context ctx;
   cl_command_queue q;
+  cl_event ev[1];
+  cl_event *evl = NULL;
+  cl_uint num_ev = 0;
   int res;
 
   if (sz == 0) return GA_NO_ERROR;
@@ -394,8 +421,16 @@ static int cl_read(void *dst, gpudata *src, size_t srcoff, size_t sz) {
   q = get_a_q(ctx, &res);
   if (q == NULL) return res;
 
-  err = clEnqueueReadBuffer(q, src->buf, CL_TRUE, srcoff, sz, dst, 0, NULL,
+  if (src->ev != NULL) {
+    ev[0] = src->ev;
+    evl = ev;
+    num_ev = 1;
+  }
+
+  err = clEnqueueReadBuffer(q, src->buf, CL_TRUE, srcoff, sz, dst, num_ev, evl,
                             NULL);
+  src->ev = NULL;
+  if (num_ev == 1) clReleaseEvent(ev[0]);
   clReleaseCommandQueue(q);
   if (err != CL_SUCCESS) {
     return GA_IMPL_ERROR;
@@ -407,6 +442,9 @@ static int cl_read(void *dst, gpudata *src, size_t srcoff, size_t sz) {
 static int cl_write(gpudata *dst, size_t dstoff, const void *src, size_t sz) {
   cl_context ctx;
   cl_command_queue q;
+  cl_event ev[1];
+  cl_event *evl = NULL;
+  cl_uint num_ev = 0;
   int res;
 
   if (sz == 0) return GA_NO_ERROR;
@@ -417,8 +455,16 @@ static int cl_write(gpudata *dst, size_t dstoff, const void *src, size_t sz) {
   q = get_a_q(ctx, &res);
   if (q == NULL) return res;
 
-  err = clEnqueueWriteBuffer(q, dst->buf, CL_TRUE, dstoff, sz, src, 0, NULL,
-                             NULL);
+  if (dst->ev != NULL) {
+    ev[0] = dst->ev;
+    evl = ev;
+    num_ev = 1;
+  }
+
+  err = clEnqueueWriteBuffer(q, dst->buf, CL_TRUE, dstoff, sz, src, num_ev,
+                             evl, NULL);
+  dst->ev = NULL;
+  if (num_ev == 1) clReleaseEvent(ev[0]);
   clReleaseCommandQueue(q);
   if (err != CL_SUCCESS) {
     return GA_IMPL_ERROR;
@@ -554,6 +600,7 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
   size_t *newl;
   const char **news;
   unsigned int n = 0;
+  cl_uint num_args;
   int error;
 
   if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
@@ -609,6 +656,7 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
     FAIL(NULL, GA_IMPL_ERROR);
   }  
 
+  res->bs = NULL;
   res->k = clCreateKernel(p, fname, &err);
   clReleaseProgram(p);
   if (err != CL_SUCCESS) {
@@ -616,11 +664,25 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
     FAIL(NULL, GA_IMPL_ERROR);
   }
 
+  err = clGetKernelInfo(res->k, CL_KERNEL_NUM_ARGS, sizeof(num_args),
+                        &num_args, NULL);
+  if (err != CL_SUCCESS) {
+    cl_freekernel(res);
+    FAIL(NULL, GA_IMPL_ERROR);
+  }
+
+  res->bs = calloc(sizeof(gpudata *), num_args);
+  if (res->bs == NULL) {
+    cl_freekernel(res);
+    FAIL(NULL, GA_MEMORY_ERROR);
+  }
+
   return res;
 }
 
 static void cl_freekernel(gpukernel *k) {
   if (k->k) clReleaseKernel(k->k);
+  free(k->bs);
   free(k);
 }
 
@@ -639,22 +701,24 @@ static int cl_setkernelarg(gpukernel *k, unsigned int index, int typecode,
 }
 
 static int cl_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
+  k->bs[index] = b;
   return cl_setkernelarg(k, index, GA_DELIM, &b->buf);
 }
 
 static int cl_callkernel(gpukernel *k, size_t n) {
   cl_event ev;
+  cl_event *evw;
   cl_context ctx;
   cl_command_queue q;
   cl_device_id dev;
   size_t n_max;
+  cl_uint num_ev;
+  cl_uint num_args;
+  cl_uint i;
   int res;
 
   err = clGetKernelInfo(k->k, CL_KERNEL_CONTEXT, sizeof(ctx), &ctx, NULL);
   if (err != CL_SUCCESS) return GA_IMPL_ERROR;
-
-  q = get_a_q(ctx, &res);
-  if (q == NULL) return res;
 
   dev = get_dev(ctx, &res);
   if (dev == NULL) return res;
@@ -665,12 +729,46 @@ static int cl_callkernel(gpukernel *k, size_t n) {
 
   if (n > n_max) n = n_max;
 
-  err = clEnqueueNDRangeKernel(q, k->k, 1, NULL, &n, NULL, 0, NULL, &ev);
+  err = clGetKernelInfo(k->k, CL_KERNEL_NUM_ARGS, sizeof(num_args), &num_args,
+                        NULL);
   if (err != CL_SUCCESS) return GA_IMPL_ERROR;
 
-  err = clWaitForEvents(1, &ev);
-  clReleaseEvent(ev);
+  q = get_a_q(ctx, &res);
+  if (q == NULL) return res;
+
+  num_ev = 0;
+  evw = calloc(sizeof(cl_event), num_args);
+  if (evw == NULL) {
+    clReleaseCommandQueue(q);
+    return GA_MEMORY_ERROR;
+  }
+  
+  for (i = 0; i < num_args; i++) {
+    if (k->bs[i] != NULL && k->bs[i]->ev != NULL) {
+      evw[num_ev++] = k->bs[i]->ev;
+      k->bs[i]->ev = NULL;
+    }
+  }
+
+  if (num_ev == 0) {
+    free(evw);
+    evw = NULL;
+  }
+
+  err = clEnqueueNDRangeKernel(q, k->k, 1, NULL, &n, NULL, num_ev, evw, &ev);
+  clReleaseCommandQueue(q);
+  for (i = 0; i < num_ev; i++)
+    clReleaseEvent(evw[i]);
+  free(evw);
   if (err != CL_SUCCESS) return GA_IMPL_ERROR;
+
+  for (i = 0; i < num_args; i++) {
+    if (k->bs[i] != NULL && k->bs[i]->ev == NULL) {
+      k->bs[i]->ev = ev;
+      clRetainEvent(ev);
+    }
+  }
+  clReleaseEvent(ev);
 
   return GA_NO_ERROR;
 }
