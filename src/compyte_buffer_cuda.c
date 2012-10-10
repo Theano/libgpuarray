@@ -60,13 +60,14 @@ struct _gpudata {
 
 gpudata *cuda_make_buf(CUdeviceptr p, size_t sz) {
     gpudata *res;
+    CUresult e;
     res = malloc(sizeof(*res));
     if (res == NULL) return NULL;
 
     res->ptr = p;
-    err = cuEventCreate(&res->ev,
-                        CU_EVENT_DISABLE_TIMING|CU_EVENT_BLOCKING_SYNC);
-    if (err != CUDA_SUCCESS) {
+    e = cuEventCreate(&res->ev,
+		      CU_EVENT_DISABLE_TIMING|CU_EVENT_BLOCKING_SYNC);
+    if (e != CUDA_SUCCESS) {
       free(res);
       return NULL;
     }
