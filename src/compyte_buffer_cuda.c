@@ -13,7 +13,7 @@
 #include <process.h>
 /* I am really tired of hunting through online docs
  * to find where the define is.  256 seem to be the
- * concencus for the value so there it is.
+ * consensus for the value so there it is.
  */
 #define PATH_MAX 256
 #else
@@ -53,6 +53,7 @@ typedef struct {char c; CUdeviceptr x; } st_devptr;
 
 struct _gpudata {
     CUdeviceptr ptr;
+    CUevent ev;
     size_t sz;
     int flags;
 };
@@ -63,8 +64,14 @@ gpudata *cuda_make_buf(CUdeviceptr p, size_t sz) {
     if (res == NULL) return NULL;
 
     res->ptr = p;
+    err = cuEventCreate(&res->ev,
+                        CU_EVENT_DISABLE_TIMING|CU_EVENT_BLOCKING_SYNC);
+    if (err != CUDA_SUCCESS) {
+      free(res);
+      return NULL;
+    }
     res->sz = sz;
-    res->flags |= DONTFREE;
+    res->flags = DONTFREE;
 
     return res;
 }
@@ -83,6 +90,7 @@ struct _gpukernel {
     size_t types[NUM_ARGS];
 #endif
     unsigned int argcount;
+    gpudata *bs[NUM_ARGS];
 };
 
 #define FAIL(v, e) { if (ret) *ret = e; return v; }
@@ -194,6 +202,9 @@ static const char *get_error_string(CUresult err) {
     }
 }
 
+/* Will cause problems for multi-thread and/or multi-context */
+static CUstream s;
+
 static void *cuda_init(int ord, int *ret) {
     CUdevice dev;
     CUcontext ctx;
@@ -202,8 +213,13 @@ static void *cuda_init(int ord, int *ret) {
     CHKFAIL(NULL);
     err = cuDeviceGet(&dev, ord);
     CHKFAIL(NULL);
-    err = cuCtxCreate(&ctx, CU_CTX_SCHED_AUTO, dev);
+    err = cuCtxCreate(&ctx, CU_CTX_SCHED_YIELD, dev);
     CHKFAIL(NULL);
+    err = cuStreamCreate(&s, 0);
+    if (err != CUDA_SUCCESS) {
+      cuCtxDestroy(ctx);
+      FAIL(NULL, GA_IMPL_ERROR);
+    }
     return ctx;
 }
 
@@ -212,23 +228,33 @@ static gpudata *cuda_alloc(void *ctx /* IGNORED */, size_t size, int *ret) {
 
     res = malloc(sizeof(*res));
     if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
-    
+
     res->sz = size;
     res->flags = 0;
-    
-    if (size != 0) {
-        err = cuMemAlloc(&res->ptr, size);
-        if (err != CUDA_SUCCESS) {
-            free(res);
-            FAIL(NULL, GA_IMPL_ERROR);
-        }
+
+    err = cuEventCreate(&res->ev,
+                        CU_EVENT_DISABLE_TIMING|CU_EVENT_BLOCKING_SYNC);
+    if (err != CUDA_SUCCESS) {
+      free(res);
+      FAIL(NULL, GA_IMPL_ERROR);
     }
+
+    if (size == 0) size = 1;
+
+    err = cuMemAlloc(&res->ptr, size);
+    if (err != CUDA_SUCCESS) {
+        cuEventDestroy(res->ev);
+        free(res);
+        FAIL(NULL, GA_IMPL_ERROR);
+    }
+    cuEventRecord(res->ev, s);
     return res;
 }
 
 static void cuda_free(gpudata *d) {
   if (!(d->flags & DONTFREE))
     cuMemFree(d->ptr);
+  cuEventDestroy(d->ev);
   free(d);
 }
 
@@ -238,17 +264,24 @@ static int cuda_share(gpudata *a, gpudata *b, int *ret) {
              (b->ptr <= a->ptr && b->ptr + b->sz > a->ptr)));
 }
 
-static int cuda_move(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff, size_t sz)
-{
+static int cuda_move(gpudata *dst, size_t dstoff, gpudata *src,
+                     size_t srcoff, size_t sz) {
     if (sz == 0) return GA_NO_ERROR;
 
     if ((dst->sz - dstoff) < sz || (src->sz -srcoff) < sz)
         return GA_VALUE_ERROR;
 
-    err = cuMemcpyDtoD(dst->ptr + dstoff, src->ptr + srcoff, sz);
+    err = cuStreamWaitEvent(s, src->ev, 0);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+    err = cuStreamWaitEvent(s, dst->ev, 0);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+
+    err = cuMemcpyDtoDAsync(dst->ptr + dstoff, src->ptr + srcoff, sz, s);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
+    cuEventRecord(src->ev, s);
+    cuEventRecord(dst->ev, s);
     return GA_NO_ERROR;
 }
 
@@ -259,10 +292,16 @@ static int cuda_read(void *dst, gpudata *src, size_t srcoff, size_t sz)
     if ((src->sz - srcoff) < sz)
         return GA_VALUE_ERROR;
 
-    err = cuMemcpyDtoH(dst, src->ptr + srcoff, sz);
+    err = cuStreamWaitEvent(s, src->ev, 0);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+
+    err = cuMemcpyDtoHAsync(dst, src->ptr + srcoff, sz, s);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
+    cuEventRecord(src->ev, s);
+    /* We want the copy to be finished when the function returns */
+    cuEventSynchronize(src->ev);
     return GA_NO_ERROR;
 }
 
@@ -273,20 +312,29 @@ static int cuda_write(gpudata *dst, size_t dstoff, const void *src, size_t sz)
     if ((dst->sz - dstoff) < sz)
         return GA_VALUE_ERROR;
 
-    err = cuMemcpyHtoD(dst->ptr + dstoff, src, sz);
+    err = cuStreamWaitEvent(s, dst->ev, 0);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+
+    err = cuMemcpyHtoDAsync(dst->ptr + dstoff, src, sz, s);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
+    cuEventRecord(dst->ev, s);
+    cuEventSynchronize(dst->ev);
     return GA_NO_ERROR;
 }
 
 static int cuda_memset(gpudata *dst, size_t dstoff, int data) {
     if ((dst->sz - dstoff) == 0) return GA_NO_ERROR;
 
-    err = cuMemsetD8(dst->ptr + dstoff, data, dst->sz - dstoff);
+    err = cuStreamWaitEvent(s, dst->ev, 0);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+
+    err = cuMemsetD8Async(dst->ptr + dstoff, data, dst->sz - dstoff, s);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
+    cuEventRecord(dst->ev, s);
     return GA_NO_ERROR;
 }
 
@@ -590,11 +638,15 @@ static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
 #if CUDA_VERSION < 4000
     k->types[index] = typecode;
 #endif
+    k->bs[index] = NULL;
     return GA_NO_ERROR;
 }
 
 static int cuda_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
-    return cuda_setkernelarg(k, index, GA_DELIM, &b->ptr);
+    /* The GA_DELIM here is a horrible abuse of reserved values */
+    int res = cuda_setkernelarg(k, index, GA_DELIM, &b->ptr);
+    if (res == GA_NO_ERROR) k->bs[index] = b;
+    return res;
 }
 
 static int do_sched(gpukernel *k, size_t n, unsigned int *bc,
@@ -632,23 +684,32 @@ static int do_sched(gpukernel *k, size_t n, unsigned int *bc,
 
 static int cuda_callkernel(gpukernel *k, size_t n) {
     int res;
+    unsigned int i;
     unsigned int block_count;
     unsigned int threads_per_block;
+#if CUDA_VERSION < 4000
+    size_t total = 0;
+    size_t align, sz;
+#endif
 
     res = do_sched(k, n, &block_count, &threads_per_block);
     if (res != GA_NO_ERROR)
         return res;
 
+    for (i = 0; i < k->argcount; i++) {
+        if (k->bs[i] != NULL) {
+            err = cuStreamWaitEvent(s, k->bs[i]->ev, 0);
+            if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+        }
+    }
+
 #if CUDA_VERSION >= 4000
     err = cuLaunchKernel(k->k, block_count, 1, 1, threads_per_block, 1, 1,
-                         0, NULL, k->args, NULL);
+                         0, s, k->args, NULL);
     if (err != CUDA_SUCCESS) {
         return GA_IMPL_ERROR;
     }
 #else
-    size_t total = 0;
-    size_t align, sz;
-    unsigned int i;
     for (i = 0; i < k->argcount; i++) {
         if (k->types[i] == GA_DELIM) {
             align = DEVPTR_ALIGN;
@@ -666,12 +727,12 @@ static int cuda_callkernel(gpukernel *k, size_t n) {
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
     err = cuFuncSetBlockShape(k->k, threads_per_block, 1, 1);
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-    err = cuLaunchGrid(k->k, block_count, 1);
+    err = cuLaunchGridAsync(k->k, block_count, 1, s);
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
 #endif
-    err = cuCtxSynchronize();
-    if (err != CUDA_SUCCESS) {
-        return GA_IMPL_ERROR;
+    for (i = 0; i < k->argcount; i++) {
+      if (k->bs[i] != NULL)
+        cuEventRecord(k->bs[i]->ev, s);
     }
     return GA_NO_ERROR;
 }
