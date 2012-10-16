@@ -606,7 +606,7 @@ cdef GpuArray new_GpuArray(void *ctx, cls):
     res.base = None
     return res
 
-cdef class GpuArray:
+cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
     cdef _GpuArray ga
     cdef void *ctx
     cdef readonly object base
