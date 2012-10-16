@@ -35,9 +35,12 @@ if have_cython:
 else:
     srcs = ['pygpu/gpuarray.c']
 
-setup(name='compyte',
+setup(name='pygpu',
+      version='0.2.0',
+      description='numpy-like wrapper on libcompyte for GPU computations',
       cmdclass = {'build_ext': build_ext},
       packages = ['pygpu'],
+      data_files = [('pygpu', ['pygpu/gpuarray.h'])],
       ext_modules=[Extension('pygpu.gpuarray',
                              sources = srcs,
                              include_dirs = [np.get_include(), 'src'],
