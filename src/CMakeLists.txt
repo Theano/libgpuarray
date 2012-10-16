@@ -86,3 +86,17 @@ if(OPENCL_FOUND)
   target_link_libraries(compyte ${OPENCL_LIBRARIES})
   target_link_libraries(compyte-static ${OPENCL_LIBRARIES})
 endif()
+
+FILE(GLOB headers compyte/*.h)
+
+INSTALL(FILES ${headers} DESTINATION include/compyte)
+
+if(NOT UNIX)
+  INSTALL(FILES compyte/wincompat/stdint.h DESTINATION include/compyte/wincompat)
+endif()
+
+INSTALL(TARGETS compyte compyte-static
+  RUNTIME DESTINATION bin
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+)
