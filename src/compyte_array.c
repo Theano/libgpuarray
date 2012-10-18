@@ -256,7 +256,7 @@ int GpuArray_memset(GpuArray *a, int data) {
 }
 
 const char *GpuArray_error(GpuArray *a, int err) {
-  return Gpu_error(a->ops, err);
+  return Gpu_error(a->ops, a->data, err);
 }
 
 void GpuArray_fprintf(FILE *fd, const GpuArray *a) {

@@ -26,6 +26,7 @@ typedef struct _gpukernel gpukernel;
 typedef struct _compyte_buffer_ops {
   /* This allocates a buffer of size sz in context ctx */
   void *(*buffer_init)(int dev, int *ret);
+  void (*buffer_deinit)(void *ctx);
   gpudata *(*buffer_alloc)(void *ctx, size_t sz, int *ret);
   void (*buffer_free)(gpudata *);
   int (*buffer_share)(gpudata *, gpudata *, int *ret);
@@ -64,9 +65,9 @@ typedef struct _compyte_buffer_ops {
                         unsigned int b_nd, const size_t *b_dims,
                         const ssize_t *b_str);
 
-  /* Get a string describing the last error that happened 
+  /* Get a string describing the last error that happened
      (may change if you make other api calls) */
-  const char *(*buffer_error)(void);
+  const char *(*buffer_error)(gpudata *b);
 } compyte_buffer_ops;
 
 typedef enum _ga_usefl {
@@ -80,7 +81,8 @@ typedef enum _ga_usefl {
   GA_USE_PTX =      0x1000,
 } ga_usefl;
 
-COMPYTE_PUBLIC const char *Gpu_error(compyte_buffer_ops *o, int err);
+COMPYTE_PUBLIC const char *Gpu_error(compyte_buffer_ops *o, gpudata *b,
+				     int err);
 COMPYTE_PUBLIC compyte_buffer_ops *compyte_get_ops(const char *name);
 
 #ifdef __cplusplus

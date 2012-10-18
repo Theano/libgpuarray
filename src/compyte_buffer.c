@@ -4,9 +4,9 @@
 #include "compyte/buffer.h"
 #include "compyte/error.h"
 
-const char *Gpu_error(compyte_buffer_ops *o, int err) {
+const char *Gpu_error(compyte_buffer_ops *o, gpudata *b, int err) {
   if (err == GA_IMPL_ERROR)
-    return o->buffer_error();
+    return o->buffer_error(b);
   else
     return compyte_error_str(err);
 }
