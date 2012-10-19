@@ -353,6 +353,8 @@ static gpudata *cl_alloc(void *c, size_t size, int *ret) {
     FAIL(NULL, GA_IMPL_ERROR);
   }
 
+  res->ctx = ctx;
+  ctx->refcnt++;
   return res;
 }
 
