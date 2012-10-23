@@ -88,6 +88,14 @@ COMPYTE_LOCAL cl_ctx *cl_make_ctx(cl_context ctx) {
   return res;
 }
 
+COMPYTE_LOCAL cl_context cl_get_ctx(void *ctx) {
+  return ((cl_ctx *)ctx)->ctx;
+}
+
+COMPYTE_LOCAL cl_command_queue cl_get_stream(void *ctx) {
+  return ((cl_ctx *)ctx)->q;
+}
+
 static void cl_free_ctx(cl_ctx *ctx) {
   ctx->refcnt--;
   if (ctx->refcnt == 0) {
@@ -103,21 +111,27 @@ struct _gpudata {
   cl_ctx *ctx;
 };
 
-gpudata *cl_make_buf(void *ctx, cl_mem buf) {
+COMPYTE_LOCAL gpudata *cl_make_buf(void *c, cl_mem buf) {
+  cl_ctx *ctx = (cl_ctx *)c;
   gpudata *res;
+  cl_context buf_ctx;
+
+  ctx->err = clGetMemObjectInfo(buf, CL_MEM_CONTEXT, sizeof(buf_ctx),
+                                &buf_ctx, NULL);
+  if (ctx->err != CL_SUCCESS) return NULL;
+  if (buf_ctx != ctx->ctx) return NULL;
 
   res = malloc(sizeof(*res));
   if (res == NULL) return NULL;
 
   res->buf = buf;
   res->ev = NULL;
-  err = clRetainMemObject(buf);
-  if (err != CL_SUCCESS) {
+  ctx->err = clRetainMemObject(buf);
+  if (ctx->err != CL_SUCCESS) {
     free(res);
     return NULL;
   }
-  // Maybe should make sure that the buffer context matches the ctx
-  res->ctx = (cl_ctx *)ctx;
+  res->ctx = ctx;
   res->ctx->refcnt++;
 
   return res;

@@ -90,13 +90,17 @@ COMPYTE_LOCAL CUcontext cuda_get_ctx(void *ctx) {
   return ((cuda_context *)ctx)->ctx;
 }
 
+COMPYTE_LOCAL CUstream cuda_get_stream(void *ctx) {
+  return ((cuda_context *)ctx)->s;
+}
+
 static void cuda_enter(cuda_context *ctx) {
   cuCtxGetCurrent(&ctx->old);
   /* If no context was there in the first place, then we take over
      to avoid the set dance on the thread */
   if (ctx->old == NULL) ctx->old = ctx->ctx;
   if (ctx->old != ctx->ctx)
-    cuCtxSetCurrent(ctx->ctx);
+    ctx->err = cuCtxSetCurrent(ctx->ctx);
 }
 
 static void cuda_exit(cuda_context *ctx) {
@@ -120,12 +124,17 @@ COMPYTE_LOCAL gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
     if (res == NULL) return NULL;
 
     cuda_enter(ctx);
+    if (ctx->err != CUDA_SUCCESS) {
+      free(res);
+      return NULL;
+    }
 
     res->ptr = p;
     ctx->err = cuEventCreate(&res->ev,
 		      CU_EVENT_DISABLE_TIMING|CU_EVENT_BLOCKING_SYNC);
     if (ctx->err != CUDA_SUCCESS) {
       free(res);
+      cuda_exit(ctx);
       return NULL;
     }
     res->sz = sz;
@@ -303,6 +312,10 @@ static gpudata *cuda_alloc(void *c, size_t size, int *ret) {
     res->flags = 0;
 
     cuda_enter(ctx);
+    if (ctx->err != CUDA_SUCCESS) {
+      free(res);
+      FAIL(NULL, GA_IMPL_ERROR);
+    }
 
     ctx->err = cuEventCreate(&res->ev,
                              CU_EVENT_DISABLE_TIMING|CU_EVENT_BLOCKING_SYNC);
@@ -329,6 +342,7 @@ static gpudata *cuda_alloc(void *c, size_t size, int *ret) {
 }
 
 static void cuda_free(gpudata *d) {
+  /* We ignore errors on free */
   cuda_enter(d->ctx);
   if (!(d->flags & DONTFREE))
     cuMemFree(d->ptr);
@@ -360,6 +374,8 @@ static int cuda_move(gpudata *dst, size_t dstoff, gpudata *src,
         return GA_VALUE_ERROR;
 
     cuda_enter(ctx);
+    if (ctx->err != CUDA_SUCCESS)
+      return GA_IMPL_ERROR;
 
     ctx->err = cuStreamWaitEvent(ctx->s, src->ev, 0);
     if (ctx->err != CUDA_SUCCESS) {
@@ -380,7 +396,7 @@ static int cuda_move(gpudata *dst, size_t dstoff, gpudata *src,
     }
     cuEventRecord(src->ev, ctx->s);
     cuEventRecord(dst->ev, ctx->s);
-    cuda_exit(dst->ctx);
+    cuda_exit(ctx);
     return res;
 }
 
@@ -393,6 +409,8 @@ static int cuda_read(void *dst, gpudata *src, size_t srcoff, size_t sz) {
         return GA_VALUE_ERROR;
 
     cuda_enter(ctx);
+    if (ctx->err != CUDA_SUCCESS)
+      return GA_IMPL_ERROR;
 
     ctx->err = cuStreamWaitEvent(ctx->s, src->ev, 0);
     if (ctx->err != CUDA_SUCCESS) {
@@ -422,6 +440,8 @@ static int cuda_write(gpudata *dst, size_t dstoff, const void *src,
         return GA_VALUE_ERROR;
 
     cuda_enter(ctx);
+    if (ctx->err != CUDA_SUCCESS)
+      return GA_IMPL_ERROR;
 
     ctx->err = cuStreamWaitEvent(ctx->s, dst->ev, 0);
     if (ctx->err != CUDA_SUCCESS) {
@@ -445,6 +465,8 @@ static int cuda_memset(gpudata *dst, size_t dstoff, int data) {
     if ((dst->sz - dstoff) == 0) return GA_NO_ERROR;
 
     cuda_enter(ctx);
+    if (ctx->err != CUDA_SUCCESS)
+      return GA_IMPL_ERROR;
 
     ctx->err = cuStreamWaitEvent(ctx->s, dst->ev, 0);
     if (ctx->err != CUDA_SUCCESS) {
@@ -640,6 +662,8 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
 
     cuda_enter(ctx);
+    if (ctx->err != CUDA_SUCCESS)
+      FAIL(NULL, GA_IMPL_ERROR);
 
     ctx->err = cuCtxGetDevice(&dev);
     if (ctx->err != CUDA_SUCCESS) {
@@ -756,10 +780,12 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
 
     res->ctx = ctx;
     ctx->refcnt++;
+    cuda_exit(ctx);
     return res;
 }
 
 static void cuda_freekernel(gpukernel *k) {
+    /* We don't check for errors on free */
     unsigned int i;
     cuda_enter(k->ctx);
     for (i = 0; i < k->argcount; i++)
@@ -855,6 +881,8 @@ static int cuda_callkernel(gpukernel *k, size_t n) {
 #endif
 
     cuda_enter(ctx);
+    if (ctx->err != CUDA_SUCCESS)
+      return GA_IMPL_ERROR;
 
     res = do_sched(k, n, &block_count, &threads_per_block, &ctx->err);
     if (res != GA_NO_ERROR) {
