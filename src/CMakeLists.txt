@@ -73,7 +73,7 @@ endif()
 execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ../lib)
 
 add_library(compyte SHARED ${COMPYTE_SRC})
-set_target_properties(compyte PROPERTIES COMPILE_FLAGS -DCOMPYTE_BUILDING_DLL)
+set_target_properties(compyte PROPERTIES COMPILE_FLAGS "-DCOMPYTE_BUILDING_DLL -DCOMPYTE_SHARED")
 
 add_library(compyte-static STATIC ${COMPYTE_SRC})
 

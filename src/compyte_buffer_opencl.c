@@ -58,7 +58,7 @@ typedef struct _cl_ctx {
   unsigned int refcnt;
 } cl_ctx;
 
-cl_ctx *cl_make_ctx(cl_context ctx) {
+COMPYTE_LOCAL cl_ctx *cl_make_ctx(cl_context ctx) {
   cl_ctx *res;
   cl_device_id id;
   cl_command_queue_properties qprop;
@@ -88,7 +88,7 @@ cl_ctx *cl_make_ctx(cl_context ctx) {
   return res;
 }
 
-void cl_free_ctx(cl_ctx *ctx) {
+static void cl_free_ctx(cl_ctx *ctx) {
   ctx->refcnt--;
   if (ctx->refcnt == 0) {
     clReleaseCommandQueue(ctx->q);
@@ -123,7 +123,7 @@ gpudata *cl_make_buf(void *ctx, cl_mem buf) {
   return res;
 }
 
-cl_mem cl_get_buf(gpudata *g) { return g->buf; }
+COMPYTE_LOCAL cl_mem cl_get_buf(gpudata *g) { return g->buf; }
 
 struct _gpukernel {
   cl_kernel k;

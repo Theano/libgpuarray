@@ -61,7 +61,7 @@ typedef struct _cuda_context {
   unsigned int refcnt;
 } cuda_context;
 
-void *cuda_make_ctx(CUcontext ctx) {
+COMPYTE_LOCAL void *cuda_make_ctx(CUcontext ctx) {
   cuda_context *res;
   res = malloc(sizeof(*res));
   if (res == NULL)
@@ -86,7 +86,7 @@ static void cuda_free_ctx(cuda_context *ctx) {
   }
 }
 
-CUcontext cuda_get_ctx(void *ctx) {
+COMPYTE_LOCAL CUcontext cuda_get_ctx(void *ctx) {
   return ((cuda_context *)ctx)->ctx;
 }
 
@@ -112,7 +112,7 @@ struct _gpudata {
     int flags;
 };
 
-gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
+COMPYTE_LOCAL gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
     cuda_context *ctx = (cuda_context *)c;
     gpudata *res;
 
@@ -138,8 +138,8 @@ gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
     return res;
 }
 
-CUdeviceptr cuda_get_ptr(gpudata *g) { return g->ptr; }
-size_t cuda_get_sz(gpudata *g) { return g->sz; }
+COMPYTE_LOCAL CUdeviceptr cuda_get_ptr(gpudata *g) { return g->ptr; }
+COMPYTE_LOCAL size_t cuda_get_sz(gpudata *g) { return g->sz; }
 
 /* The total size of the arguments is limited to 256 bytes */
 #define NUM_ARGS (256/sizeof(void*))
@@ -609,7 +609,8 @@ static void *call_compiler_impl(const char *src, size_t len, int *ret) {
 
 static void *(*call_compiler)(const char *src, size_t len, int *ret) = call_compiler_impl;
 
-void cuda_set_compiler(void *(*compiler_f)(const char *, size_t, int *)) {
+COMPYTE_LOCAL void cuda_set_compiler(void *(*compiler_f)(const char *, size_t,
+                                                         int *)) {
     if (compiler_f == NULL) {
         call_compiler = call_compiler_impl;
     } else {
