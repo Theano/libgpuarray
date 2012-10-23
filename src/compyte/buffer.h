@@ -29,6 +29,7 @@ typedef struct _compyte_buffer_ops {
   void (*buffer_deinit)(void *ctx);
   gpudata *(*buffer_alloc)(void *ctx, size_t sz, int *ret);
   void (*buffer_free)(gpudata *);
+  void *(*buffer_get_context)(gpudata *);
   int (*buffer_share)(gpudata *, gpudata *, int *ret);
   
   /* device to device copy, no overlap */
@@ -47,6 +48,8 @@ typedef struct _compyte_buffer_ops {
 				 const char *fname, int flags, int *ret);
   /* Free the kernel and all associated memory (including argument buffers) */
   void (*buffer_freekernel)(gpukernel *k);
+
+  void *(*buffer_get_kernel_context)(gpukernel *k);
   
   /* Copy the passed value to a kernel argument buffer */
   int (*buffer_setkernelarg)(gpukernel *k, unsigned int index,

@@ -338,6 +338,10 @@ static void cuda_free(gpudata *d) {
   free(d);
 }
 
+static void *cuda_get_context(gpudata *b) {
+  return b->ctx;
+}
+
 static int cuda_share(gpudata *a, gpudata *b, int *ret) {
     return (a->ctx == b->ctx && a->sz != 0 && b->sz != 0 &&
             ((a->ptr <= b->ptr && a->ptr + a->sz > b->ptr) ||
@@ -766,6 +770,10 @@ static void cuda_freekernel(gpukernel *k) {
     free(k);
 }
 
+static void *cuda_get_kernel_context(gpukernel *k) {
+  return k->ctx;
+}
+
 static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
                              const void *val) {
     void *tmp;
@@ -1168,6 +1176,7 @@ compyte_buffer_ops cuda_ops = {cuda_init,
                                cuda_deinit,
                                cuda_alloc,
                                cuda_free,
+                               cuda_get_context,
                                cuda_share,
                                cuda_move,
                                cuda_read,
@@ -1175,6 +1184,7 @@ compyte_buffer_ops cuda_ops = {cuda_init,
                                cuda_memset,
                                cuda_newkernel,
                                cuda_freekernel,
+                               cuda_get_kernel_context,
                                cuda_setkernelarg,
                                cuda_setkernelargbuf,
                                cuda_callkernel,
