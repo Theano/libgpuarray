@@ -18,6 +18,10 @@ void GpuKernel_clear(GpuKernel *k) {
   k->ops = NULL;
 }
 
+void *GpuKernel_context(GpuKernel *k) {
+  return k->ops->buffer_get_kernel_context(k->k);
+}
+
 int GpuKernel_setarg(GpuKernel *k, unsigned int index, int typecode,
 		     void *arg) {
   return k->ops->buffer_setkernelarg(k->k, index, typecode, arg);

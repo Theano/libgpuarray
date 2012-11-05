@@ -66,6 +66,7 @@ COMPYTE_PUBLIC int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssi
 COMPYTE_PUBLIC void GpuArray_clear(GpuArray *a);
 
 COMPYTE_PUBLIC int GpuArray_share(GpuArray *a, GpuArray *b);
+COMPYTE_PUBLIC void *GpuArray_context(GpuArray *a);
 
 COMPYTE_PUBLIC int GpuArray_move(GpuArray *dst, GpuArray *src);
 COMPYTE_PUBLIC int GpuArray_write(GpuArray *dst, void *src, size_t src_sz);

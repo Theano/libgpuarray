@@ -16,14 +16,19 @@ typedef struct _GpuKernel {
   compyte_buffer_ops *ops;
 } GpuKernel;
 
-COMPYTE_PUBLIC int GpuKernel_init(GpuKernel *, compyte_buffer_ops *ops, void *ctx,
-                   unsigned int count, const char **strs, size_t *lens,
-                   const char *name, int flags);
+COMPYTE_PUBLIC int GpuKernel_init(GpuKernel *, compyte_buffer_ops *ops,
+                                  void *ctx, unsigned int count,
+                                  const char **strs, size_t *lens,
+                                  const char *name, int flags);
 
 COMPYTE_PUBLIC void GpuKernel_clear(GpuKernel *);
 
-COMPYTE_PUBLIC int GpuKernel_setarg(GpuKernel *, unsigned int index, int typecode, void *arg);
-COMPYTE_PUBLIC int GpuKernel_setbufarg(GpuKernel *, unsigned int index, GpuArray *);
+COMPYTE_PUBLIC void *GpuKernel_context(GpuKernel *);
+
+COMPYTE_PUBLIC int GpuKernel_setarg(GpuKernel *, unsigned int index,
+                                    int typecode, void *arg);
+COMPYTE_PUBLIC int GpuKernel_setbufarg(GpuKernel *, unsigned int index,
+                                       GpuArray *);
 
 COMPYTE_PUBLIC int GpuKernel_call(GpuKernel *, size_t n);
 

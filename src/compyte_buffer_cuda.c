@@ -1192,8 +1192,8 @@ fail:
     return res;
 }
 
-static const char *cuda_error(gpudata *b) {
-  cuda_context *ctx = b->ctx;
+static const char *cuda_error(void *c) {
+  cuda_context *ctx = (cuda_context *)c;
   if (ctx == NULL)
     return get_error_string(err);
   else

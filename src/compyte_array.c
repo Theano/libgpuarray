@@ -213,6 +213,10 @@ int GpuArray_share(GpuArray *a, GpuArray *b) {
   return a->ops->buffer_share(a->data, b->data, NULL);
 }
 
+void *GpuArray_context(GpuArray *a) {
+  return a->ops->buffer_get_context(a->data);
+}
+
 int GpuArray_move(GpuArray *dst, GpuArray *src) {
   size_t sz;
   unsigned int i;
@@ -256,7 +260,7 @@ int GpuArray_memset(GpuArray *a, int data) {
 }
 
 const char *GpuArray_error(GpuArray *a, int err) {
-  return Gpu_error(a->ops, a->data, err);
+  return Gpu_error(a->ops, a->ops->buffer_get_context(a->data), err);
 }
 
 void GpuArray_fprintf(FILE *fd, const GpuArray *a) {

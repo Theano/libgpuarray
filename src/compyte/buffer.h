@@ -70,7 +70,7 @@ typedef struct _compyte_buffer_ops {
 
   /* Get a string describing the last error that happened
      (may change if you make other api calls) */
-  const char *(*buffer_error)(gpudata *b);
+  const char *(*buffer_error)(void *ctx);
 } compyte_buffer_ops;
 
 typedef enum _ga_usefl {
@@ -84,7 +84,7 @@ typedef enum _ga_usefl {
   GA_USE_PTX =      0x1000,
 } ga_usefl;
 
-COMPYTE_PUBLIC const char *Gpu_error(compyte_buffer_ops *o, gpudata *b,
+COMPYTE_PUBLIC const char *Gpu_error(compyte_buffer_ops *o, void *ctx,
 				     int err);
 COMPYTE_PUBLIC compyte_buffer_ops *compyte_get_ops(const char *name);
 

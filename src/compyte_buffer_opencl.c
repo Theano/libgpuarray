@@ -883,11 +883,12 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
   return res;
 }
 
-static const char *cl_error(gpudata *b) {
-  if (b == NULL)
+static const char *cl_error(void *c) {
+  cl_ctx *ctx = (cl_ctx *)c;
+  if (ctx == NULL)
     return get_error_string(err);
   else
-    return get_error_string(b->ctx->err);
+    return get_error_string(ctx->err);
 }
 
 compyte_buffer_ops opencl_ops = {cl_init,
