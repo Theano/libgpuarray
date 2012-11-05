@@ -71,12 +71,12 @@ cdef extern from "compyte/buffer.h":
 
     ctypedef struct compyte_buffer_ops:
         void *buffer_init(int devno, int *ret)
-        char *buffer_error()
+        char *buffer_error(void *ctx)
 
     cdef enum ga_usefl:
         GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF
 
-    char *Gpu_error(compyte_buffer_ops *o, int err) nogil
+    char *Gpu_error(compyte_buffer_ops *o, void *ctx, int err) nogil
     compyte_buffer_ops *compyte_get_ops(const_char_p) nogil
 
 cdef extern from "compyte/kernel.h":
@@ -88,6 +88,7 @@ cdef extern from "compyte/kernel.h":
                        unsigned int count, char **strs, size_t *lens,
                        char *name, int flags) nogil
     void GpuKernel_clear(_GpuKernel *k) nogil
+    void *GpuKernel_context(_GpuKernel *k) nogil
     int GpuKernel_setarg(_GpuKernel *k, unsigned int index, int typecode,
                          void *arg) nogil
     int GpuKernel_setbufarg(_GpuKernel *k, unsigned int index,
@@ -134,6 +135,7 @@ cdef extern from "compyte/array.h":
     void GpuArray_clear(_GpuArray *a) nogil
 
     int GpuArray_share(_GpuArray *a, _GpuArray *b) nogil
+    void *GpuArray_context(_GpuArray *a) nogil
 
     int GpuArray_move(_GpuArray *dst, _GpuArray *src) nogil
     int GpuArray_write(_GpuArray *dst, void *src, size_t src_sz) nogil
@@ -308,10 +310,10 @@ cdef array_clear(GpuArray a):
         GpuArray_clear(&a.ga)
 
 cdef bint array_share(GpuArray a, GpuArray b):
-    cdef int res
-    with nogil:
-        res = GpuArray_share(&a.ga, &b.ga)
-    return res
+    return GpuArray_share(&a.ga, &b.ga)
+
+cdef void *array_context(GpuArray a):
+    return GpuArray_context(&a.ga)
 
 cdef array_move(GpuArray a, GpuArray src):
     cdef int err
@@ -341,6 +343,9 @@ cdef array_memset(GpuArray a, int data):
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
+cdef const_char_p kernel_error(GpuKernel k, int err):
+    return Gpu_error(k.k.ops, kernel_context(k), err)
+
 cdef kernel_init(GpuKernel k, compyte_buffer_ops *ops, void *ctx,
                  unsigned int count, const_char_pp strs, size_t *len,
                  char *name, int flags):
@@ -348,32 +353,34 @@ cdef kernel_init(GpuKernel k, compyte_buffer_ops *ops, void *ctx,
     with nogil:
         err = GpuKernel_init(&k.k, ops, ctx, count, strs, len, name, flags)
     if err != GA_NO_ERROR:
-        raise GpuArrayException(Gpu_error(ops, err), err)
+        raise GpuArrayException(Gpu_error(ops, kernel_context(k), err), err)
 
 cdef kernel_clear(GpuKernel k):
-    with nogil:
-        GpuKernel_clear(&k.k)
+    GpuKernel_clear(&k.k)
+
+cdef void *kernel_context(GpuKernel k):
+    return GpuKernel_context(&k.k)
 
 cdef kernel_setarg(GpuKernel k, unsigned int index, int typecode, void *arg):
     cdef int err
     with nogil:
         err = GpuKernel_setarg(&k.k, index, typecode, arg)
     if err != GA_NO_ERROR:
-        raise GpuArrayException(Gpu_error(k.k.ops, err), err)
+        raise GpuArrayException(kernel_error(k, err), err)
 
 cdef kernel_setbufarg(GpuKernel k, unsigned int index, GpuArray a):
     cdef int err
     with nogil:
         err = GpuKernel_setbufarg(&k.k, index, &a.ga)
     if err != GA_NO_ERROR:
-        raise GpuArrayException(Gpu_error(k.k.ops, err), err)
+        raise GpuArrayException(kernel_error(k, err), err)
 
 cdef kernel_call(GpuKernel k, size_t n):
     cdef int err
     with nogil:
         err = GpuKernel_call(&k.k, n)
     if err != GA_NO_ERROR:
-        raise GpuArrayException(Gpu_error(k.k.ops, err), err)
+        raise GpuArrayException(kernel_error(k, err), err)
 
 cdef compyte_buffer_ops *GpuArray_ops
 cdef void *GpuArray_ctx
@@ -414,7 +421,7 @@ def init(kind, int devno):
         if err == GA_VALUE_ERROR:
             raise GpuArrayException("No device %d"%(devno,), err)
         else:
-            raise GpuArrayException(ops.buffer_error(), err)
+            raise GpuArrayException(ops.buffer_error(NULL), err)
     return <size_t>ctx
 
 def zeros(shape, dtype=GA_DOUBLE, order='A', context=None, kind=None,
@@ -447,7 +454,7 @@ def empty(shape, dtype=GA_DOUBLE, order='A', context=None, kind=None,
     try:
         for i, d in enumerate(shape):
             cdims[i] = d
-        res = new_GpuArray(ctx, cls)
+        res = new_GpuArray(cls)
         array_empty(res, ops, ctx, dtype_to_typecode(dtype),
                     <unsigned int>len(shape), cdims, to_ga_order(order))
     finally:
@@ -512,7 +519,7 @@ def from_gpudata(size_t data, offset, dtype, shape, kind=None, context=None,
                 strides[i] = size
                 size *= cdims[i]
 
-        res = new_GpuArray(ctx, cls)
+        res = new_GpuArray(cls)
         array_fromdata(res, ops, <gpudata *>data, offset, typecode, nd, cdims,
                        cstrides, <int>(1 if writable else 0))
         res.base = base
@@ -536,7 +543,7 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
 
         if kind is not None and get_ops(kind) != arg.ga.ops:
             raise ValueError("cannot change the kind of an array")
-        if context is not None and get_ctx(context) != arg.ctx:
+        if context is not None and get_ctx(context) != array_context(arg):
             raise ValueError("cannot copy an array to a different context")
 
         if (not copy
@@ -559,7 +566,8 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
         if cls is None:
             cls = proto.__class__
         res = empty(shp, dtype=(dtype or arg.dtype), order=order, cls=cls,
-                    kind=ops_kind(arg.ga.ops), context=ctx_object(arg.ctx))
+                    kind=ops_kind(arg.ga.ops),
+                    context=ctx_object(array_context(arg)))
         if len(shp) < ndmin:
             tmp = res[idx]
         else:
@@ -590,25 +598,23 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
     else:
         ord = GA_C_ORDER
 
-    res = new_GpuArray(ctx, cls)
+    res = new_GpuArray(cls)
     array_empty(res, ops, ctx, dtype_to_typecode(a.dtype),
                 np.PyArray_NDIM(a), <size_t *>np.PyArray_DIMS(a), ord)
     array_write(res, np.PyArray_DATA(a), np.PyArray_NBYTES(a))
     return res
 
-cdef GpuArray new_GpuArray(void *ctx, cls):
+cdef GpuArray new_GpuArray(cls):
     cdef GpuArray res
     if cls is None or cls is GpuArray:
         res = GpuArray.__new__(GpuArray)
     else:
         res = GpuArray.__new__(cls)
-    res.ctx = ctx
     res.base = None
     return res
 
 cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
     cdef _GpuArray ga
-    cdef void *ctx
     cdef readonly object base
     cdef object __weakref__
 
@@ -684,8 +690,8 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
         else:
             typecode = dtype_to_typecode(dtype)
 
-        res = new_GpuArray(self.ctx, self.__class__)
-        array_empty(res, self.ga.ops, self.ctx, typecode,
+        res = new_GpuArray(self.__class__)
+        array_empty(res, self.ga.ops, array_context(self), typecode,
                     self.ga.nd, self.ga.dimensions, ord)
         return res
 
@@ -705,7 +711,7 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
             return self.copy()
 
     def view(self, cls=None):
-        cdef GpuArray res = new_GpuArray(self.ctx, cls)
+        cdef GpuArray res = new_GpuArray(cls)
         array_view(res, self)
         base = self
         while hasattr(base, 'base') and base.base is not None:
@@ -786,7 +792,7 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
             base = self
             while hasattr(base, 'base') and base.base is not None:
                 base = base.base
-            res = new_GpuArray(self.ctx, self.__class__)
+            res = new_GpuArray(self.__class__)
             array_index(res, self, starts, stops, steps)
             res.base = base
         finally:
@@ -891,11 +897,10 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
     property context:
         "Return the context with which this array is associated."
         def __get__(self):
-            return ctx_object(self.ctx)
+            return ctx_object(array_context(self))
 
 cdef class GpuKernel:
     cdef _GpuKernel k
-    cdef void *ctx
 
     def __dealloc__(self):
         kernel_clear(self)
@@ -919,9 +924,9 @@ cdef class GpuKernel:
             ops = get_ops(kind)
 
         if context is None:
-            self.ctx = GpuArray_ctx
+            ctx = GpuArray_ctx
         else:
-            self.ctx = get_ctx(context)
+            ctx = get_ctx(context)
 
         if cluda:
             flags |= GA_USE_CLUDA
@@ -943,7 +948,7 @@ cdef class GpuKernel:
 
         s[0] = ss
         l = len(ss)
-        kernel_init(self, ops, self.ctx, 1, s, &l, name, flags)
+        kernel_init(self, ops, ctx, 1, s, &l, name, flags)
 
     def __call__(self, *args, n=None):
         if n is None:
