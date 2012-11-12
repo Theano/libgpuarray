@@ -72,6 +72,7 @@ cdef extern from "compyte/buffer.h":
     ctypedef struct compyte_buffer_ops:
         void *buffer_init(int devno, int *ret)
         char *buffer_error(void *ctx)
+        void *buffer_get_context(gpudata *)
 
     cdef enum ga_usefl:
         GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF
@@ -277,16 +278,16 @@ cdef array_empty(GpuArray a, compyte_buffer_ops *ops, void *ctx, int typecode,
     cdef int err
     err = GpuArray_empty(&a.ga, ops, ctx, typecode, nd, dims, ord)
     if err != GA_NO_ERROR:
-        raise GpuArrayException(GpuArray_error(&a.ga, err), err)
+        raise GpuArrayException(Gpu_error(ops, ctx, err), err)
 
-cdef array_fromdata(GpuArray a, compyte_buffer_ops *ops, gpudata *data, size_t offset,
-                    int typecode, unsigned int nd, size_t *dims,
+cdef array_fromdata(GpuArray a, compyte_buffer_ops *ops, gpudata *data,
+                    size_t offset, int typecode, unsigned int nd, size_t *dims,
                     ssize_t *strides, int writeable):
     cdef int err
     err = GpuArray_fromdata(&a.ga, ops, data, offset, typecode, nd, dims,
                             strides, writeable)
     if err != GA_NO_ERROR:
-        raise GpuArrayException(GpuArray_error(&a.ga, err), err)
+        raise GpuArrayException(Gpu_error(ops, ops.buffer_get_context(data), err), err)
 
 cdef array_view(GpuArray v, GpuArray a):
     cdef int err
