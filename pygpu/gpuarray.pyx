@@ -235,6 +235,13 @@ def register_dtype(np.dtype dtype, cname):
     NP_TO_TYPE[dtype] = typecode
     TYPE_TO_NP[typecode] = dtype
 
+cdef public np.dtype typecode_to_dtype(int typecode):
+    res = TYPE_TO_NP.get(typecode, None)
+    if res is not None:
+        return res
+    else:
+        raise NotImplementedError("TODO")
+
 cpdef int dtype_to_typecode(dtype) except -1:
     if isinstance(dtype, int):
         return dtype
@@ -846,11 +853,7 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
     property dtype:
         "The dtype of the element"
         def __get__(self):
-            res = TYPE_TO_NP.get(self.ga.typecode, None)
-            if res is not None:
-                return res
-            else:
-                raise NotImplementedError("TODO")
+            return typecode_to_dtype(self.ga.typecode)
 
     property typecode:
         "The compyte typecode for the data type of the array"
