@@ -142,6 +142,7 @@ cdef extern from "compyte/array.h":
     int GpuArray_write(_GpuArray *dst, void *src, size_t src_sz)
     int GpuArray_read(void *dst, size_t dst_sz, _GpuArray *src)
     int GpuArray_memset(_GpuArray *a, int data)
+    int GpuArray_copy(_GpuArray *res, _GpuArray *a, ga_order order)
 
     char *GpuArray_error(_GpuArray *a, int err)
 
@@ -332,6 +333,12 @@ cdef array_read(void *dst, size_t sz, GpuArray src):
 cdef array_memset(GpuArray a, int data):
     cdef int err
     err = GpuArray_memset(&a.ga, data)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(GpuArray_error(&a.ga, err), err)
+
+cdef array_copy(GpuArray res, GpuArray a, ga_order order):
+    cdef int err
+    err = GpuArray_copy(&res.ga, &a.ga, order)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
@@ -685,8 +692,8 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
 
     cpdef copy(self, order='C'):
         cdef GpuArray res
-        res = self._empty_like_me(order=order)
-        array_move(res, self)
+        res = new_GpuArray(self.__class__)
+        array_copy(res, self, to_ga_order(order))
         return res
 
     def __copy__(self):
