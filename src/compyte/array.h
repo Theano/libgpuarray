@@ -74,6 +74,8 @@ COMPYTE_PUBLIC int GpuArray_read(void *dst, size_t dst_sz, GpuArray *src);
 
 COMPYTE_PUBLIC int GpuArray_memset(GpuArray *a, int data);
 
+COMPYTE_PUBLIC int GpuArray_copy(GpuArray *res, GpuArray *a, ga_order order);
+
 COMPYTE_PUBLIC const char *GpuArray_error(GpuArray *a, int err);
 
 COMPYTE_PUBLIC void GpuArray_fprintf(FILE *fd, const GpuArray *a);

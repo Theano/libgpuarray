@@ -259,6 +259,17 @@ int GpuArray_memset(GpuArray *a, int data) {
   return a->ops->buffer_memset(a->data, a->offset, data);
 }
 
+int GpuArray_copy(GpuArray *res, GpuArray *a, ga_order order) {
+  int err;
+  err = GpuArray_empty(res, a->ops, GpuArray_context(a), a->typecode,
+                       a->nd, a->dimensions, order);
+  if (err != GA_NO_ERROR) return err;
+  err = GpuArray_move(res, a);
+  if (err != GA_NO_ERROR)
+    GpuArray_clear(res);
+  return err;
+}
+
 const char *GpuArray_error(GpuArray *a, int err) {
   return Gpu_error(a->ops, a->ops->buffer_get_context(a->data), err);
 }
