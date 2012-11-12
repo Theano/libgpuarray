@@ -3,6 +3,13 @@
 
 #include <compyte/buffer.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+#ifdef CONFUSE_EMACS
+}
+#endif
+
 typedef struct _GpuArray {
   gpudata *data;
   compyte_buffer_ops *ops;
@@ -81,4 +88,9 @@ COMPYTE_PUBLIC const char *GpuArray_error(GpuArray *a, int err);
 COMPYTE_PUBLIC void GpuArray_fprintf(FILE *fd, const GpuArray *a);
 COMPYTE_LOCAL int GpuArray_is_c_contiguous(const GpuArray *a);
 COMPYTE_LOCAL int GpuArray_is_f_contiguous(const GpuArray *a);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif
