@@ -384,8 +384,8 @@ cdef kernel_call(GpuKernel k, size_t n):
     if err != GA_NO_ERROR:
         raise GpuArrayException(kernel_error(k, err), err)
 
-cdef compyte_buffer_ops *GpuArray_ops
-cdef void *GpuArray_ctx
+cdef compyte_buffer_ops *GpuArray_ops = NULL
+cdef void *GpuArray_ctx = NULL
 
 cdef compyte_buffer_ops *get_ops(kind) except NULL:
     cdef compyte_buffer_ops *res
@@ -591,9 +591,7 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
                     copy=False)
 
     if not np.PyArray_ISONESEGMENT(a):
-        a = np.PyArray_ContiguousFromAny(a, np.PyArray_TYPE(a),
-                                         np.PyArray_NDIM(a),
-                                         np.PyArray_NDIM(a))
+        a = np.PyArray_GETCONTIGUOUS(a)
 
     if np.PyArray_ISFORTRAN(a) and not np.PyArray_ISCONTIGUOUS(a):
         ord = GA_F_ORDER
@@ -606,7 +604,7 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
     array_write(res, np.PyArray_DATA(a), np.PyArray_NBYTES(a))
     return res
 
-cdef GpuArray new_GpuArray(cls):
+cdef public GpuArray new_GpuArray(cls):
     cdef GpuArray res
     if cls is None or cls is GpuArray:
         res = GpuArray.__new__(GpuArray)
