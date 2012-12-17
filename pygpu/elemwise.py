@@ -226,8 +226,8 @@ class ElemwiseKernel(object):
         self.kernel_args = kernel_args
         self.kernel_args.insert(0, numpy.asarray(self.n, dtype='uint32'))
 
-    def get_basic(self, args, nd, dims, offsets):
-        self.prepare_args_basic(args, dims, offsets)
+    def get_basic(self, args, nd, dims, strs, offsets):
+        self.prepare_args_basic(args, dims, strs, offsets)
         if nd not in self._cache_basic:
             src = basic_kernel.render(preamble=self.preamble, name="elemk",
                                       nd=nd, arguments=self.arguments,
@@ -239,14 +239,14 @@ class ElemwiseKernel(object):
                                                        **self.flags)
         return self._cache_basic[nd]
 
-    def prepare_args_basic(self, args, dims, offsets):
+    def prepare_args_basic(self, args, dims, strs, offsets):
         kernel_args = []
         for i, arg in enumerate(args):
             if isinstance(arg, gpuarray.GpuArray):
                 kernel_args.append(arg),
                 kernel_args.append(numpy.asarray(offsets[i], dtype='uint32'))
                 kernel_args.extend(numpy.asarray(s, dtype='int32')
-                                   for s in arg.strides)
+                                   for s in strs[i])
             else:
                 kernel_args.append(arg)
 
@@ -272,7 +272,7 @@ class ElemwiseKernel(object):
     def prepare_args_specialized(self, args):
         self.kernel_args = args
 
-    def check_args(self, args):
+    def check_args(self, args, collapse=True):
         arrays = []
         strs = []
         offsets = []
@@ -299,8 +299,32 @@ class ElemwiseKernel(object):
             c_contig = c_contig and ary.flags['C_CONTIGUOUS']
             f_contig = f_contig and ary.flags['F_CONTIGUOUS']
 
+        contig = c_contig or f_contig
+
+        if not contig and collapse and nd > 1:
+            # make the strides and dims editable
+            dims = list(dims)
+            strs = [list(str) for str in strs]
+            # remove dimensions that are of size 1
+            for i in range(nd-1, -1, -1):
+                if dims[i] == 1:
+                    del dims[i]
+                    for str in strs:
+                        del str[i]
+                    nd -= 1
+
+            # collapse contiguous dimensions
+            for i in range(nd-1, 0, -1):
+                if all(str[i] * dims[i] == str[i-1] for str in strs):
+                    dims[i-1] *= dims[i]
+                    del dims[i]
+                    for str in strs:
+                        str[i-1] = str[i]
+                        del str[i]
+                    nd -= 1
+
         self.n = n
-        return nd, dims, strs, offsets, c_contig or f_contig
+        return nd, dims, strs, offsets, contig
 
     def select_kernel(self, args):
         nd, dims, strs, offsets, contig = self.check_args(args)
@@ -329,10 +353,10 @@ class ElemwiseKernel(object):
             self._numcall = 1
 
         if nd not in self._cache:
-            k = self.get_basic(args, nd, dims, offsets)
+            k = self.get_basic(args, nd, dims, strs, offsets)
             self._cache[nd] = k
             return k
-        self.prepare_args_basic(args, dims, offsets)
+        self.prepare_args_basic(args, dims, strs, offsets)
         return self._cache[nd]
 
     def prepare(self, *args):
