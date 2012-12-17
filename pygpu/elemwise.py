@@ -414,6 +414,9 @@ class ElemwiseKernel(object):
                         str[i-1] = str[i]
                         del str[i]
                     nd -= 1
+            # re-wrap dims and tuples
+            dims = tuple(dims)
+            strs = [tuple(str) for str in strs]
 
         self.n = n
         return nd, dims, strs, offsets, contig
