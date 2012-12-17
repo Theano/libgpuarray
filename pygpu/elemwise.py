@@ -61,7 +61,9 @@ KERNEL void ${name}(const unsigned int n
     % endfor
 % endfor
     % for arg in arguments:
+        % if arg.isarray():
     ${arg.decltype()} ${arg.name} = (${arg.decltype()})${arg.name}_p;
+        % endif
     % endfor
     ${expression};
   }
@@ -149,7 +151,9 @@ KERNEL void ${name}(
     % endfor
 % endfor
     % for arg in arguments:
+        % if arg.isarray():
     ${arg.decltype()} ${arg.name} = (${arg.decltype()})${arg.name}_p;
+        % endif
     % endfor
     ${expression};
   }
@@ -352,12 +356,7 @@ class ElemwiseKernel(object):
             self._speck = None
             self._numcall = 1
 
-        if nd not in self._cache:
-            k = self.get_basic(args, nd, dims, strs, offsets)
-            self._cache[nd] = k
-            return k
-        self.prepare_args_basic(args, dims, strs, offsets)
-        return self._cache[nd]
+        return self.get_basic(args, nd, dims, strs, offsets)
 
     def prepare(self, *args):
         nd, dims, strs, contig = self.check_args(args)
