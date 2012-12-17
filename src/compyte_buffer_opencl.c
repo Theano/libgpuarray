@@ -662,7 +662,7 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
   }
 
   ctx->err = clBuildProgram(p, 1, &dev, "-w", NULL, NULL);
-  if (err != CL_SUCCESS) {
+  if (ctx->err != CL_SUCCESS) {
     free(res);
     clReleaseProgram(p);
     FAIL(NULL, GA_IMPL_ERROR);

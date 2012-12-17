@@ -358,7 +358,7 @@ cdef kernel_init(GpuKernel k, compyte_buffer_ops *ops, void *ctx,
     cdef int err
     err = GpuKernel_init(&k.k, ops, ctx, count, strs, len, name, flags)
     if err != GA_NO_ERROR:
-        raise GpuArrayException(Gpu_error(ops, kernel_context(k), err), err)
+        raise GpuArrayException(Gpu_error(ops, ctx, err), err)
 
 cdef kernel_clear(GpuKernel k):
     GpuKernel_clear(&k.k)
