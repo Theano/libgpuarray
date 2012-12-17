@@ -70,6 +70,66 @@ KERNEL void ${name}(const unsigned int n
 }
 """)
 
+# parameters: preamble, name, n, nd, dims, arguments, expression
+dimspec_kernel = Template("""
+${preamble}
+
+KERNEL void ${name}(
+% for arg in arguments:
+    % if arg.isarray():
+                    ${arg.decltype()} ${arg.name}_data,
+                    const unsigned int ${arg.name}_offset${'' if nd == 0 and loop.last else ','}
+        % for d in range(nd):
+                    const int ${arg.name}_str_${d}${'' if (loop.last and loop.parent.last) else ','}
+        % endfor
+    % else:
+                    ${arg.decltype()} ${arg.name}${',' if not loop.last else ''}
+    % endif
+% endfor
+) {
+  const unsigned int idx = LDIM_0 * GID_0 + LID_0;
+  const unsigned int numThreads = LDIM_0 * GDIM_0;
+  unsigned int i;
+  GLOBAL_MEM char *tmp;
+
+% for arg in arguments:
+  % if arg.isarray():
+  tmp = (GLOBAL_MEM char *)${arg.name}_data; tmp += ${arg.name}_offset;
+  ${arg.name}_data = (${arg.decltype()})tmp;
+  % endif
+% endfor
+
+  for (i = idx; i < ${n}; i += numThreads) {
+    int ii = i;
+    int pos;
+% for arg in arguments:
+    % if arg.isarray():
+        GLOBAL_MEM char *${arg.name}_p = (GLOBAL_MEM char *)${arg.name}_data;
+    % endif
+% endfor
+% for i in range(nd-1, -1, -1):
+    % if i > 0:
+        pos = ii % ${dims[i]};
+        ii = ii / ${dims[i]};
+    % else:
+        pos = ii;
+    % endif
+    % for arg in arguments:
+        % if arg.isarray():
+            ${arg.name}_p += pos * ${arg.name}_str_${i};
+        % endif
+    % endfor
+% endfor
+    % for arg in arguments:
+        % if arg.isarray():
+    ${arg.decltype()} ${arg.name} = (${arg.decltype()})${arg.name}_p;
+        % endif
+    % endfor
+    ${expression};
+  }
+}
+""")
+
 # arguments: preamble, name, arguments, expression
 contiguous_kernel = Template("""
 ${preamble}
@@ -176,9 +236,7 @@ def massage_op(operation):
 
 class ElemwiseKernel(object):
     def __init__(self, kind, context, arguments, operation, preamble="",
-                 spec_limit=3):
-        self._cache = dict()
-
+                 dimspec_limit=2, spec_limit=10):
         if isinstance(arguments, str):
             self.arguments = parse_c_args(arguments)
         else:
@@ -189,6 +247,7 @@ class ElemwiseKernel(object):
         self.kind = kind
         self.context = context
         self._spec_limit = spec_limit
+        self._dimspec_limit = dimspec_limit
 
         if not any(isinstance(arg, ArrayArg) for arg in self.arguments):
             raise RuntimeError(
@@ -219,7 +278,9 @@ class ElemwiseKernel(object):
                                            context=self.context, cluda=True,
                                            **self.flags)
         self._speckey = None
+        self._dims = None
         self._cache_basic = {}
+        self._cache_dimspec = {}
 
     def prepare_args_contig(self, args, offsets):
         kernel_args = []
@@ -258,6 +319,33 @@ class ElemwiseKernel(object):
             kernel_args.insert(0, numpy.asarray(d, dtype='uint32'))
 
         kernel_args.insert(0, numpy.asarray(self.n, dtype='uint32'))
+
+        self.kernel_args = kernel_args
+
+    def get_dimspec(self, args, nd, dims, strs, offsets):
+        self.prepare_args_dimspec(args, strs, offsets)
+        if dims not in self._cache_dimspec:
+            src = dimspec_kernel.render(preamble=self.preamble, name="elemk",
+                                        n=self.n, nd=nd, dims=dims,
+                                        arguments=self.arguments,
+                                        expression=self.expression)
+            self._cache_dimspec[dims] = gpuarray.GpuKernel(src, "elemk",
+                                                           cluda=True,
+                                                           kind=self.kind,
+                                                           context=self.context,
+                                                           **self.flags)
+        return self._cache_dimspec[dims]
+
+    def prepare_args_dimspec(self, args, strs, offsets):
+        kernel_args = []
+        for i, arg in enumerate(args):
+            if isinstance(arg, gpuarray.GpuArray):
+                kernel_args.append(arg),
+                kernel_args.append(numpy.asarray(offsets[i], dtype='uint32'))
+                kernel_args.extend(numpy.asarray(s, dtype='int32')
+                                   for s in strs[i])
+            else:
+                kernel_args.append(arg)
 
         self.kernel_args = kernel_args
 
@@ -351,7 +439,16 @@ class ElemwiseKernel(object):
                     self._speck = self.get_specialized(args, nd, dims, strs,
                                                        offsets)
                     return self._speck
+        elif dims in self._cache_dimspec:
+            self.prepare_args_dimspec(args, strs, offsets)
+            return self._cache_dimspec[dims]
+        elif dims == self._dims:
+            self._dimcall += 1
+            if self._dimcall > self._dimspec_limit:
+                return self.get_dimspec(args, nd, dims, strs, offsets)
         else:
+            self._dims = dims
+            self._dimcall = 1
             self._speckey = key
             self._speck = None
             self._numcall = 1
@@ -374,6 +471,28 @@ class ElemwiseKernel(object):
 
     def __call__(self, *args):
         k = self.select_kernel(args)
+        k(*self.kernel_args, n=self.n)
+
+    def call_contig(self, *args):
+        nd, dims, strs, offsets, contig = self.check_args(args)
+        if not contig:
+            raise ValueError("Can't call contig on non-contiguous data")
+        self.prepare_args_contig(args, offsets)
+        self.contig_k(*self.kernel_args, n=self.n)
+
+    def call_basic(self, *args):
+        nd, dims, strs, offsets, _ = self.check_args(args)
+        k = self.get_basic(args, nd, dims, strs, offsets)
+        k(*self.kernel_args, n=self.n)
+
+    def call_dimspec(self, *args):
+        nd, dims, strs, offsets, _ = self.check_args(args)
+        k = self.get_dimspec(args, nd, dims, strs, offsets)
+        k(*self.kernel_args, n=self.n)
+
+    def call_specialized(self, *args):
+        nd, dims, strs, offsets, _ = self.check_args(args)
+        k = self.get_specialized(args, nd, dims, strs, offsets)
         k(*self.kernel_args, n=self.n)
 
 

@@ -106,15 +106,25 @@ def elemwise_layouts(shape, offseted_outer, offseted_inner, sliced, order):
     outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
 
     k = ElemwiseKernel(kind, context, "float *a, float *b, float *c",
-                       "c[i] = a[i] + b[i]", spec_limit=1)
-
-    # first call should use the basic version is most cases
+                       "c[i] = a[i] + b[i]")
+    # will use contig or basic
     k(ag, bg, outg)
     outc = ac + bc
     assert numpy.allclose(numpy.asarray(outg), outc)
-    # second call should use the specialized version in most cases
+
+    # test basic
     outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
-    k(ag, bg, outg)
+    k.call_basic(ag, bg, outg)
+    assert numpy.allclose(numpy.asarray(outg), outc)
+
+    # test dimspec
+    outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
+    k.call_dimspec(ag, bg, outg)
+    assert numpy.allclose(numpy.asarray(outg), outc)
+
+    # test specialized
+    outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
+    k.call_specialized(ag, bg, outg)
     assert numpy.allclose(numpy.asarray(outg), outc)
 
 
