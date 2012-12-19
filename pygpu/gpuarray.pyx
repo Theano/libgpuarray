@@ -73,6 +73,11 @@ cdef extern from "compyte/buffer.h":
         void *buffer_init(int devno, int *ret)
         char *buffer_error(void *ctx)
         void *buffer_get_context(gpudata *)
+        int buffer_property(void *c, gpudata *b, gpukernel *k, int prop_id,
+                            void *res)
+
+    int GA_CTX_PROP_DEVNAME
+    int GA_KERNEL_PROP_MAXLSIZE
 
     cdef enum ga_usefl:
         GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF
@@ -424,7 +429,23 @@ def init(kind, int devno):
             raise GpuArrayException("No device %d"%(devno,), err)
         else:
             raise GpuArrayException(ops.buffer_error(NULL), err)
-    return <size_t>ctx
+    return ctx_object(ctx)
+
+def get_devname(kind, size_t c):
+    cdef void *ctx = get_ctx(c)
+    cdef compyte_buffer_ops *ops = get_ops(kind)
+    cdef char *tmp
+    cdef int err
+    cdef unicode res
+
+    err = ops.buffer_property(ctx, NULL, NULL, GA_CTX_PROP_DEVNAME, &tmp)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(Gpu_error(ops, ctx, err), err)
+    try:
+        res = tmp.decode('ascii')
+    finally:
+        free(tmp)
+    return res
 
 def zeros(shape, dtype=GA_DOUBLE, order='A', context=None, kind=None,
           cls=None):

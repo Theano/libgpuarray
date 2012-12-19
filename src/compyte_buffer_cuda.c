@@ -1192,6 +1192,72 @@ fail:
     return res;
 }
 
+static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
+                         void *res) {
+  cuda_context *ctx = NULL;
+  CUdevice id;
+  if (c != NULL) {
+    ctx = (cuda_context *)c;
+  } else if (buf != NULL) {
+    ctx = buf->ctx;
+  } else if (k != NULL) {
+    ctx = k->ctx;
+  }
+  if (ctx == NULL) {
+    return GA_VALUE_ERROR;
+  }
+  /* I know that 512 and 1024 are magic numbers.
+     There is an indication in buffer.h, though. */
+  if (prop_id < 512 && c == NULL) {
+    return GA_VALUE_ERROR;
+  } else if (prop_id < 1024 && buf == NULL) {
+    return GA_VALUE_ERROR;
+  } else if (k == NULL) {
+    return GA_VALUE_ERROR;
+  }
+
+  cuda_enter(ctx);
+  if (ctx->err != CUDA_SUCCESS)
+    return GA_IMPL_ERROR;
+
+  switch (prop_id) {
+  case GA_CTX_PROP_DEVNAME:
+    char *tmp;
+    ctx->err = cuCtxGetDevice(&id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    /* 256 is what the CUDA API uses so it's good enough for me */
+    tmp = malloc(256);
+    if (tmp == NULL) {
+      cuda_exit(ctx)
+      return GA_MEMORY_ERROR;
+    }
+    ctx->err = cuDeviceGetName(tmp, 256, id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    *((char **)res) = tmp;
+    cuda_exit(ctx);
+    return GA_NO_ERROR;
+  case GA_KERNEL_MAXLSIZE:
+    int tmp;
+    ctx->err = cuFuncGetAttribute(&tmp,
+                                  CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK,
+                                  k->k);
+    cuda_exit(ctx);
+    if (ctx->err != CUDA_SUCCESS)
+      return GA_IMPL_ERROR;
+    *((size_t *)res) = tmp;
+    return GA_NO_ERROR;
+  default:
+    cuda_exit(ctx)
+    return GA_INVALID_ERROR;
+  }
+}
+
 static const char *cuda_error(void *c) {
   cuda_context *ctx = (cuda_context *)c;
   if (ctx == NULL)
@@ -1217,4 +1283,5 @@ compyte_buffer_ops cuda_ops = {cuda_init,
                                cuda_setkernelargbuf,
                                cuda_callkernel,
                                cuda_extcopy,
+                               cuda_property,
                                cuda_error};

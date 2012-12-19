@@ -68,10 +68,21 @@ typedef struct _compyte_buffer_ops {
                         unsigned int b_nd, const size_t *b_dims,
                         const ssize_t *b_str);
 
+  int (*buffer_property)(void *ctx, gpudata *buf, gpukernel *k, int prop_id,
+                         void *res);
+
   /* Get a string describing the last error that happened
      (may change if you make other api calls) */
   const char *(*buffer_error)(void *ctx);
 } compyte_buffer_ops;
+
+/* Start at 1 for GA_CTX_PROP_ */
+#define GA_CTX_PROP_DEVNAME 1
+
+/* Start at 512 for GA_BUFFER_PROP_ */
+
+/* Start at 1024 for GA_KERNEL_PROP_ */
+#define GA_KERNEL_PROP_MAXLSIZE 1024
 
 typedef enum _ga_usefl {
   GA_USE_CLUDA =      0x01,

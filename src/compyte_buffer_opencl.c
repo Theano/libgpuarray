@@ -883,6 +883,70 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
   return res;
 }
 
+static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
+                       void *res) {
+  cl_ctx *ctx = NULL;
+  cl_device_id id;
+  if (c != NULL) {
+    ctx = (cl_ctx *)c;
+  } else if (buf != NULL) {
+    ctx = buf->ctx;
+  } else if (k != NULL) {
+    ctx = k->ctx;
+  }
+  if (ctx == NULL) {
+    return GA_VALUE_ERROR;
+  }
+  /* I know that 512 and 1024 are magic numbers.
+     There is an indication in buffer.h, though. */
+  if (prop_id < 512) {
+    if (c == NULL)
+      return GA_VALUE_ERROR;
+  } else if (prop_id < 1024) {
+    if (buf == NULL)
+      return GA_VALUE_ERROR;
+  } else {
+    if (k == NULL)
+      return GA_VALUE_ERROR;
+  }
+
+  switch (prop_id) {
+    char *s;
+    size_t sz;
+  case GA_CTX_PROP_DEVNAME:
+    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
+                                &id, NULL);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_NAME, 0, NULL, &sz);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+    s = malloc(sz);
+    if (s == NULL)
+      return GA_MEMORY_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_NAME, sz, s, NULL);
+    if (ctx->err != CL_SUCCESS) {
+      free(s);
+      return GA_IMPL_ERROR;
+    }
+    *((char **)res) = s;
+    return GA_NO_ERROR;
+  case GA_KERNEL_PROP_MAXLSIZE:
+    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
+                                &id, NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    ctx->err = clGetKernelWorkGroupInfo(k->k, id, CL_KERNEL_WORK_GROUP_SIZE,
+                                        sizeof(sz), &sz, NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    *((size_t *)res) = sz;
+    return GA_NO_ERROR;
+  default:
+    return GA_INVALID_ERROR;
+  }
+}
+
 static const char *cl_error(void *c) {
   cl_ctx *ctx = (cl_ctx *)c;
   if (ctx == NULL)
@@ -908,4 +972,5 @@ compyte_buffer_ops opencl_ops = {cl_init,
                                  cl_setkernelargbuf,
                                  cl_callkernel,
                                  cl_extcopy,
+                                 cl_property,
                                  cl_error};

@@ -21,7 +21,8 @@ dtypes_no_complex = ["float32", "float64",
 kind = "opencl"
 #kind = "cuda"
 context = gpuarray.init(kind, 0)
-
+import sys
+print >>sys.stderr, "Testing for", gpuarray.get_devname(kind, context)
 
 def guard_devsup(func):
     def f(*args, **kwargs):
