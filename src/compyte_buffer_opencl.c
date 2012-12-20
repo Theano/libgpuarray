@@ -159,7 +159,8 @@ static int cl_setkernelarg(gpukernel *k, unsigned int index,
 			   int typecode, const void *val);
 static int cl_setkernelargbuf(gpukernel *k, unsigned int index,
 			      gpudata *b);
-static int cl_callkernel(gpukernel *k, size_t);
+static int cl_callkernel(gpukernel *k, size_t bs, size_t gs);
+static int cl_property(void *c, gpudata *b, gpukernel *k, int p, void *r);
 
 static const char CL_PREAMBLE[] =
   "#define local_barrier() barrier(CLK_LOCAL_MEM_FENCE)\n"
@@ -497,7 +498,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
   cl_ctx *ctx = dst->ctx;
   char local_kern[256];
   const char *rlk[1];
-  size_t sz, bytes, n;
+  size_t sz, bytes, n, ls, gs;
   gpukernel *m;
   int r, res = GA_IMPL_ERROR;
 
@@ -562,7 +563,14 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
   res = cl_setkernelargbuf(m, 0, dst);
   if (res != GA_NO_ERROR) goto fail;
 
-  res = cl_callkernel(m, n);
+  /* Cheap kernel scheduling */
+  ctx->err = cl_property(NULL, NULL, m, GA_KERNEL_PROP_MAXLSIZE, &ls);
+  if (ctx->err != CL_SUCCESS) {
+    res = GA_IMPL_ERROR;
+    goto fail;
+  }
+  gs = ((n-1) / ls) + 1;
+  res = cl_callkernel(m, ls, gs);
 
  fail:
   cl_freekernel(m);
@@ -725,12 +733,11 @@ static int cl_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
   return cl_setkernelarg(k, index, GA_DELIM, &b->buf);
 }
 
-static int cl_callkernel(gpukernel *k, size_t n) {
+static int cl_callkernel(gpukernel *k, size_t ls, size_t gs) {
   cl_ctx *ctx = k->ctx;
   cl_event ev;
   cl_event *evw;
   cl_device_id dev;
-  size_t n_max;
   cl_uint num_ev;
   cl_uint num_args;
   cl_uint i;
@@ -738,12 +745,6 @@ static int cl_callkernel(gpukernel *k, size_t n) {
 
   dev = get_dev(ctx->ctx, &res);
   if (dev == NULL) return res;
-
-  ctx->err = clGetKernelWorkGroupInfo(k->k, dev, CL_KERNEL_WORK_GROUP_SIZE,
-				      sizeof(n_max), &n_max, NULL);
-  if (ctx->err != CL_SUCCESS) return GA_IMPL_ERROR;
-
-  if (n > n_max) n = n_max;
 
   ctx->err = clGetKernelInfo(k->k, CL_KERNEL_NUM_ARGS, sizeof(num_args),
 			     &num_args, NULL);
@@ -767,7 +768,8 @@ static int cl_callkernel(gpukernel *k, size_t n) {
     evw = NULL;
   }
 
-  ctx->err = clEnqueueNDRangeKernel(ctx->q, k->k, 1, NULL, &n, NULL,
+  gs *= ls;
+  ctx->err = clEnqueueNDRangeKernel(ctx->q, k->k, 1, NULL, &gs, &ls,
 				    num_ev, evw, &ev);
   free(evw);
   if (ctx->err != CL_SUCCESS) return GA_IMPL_ERROR;
@@ -809,7 +811,7 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
                       const ssize_t *b_str) {
   cl_ctx *ctx = input->ctx;
   char *strs[64];
-  size_t nEls;
+  size_t nEls, ls, gs;
   gpukernel *k;
   unsigned int count = 0;
   int res = GA_SYS_ERROR;
@@ -871,8 +873,14 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
   res = cl_setkernelargbuf(k, 1, output);
   if (res != GA_NO_ERROR) goto kfail;
 
-  assert(nEls < UINT_MAX);
-  res = cl_callkernel(k, nEls);
+  /* Cheap kernel scheduling */
+  ctx->err = cl_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, &ls);
+  if (ctx->err != CL_SUCCESS) {
+    res = GA_IMPL_ERROR;
+    goto fail;
+  }
+  gs = ((nEls-1) / ls) + 1;
+  res = cl_callkernel(k, ls, gs);
 
  kfail:
   cl_freekernel(k);
@@ -886,7 +894,6 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
 static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
                        void *res) {
   cl_ctx *ctx = NULL;
-  cl_device_id id;
   if (c != NULL) {
     ctx = (cl_ctx *)c;
   } else if (buf != NULL) {
@@ -913,6 +920,9 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
   switch (prop_id) {
     char *s;
     size_t sz;
+    size_t *psz;
+    cl_device_id id;
+    cl_uint ui;
   case GA_CTX_PROP_DEVNAME:
     ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
                                 &id, NULL);
@@ -931,6 +941,26 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     }
     *((char **)res) = s;
     return GA_NO_ERROR;
+  case GA_CTX_PROP_MAXLSIZE:
+    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
+                                &id, NULL);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_MAX_WORK_ITEM_SIZES, 0, NULL,
+                               &sz);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+    psz = malloc(sz);
+    if (psz == NULL)
+      return GA_MEMORY_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_MAX_WORK_ITEM_SIZES, sz, psz, NULL);
+    if (ctx->err != CL_SUCCESS) {
+      free(psz);
+      return GA_IMPL_ERROR;
+    }
+    *((size_t *)res) = psz[0];
+    free(psz);
+    return GA_NO_ERROR;
   case GA_KERNEL_PROP_MAXLSIZE:
     ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
                                 &id, NULL);
@@ -941,6 +971,49 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     if (ctx->err != GA_NO_ERROR)
       return GA_IMPL_ERROR;
     *((size_t *)res) = sz;
+    return GA_NO_ERROR;
+  case GA_KERNEL_PROP_PREFLSIZE:
+    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
+                                &id, NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+#ifdef OPENCL_1_1
+    ctx->err = clGetKernelWorkGroupInfo(k->k, id,
+                                CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE,
+                                        sizeof(sz), &sz, NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+#else
+    ctx->err = clGetKernelWorkGroupInfo(k->k, id, CL_KERNEL_WORK_GROUP_SIZE,
+                                        sizeof(sz), &sz, NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    /*
+      This is sort of a guess, AMD generally has 64 and NVIDIA has 32.
+      Since this is a multiple, it would not hurt a lot to overestimate
+      unless we go over the maximum. However underestimating may hurt
+      performance due to the way we do the automatic allocation.
+
+      Also OpenCL 1.0 kind of sucks and this is only used for that.
+    */
+    sz = (64 < sz) ? 64 : sz;
+#endif
+    *((size_t *)res) = sz;
+    return GA_NO_ERROR;
+  case GA_KERNEL_PROP_MAXGSIZE:
+    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id), &id,
+                                NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_ADDRESS_BITS, sizeof(ui), &ui,
+                               NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(sz),
+                               &sz, NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    *((size_t *)res) = (((size_t)1) << ui)/sz;
     return GA_NO_ERROR;
   default:
     return GA_INVALID_ERROR;

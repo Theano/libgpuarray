@@ -59,7 +59,7 @@ typedef struct _compyte_buffer_ops {
   
   /* Call the kernel with the previously specified arguments
      (this is synchronous only for now, might make async later) */
-  int (*buffer_callkernel)(gpukernel *k, size_t n);
+  int (*buffer_callkernel)(gpukernel *k, size_t bs, size_t gs);
 
   /* Function to facilitate copy and cast operations*/
   int (*buffer_extcopy)(gpudata *input, size_t ioff, gpudata *output, size_t ooff,
@@ -77,12 +77,15 @@ typedef struct _compyte_buffer_ops {
 } compyte_buffer_ops;
 
 /* Start at 1 for GA_CTX_PROP_ */
-#define GA_CTX_PROP_DEVNAME 1
+#define GA_CTX_PROP_DEVNAME  1
+#define GA_CTX_PROP_MAXLSIZE 2
 
 /* Start at 512 for GA_BUFFER_PROP_ */
 
 /* Start at 1024 for GA_KERNEL_PROP_ */
-#define GA_KERNEL_PROP_MAXLSIZE 1024
+#define GA_KERNEL_PROP_MAXLSIZE  1024
+#define GA_KERNEL_PROP_PREFLSIZE 1025
+#define GA_KERNEL_PROP_MAXGSIZE  1026
 
 typedef enum _ga_usefl {
   GA_USE_CLUDA =      0x01,

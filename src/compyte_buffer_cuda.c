@@ -836,45 +836,12 @@ static int cuda_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
     return res;
 }
 
-static int do_sched(gpukernel *k, size_t n, unsigned int *bc,
-                    unsigned int *tpb, CUresult *err) {
-    CUdevice dev;
-    int min_t;
-    int max_t;
-    int max_b;
-
-    *err = cuCtxGetDevice(&dev);
-    if (*err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-    *err = cuDeviceGetAttribute(&min_t, CU_DEVICE_ATTRIBUTE_WARP_SIZE, dev);
-    if (*err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-    *err = cuFuncGetAttribute(&max_t, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK,
-			      k->k);
-    if (*err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-    *err = cuDeviceGetAttribute(&max_b, CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_X,
-				dev);
-    if (*err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-
-    if (n < (unsigned)(max_t)) {
-        *bc = (unsigned)(n + min_t - 1) / min_t;
-        *tpb = min_t;
-    } else if (n < (unsigned)(max_b * max_t)) {
-        *bc = (unsigned)(n + max_t - 1) / max_t;
-        *tpb = max_t;
-    } else {
-        *bc = max_b;
-        *tpb = max_t;
-    }
-    return GA_NO_ERROR;
-}
-
 #define ALIGN_UP(offset, align) ((offset) + (align) - 1) & ~((align) - 1)
 
-static int cuda_callkernel(gpukernel *k, size_t n) {
+static int cuda_callkernel(gpukernel *k, size_t bs, size_t gs) {
     cuda_context *ctx = k->ctx;
     int res;
     unsigned int i;
-    unsigned int block_count;
-    unsigned int threads_per_block;
 #if CUDA_VERSION < 4000
     size_t total = 0;
     size_t align, sz;
@@ -883,12 +850,6 @@ static int cuda_callkernel(gpukernel *k, size_t n) {
     cuda_enter(ctx);
     if (ctx->err != CUDA_SUCCESS)
       return GA_IMPL_ERROR;
-
-    res = do_sched(k, n, &block_count, &threads_per_block, &ctx->err);
-    if (res != GA_NO_ERROR) {
-      cuda_exit(ctx);
-      return res;
-    }
 
     for (i = 0; i < k->argcount; i++) {
         if (k->bs[i] != NULL) {
@@ -901,8 +862,8 @@ static int cuda_callkernel(gpukernel *k, size_t n) {
     }
 
 #if CUDA_VERSION >= 4000
-    ctx->err = cuLaunchKernel(k->k, block_count, 1, 1, threads_per_block, 1, 1,
-                              0, ctx->s, k->args, NULL);
+    ctx->err = cuLaunchKernel(k->k, gs, 1, 1, bs, 1, 1, 0, ctx->s, k->args,
+                              NULL);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
@@ -929,12 +890,12 @@ static int cuda_callkernel(gpukernel *k, size_t n) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
-    ctx->err = cuFuncSetBlockShape(k->k, threads_per_block, 1, 1);
+    ctx->err = cuFuncSetBlockShape(k->k, bs, 1, 1);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
-    ctx->err = cuLaunchGridAsync(k->k, block_count, 1, ctx->s);
+    ctx->err = cuLaunchGridAsync(k->k, gs, 1, ctx->s);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
@@ -1195,7 +1156,6 @@ fail:
 static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
                          void *res) {
   cuda_context *ctx = NULL;
-  CUdevice id;
   if (c != NULL) {
     ctx = (cuda_context *)c;
   } else if (buf != NULL) {
@@ -1221,36 +1181,81 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     return GA_IMPL_ERROR;
 
   switch (prop_id) {
+    char *s;
+    CUdevice id;
+    int i;
   case GA_CTX_PROP_DEVNAME:
-    char *tmp;
     ctx->err = cuCtxGetDevice(&id);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
     /* 256 is what the CUDA API uses so it's good enough for me */
-    tmp = malloc(256);
-    if (tmp == NULL) {
+    s = malloc(256);
+    if (s == NULL) {
       cuda_exit(ctx)
       return GA_MEMORY_ERROR;
     }
-    ctx->err = cuDeviceGetName(tmp, 256, id);
+    ctx->err = cuDeviceGetName(s, 256, id);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
-    *((char **)res) = tmp;
+    *((char **)res) = s;
     cuda_exit(ctx);
     return GA_NO_ERROR;
-  case GA_KERNEL_MAXLSIZE:
-    int tmp;
-    ctx->err = cuFuncGetAttribute(&tmp,
+  case GA_CTX_PROP_MAXLSIZE:
+    ctx->err = cuCtxGetDevice(&id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    ctx->err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_X,
+                                    id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    *((size_t *)res) = i;
+    cuda_exit(ctx);
+    return GA_NO_ERROR;
+  case GA_KERNEL_PROP_MAXLSIZE:
+    ctx->err = cuFuncGetAttribute(&i,
                                   CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK,
                                   k->k);
     cuda_exit(ctx);
     if (ctx->err != CUDA_SUCCESS)
       return GA_IMPL_ERROR;
-    *((size_t *)res) = tmp;
+    *((size_t *)res) = i;
+    return GA_NO_ERROR;
+  case GA_KERNEL_PROP_PREFLSIZE:
+    ctx->err = cuCtxGetDevice(&id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    ctx->err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_WARP_SIZE, id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    *((size_t *)res) = i;
+    cuda_exit(ctx);
+    return GA_NO_ERROR;
+  case GA_KERNEL_PROP_MAXGSIZE:
+    ctx->err = cuCtxGetDevice(&id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    ctx->err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_X,
+                                    id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    *((size_t *)res) = i;
+    cuda_exit(ctx);
     return GA_NO_ERROR;
   default:
     cuda_exit(ctx)

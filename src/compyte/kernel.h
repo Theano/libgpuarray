@@ -30,7 +30,7 @@ COMPYTE_PUBLIC int GpuKernel_setarg(GpuKernel *, unsigned int index,
 COMPYTE_PUBLIC int GpuKernel_setbufarg(GpuKernel *, unsigned int index,
                                        GpuArray *);
 
-COMPYTE_PUBLIC int GpuKernel_call(GpuKernel *, size_t n);
+COMPYTE_PUBLIC int GpuKernel_call(GpuKernel *, size_t n, size_t ls, size_t gs);
 
 #ifdef __cplusplus
 }

@@ -31,6 +31,48 @@ int GpuKernel_setbufarg(GpuKernel *k, unsigned int index, GpuArray *a) {
   return k->ops->buffer_setkernelargbuf(k->k, index, a->data);
 }
 
-int GpuKernel_call(GpuKernel *k, size_t n) {
-  return k->ops->buffer_callkernel(k->k, n);
+static int do_sched(GpuKernel *k, size_t n, size_t *ls, size_t *gs) {
+  size_t min_l;
+  size_t max_l;
+  size_t max_g;
+  int err;
+
+  err = k->ops->buffer_property(NULL, NULL, k->k, GA_KERNEL_PROP_MAXLSIZE,
+                                &max_l);
+  if (err != GA_NO_ERROR)
+    return err;
+  err = k->ops->buffer_property(NULL, NULL, k->k, GA_KERNEL_PROP_PREFLSIZE,
+                                &min_l);
+  if (err != GA_NO_ERROR)
+    return err;
+  err = k->ops->buffer_property(NULL, NULL, k->k, GA_KERNEL_PROP_MAXGSIZE,
+                                &max_g);
+  if (err != GA_NO_ERROR)
+    return err;
+  if (*gs == 0) {
+    if (*ls == 0) {
+      if (n < max_l)
+        *ls = min_l;
+      else
+        *ls = max_l;
+    }
+    *gs = ((n-1) / (*ls)) + 1;
+    if (*gs > max_g)
+      *gs = max_g;
+  } else if (*ls == 0) {
+    *ls = (n-1) / ((*gs)-1);
+    if (*ls > max_l)
+      *ls = max_l;
+  }
+  return GA_NO_ERROR;
+}
+
+int GpuKernel_call(GpuKernel *k, size_t n, size_t bs, size_t gs) {
+  int err;
+  if (bs == 0 || gs == 0) {
+    err = do_sched(k, n, &bs, &gs);
+    if (err != GA_NO_ERROR)
+      return err;
+  }
+  return k->ops->buffer_callkernel(k->k, bs, gs);
 }

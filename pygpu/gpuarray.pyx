@@ -99,7 +99,7 @@ cdef extern from "compyte/kernel.h":
                          void *arg)
     int GpuKernel_setbufarg(_GpuKernel *k, unsigned int index,
                             _GpuArray *a)
-    int GpuKernel_call(_GpuKernel *, size_t n)
+    int GpuKernel_call(_GpuKernel *, size_t n, size_t ls, size_t gs)
 
 cdef extern from "compyte/array.h":
     ctypedef struct _GpuArray "GpuArray":
@@ -383,9 +383,15 @@ cdef kernel_setbufarg(GpuKernel k, unsigned int index, GpuArray a):
     if err != GA_NO_ERROR:
         raise GpuArrayException(kernel_error(k, err), err)
 
-cdef kernel_call(GpuKernel k, size_t n):
+cdef kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs):
     cdef int err
-    err = GpuKernel_call(&k.k, n)
+    err = GpuKernel_call(&k.k, n, ls, gs)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(kernel_error(k, err), err)
+
+cdef kernel_property(GpuKernel k, int prop_id, void *res):
+    cdef int err
+    err = k.k.ops.buffer_property(NULL, NULL, k.k.k, prop_id, res)
     if err != GA_NO_ERROR:
         raise GpuArrayException(kernel_error(k, err), err)
 
@@ -967,11 +973,11 @@ cdef class GpuKernel:
         l = len(ss)
         kernel_init(self, ops, ctx, 1, s, &l, name, flags)
 
-    def __call__(self, *args, n=None):
-        if n is None:
-            raise ValueError("Must specify size (n)")
+    def __call__(self, *args, n=None, ls=0, gs=0):
+        if n is None and (ls == 0 or gs == 0):
+            raise ValueError("Must specify size (n) or both gs and ls")
         self.setargs(args)
-        self.call(n)
+        self.call(n, gs, ls)
 
     cpdef setargs(self, args):
         # Work backwards to avoid a lot of reallocations in the argument code.
@@ -1034,5 +1040,11 @@ cdef class GpuKernel:
         else:
             raise ValueError("Can't set argument of this type")
 
-    cpdef call(self, size_t n):
-        kernel_call(self, n)
+    cpdef call(self, size_t n, size_t ls, size_t gs):
+        kernel_call(self, n, ls, gs)
+
+    property maxlsize:
+        def __get__(self):
+            cdef size_t res
+            kernel_property(self, GA_KERNEL_PROP_MAXLSIZE, &res)
+            return res
