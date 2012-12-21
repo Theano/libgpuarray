@@ -183,7 +183,7 @@ KERNEL void ${name}(
   GLOBAL_MEM char *tmp;
 
 % for i, arg in enumerate(arguments):
-  % if arg.isarray():
+  % if arg.isarray() and offsets[i] != 0:
   tmp = (GLOBAL_MEM char *)${arg.name}_data; tmp += ${offsets[i]};
   ${arg.name}_data = (${arg.decltype()})tmp;
   % endif
@@ -205,7 +205,7 @@ KERNEL void ${name}(
         pos = ii;
     % endif
     % for a, arg in enumerate(arguments):
-        % if arg.isarray():
+        % if arg.isarray() and strs[a][i] != 0:
             ${arg.name}_p += pos * ${strs[a][i]};
         % endif
     % endfor
