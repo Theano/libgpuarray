@@ -17,10 +17,13 @@ class Argument(object):
         self.dtype = dtype
         self.name = name
 
+    def ctype(self):
+        return dtype_to_ctype(self.dtype)
+
 
 class ArrayArg(Argument):
     def decltype(self):
-        return "GLOBAL_MEM %s *" % (dtype_to_ctype(self.dtype))
+        return "GLOBAL_MEM %s *" % (self.ctype(),)
 
     def expr(self):
         return "%s[i]" % (self.name,)
@@ -31,7 +34,7 @@ class ArrayArg(Argument):
 
 class ScalarArg(Argument):
     def decltype(self):
-        return dtype_to_ctype(self.dtype)
+        return self.ctype()
 
     def expr(self):
         return self.name

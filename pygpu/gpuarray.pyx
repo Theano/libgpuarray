@@ -77,7 +77,12 @@ cdef extern from "compyte/buffer.h":
                             void *res)
 
     int GA_CTX_PROP_DEVNAME
+    int GA_CTX_PROP_MAXLSIZE
+    int GA_CTX_PROP_LMEMSIZE
+    int GA_CTX_PROP_NUMPROCS
     int GA_KERNEL_PROP_MAXLSIZE
+    int GA_KERNEL_PROP_PREFLSIZE
+    int GA_KERNEL_PROP_MAXGSIZE
 
     cdef enum ga_usefl:
         GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF
@@ -398,6 +403,12 @@ cdef kernel_property(GpuKernel k, int prop_id, void *res):
 cdef compyte_buffer_ops *GpuArray_ops = NULL
 cdef void *GpuArray_ctx = NULL
 
+cdef ctx_property(compyte_buffer_ops *ops, void *ctx, int prop_id, void *res):
+    cdef int err
+    err = ops.buffer_property(ctx, NULL, NULL, prop_id, res)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(Gpu_error(ops, ctx, err), err)
+
 cdef compyte_buffer_ops *get_ops(kind) except NULL:
     cdef compyte_buffer_ops *res
     res = compyte_get_ops(kind)
@@ -441,16 +452,34 @@ def get_devname(kind, size_t c):
     cdef void *ctx = get_ctx(c)
     cdef compyte_buffer_ops *ops = get_ops(kind)
     cdef char *tmp
-    cdef int err
     cdef unicode res
 
-    err = ops.buffer_property(ctx, NULL, NULL, GA_CTX_PROP_DEVNAME, &tmp)
-    if err != GA_NO_ERROR:
-        raise GpuArrayException(Gpu_error(ops, ctx, err), err)
+    ctx_property(ops, ctx, GA_CTX_PROP_DEVNAME, &tmp)
     try:
         res = tmp.decode('ascii')
     finally:
         free(tmp)
+    return res
+
+def get_maxlsize(kind, size_t c):
+    cdef void *ctx = get_ctx(c)
+    cdef compyte_buffer_ops *ops = get_ops(kind)
+    cdef size_t res
+    ctx_property(ops, ctx, GA_CTX_PROP_MAXLSIZE, &res)
+    return res
+
+def get_lmemsize(kind, size_t c):
+    cdef void *ctx = get_ctx(c)
+    cdef compyte_buffer_ops *ops = get_ops(kind)
+    cdef size_t res
+    ctx_property(ops, ctx, GA_CTX_PROP_LMEMSIZE, &res)
+    return res
+
+def get_numprocs(kind, size_t c):
+    cdef void *ctx = get_ctx(c)
+    cdef compyte_buffer_ops *ops = get_ops(kind)
+    cdef unsigned int res
+    ctx_property(ops, ctx, GA_CTX_PROP_NUMPROCS, &res)
     return res
 
 def zeros(shape, dtype=GA_DOUBLE, order='A', context=None, kind=None,
@@ -1047,4 +1076,16 @@ cdef class GpuKernel:
         def __get__(self):
             cdef size_t res
             kernel_property(self, GA_KERNEL_PROP_MAXLSIZE, &res)
+            return res
+
+    property preflsize:
+        def __get__(self):
+            cdef size_t res
+            kernel_property(self, GA_KERNEL_PROP_PREFLSIZE, &res)
+            return res
+
+    property maxgsize:
+        def __get__(self):
+            cdef size_t res
+            kernel_property(self, GA_KERNEL_PROP_MAXGSIZE, &res)
             return res
