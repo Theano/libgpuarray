@@ -973,8 +973,8 @@ cdef class GpuKernel:
         l = len(ss)
         kernel_init(self, ops, ctx, 1, s, &l, name, flags)
 
-    def __call__(self, *args, n=None, ls=0, gs=0):
-        if n is None and (ls == 0 or gs == 0):
+    def __call__(self, *args, n=0, ls=0, gs=0):
+        if n == 0 and (ls == 0 or gs == 0):
             raise ValueError("Must specify size (n) or both gs and ls")
         self.setargs(args)
         self.call(n, gs, ls)
