@@ -1,11 +1,11 @@
 from mako.template import Template
 
-from tools import ScalarArg, ArrayArg, as_argument
+from tools import ScalarArg, ArrayArg, as_argument, check_args
 from dtypes import parse_c_arg_backend
+from dtypes import dtype_to_ctype, get_np_obj, get_common_dtype
 
 import numpy
 import gpuarray
-from dtypes import dtype_to_ctype, get_np_obj, get_common_dtype
 
 # parameters: preamble, name, nd, arguments, expression
 basic_kernel = Template("""
@@ -250,10 +250,9 @@ class ElemwiseKernel(object):
         self._dimspec_limit = dimspec_limit
 
         if not any(isinstance(arg, ArrayArg) for arg in self.arguments):
-            raise RuntimeError(
-                "ElemwiseKernel can only be used with "
-                "functions that have at least one "
-                "vector argument")
+            raise RuntimeError("ElemwiseKernel can only be used with "
+                               "functions that have at least one "
+                               "vector argument.")
 
         have_small = False
         have_double = False
@@ -364,65 +363,8 @@ class ElemwiseKernel(object):
     def prepare_args_specialized(self, args):
         self.kernel_args = args
 
-    def check_args(self, args, collapse=True):
-        arrays = []
-        strs = []
-        offsets = []
-        for arg in args:
-            if isinstance(arg, gpuarray.GpuArray):
-                strs.append(arg.strides)
-                offsets.append(arg.offset)
-                arrays.append(arg)
-            else:
-                strs.append(None)
-                offsets.append(None)
-
-        if len(arrays) < 1:
-            raise ArugmentError("No arrays in kernel arguments, "
-                                "something is wrong")
-        n = arrays[0].size
-        nd = arrays[0].ndim
-        dims = arrays[0].shape
-        c_contig = True
-        f_contig = True
-        for ary in arrays:
-            if dims != ary.shape:
-                raise ValueError("Some array differs from the others in shape")
-            c_contig = c_contig and ary.flags['C_CONTIGUOUS']
-            f_contig = f_contig and ary.flags['F_CONTIGUOUS']
-
-        contig = c_contig or f_contig
-
-        if not contig and collapse and nd > 1:
-            # make the strides and dims editable
-            dims = list(dims)
-            strs = [list(str) for str in strs]
-            # remove dimensions that are of size 1
-            for i in range(nd-1, -1, -1):
-                if dims[i] == 1:
-                    del dims[i]
-                    for str in strs:
-                        del str[i]
-                    nd -= 1
-
-            # collapse contiguous dimensions
-            for i in range(nd-1, 0, -1):
-                if all(str[i] * dims[i] == str[i-1] for str in strs):
-                    dims[i-1] *= dims[i]
-                    del dims[i]
-                    for str in strs:
-                        str[i-1] = str[i]
-                        del str[i]
-                    nd -= 1
-            # re-wrap dims and tuples
-            dims = tuple(dims)
-            strs = [tuple(str) for str in strs]
-
-        self.n = n
-        return nd, dims, strs, offsets, contig
-
     def select_kernel(self, args):
-        nd, dims, strs, offsets, contig = self.check_args(args)
+        self.n, nd, dims, strs, offsets, contig = check_args(args)
         if contig:
             self.prepare_args_contig(args, offsets)
             return self.contig_k
@@ -459,7 +401,7 @@ class ElemwiseKernel(object):
         return self.get_basic(args, nd, dims, strs, offsets)
 
     def prepare(self, *args):
-        nd, dims, strs, contig = self.check_args(args)
+        self.n, nd, dims, strs, contig = check_args(args)
         if contig:
             self.prepare_args_contig(args)
             self._prepare_k = self.contig_k
@@ -477,24 +419,24 @@ class ElemwiseKernel(object):
         k(*self.kernel_args, n=self.n)
 
     def call_contig(self, *args):
-        nd, dims, strs, offsets, contig = self.check_args(args)
+        self.n, nd, dims, strs, offsets, contig = check_args(args)
         if not contig:
             raise ValueError("Can't call contig on non-contiguous data")
         self.prepare_args_contig(args, offsets)
         self.contig_k(*self.kernel_args, n=self.n)
 
     def call_basic(self, *args):
-        nd, dims, strs, offsets, _ = self.check_args(args)
+        self.n, nd, dims, strs, offsets, _ = check_args(args)
         k = self.get_basic(args, nd, dims, strs, offsets)
         k(*self.kernel_args, n=self.n)
 
     def call_dimspec(self, *args):
-        nd, dims, strs, offsets, _ = self.check_args(args)
+        self.n, nd, dims, strs, offsets, _ = check_args(args)
         k = self.get_dimspec(args, nd, dims, strs, offsets)
         k(*self.kernel_args, n=self.n)
 
     def call_specialized(self, *args):
-        nd, dims, strs, offsets, _ = self.check_args(args)
+        self.n, nd, dims, strs, offsets, _ = check_args(args)
         k = self.get_specialized(args, nd, dims, strs, offsets)
         k(*self.kernel_args, n=self.n)
 
