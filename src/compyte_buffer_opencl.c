@@ -961,6 +961,16 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((size_t *)res) = psz[0];
     free(psz);
     return GA_NO_ERROR;
+  case GA_CTX_PROP_LMEMSIZE:
+    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
+                                &id, NULL);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_LOCAL_MEM_SIZE, 0, NULL, &sz);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+    *((size_t *)res) = sz;
+    return GA_NO_ERROR;
   case GA_KERNEL_PROP_MAXLSIZE:
     ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
                                 &id, NULL);

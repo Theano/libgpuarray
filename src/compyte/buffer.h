@@ -79,6 +79,7 @@ typedef struct _compyte_buffer_ops {
 /* Start at 1 for GA_CTX_PROP_ */
 #define GA_CTX_PROP_DEVNAME  1
 #define GA_CTX_PROP_MAXLSIZE 2
+#define GA_CTX_PROP_LMEMSIZE 3
 
 /* Start at 512 for GA_BUFFER_PROP_ */
 
