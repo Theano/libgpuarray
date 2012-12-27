@@ -93,6 +93,8 @@ def test_elemwise_layouts():
                     for order in ['c', 'f']:
                         yield elemwise_layouts, shape, offseted_outer, \
                             offseted_inner, sliced, order
+                        yield elemwise_layouts_mixed, shape, offseted_outer, \
+                            offseted_inner, sliced, order
 
 
 @guard_devsup
@@ -125,6 +127,40 @@ def elemwise_layouts(shape, offseted_outer, offseted_inner, sliced, order):
     # test specialized
     outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
     k.call_specialized(ag, bg, outg)
+    assert numpy.allclose(numpy.asarray(outg), outc)
+
+
+@guard_devsup
+def elemwise_layouts_mixed(shape, offseted_outer, offseted_inner, sliced,
+                           order):
+    ac, ag = gen_gpuarray(shape, dtype='float32', sliced=sliced, order=order,
+                          offseted_outer=offseted_outer,
+                          offseted_inner=offseted_inner,
+                          kind=kind, ctx=context)
+    b = numpy.asarray(2.0, dtype='float32')
+
+    outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
+
+    k = ElemwiseKernel(kind, context, "float *a, float b, float *c",
+                       "c[i] = a[i] + b")
+    # will use contig or basic
+    k(ag, b, outg)
+    outc = ac + b
+    assert numpy.allclose(numpy.asarray(outg), outc)
+
+    # test basic
+    outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
+    k.call_basic(ag, b, outg)
+    assert numpy.allclose(numpy.asarray(outg), outc)
+
+    # test dimspec
+    outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
+    k.call_dimspec(ag, b, outg)
+    assert numpy.allclose(numpy.asarray(outg), outc)
+
+    # test specialized
+    outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
+    k.call_specialized(ag, b, outg)
     assert numpy.allclose(numpy.asarray(outg), outc)
 
 
