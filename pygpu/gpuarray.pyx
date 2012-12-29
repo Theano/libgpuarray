@@ -778,10 +778,10 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
     def view(self, cls=None):
         cdef GpuArray res = new_GpuArray(cls)
         array_view(res, self)
-        base = self
-        while hasattr(base, 'base') and base.base is not None:
-            base = base.base
-        res.base = base
+        if self.base is not None:
+            res.base = self.base
+        else:
+            res.base = self
         return res
 
     def astype(self, dtype, order='A', copy=True):
@@ -875,9 +875,10 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
                 stops[i] = self.ga.dimensions[i]
                 steps[i] = 1
 
-            base = self
-            while hasattr(base, 'base') and base.base is not None:
-                base = base.base
+            if self.base is not None:
+                base = self.base
+            else:
+                base = self
             res = new_GpuArray(self.__class__)
             array_index(res, self, starts, stops, steps)
             res.base = base
