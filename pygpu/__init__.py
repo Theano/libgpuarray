@@ -4,3 +4,5 @@ def get_include():
     assert os.path.exists(os.path.join(p, 'pygpu/gpuarray.h'))
     return p
 
+from . import gpuarray
+from .gpuarray import init, set_kind_context, array, zeros, empty
