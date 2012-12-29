@@ -198,6 +198,162 @@ int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
   return GA_NO_ERROR;
 }
 
+int GpuArray_reshape(GpuArray *res, GpuArray *a, unsigned int nd,
+                      size_t *newdims, ga_order ord, int nocopy) {
+  ssize_t *newstrides;
+  size_t np;
+  size_t op;
+  size_t newsize = 1;
+  size_t oldsize = 1;
+  unsigned int ni = 0;
+  unsigned int oi = 0;
+  unsigned int nj = 1;
+  unsigned int oj = 1;
+  unsigned int nk;
+  unsigned int ok;
+  unsigned int i;
+  int err;
+
+  if (ord == GA_ANY_ORDER && GpuArray_ISFORTRAN(a) && a->nd > 1)
+    ord = GA_F_ORDER;
+
+  for (i = 0; i < a->nd; i++) {
+    oldsize *= a->dimensions[i];
+  }
+
+  for (i = 0; i < nd; i++) {
+    size_t d = newdims[i];
+    if ((d >= MUL_NO_OVERFLOW || newsize >= MUL_NO_OVERFLOW) &&
+	d > 0 && SIZE_MAX / d < newsize)
+      return GA_INVALID_ERROR;
+    newsize *= d;
+  }
+
+  if (newsize != oldsize) return GA_INVALID_ERROR;
+
+  res->ops = a->ops;
+  res->data = a->data;
+  res->offset = a->offset;
+  res->typecode = a->typecode;
+  res->flags = a->flags & ~GA_OWNDATA;
+
+  /* If the source and desired layouts are the same, then just copy
+     strides and dimensions */
+  if ((ord != GA_F_ORDER && GpuArray_CHKFLAGS(a, GA_C_CONTIGUOUS)) ||
+      (ord == GA_F_ORDER && GpuArray_CHKFLAGS(a, GA_F_CONTIGUOUS))) {
+    goto do_final_copy;
+  }
+
+  newstrides = calloc(nd, sizeof(ssize_t));
+  if (newstrides == NULL)
+    return GA_MEMORY_ERROR;
+
+  while (ni < nd && oi < a->nd) {
+    np = newdims[ni];
+    op = a->dimensions[oi];
+
+    while (np != op) {
+      if (np < op) {
+        np *= newdims[nj++];
+      } else {
+        op *= a->dimensions[oj++];
+      }
+    }
+
+    for (ok = oi; ok < oj - 1; ok++) {
+      if (ord == GA_F_ORDER) {
+        if (a->strides[ok+1] != a->dimensions[ok]*a->strides[ok])
+          goto need_copy;
+      } else {
+        if (a->strides[ok] != a->dimensions[ok+1]*a->strides[ok+1])
+          goto need_copy;
+      }
+    }
+
+    if (ord == GA_F_ORDER) {
+      newstrides[ni] = a->strides[oi];
+      for (nk = ni + 1; nk < nj; nk++) {
+        newstrides[nk] = newstrides[nk - 1]*newdims[nk - 1];
+      }
+    } else {
+      newstrides[nj-1] = a->strides[oj-1];
+      for (nk = nj-1; nk > ni; nk--) {
+        newstrides[nk-1] = newstrides[nk]*newdims[nk];
+      }
+    }
+    ni = nj++;
+    oi = oj++;
+  }
+
+  /* Fixup trailing ones */
+  if (ord == GA_F_ORDER) {
+    for (i = nj-1; i < nd; i++) {
+      newstrides[i] = newstrides[i-1] * newdims[i-1];
+    }
+  } else {
+    for (i = nj-1; i < nd; i++) {
+      newstrides[i] = compyte_get_elsize(res->typecode);
+    }
+  }
+
+  res->nd = nd;
+  /* We reuse newstrides since it was allocated in this function.
+     Can't do the same with newdims (which is a parameter). */
+  res->strides = newstrides;
+  res->dimensions = calloc(nd, sizeof(size_t));
+  if (res->dimensions == NULL) {
+    GpuArray_clear(res);
+    return GA_MEMORY_ERROR;
+  }
+  memcpy(res->dimensions, newdims, res->nd*sizeof(size_t));
+
+  goto fix_flags;
+ need_copy:
+  free(newstrides);
+  GpuArray_clear(res);
+  if (nocopy)
+    return GA_VALUE_ERROR; /* Might want a better error code */
+
+  err = GpuArray_copy(res, a, ord);
+  if (err != GA_NO_ERROR) return err;
+  free(res->dimensions);
+  free(res->strides);
+
+ do_final_copy:
+  res->nd = nd;
+  res->dimensions = calloc(res->nd, sizeof(size_t));
+  res->strides = calloc(res->nd, sizeof(ssize_t));
+  if (res->dimensions == NULL || res->strides == NULL) {
+    GpuArray_clear(res);
+    return GA_MEMORY_ERROR;
+  }
+  memcpy(res->dimensions, newdims, res->nd*sizeof(size_t));
+  if (ord == GA_F_ORDER) {
+    if (res->nd > 0)
+      res->strides[0] = compyte_get_elsize(res->typecode);
+    for (i = 1; i < res->nd; i++) {
+      res->strides[i] = res->strides[i-1] * res->dimensions[i-1];
+    }
+  } else {
+    if (res->nd > 0)
+      res->strides[res->nd-1] = compyte_get_elsize(res->typecode);
+    for (i = res->nd-1; i > 0; i--) {
+      res->strides[i-1] = res->strides[i] * res->dimensions[i];
+    }
+  }
+
+ fix_flags:
+  if (GpuArray_is_c_contiguous(res))
+    res->flags |= GA_C_CONTIGUOUS;
+  else
+    res->flags &= ~GA_C_CONTIGUOUS;
+  if (GpuArray_is_f_contiguous(res))
+    res->flags |= GA_F_CONTIGUOUS;
+  else
+    res->flags &= ~GA_F_CONTIGUOUS;
+  return GA_NO_ERROR;
+}
+
 void GpuArray_clear(GpuArray *a) {
   if (a->data && GpuArray_OWNSDATA(a))
     a->ops->buffer_free(a->data);

@@ -142,6 +142,8 @@ cdef extern from "compyte/array.h":
     int GpuArray_view(_GpuArray *v, _GpuArray *a)
     int GpuArray_index(_GpuArray *r, _GpuArray *a, ssize_t *starts,
                        ssize_t *stops, ssize_t *steps)
+    int GpuArray_reshape(_GpuArray *res, _GpuArray *a, unsigned int nd,
+                         size_t *newdims, ga_order ord, int nocopy)
 
     void GpuArray_clear(_GpuArray *a)
 
@@ -317,6 +319,13 @@ cdef array_index(GpuArray r, GpuArray a, ssize_t *starts, ssize_t *stops,
                  ssize_t *steps):
     cdef int err
     err = GpuArray_index(&r.ga, &a.ga, starts, stops, steps)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(GpuArray_error(&a.ga, err), err)
+
+cdef array_reshape(GpuArray res, GpuArray a, unsigned int nd, size_t *newdims,
+                   ga_order ord, int nocopy):
+    cdef int err
+    err = GpuArray_reshape(&res.ga, &a.ga, nd, newdims, ord, nocopy)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
@@ -789,6 +798,27 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
         array_move(res, self)
         return res
 
+    def reshape(self, shape, order=GA_C_ORDER):
+        cdef size_t *newdims
+        cdef unsigned int nd
+        cdef unsigned int i
+        cdef GpuArray res
+        nd = len(shape)
+        newdims = <size_t *>calloc(nd, sizeof(size_t))
+        try:
+            for i in range(nd):
+                newdims[i] = shape[i]
+            res = new_GpuArray(self.__class__)
+            array_reshape(res, self, nd, newdims, to_ga_order(order), 0)
+        finally:
+            free(newdims)
+        if not py_CHKFLAGS(res, GA_OWNDATA):
+            if self.base is not None:
+                res.base = self.base
+            else:
+                res.base = self
+        return res
+
     def __len__(self):
         if self.ga.nd > 0:
             return self.ga.dimensions[0]
@@ -879,7 +909,30 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
             return tuple(res)
 
         def __set__(self, newshape):
-            raise NotImplementedError("TODO: call reshape")
+            cdef size_t *newdims
+            cdef unsigned int nd
+            cdef unsigned int i
+            cdef GpuArray res
+            nd = len(newshape)
+            newdims = <size_t *>calloc(nd, sizeof(size_t))
+            if newdims == NULL:
+                raise MemoryError("calloc")
+            try:
+                for i in range(nd):
+                    newdims[i] = newshape[i]
+                res = new_GpuArray(GpuArray)
+                array_reshape(res, self, nd, newdims, GA_C_ORDER, 1)
+            finally:
+                free(newdims)
+            # This is safe becase the reshape above is a nocopy one
+            free(self.ga.dimensions)
+            free(self.ga.strides)
+            self.ga.dimensions = res.ga.dimensions
+            self.ga.strides = res.ga.strides
+            self.ga.nd = nd
+            res.ga.dimensions = NULL
+            res.ga.strides = NULL
+            array_clear(res)
 
     property size:
         "The number of elements in this object."

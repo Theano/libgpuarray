@@ -334,6 +334,39 @@ def copy_view(shp, dtype, offseted, order1, order2):
     check_flags(g, copy.copy(a.view()))
 
 
+def test_shape():
+    for shps in [((), (1,)), ((5,), (1, 5)), ((5,), (5, 1)), ((2, 3), (6,)),
+                 ((6,), (2, 3))]:
+        for offseted in [True, False]:
+            for order1 in ['c', 'f']:
+                yield shape_, shps, offseted, order1
+                for order2 in ['a', 'c', 'f']:
+                    yield reshape, shps, offseted, order1, order2
+
+
+def shape_(shps, offseted, order):
+    ac, ag = gen_gpuarray(shps[0], 'float32', offseted, order=order,
+                          kind=kind, ctx=ctx)
+    try:
+        ac.shape = shps[1]
+    except AttributeError:
+        # If numpy says it can't be done, we don't try to test it
+        return
+    ag.shape = shps[1]
+    assert ac.strides == ag.strides
+    assert numpy.allclose(ac, numpy.asarray(ag))
+
+
+def reshape(shps, offseted, order1, order2):
+    ac, ag = gen_gpuarray(shps[0], 'float32', offseted, order=order1,
+                          kind=kind, ctx=ctx)
+    outc = ac.reshape(shps[1], order=order2)
+    outg = ag.reshape(shps[1], order=order2)
+    assert outc.shape == outg.shape
+    assert outc.strides == outg.strides
+    assert numpy.allclose(outc, numpy.asarray(outg))
+
+
 def test_len():
     for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:

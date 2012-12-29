@@ -70,6 +70,7 @@ COMPYTE_PUBLIC int GpuArray_view(GpuArray *v, GpuArray *a);
 COMPYTE_PUBLIC int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
                    ssize_t *steps);
 
+COMPYTE_PUBLIC int GpuArray_reshape(GpuArray *res, GpuArray *a, unsigned int nd, size_t *newdims, ga_order ord, int nocopy);
 COMPYTE_PUBLIC void GpuArray_clear(GpuArray *a);
 
 COMPYTE_PUBLIC int GpuArray_share(GpuArray *a, GpuArray *b);
