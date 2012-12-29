@@ -21,7 +21,7 @@
 int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 		   int typecode, unsigned int nd, size_t *dims, ga_order ord) {
   size_t size = compyte_get_elsize(typecode);
-  int i;
+  unsigned int i;
   int res = GA_NO_ERROR;
 
   if (ops == NULL)
@@ -62,14 +62,14 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
   /* mults will not overflow, checked on entry */
   switch (ord) {
   case GA_C_ORDER:
-    for (i = nd-1; i >= 0; i--) {
-      a->strides[i] = size;
-      size *= a->dimensions[i];
+    for (i = nd; i > 0; i--) {
+      a->strides[i-1] = size;
+      size *= a->dimensions[i-1];
     }
     a->flags |= GA_C_CONTIGUOUS;
     break;
   case GA_F_ORDER:
-    for (i = 0; (unsigned)i < nd; i++) {
+    for (i = 0; i < nd; i++) {
       a->strides[i] = size;
       size *= a->dimensions[i];
     }
