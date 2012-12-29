@@ -445,6 +445,9 @@ def set_kind_context(kind, size_t ctx):
     GpuArray_ops = get_ops(kind)
 
 def init(kind, int devno):
+    """
+    init(kind, devno)
+    """
     cdef int err = GA_NO_ERROR
     cdef void *ctx
     cdef compyte_buffer_ops *ops
@@ -493,6 +496,9 @@ def get_numprocs(kind, size_t c):
 
 def zeros(shape, dtype=GA_DOUBLE, order='A', context=None, kind=None,
           cls=None):
+    """
+    zeros(shape, dtype='float64', order='A', context=None, kind=None, cls=None)
+    """
     res = empty(shape, dtype=dtype, order=order, context=context, kind=kind,
                 cls=cls)
     array_memset(res, 0)
@@ -500,6 +506,9 @@ def zeros(shape, dtype=GA_DOUBLE, order='A', context=None, kind=None,
 
 def empty(shape, dtype=GA_DOUBLE, order='A', context=None, kind=None,
           cls=None):
+    """
+    empty(shape, dtype='float64', order='A', context=None, kind=None, cls=None)
+    """
     cdef void *ctx
     cdef compyte_buffer_ops *ops
     cdef size_t *cdims
@@ -597,6 +606,10 @@ def from_gpudata(size_t data, offset, dtype, shape, kind=None, context=None,
 
 def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
           context=None, cls=None):
+    """
+    array(obj, dtype='float64', copy=True, order=None, ndmin=0, kind=None,
+          context=None, cls=None)
+    """
     cdef GpuArray res
     cdef GpuArray arg
     cdef GpuArray tmp
