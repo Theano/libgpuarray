@@ -45,6 +45,5 @@ setup(name='pygpu',
                              sources = srcs,
                              include_dirs = [np.get_include(), 'src'],
                              libraries = ['compyte'],
-                             library_dirs = ['lib']
                              )
                    ])
