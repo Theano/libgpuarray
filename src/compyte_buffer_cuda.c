@@ -51,7 +51,7 @@ typedef struct {char c; CUdeviceptr x; } st_devptr;
 
 #define DONTFREE 0x1
 
-CUresult err;
+static CUresult err;
 
 typedef struct _cuda_context {
   CUcontext ctx;
@@ -96,11 +96,11 @@ COMPYTE_LOCAL CUstream cuda_get_stream(void *ctx) {
 
 static void cuda_enter(cuda_context *ctx) {
   cuCtxGetCurrent(&ctx->old);
+  if (ctx->old != ctx->ctx)
+    ctx->err = cuCtxSetCurrent(ctx->ctx);
   /* If no context was there in the first place, then we take over
      to avoid the set dance on the thread */
   if (ctx->old == NULL) ctx->old = ctx->ctx;
-  if (ctx->old != ctx->ctx)
-    ctx->err = cuCtxSetCurrent(ctx->ctx);
 }
 
 static void cuda_exit(cuda_context *ctx) {
@@ -214,6 +214,8 @@ static const char CUDA_PREAMBLE[] =
     "#define ga_half uint16_t\n";
 /* XXX: add complex, quads, longlong */
 /* XXX: add vector types */
+
+static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
 
 static const char *get_error_string(CUresult err) {
     switch (err) {
@@ -1059,7 +1061,7 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
     unsigned int count = 0;
     int res = GA_SYS_ERROR;
     
-    size_t nEls = 1;
+    size_t nEls = 1, ls, gs;
     gpukernel *k;
     unsigned int i;
     int flags = GA_USE_PTX;
@@ -1069,6 +1071,9 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
     const char *out_t;
     const char *rmod;
     const char *arch;
+
+    if (input->ctx != output->ctx)
+      return GA_INVALID_ERROR;
 
     for (i = 0; i < a_nd; i++) {
         nEls *= a_dims[i];
@@ -1130,7 +1135,7 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
         flags |= GA_USE_COMPLEX;
     }
 
-    k = cuda_newkernel(NULL, count, (const char **)strs, NULL, "elemk",
+    k = cuda_newkernel(input->ctx, count, (const char **)strs, NULL, "elemk",
                        flags, &res);
     if (k == NULL) goto fail;
     input->ptr += ioff;
@@ -1142,7 +1147,12 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
     output->ptr -= ooff;
     if (res != GA_NO_ERROR) goto failk;
 
-    res = cuda_callkernel(k, nEls);
+    /* Cheap kernel scheduling */
+    res = cuda_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, &ls);
+    if (res != GA_NO_ERROR) goto failk;
+
+    gs = ((nEls-1) / ls) + 1;
+    res = cuda_callkernel(k, ls, gs);
 
 failk:
     cuda_freekernel(k);
@@ -1168,12 +1178,15 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
   }
   /* I know that 512 and 1024 are magic numbers.
      There is an indication in buffer.h, though. */
-  if (prop_id < 512 && c == NULL) {
-    return GA_VALUE_ERROR;
-  } else if (prop_id < 1024 && buf == NULL) {
-    return GA_VALUE_ERROR;
-  } else if (k == NULL) {
-    return GA_VALUE_ERROR;
+  if (prop_id < 512) {
+    if (c == NULL)
+      return GA_VALUE_ERROR;
+  } else if (prop_id < 1024) {
+    if (buf == NULL)
+      return GA_VALUE_ERROR;
+  } else {
+    if (k == NULL)
+      return GA_VALUE_ERROR;
   }
 
   cuda_enter(ctx);
@@ -1193,7 +1206,7 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     /* 256 is what the CUDA API uses so it's good enough for me */
     s = malloc(256);
     if (s == NULL) {
-      cuda_exit(ctx)
+      cuda_exit(ctx);
       return GA_MEMORY_ERROR;
     }
     ctx->err = cuDeviceGetName(s, 256, id);
@@ -1289,7 +1302,7 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     cuda_exit(ctx);
     return GA_NO_ERROR;
   default:
-    cuda_exit(ctx)
+    cuda_exit(ctx);
     return GA_INVALID_ERROR;
   }
 }
