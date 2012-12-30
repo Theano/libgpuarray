@@ -12,11 +12,6 @@ set(LIBRARY_OUTPUT_PATH ../lib)
 find_package(CUDA)
 find_package(OpenCL)
 
-configure_file(
-  ${PROJECT_SOURCE_DIR}/compyte/compat.h.in
-  ${PROJECT_SOURCE_DIR}/compyte/compat.h
-  )
-
 include_directories("${PROJECT_SOURCE_DIR}")
 
 SET(COMPYTE_SRC
@@ -71,6 +66,11 @@ if(OPENCL_FOUND)
 endif()
 
 execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ../lib)
+
+configure_file(
+  ${PROJECT_SOURCE_DIR}/compyte/compat.h.in
+  ${PROJECT_SOURCE_DIR}/compyte/compat.h
+  )
 
 add_library(compyte SHARED ${COMPYTE_SRC})
 set_target_properties(compyte PROPERTIES COMPILE_FLAGS "-DCOMPYTE_BUILDING_DLL -DCOMPYTE_SHARED")
