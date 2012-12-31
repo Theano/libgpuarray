@@ -157,8 +157,6 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
 static void cl_freekernel(gpukernel *k);
 static int cl_setkernelarg(gpukernel *k, unsigned int index,
 			   int typecode, const void *val);
-static int cl_setkernelargbuf(gpukernel *k, unsigned int index,
-			      gpudata *b);
 static int cl_callkernel(gpukernel *k, size_t bs, size_t gs);
 static int cl_property(void *c, gpudata *b, gpukernel *k, int p, void *r);
 
@@ -560,7 +558,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
 
   m = cl_newkernel(ctx, 1, rlk, &sz, "kmemset", 0, &res);
   if (m == NULL) return res;
-  res = cl_setkernelargbuf(m, 0, dst);
+  res = cl_setkernelarg(m, 0, GA_BUFFER, dst);
   if (res != GA_NO_ERROR) goto fail;
 
   /* Cheap kernel scheduling */
@@ -713,21 +711,21 @@ static void *cl_get_kernel_context(gpukernel *k) {
 static int cl_setkernelarg(gpukernel *k, unsigned int index, int typecode,
 			   const void *val) {
   size_t sz;
-  if (typecode == GA_DELIM)
+  gpudata *b;
+  if (typecode == GA_BUFFER) {
+    b = (gpudata *)val;
+    if (k->ctx != b->ctx) return GA_VALUE_ERROR;
+    k->bs[index] = b;
     sz = sizeof(cl_mem);
-  else
+    val = &b->buf;
+  } else {
     sz = compyte_get_elsize(typecode);
+  }
   k->ctx->err = clSetKernelArg(k->k, index, sz, val);
   if (k->ctx->err != CL_SUCCESS) {
     return GA_IMPL_ERROR;
   }
   return GA_NO_ERROR;
-}
-
-static int cl_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
-  if (k->ctx != b->ctx) return GA_VALUE_ERROR;
-  k->bs[index] = b;
-  return cl_setkernelarg(k, index, GA_DELIM, &b->buf);
 }
 
 static int cl_callkernel(gpukernel *k, size_t ls, size_t gs) {
@@ -865,9 +863,9 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
   k = cl_newkernel(ctx, count, (const char **)strs, NULL, "elemk",
                    flags, &res);
   if (k == NULL) goto fail;
-  res = cl_setkernelargbuf(k, 0, input);
+  res = cl_setkernelarg(k, 0, GA_BUFFER, input);
   if (res != GA_NO_ERROR) goto kfail;
-  res = cl_setkernelargbuf(k, 1, output);
+  res = cl_setkernelarg(k, 1, GA_BUFFER, output);
   if (res != GA_NO_ERROR) goto kfail;
   /* Cheap kernel scheduling */
   res = cl_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, &ls);
@@ -1058,7 +1056,6 @@ compyte_buffer_ops opencl_ops = {cl_init,
                                  cl_freekernel,
                                  cl_get_kernel_context,
                                  cl_setkernelarg,
-                                 cl_setkernelargbuf,
                                  cl_callkernel,
                                  cl_extcopy,
                                  cl_property,

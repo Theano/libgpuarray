@@ -805,15 +805,20 @@ static void *cuda_get_kernel_context(gpukernel *k) {
 static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
                              const void *val) {
     void *tmp;
+    gpudata *b;
     size_t sz;
     if (index >= NUM_ARGS) return GA_VALUE_ERROR;
 
     if (index >= k->argcount)
         k->argcount = index+1;
 
-    /* Flag value (and a horrible abuse of reserved values) */
-    if (typecode == GA_DELIM) {
+    if (typecode == GA_BUFFER) {
+        b = (gpudata *)val;
+        if (k->ctx != b->ctx)
+            return GA_VALUE_ERROR;
+        k->bs[index] = b;
         sz = sizeof(CUdeviceptr);
+        val = &b->ptr;
     } else {
         sz = compyte_get_elsize(typecode);
     }
@@ -827,15 +832,6 @@ static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
 #endif
     k->bs[index] = NULL;
     return GA_NO_ERROR;
-}
-
-static int cuda_setkernelargbuf(gpukernel *k, unsigned int index, gpudata *b) {
-    if (k->ctx != b->ctx)
-      return GA_VALUE_ERROR;
-    /* The GA_DELIM here is a horrible abuse of reserved values */
-    int res = cuda_setkernelarg(k, index, GA_DELIM, &b->ptr);
-    if (res == GA_NO_ERROR) k->bs[index] = b;
-    return res;
 }
 
 #define ALIGN_UP(offset, align) ((offset) + (align) - 1) & ~((align) - 1)
@@ -1139,11 +1135,11 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
                        flags, &res);
     if (k == NULL) goto fail;
     input->ptr += ioff;
-    res = cuda_setkernelargbuf(k, 0, input);
+    res = cuda_setkernelarg(k, 0, GA_BUFFER, input);
     input->ptr -= ioff;
     if (res != GA_NO_ERROR) goto failk;
     output->ptr += ooff;
-    res = cuda_setkernelargbuf(k, 1, output);
+    res = cuda_setkernelarg(k, 1, GA_BUFFER, output);
     output->ptr -= ooff;
     if (res != GA_NO_ERROR) goto failk;
 
@@ -1329,7 +1325,6 @@ compyte_buffer_ops cuda_ops = {cuda_init,
                                cuda_freekernel,
                                cuda_get_kernel_context,
                                cuda_setkernelarg,
-                               cuda_setkernelargbuf,
                                cuda_callkernel,
                                cuda_extcopy,
                                cuda_property,

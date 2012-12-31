@@ -20,6 +20,7 @@ typedef struct _compyte_type {
 } compyte_type;
 
 enum COMPYTE_TYPES {
+  GA_BUFFER = -1,
   GA_BOOL = 0,
   GA_BYTE = 1,
   GA_UBYTE = 2,

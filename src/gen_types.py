@@ -137,6 +137,7 @@ typedef struct _compyte_type {
 } compyte_type;
 
 enum COMPYTE_TYPES {
+  GA_BUFFER = -1,
 % for i, v in sorted(TYPEMAP.items()):
   GA_${v[1].upper()} = ${i},
 % endfor

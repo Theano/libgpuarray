@@ -54,8 +54,6 @@ typedef struct _compyte_buffer_ops {
   /* Copy the passed value to a kernel argument buffer */
   int (*buffer_setkernelarg)(gpukernel *k, unsigned int index,
 			     int typecode, const void *val);
-  int (*buffer_setkernelargbuf)(gpukernel *k, unsigned int index,
-				gpudata *b);
   
   /* Call the kernel with the previously specified arguments
      (this is synchronous only for now, might make async later) */
