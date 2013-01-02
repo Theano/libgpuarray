@@ -67,6 +67,7 @@ COMPYTE_PUBLIC int GpuArray_fromdata(GpuArray *a, compyte_buffer_ops *ops, gpuda
                       ssize_t *strides, int writeable);
 
 COMPYTE_PUBLIC int GpuArray_view(GpuArray *v, GpuArray *a);
+COMPYTE_PUBLIC int GpuArray_sync(GpuArray *a);
 COMPYTE_PUBLIC int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
                    ssize_t *steps);
 

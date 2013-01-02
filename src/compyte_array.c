@@ -142,6 +142,10 @@ int GpuArray_view(GpuArray *v, GpuArray *a) {
   return GA_NO_ERROR;
 }
 
+int GpuArray_sync(GpuArray *a) {
+  return a->ops->buffer_sync(a->data);
+}
+
 int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
 		   ssize_t *steps) {
   int err;

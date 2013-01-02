@@ -781,6 +781,18 @@ static int cl_callkernel(gpukernel *k, size_t ls, size_t gs) {
   return GA_NO_ERROR;
 }
 
+static int cl_sync(gpudata *b) {
+  cl_ctx *ctx = (cl_ctx *)b->ctx;
+  if (b->ev != NULL) {
+    ctx->err = clWaitForEvents(1, &b->ev);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    clReleaseEvent(b->ev);
+    b->ev = NULL;
+  }
+  return GA_NO_ERROR;
+}
+
 static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
   "#define DTYPEB %s\n"
   "__kernel void elemk(__global const DTYPEA *a_data,"
@@ -1057,6 +1069,7 @@ compyte_buffer_ops opencl_ops = {cl_init,
                                  cl_get_kernel_context,
                                  cl_setkernelarg,
                                  cl_callkernel,
+                                 cl_sync,
                                  cl_extcopy,
                                  cl_property,
                                  cl_error};

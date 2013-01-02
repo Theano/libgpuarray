@@ -58,6 +58,8 @@ typedef struct _compyte_buffer_ops {
   /* Call the kernel with the previously specified arguments
      (this is synchronous only for now, might make async later) */
   int (*buffer_callkernel)(gpukernel *k, size_t bs, size_t gs);
+  /* Make sure all compute operations involving this buffer are finished. */
+  int (*buffer_sync)(gpudata *b);
 
   /* Function to facilitate copy and cast operations*/
   int (*buffer_extcopy)(gpudata *input, size_t ioff, gpudata *output, size_t ooff,

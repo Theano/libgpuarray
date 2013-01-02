@@ -907,6 +907,19 @@ static int cuda_callkernel(gpukernel *k, size_t bs, size_t gs) {
     return GA_NO_ERROR;
 }
 
+static int cuda_sync(gpudata *b) {
+  cuda_context *ctx = (cuda_context *)b->ctx;
+
+  cuda_enter(ctx);
+  if (ctx->err != GA_NO_ERROR)
+    return GA_IMPL_ERROR;
+  ctx->err = cuEventSynchronize(b->ev);
+  cuda_exit(ctx);
+  if (ctx->err != CUDA_SUCCESS)
+    return GA_IMPL_ERROR;
+  return GA_NO_ERROR;
+}
+
 static const char ELEM_HEADER_PTX[] = ".version 3.0\n.target %s\n\n"
     ".entry elemk (\n"
     ".param .u%u a_data,\n"
@@ -1326,6 +1339,7 @@ compyte_buffer_ops cuda_ops = {cuda_init,
                                cuda_get_kernel_context,
                                cuda_setkernelarg,
                                cuda_callkernel,
+                               cuda_sync,
                                cuda_extcopy,
                                cuda_property,
                                cuda_error};
