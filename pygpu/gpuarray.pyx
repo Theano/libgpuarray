@@ -140,6 +140,7 @@ cdef extern from "compyte/array.h":
                           size_t offset, int typecode, unsigned int nd, size_t *dims,
                           ssize_t *strides, int writable)
     int GpuArray_view(_GpuArray *v, _GpuArray *a)
+    int GpuArray_sync(_GpuArray *a)
     int GpuArray_index(_GpuArray *r, _GpuArray *a, ssize_t *starts,
                        ssize_t *stops, ssize_t *steps)
     int GpuArray_reshape(_GpuArray *res, _GpuArray *a, unsigned int nd,
@@ -312,6 +313,12 @@ cdef array_fromdata(GpuArray a, compyte_buffer_ops *ops, gpudata *data,
 cdef array_view(GpuArray v, GpuArray a):
     cdef int err
     err = GpuArray_view(&v.ga, &a.ga)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(GpuArray_error(&a.ga, err), err)
+
+cdef array_sync(GpuArray a):
+    cdef int err
+    err = GpuArray_sync(&a.ga)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
@@ -787,6 +794,9 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
             return memo[id(self)]
         else:
             return self.copy()
+
+    def sync(self):
+        array_sync(self)
 
     def view(self, cls=None):
         cdef GpuArray res = new_GpuArray(cls)
