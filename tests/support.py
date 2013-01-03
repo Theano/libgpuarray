@@ -1,6 +1,6 @@
+import os, sys
 import numpy
 from nose.plugins.skip import SkipTest
-from nose.plugins import Plugin
 
 from pygpu import gpuarray
 
@@ -19,10 +19,27 @@ dtypes_no_complex = ["float32", "float64",
                      "int32", "int64", "uint32", "uint64"]
 
 kind = "opencl"
-#kind = "cuda"
-context = gpuarray.init(kind, 0)
-import sys
-print >>sys.stderr, "Testing for", gpuarray.get_devname(kind, context)
+devnum = 0
+
+def get_env_dev():
+    for name in ['COMPYTE_TEST_DEVICE', 'DEVICE']:
+        if name in os.environ:
+            return os.environ[name]
+
+test_dev = get_env_dev()
+if test_dev:
+    if test_dev.startswith('cuda'):
+        kind = "cuda"
+        devnum = int(test_dev[4:])
+    elif test_dev.startswith('opencl'):
+        kind = "opencl"
+        devspec = test_dev[6:].split(':')
+        devnum = int(devspec[0]) << 16 | int(devspec[1])
+    else:
+        print >>sys.stderr, "Unknown device format", test_dev, ", using defaults"
+
+context = gpuarray.init(kind, devnum)
+print >>sys.stderr, "*** Testing for", gpuarray.get_devname(kind, context)
 
 def guard_devsup(func):
     def f(*args, **kwargs):
