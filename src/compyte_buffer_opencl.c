@@ -1039,7 +1039,14 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
                                &sz, NULL);
     if (ctx->err != GA_NO_ERROR)
       return GA_IMPL_ERROR;
-    *((size_t *)res) = (((size_t)1) << ui)/sz;
+    if (ui == 32) {
+      sz = 4294967295/sz;
+    } else if (ui == 64) {
+      sz = 18446744073709551615ULL/sz;
+    } else {
+      assert(0 && "This should not be reached!");
+    }
+    *((size_t *)res) = sz;
     return GA_NO_ERROR;
   default:
     return GA_INVALID_ERROR;
