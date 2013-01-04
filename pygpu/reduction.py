@@ -141,7 +141,6 @@ KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} out,
   const unsigned int idx = LDIM_0 * GID_0 + lid;
   const unsigned int numThreads = LDIM_0 * GDIM_0;
   unsigned int i;
-  GLOBAL_MEM char *tmp;
 
   ${out_arg.ctype()} acc = ${neutral};
   for (i = idx; i < n; i += numThreads) {
