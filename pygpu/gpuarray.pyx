@@ -1083,7 +1083,7 @@ cdef class GpuKernel:
         if n == 0 and (ls == 0 or gs == 0):
             raise ValueError("Must specify size (n) or both gs and ls")
         self.setargs(args)
-        self.call(n, gs, ls)
+        self.call(n, ls, gs)
 
     cpdef setargs(self, args):
         # Work backwards to avoid a lot of reallocations in the argument code.
