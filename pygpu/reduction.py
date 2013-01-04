@@ -254,11 +254,21 @@ class ReductionKernel(object):
             raise RuntimeError("Stage 2 kernel will not run. Please "
                                "report this along with your reduction code.")
     def _get_gs(self, n, ls, k):
+        np = gpuarray.get_numprocs(self.kind, self.context)
+
+        # special cases for OpenCL on CPU where the max local size is 1
+        if n == np:
+            return 1
+        if ls == 1:
+            return min(np, k.maxgsize)
+
         # Run enough threads to fully occupy the device but not so much
         # that it will take a large number of stage2 calls
-        gs = gpuarray.get_numprocs(self.kind, self.context) * 8
+        gs = np * 8
+
         # But don't run a bunch of useless threads
         gs = min(int(((n-1)/ls)+1), gs)
+
         # And don't go over the maximum
         return min(gs, k.maxgsize)
 
