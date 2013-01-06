@@ -5,4 +5,4 @@ def get_include():
     return p
 
 from . import gpuarray
-from .gpuarray import init, set_kind_context, array, zeros, empty
+from .gpuarray import init, set_default_context, array, zeros, empty

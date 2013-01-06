@@ -193,6 +193,38 @@ cdef void *call_compiler_python(const_char_p src, size_t sz,
 ctypedef void *(*comp_f)(const_char_p, size_t, int*)
 
 def set_cuda_compiler_fn(fn):
+    """
+    set_cuda_compiler_fn(fn)
+
+    Sets the compiler function for cuda kernels.
+
+    :param fn: compiler function
+    :type fn: callable
+    :rtype: None
+
+    `fn` must have the following signature::
+
+        fn(source)
+
+    It will recieve a python bytes string consiting the of complete
+    kernel source code and must return a python byte string consisting
+    of the compilation results or raise an exception.
+
+    .. warning::
+
+        Exceptions raised by the function will not be propagated
+        because the call path goes through libcompyte.  They are only
+        used to indicate that there was a problem during the
+        compilation.
+
+    This overrides the built-in compiler function with the provided
+    one or resets to the default if `None` is given.  The provided
+    function must be rentrant if the library is used in a
+    multi-threaded context.
+
+    .. note::
+        If the "cuda" module was not compiled in libcompyte then this function will raise a `RuntimeError` unconditionaly.
+    """
     cdef void (*set_comp)(comp_f f)
     set_comp = <void (*)(comp_f)>compyte_get_extension("cuda_set_compiler")
     if set_comp == NULL:
@@ -226,6 +258,20 @@ cdef dict NP_TO_TYPE = {
 cdef dict TYPE_TO_NP = dict((v, k) for k, v in NP_TO_TYPE.iteritems())
 
 def register_dtype(np.dtype dtype, cname):
+    """
+    register_dtype(dtype, cname)
+
+    Make a new type known to the cluda machinery.
+
+    This function return the associted internal typecode for the new
+    type.
+
+    :param dtype: new type
+    :type dtype: numpy.dtype
+    :param cname: C name for the type declarations
+    :type cname: string
+    :rtype: int
+    """
     cdef compyte_type *t
     cdef int typecode
     cdef char *tmp
@@ -257,6 +303,15 @@ cdef public np.dtype typecode_to_dtype(int typecode):
         raise NotImplementedError("TODO")
 
 cpdef int dtype_to_typecode(dtype) except -1:
+    """
+    dtype_to_typecode(dtype)
+
+    Get the internal typecode for a type.
+
+    :param dtype: type to get the code for
+    :type dtype: numpy.dtype
+    :rtype: int
+    """
     if isinstance(dtype, int):
         return dtype
     if isinstance(dtype, str):
@@ -268,6 +323,15 @@ cpdef int dtype_to_typecode(dtype) except -1:
     raise ValueError("don't know how to convert to dtype: %s"%(dtype,))
 
 def dtype_to_ctype(dtype):
+    """
+    dtype_to_ctype(dtype)
+
+    Return the C name for a type.
+
+    :param dtype: type to get the name for
+    :type dtype: numpy.dtype
+    :rtype: string
+    """
     cdef int typecode = dtype_to_typecode(dtype)
     cdef compyte_type *t = compyte_get_type(typecode)
     if t.cluda_name == NULL:
@@ -277,7 +341,7 @@ def dtype_to_ctype(dtype):
 cdef ga_order to_ga_order(ord) except <ga_order>-2:
     if ord == "C" or ord == "c":
         return GA_C_ORDER
-    elif ord == "A" or ord == "a":
+    elif ord == "A" or ord == "a" or ord is None:
         return GA_ANY_ORDER
     elif ord == "F" or ord == "f":
         return GA_F_ORDER
@@ -285,7 +349,13 @@ cdef ga_order to_ga_order(ord) except <ga_order>-2:
         raise ValueError("Valid orders are: 'A' (any), 'C' (C), 'F' (Fortran)")
 
 class GpuArrayException(Exception):
+    """
+    Exception used for all errors related to libcompyte.
+    """
     def __init__(self, msg, errcode):
+        """
+        __init__(self, msg, errcode)
+        """
         Exception.__init__(self, msg)
         self.errcode = errcode
 
@@ -635,10 +705,18 @@ def asfortranarray(a, dtype=None, GpuArray context=None):
                  context=context)
 
 def may_share_memory(GpuArray a not None, GpuArray b not None):
+    """
+    may_share_memory(a, b)
+
+    Returns True if `a` and `b` may share memory, False otherwise.
+    """
     return array_share(a, b)
 
 def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
                  strides=None, writable=True, base=None, cls=None):
+    """
+    from_gpudata(data, offset, dtype, shape, context=None, strides=None, writable=True, base=None, cls=None)
+    """
     cdef GpuArray res
     cdef size_t *cdims
     cdef ssize_t *cstrides
