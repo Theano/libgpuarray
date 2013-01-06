@@ -170,7 +170,7 @@ struct _gpukernel {
 
 static const char CUDA_PREAMBLE[] =
     "#define local_barrier() __syncthreads()\n"
-    "#define WITHIN_KERNEL __device__\n"
+    "#define WITHIN_KERNEL extern \"C\" __device__\n"
     "#define KERNEL extern \"C\" __global__\n"
     "#define GLOBAL_MEM /* empty */\n"
     "#define LOCAL_MEM __shared__\n"
