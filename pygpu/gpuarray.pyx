@@ -824,7 +824,7 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0,
     array_write(res, np.PyArray_DATA(a), np.PyArray_NBYTES(a))
     return res
 
-cdef class GpuContext:
+cdef public class GpuContext [type GpuContextType, object GpuContextObject]:
     """
     Class that holds all the information pertaining to a context.
 
