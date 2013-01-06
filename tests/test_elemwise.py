@@ -6,7 +6,7 @@ from pygpu.array import gpuarray as elemary
 from pygpu.elemwise import ElemwiseKernel
 
 from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
-                      kind, context, gen_gpuarray, dtypes_no_complex)
+                      context, gen_gpuarray, dtypes_no_complex)
 
 
 operators1 = [operator.neg, operator.pos, operator.abs]
@@ -29,7 +29,7 @@ def test_elemwise1_ops_array():
 
 @guard_devsup
 def elemwise1_ops_array(op, dtype):
-    c, g = gen_gpuarray((50,), dtype, kind=kind, ctx=context, cls=elemary)
+    c, g = gen_gpuarray((50,), dtype, ctx=context, cls=elemary)
 
     out_c = op(c)
     out_g = op(g)
@@ -55,9 +55,8 @@ def test_ielemwise2_ops_array():
 
 @guard_devsup
 def elemwise2_ops_array(op, dtype1, dtype2, shape):
-    ac, ag = gen_gpuarray(shape, dtype1, kind=kind, ctx=context, cls=elemary)
-    bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, kind=kind, ctx=context,
-                          cls=elemary)
+    ac, ag = gen_gpuarray(shape, dtype1, ctx=context, cls=elemary)
+    bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, ctx=context, cls=elemary)
 
     out_c = op(ac, bc)
     out_g = op(ag, bg)
@@ -73,9 +72,9 @@ def ielemwise2_ops_array(op, dtype1, dtype2, shape):
     if op == operator.isub and dtype1[0] == 'u':
         # array elements are smaller than 10 by default, so we avoid underflow
         incr = 10
-    ac, ag = gen_gpuarray(shape, dtype1, incr=incr, kind=kind, ctx=context,
+    ac, ag = gen_gpuarray(shape, dtype1, incr=incr, ctx=context,
                           cls=elemary)
-    bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, kind=kind, ctx=context,
+    bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, ctx=context,
                           cls=elemary)
 
     out_c = op(ac, bc)
@@ -101,13 +100,12 @@ def test_elemwise_layouts():
 def elemwise_layouts(shape, offseted_outer, offseted_inner, sliced, order):
     ac, ag = gen_gpuarray(shape, dtype='float32', sliced=sliced, order=order,
                           offseted_outer=offseted_outer,
-                          offseted_inner=offseted_inner,
-                          kind=kind, ctx=context)
-    bc, bg = gen_gpuarray(shape, dtype='float32', kind=kind, ctx=context)
+                          offseted_inner=offseted_inner, ctx=context)
+    bc, bg = gen_gpuarray(shape, dtype='float32', ctx=context)
 
-    outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
+    outg = gpuarray.empty(shape, dtype='float32', context=context)
 
-    k = ElemwiseKernel(kind, context, "float *a, float *b, float *c",
+    k = ElemwiseKernel(context, "float *a, float *b, float *c",
                        "c[i] = a[i] + b[i]")
     # will use contig or basic
     k(ag, bg, outg)
@@ -115,17 +113,17 @@ def elemwise_layouts(shape, offseted_outer, offseted_inner, sliced, order):
     assert numpy.allclose(numpy.asarray(outg), outc)
 
     # test basic
-    outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
+    outg = gpuarray.empty(shape, dtype='float32', context=context)
     k.call_basic(ag, bg, outg)
     assert numpy.allclose(numpy.asarray(outg), outc)
 
     # test dimspec
-    outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
+    outg = gpuarray.empty(shape, dtype='float32', context=context)
     k.call_dimspec(ag, bg, outg)
     assert numpy.allclose(numpy.asarray(outg), outc)
 
     # test specialized
-    outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
+    outg = gpuarray.empty(shape, dtype='float32', context=context)
     k.call_specialized(ag, bg, outg)
     assert numpy.allclose(numpy.asarray(outg), outc)
 
@@ -135,13 +133,12 @@ def elemwise_layouts_mixed(shape, offseted_outer, offseted_inner, sliced,
                            order):
     ac, ag = gen_gpuarray(shape, dtype='float32', sliced=sliced, order=order,
                           offseted_outer=offseted_outer,
-                          offseted_inner=offseted_inner,
-                          kind=kind, ctx=context)
+                          offseted_inner=offseted_inner, ctx=context)
     b = numpy.asarray(2.0, dtype='float32')
 
-    outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
+    outg = gpuarray.empty(shape, dtype='float32', context=context)
 
-    k = ElemwiseKernel(kind, context, "float *a, float b, float *c",
+    k = ElemwiseKernel(context, "float *a, float b, float *c",
                        "c[i] = a[i] + b")
     # will use contig or basic
     k(ag, b, outg)
@@ -149,17 +146,17 @@ def elemwise_layouts_mixed(shape, offseted_outer, offseted_inner, sliced,
     assert numpy.allclose(numpy.asarray(outg), outc)
 
     # test basic
-    outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
+    outg = gpuarray.empty(shape, dtype='float32', context=context)
     k.call_basic(ag, b, outg)
     assert numpy.allclose(numpy.asarray(outg), outc)
 
     # test dimspec
-    outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
+    outg = gpuarray.empty(shape, dtype='float32', context=context)
     k.call_dimspec(ag, b, outg)
     assert numpy.allclose(numpy.asarray(outg), outc)
 
     # test specialized
-    outg = gpuarray.empty(shape, dtype='float32', kind=kind, context=context)
+    outg = gpuarray.empty(shape, dtype='float32', context=context)
     k.call_specialized(ag, b, outg)
     assert numpy.allclose(numpy.asarray(outg), outc)
 
@@ -180,7 +177,7 @@ def test_ielemwise2_ops_mixed():
 
 @guard_devsup
 def elemwise2_ops_mixed(op, dtype, shape, elem):
-    c, g = gen_gpuarray(shape, dtype, kind=kind, ctx=context, cls=elemary)
+    c, g = gen_gpuarray(shape, dtype, ctx=context, cls=elemary)
 
     out_c = op(c, elem)
     out_g = op(g, elem)
@@ -189,7 +186,7 @@ def elemwise2_ops_mixed(op, dtype, shape, elem):
     assert out_c.dtype == out_g.dtype
     assert numpy.allclose(out_c, numpy.asarray(out_g))
 
-    c, g = gen_gpuarray(shape, dtype, nozeros=True, kind=kind, ctx=context,
+    c, g = gen_gpuarray(shape, dtype, nozeros=True, ctx=context,
                         cls=elemary)
     out_c = op(elem, c)
     out_g = op(elem, g)
@@ -205,7 +202,7 @@ def ielemwise2_ops_mixed(op, dtype, shape, elem):
     if op == operator.isub and dtype[0] == 'u':
         # array elements are smaller than 10 by default, so we avoid underflow
         incr = 10
-    c, g = gen_gpuarray(shape, dtype, incr=incr, kind=kind, ctx=context,
+    c, g = gen_gpuarray(shape, dtype, incr=incr, ctx=context,
                         cls=elemary)
 
     out_c = op(c, elem)
@@ -228,8 +225,8 @@ def test_divmod():
 
 @guard_devsup
 def divmod_array(dtype1, dtype2, shape):
-    ac, ag = gen_gpuarray(shape, dtype1, kind=kind, ctx=context, cls=elemary)
-    bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, kind=kind, ctx=context,
+    ac, ag = gen_gpuarray(shape, dtype1, ctx=context, cls=elemary)
+    bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, ctx=context,
                           cls=elemary)
 
     out_c = divmod(ac, bc)
@@ -245,7 +242,7 @@ def divmod_array(dtype1, dtype2, shape):
 
 @guard_devsup
 def divmod_mixed(dtype, shape, elem):
-    c, g = gen_gpuarray(shape, dtype, nozeros=True, kind=kind, ctx=context,
+    c, g = gen_gpuarray(shape, dtype, nozeros=True, ctx=context,
                         cls=elemary)
 
     out_c = divmod(c, elem)
@@ -270,14 +267,14 @@ def divmod_mixed(dtype, shape, elem):
 
 
 def test_elemwise_bool():
-    a = gpuarray.empty((2,), kind=kind, context=context)
+    a = gpuarray.empty((2,), context=context)
     exc = None
     try:
         bool(a)
     except ValueError, e:
         exc = e
     assert e is not None
-    a = gpuarray.zeros((1,), kind=kind, context=context)
+    a = gpuarray.zeros((1,), context=context)
     assert bool(a) == False
-    a = gpuarray.zeros((), kind=kind, context=context)
+    a = gpuarray.zeros((), context=context)
     assert bool(a) == False

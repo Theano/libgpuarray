@@ -141,7 +141,7 @@ class gpuarray(array.GpuArray):
         ksrc = tmpl % {'a': a_arg.expr(), 'b': b_arg.expr(),
                        'out_t': dtype_to_ctype(odtype)}
 
-        k = ElemwiseKernel(self.kind, self.context, args, ksrc)
+        k = ElemwiseKernel(self.context, args, ksrc)
         k(div, mod, self, other)
         return (div, mod)
 
@@ -167,7 +167,7 @@ class gpuarray(array.GpuArray):
         ksrc = tmpl % {'a': a_arg.expr(), 'b': b_arg.expr(),
                        'out_t': dtype_to_ctype(odtype)}
 
-        k = ElemwiseKernel(self.kind, self.context, args, ksrc)
+        k = ElemwiseKernel(self.context, args, ksrc)
         k(div, mod, other, self)
         return (div, mod)
 

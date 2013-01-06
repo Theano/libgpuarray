@@ -5,7 +5,7 @@ from pygpu import gpuarray
 from pygpu.reduction import ReductionKernel
 
 from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
-                      kind, context, gen_gpuarray, dtypes_no_complex)
+                      context, gen_gpuarray, dtypes_no_complex)
 
 def test_red1_array():
     for dtype in dtypes_no_complex:
@@ -14,10 +14,10 @@ def test_red1_array():
 
 @guard_devsup
 def red1_array(dtype):
-    c, g = gen_gpuarray((10,), dtype, kind=kind, ctx=context)
+    c, g = gen_gpuarray((10,), dtype, ctx=context)
     
     out_c = c.sum()
-    out_g = ReductionKernel(kind, context, dtype, "0", "a + b")(g)
+    out_g = ReductionKernel(context, dtype, "0", "a + b")(g)
 
     assert out_c.shape == out_g.shape
     assert out_g.dtype == numpy.dtype(dtype)

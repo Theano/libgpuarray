@@ -235,7 +235,7 @@ def massage_op(operation):
 
 
 class ElemwiseKernel(object):
-    def __init__(self, kind, context, arguments, operation, preamble="",
+    def __init__(self, context, arguments, operation, preamble="",
                  dimspec_limit=2, spec_limit=10):
         if isinstance(arguments, str):
             self.arguments = parse_c_args(arguments)
@@ -244,7 +244,6 @@ class ElemwiseKernel(object):
 
         self.operation = operation
         self.expression = massage_op(operation)
-        self.kind = kind
         self.context = context
         self._spec_limit = spec_limit
         self._dimspec_limit = dimspec_limit
@@ -273,9 +272,8 @@ class ElemwiseKernel(object):
                                        name="elemk",
                                        arguments=self.arguments,
                                        expression=self.operation)
-        self.contig_k = gpuarray.GpuKernel(src, "elemk", kind=self.kind,
-                                           context=self.context, cluda=True,
-                                           **self.flags)
+        self.contig_k = gpuarray.GpuKernel(src, "elemk", context=self.context,
+                                           cluda=True, **self.flags)
         self._speckey = None
         self._dims = None
         self._cache_basic = {}
@@ -298,7 +296,6 @@ class ElemwiseKernel(object):
                                       expression=self.expression)
             self._cache_basic[nd] = gpuarray.GpuKernel(src, "elemk",
                                                        cluda=True,
-                                                       kind=self.kind,
                                                        context=self.context,
                                                        **self.flags)
         return self._cache_basic[nd]
@@ -330,7 +327,6 @@ class ElemwiseKernel(object):
                                         expression=self.expression)
             self._cache_dimspec[dims] = gpuarray.GpuKernel(src, "elemk",
                                                            cluda=True,
-                                                           kind=self.kind,
                                                            context=self.context,
                                                            **self.flags)
         return self._cache_dimspec[dims]
@@ -356,9 +352,8 @@ class ElemwiseKernel(object):
                                         arguments=self.arguments,
                                         expression=self.expression,
                                         offsets=offsets)
-        return gpuarray.GpuKernel(src, "elemk", kind=self.kind,
-                                  context=self.context, cluda=True,
-                                  **self.flags)
+        return gpuarray.GpuKernel(src, "elemk", context=self.context,
+                                  cluda=True, **self.flags)
 
     def prepare_args_specialized(self, args):
         self.kernel_args = args
@@ -449,7 +444,7 @@ def elemwise1(a, op, oper=None, op_tmpl="res[i] = %(op)sa[i]"):
     if oper is None:
         oper = op_tmpl % {'op': op}
 
-    k = ElemwiseKernel(a.kind, a.context, args, oper)
+    k = ElemwiseKernel(a.context, args, oper)
     k(res, a)
     return res
 
@@ -473,7 +468,7 @@ def elemwise2(a, op, b, ary, odtype=None, oper=None,
         oper = op_tmpl % {'a': a_arg.expr(), 'op': op, 'b': b_arg.expr(),
                           'out_t': dtype_to_ctype(odtype)}
 
-    k = ElemwiseKernel(ary.kind, ary.context, args, oper)
+    k = ElemwiseKernel(ary.context, args, oper)
     k(res, a, b)
     return res
 
@@ -490,7 +485,7 @@ def ielemwise2(a, op, b, oper=None, op_tmpl="a[i] = a[i] %(op)s %(b)s"):
     if oper is None:
         oper = op_tmpl % {'op': op, 'b': b_arg.expr()}
 
-    k = ElemwiseKernel(a.kind, a.context, args, oper)
+    k = ElemwiseKernel(a.context, args, oper)
     k(a, b)
     return a
 

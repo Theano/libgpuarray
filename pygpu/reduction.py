@@ -161,8 +161,8 @@ KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} out,
 """)
 
 class ReductionKernel(object):
-    def __init__(self, kind, context, dtype_out, neutral, reduce_expr, map_expr=None, arguments=None, preamble=""):
-        self.kind = kind
+    def __init__(self, context, dtype_out, neutral, reduce_expr,
+                 map_expr=None, arguments=None, preamble=""):
         self.context = context
         self.neutral = neutral
         self.dtype_out = dtype_out
@@ -207,9 +207,9 @@ class ReductionKernel(object):
                           have_complex=have_complex)
         self.preamble = preamble
 
-        local_size = min(int(gpuarray.get_lmemsize(kind, context) /
+        local_size = min(int(context.lmemsize /
                              self.out_arg.dtype.itemsize),
-                         gpuarray.get_maxlsize(kind, context))
+                         context.maxlsize)
         loop_count = 0
         while True:
             src = contig_kernel.render(preamble=self.preamble,
@@ -221,9 +221,8 @@ class ReductionKernel(object):
                                        neutral=self.neutral,
                                        expression=self.operation)
             try:
-                k = gpuarray.GpuKernel(src, "reduk", kind=self.kind,
-                                   context=self.context,
-                                   cluda=True, **self.flags)
+                k = gpuarray.GpuKernel(src, "reduk", context=self.context,
+                                       cluda=True, **self.flags)
             except gpuarray.GpuArrayException:
                 print "Failed kernel was:"
                 print src
@@ -246,7 +245,7 @@ class ReductionKernel(object):
                                    out_arg=self.out_arg,
                                    local_size=local_size,
                                    neutral=self.neutral)
-        self.stage2_k = gpuarray.GpuKernel(src, "reduk_2", kind=self.kind,
+        self.stage2_k = gpuarray.GpuKernel(src, "reduk_2",
                                            context=self.context, cluda=True,
                                            **self.flags)
         self.stage2_ls = local_size
@@ -254,7 +253,7 @@ class ReductionKernel(object):
             raise RuntimeError("Stage 2 kernel will not run. Please "
                                "report this along with your reduction code.")
     def _get_gs(self, n, ls, k):
-        np = gpuarray.get_numprocs(self.kind, self.context)
+        np = self.context.numprocs
 
         # special cases for OpenCL on CPU where the max local size is 1
         if n == np:
@@ -274,11 +273,11 @@ class ReductionKernel(object):
 
     def _alloc_out(self, gs):
         if gs == 1:
-            out = gpuarray.empty((), kind=self.kind,
-                                 context=self.context, dtype=self.dtype_out)
+            out = gpuarray.empty((), context=self.context,
+                                 dtype=self.dtype_out)
         else:
-            out = gpuarray.empty((gs,), kind=self.kind,
-                                 context=self.context, dtype=self.dtype_out)
+            out = gpuarray.empty((gs,), context=self.context,
+                                 dtype=self.dtype_out)
         return out
         
     def call_stage2(self, n, inp):

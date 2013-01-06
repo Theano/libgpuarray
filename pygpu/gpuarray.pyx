@@ -71,6 +71,7 @@ cdef extern from "compyte/buffer.h":
 
     ctypedef struct compyte_buffer_ops:
         void *buffer_init(int devno, int *ret)
+        void buffer_deinit(void *ctx)
         char *buffer_error(void *ctx)
         void *buffer_get_context(gpudata *)
         int buffer_property(void *c, gpudata *b, gpukernel *k, int prop_id,
@@ -416,14 +417,13 @@ cdef kernel_property(GpuKernel k, int prop_id, void *res):
     if err != GA_NO_ERROR:
         raise GpuArrayException(kernel_error(k, err), err)
 
-cdef compyte_buffer_ops *GpuArray_ops = NULL
-cdef void *GpuArray_ctx = NULL
+cdef GpuContext GpuArray_default_context = None
 
-cdef ctx_property(compyte_buffer_ops *ops, void *ctx, int prop_id, void *res):
+cdef ctx_property(GpuContext c, int prop_id, void *res):
     cdef int err
-    err = ops.buffer_property(ctx, NULL, NULL, prop_id, res)
+    err = c.ops.buffer_property(c.ctx, NULL, NULL, prop_id, res)
     if err != GA_NO_ERROR:
-        raise GpuArrayException(Gpu_error(ops, ctx, err), err)
+        raise GpuArrayException(Gpu_error(c.ops, c.ctx, err), err)
 
 cdef compyte_buffer_ops *get_ops(kind) except NULL:
     cdef compyte_buffer_ops *res
@@ -439,97 +439,120 @@ cdef ops_kind(compyte_buffer_ops *ops):
         return "cuda"
     raise RuntimeError("Unknown ops vector")
 
-cdef void *get_ctx(size_t ctx):
-    return <void*>ctx
-
-cdef size_t ctx_object(void *ctx):
-    return <size_t>ctx
-
-def set_kind_context(kind, size_t ctx):
-    global GpuArray_ctx
-    global GpuArray_ops
-    GpuArray_ctx = <void *>ctx
-    GpuArray_ops = get_ops(kind)
-
-def init(kind, int devno):
+def set_default_context(GpuContext ctx):
     """
-    init(kind, devno)
+    set_default_context(ctx)
+
+    Set the default context for the module.
+
+    :param ctx: default context
+    :type ctx: GpuContext
+    :rtype: None
+
+    The provided context will be used as a default value for all the
+    other functions in this module which take a context as parameter.
+    Call with `None` to clear the default value.
+
+    If you don't call this function the context of all other functions
+    is a mandatory argument.
+
+    This can be helpful to reduce clutter when working with only one
+    context. It is strongly discouraged to use this function when
+    working with multiple contexts at once.
     """
-    cdef int err = GA_NO_ERROR
-    cdef void *ctx
-    cdef compyte_buffer_ops *ops
-    ops = get_ops(kind)
-    ctx = ops.buffer_init(devno, &err)
-    if (err != GA_NO_ERROR):
-        if err == GA_VALUE_ERROR:
-            raise GpuArrayException("No device %d"%(devno,), err)
-        else:
-            raise GpuArrayException(ops.buffer_error(NULL), err)
-    return ctx_object(ctx)
+    global GpuArray_default_context
+    GpuArray_default_context = ctx
 
-def get_devname(kind, size_t c):
-    cdef void *ctx = get_ctx(c)
-    cdef compyte_buffer_ops *ops = get_ops(kind)
-    cdef char *tmp
-    cdef unicode res
+cdef GpuContext ensure_context(GpuContext c):
+    if c is None:
+        if GpuArray_default_context is None:
+            raise TypeError("No context specified.")
+        return GpuArray_default_context
+    return c
 
-    ctx_property(ops, ctx, GA_CTX_PROP_DEVNAME, &tmp)
-    try:
-        res = tmp.decode('ascii')
-    finally:
-        free(tmp)
-    return res
+def init(dev):
+    """
+    init(dev)
 
-def get_maxlsize(kind, size_t c):
-    cdef void *ctx = get_ctx(c)
-    cdef compyte_buffer_ops *ops = get_ops(kind)
-    cdef size_t res
-    ctx_property(ops, ctx, GA_CTX_PROP_MAXLSIZE, &res)
-    return res
+    Creates a context from a device specifier.
 
-def get_lmemsize(kind, size_t c):
-    cdef void *ctx = get_ctx(c)
-    cdef compyte_buffer_ops *ops = get_ops(kind)
-    cdef size_t res
-    ctx_property(ops, ctx, GA_CTX_PROP_LMEMSIZE, &res)
-    return res
+    :param dev: device specifier
+    :type dev: string
+    :rtype: GpuContext
 
-def get_numprocs(kind, size_t c):
-    cdef void *ctx = get_ctx(c)
-    cdef compyte_buffer_ops *ops = get_ops(kind)
-    cdef unsigned int res
-    ctx_property(ops, ctx, GA_CTX_PROP_NUMPROCS, &res)
-    return res
+    Device specifiers are composed of the type string and the device id like sor::
 
-def zeros(shape, dtype=GA_DOUBLE, order='A', context=None, kind=None,
+        "cuda0"
+        "opencl0:1"
+
+    For cuda the device id is the numeric identifier.  You can see
+    what devices are available by running nvidia-smi on the machine.
+
+    For opencl the device id is the platform number, a colon (:) and
+    the device number.  There are no widespread and/or easy way to
+    list available platforms and devices.  You can experiement with
+    the values, unavaiable ones will just raise an error, and there
+    are no gaps in the valid numbers.
+    """
+    if dev.startswith('cuda'):
+        kind = "cuda"
+        devnum = int(dev[4:])
+    elif dev.startswith('opencl'):
+        kind = "opencl"
+        devspec = dev[6:].split(':')
+        devnum = int(devspec[0]) << 16 | int(devspec[1])
+    else:
+        raise ValueError("Unknown device format:", dev)
+    return GpuContext(kind, devnum)
+
+def zeros(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
           cls=None):
     """
-    zeros(shape, dtype='float64', order='A', context=None, kind=None, cls=None)
+    zeros(shape, dtype='float64', order='C', context=None, cls=None)
+
+    Returns an array of zero-initialized values of the requested
+    shape, type and order.
+
+    :param shape: number of elements in each dimension
+    :type shape: iterable of ints
+    :param dtype: type of the elements
+    :type dtype: string, numpy.dtype or int
+    :param order: layout of the data in memory, one of 'A'ny, 'C' or 'F'ortran
+    :type order: string
+    :param context: context in which to do the allocation
+    :type context: GpuContext
+    :param cls: class of the returned array (must inherit from GpuArray)
+    :type cls: class
+    :rtype: array
     """
-    res = empty(shape, dtype=dtype, order=order, context=context, kind=kind,
-                cls=cls)
+    res = empty(shape, dtype=dtype, order=order, context=context, cls=cls)
     array_memset(res, 0)
     return res
 
-def empty(shape, dtype=GA_DOUBLE, order='A', context=None, kind=None,
+def empty(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
           cls=None):
     """
-    empty(shape, dtype='float64', order='A', context=None, kind=None, cls=None)
+    empty(shape, dtype='float64', order='C', context=None, cls=None)
+
+    Returns an empty (uninitialized) array of the requested shape,
+    type and order.
+
+    :param shape: number of elements in each dimension
+    :type shape: iterable of ints
+    :param dtype: type of the elements
+    :type dtype: string, numpy.dtype or int
+    :param order: layout of the data in memory, one of 'A'ny, 'C' or 'F'ortran
+    :type order: string
+    :param context: context in which to do the allocation
+    :type context: GpuContext
+    :param cls: class of the returned array (must inherit from GpuArray)
+    :type cls: class
+    :rtype: array
     """
-    cdef void *ctx
-    cdef compyte_buffer_ops *ops
     cdef size_t *cdims
     cdef GpuArray res
 
-    if kind is None:
-        ops = GpuArray_ops
-    else:
-        ops = get_ops(kind)
-
-    if context is None:
-        ctx = GpuArray_ctx
-    else:
-        ctx = get_ctx(context)
+    context = ensure_context(context)
 
     cdims = <size_t *>calloc(len(shape), sizeof(size_t))
     if cdims == NULL:
@@ -537,48 +560,93 @@ def empty(shape, dtype=GA_DOUBLE, order='A', context=None, kind=None,
     try:
         for i, d in enumerate(shape):
             cdims[i] = d
-        res = new_GpuArray(cls)
-        array_empty(res, ops, ctx, dtype_to_typecode(dtype),
+        res = new_GpuArray(cls, context)
+        array_empty(res, context.ops, context.ctx, dtype_to_typecode(dtype),
                     <unsigned int>len(shape), cdims, to_ga_order(order))
     finally:
         free(cdims)
     return res
 
-def asarray(a, dtype=None, order=None, context=None, kind=None):
+def asarray(a, dtype=None, order='A', GpuContext context=None):
+    """
+    asarray(a, dtype=None, order='A', context=None)
+
+    Returns a GpuArray from the data in `a`
+
+    :param a: data
+    :type shape: array-like
+    :param dtype: type of the elements
+    :type dtype: string, numpy.dtype or int
+    :param order: layout of the data in memory, one of 'A'ny, 'C' or 'F'ortran
+    :type order: string or int
+    :param context: context in which to do the allocation
+    :type context: GpuContext
+    :rtype: GpuArray
+
+    If `a` is already a GpuArray and all other parameters match, then
+    the object itself returned.  If `a` is an instance of a subclass
+    of GpuArray then a view of the base class will be returned.
+    Otherwise a new object is create and the data is copied into it.
+
+    `context` is optional if `a` is a GpuArray (but must match exactly
+    the context of `a` if specified) and is mandatory otherwise.
+    """
     return array(a, dtype=dtype, order=order, copy=False, context=context,
-                 kind=kind)
+                 cls=GpuArray)
 
-def ascontiguousarray(a, dtype=None, context=None, kind=None):
+def ascontiguousarray(a, dtype=None, GpuContext context=None):
+    """
+    ascontiguousarray(a, dtype=None, context=None)
+
+    Returns a contiguous array in device memory (C order).
+
+    :param a: input
+    :type a: array-like
+    :param dtype: type of the return array
+    :type dtype: string, numpy.dtype or int
+    :param context: context to use for a new array
+    :type context: GpuContext
+    :rtype: array
+
+    `context` is optional if `a` is a GpuArray (but must match exactly
+    the context of `a` if specified) and is mandatory otherwise.
+    """
     return array(a, order='C', dtype=dtype, ndmin=1, copy=False,
-                 context=context, kind=kind)
+                 context=context)
 
-def asfortranarray(a, dtype=None, context=None, kind=None):
+def asfortranarray(a, dtype=None, GpuArray context=None):
+    """
+    asfortranarray(a, dtype=None, context=None)
+
+    Returns a contiguous array in device memory (Fortran order)
+
+    :param a: input
+    :type a: array-like
+    :param dtype: type of the elements
+    :type dtype: string, numpy.dtype or int
+    :param context: context in which to do the allocation
+    :type context: GpuContext
+    :rtype: array
+
+    `context` is optional if `a` is a GpuArray (but must match exactly
+    the context of `a` if specified) and is mandatory otherwise.
+    """
     return array(a, order='F', dtype=dtype, ndmin=1, copy=False,
-                 context=context, kind=kind)
+                 context=context)
 
 def may_share_memory(GpuArray a not None, GpuArray b not None):
     return array_share(a, b)
 
-def from_gpudata(size_t data, offset, dtype, shape, kind=None, context=None,
+def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
                  strides=None, writable=True, base=None, cls=None):
     cdef GpuArray res
-    cdef compyte_buffer_ops *ops
-    cdef void *ctx
     cdef size_t *cdims
     cdef ssize_t *cstrides
     cdef unsigned int nd
     cdef size_t size
     cdef int typecode
 
-    if kind is None:
-        ops = GpuArray_ops
-    else:
-        ops = get_ops(kind)
-
-    if context is None:
-        ctx = GpuArray_ctx
-    else:
-        ctx = get_ctx(context)
+    context = ensure_context(context)
 
     nd = <unsigned int>len(shape)
     if strides is not None and len(strides) != nd:
@@ -602,35 +670,30 @@ def from_gpudata(size_t data, offset, dtype, shape, kind=None, context=None,
                 strides[i] = size
                 size *= cdims[i]
 
-        res = new_GpuArray(cls)
-        array_fromdata(res, ops, <gpudata *>data, offset, typecode, nd, cdims,
-                       cstrides, <int>(1 if writable else 0))
+        res = new_GpuArray(cls, context)
+        array_fromdata(res, context.ops, <gpudata *>data, offset, typecode,
+                       nd, cdims, cstrides, <int>(1 if writable else 0))
         res.base = base
     finally:
         free(cdims)
         free(cstrides)
     return res
 
-def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
-          context=None, cls=None):
+def array(proto, dtype=None, copy=True, order=None, ndmin=0,
+          GpuContext context=None, cls=None):
     """
-    array(obj, dtype='float64', copy=True, order=None, ndmin=0, kind=None,
-          context=None, cls=None)
+    array(obj, dtype='float64', copy=True, order=None, ndmin=0, context=None, cls=None)
     """
     cdef GpuArray res
     cdef GpuArray arg
     cdef GpuArray tmp
     cdef np.ndarray a
-    cdef compyte_buffer_ops *ops
-    cdef void *ctx
     cdef ga_order ord
 
     if isinstance(proto, GpuArray):
         arg = proto
 
-        if kind is not None and get_ops(kind) != arg.ga.ops:
-            raise ValueError("cannot change the kind of an array")
-        if context is not None and get_ctx(context) != array_context(arg):
+        if context is not None and  context.ctx != array_context(arg):
             raise ValueError("cannot copy an array to a different context")
 
         if (not copy
@@ -638,9 +701,12 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
             and (arg.ga.nd >= ndmin)
             and (order is None or order == 'A' or
                  (order == 'C' and py_CHKFLAGS(arg, GA_C_CONTIGUOUS)) or
-                 (order == 'F' and py_CHKFLAGS(arg, GA_F_CONTIGUOUS)))
-            and (cls is None or proto.__class__ is cls)):
-            return arg
+                 (order == 'F' and py_CHKFLAGS(arg, GA_F_CONTIGUOUS)))):
+            if cls is None or arg.__class__ is cls:
+                return arg
+            else:
+                return arg.view(cls)
+
         shp = arg.shape
         if len(shp) < ndmin:
             idx = (1,)*(ndmin-len(shp))
@@ -653,8 +719,7 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
         if cls is None:
             cls = proto.__class__
         res = empty(shp, dtype=(dtype or arg.dtype), order=order, cls=cls,
-                    kind=ops_kind(arg.ga.ops),
-                    context=ctx_object(array_context(arg)))
+                    context=arg.context)
         if len(shp) < ndmin:
             tmp = res[idx]
         else:
@@ -662,15 +727,7 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
         array_move(tmp, arg)
         return res
 
-    if kind is None:
-        ops = GpuArray_ops
-    else:
-        ops = get_ops(kind)
-
-    if context is None:
-        ctx = GpuArray_ctx
-    else:
-        ctx = get_ctx(context)
+    context = ensure_context(context)
 
     a = numpy.array(proto, dtype=dtype, order=order, ndmin=ndmin,
                     copy=False)
@@ -683,23 +740,104 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0, kind=None,
     else:
         ord = GA_C_ORDER
 
-    res = new_GpuArray(cls)
-    array_empty(res, ops, ctx, dtype_to_typecode(a.dtype),
+    res = new_GpuArray(cls, context)
+    array_empty(res, context.ops, context.ctx, dtype_to_typecode(a.dtype),
                 np.PyArray_NDIM(a), <size_t *>np.PyArray_DIMS(a), ord)
     array_write(res, np.PyArray_DATA(a), np.PyArray_NBYTES(a))
     return res
 
-cdef public GpuArray new_GpuArray(cls):
+cdef class GpuContext:
+    """
+    Class that holds all the information pertaining to a context.
+
+    GpuContext(kind, devno)
+
+    :param kind: module name for the context
+    :type kind: string
+    :param devno: device number
+    :type devno: int
+
+    The currently implemented modules (for the `kind` parameter) are
+    "cuda" and "opencl".  Which are available depends on the build
+    options for libcompyte.
+    """
+    cdef compyte_buffer_ops *ops
+    cdef void* ctx
+
+    def __dealloc__(self):
+        if self.ctx != NULL:
+            self.ops.buffer_deinit(self.ctx)
+
+    def __cinit__(self, kind, devno, *args, **kwargs):
+        cdef int err = GA_NO_ERROR
+        cdef void *ctx
+        self.ops = get_ops(kind)
+        self.ctx = self.ops.buffer_init(devno, &err)
+        if (err != GA_NO_ERROR):
+            if err == GA_VALUE_ERROR:
+                raise GpuArrayException("No device %d"%(devno,), err)
+            else:
+                raise GpuArrayException(self.ops.buffer_error(NULL), err)
+
+    property kind:
+        "Module name this context uses"
+        def __get__(self):
+            return ops_kind(self.ops)
+
+    property ptr:
+        "Raw pointer value for the context object"
+        def __get__(self):
+            return <size_t>self.ctx
+
+    property devname:
+        "Device name for this context"
+        def __get__(self):
+            cdef char *tmp
+            cdef unicode res
+
+            ctx_property(self, GA_CTX_PROP_DEVNAME, &tmp)
+            try:
+                res = tmp.decode('ascii')
+            finally:
+                free(tmp)
+            return res
+
+    property maxlsize:
+        "Maximum size of thread block (local size) for this context"
+        def __get__(self):
+            cdef size_t res
+            ctx_property(self, GA_CTX_PROP_MAXLSIZE, &res)
+            return res
+
+    property lmemsize:
+        "Size of the local (shared) memory, in bytes, for this context"
+        def __get__(self):
+            cdef size_t res
+            ctx_property(self, GA_CTX_PROP_LMEMSIZE, &res)
+            return res
+
+    property numprocs:
+        "Number of compute units for this context"
+        def __get__(self):
+            cdef unsigned int res
+            ctx_property(self, GA_CTX_PROP_NUMPROCS, &res)
+            return res
+
+cdef public GpuArray new_GpuArray(cls, GpuContext ctx):
     cdef GpuArray res
+    if ctx is None:
+        raise RuntimeError("ctx is None in new_GpuArray")
     if cls is None or cls is GpuArray:
         res = GpuArray.__new__(GpuArray)
     else:
         res = GpuArray.__new__(cls)
     res.base = None
+    res.context = ctx
     return res
 
 cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
     cdef _GpuArray ga
+    cdef readonly GpuContext context
     cdef readonly object base
     cdef object __weakref__
 
@@ -775,14 +913,14 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
         else:
             typecode = dtype_to_typecode(dtype)
 
-        res = new_GpuArray(self.__class__)
+        res = new_GpuArray(self.__class__, self.context)
         array_empty(res, self.ga.ops, array_context(self), typecode,
                     self.ga.nd, self.ga.dimensions, ord)
         return res
 
     cpdef copy(self, order='C'):
         cdef GpuArray res
-        res = new_GpuArray(self.__class__)
+        res = new_GpuArray(self.__class__, self.context)
         array_copy(res, self, to_ga_order(order))
         return res
 
@@ -799,7 +937,7 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
         array_sync(self)
 
     def view(self, cls=None):
-        cdef GpuArray res = new_GpuArray(cls)
+        cdef GpuArray res = new_GpuArray(cls, self.context)
         array_view(res, self)
         if self.base is not None:
             res.base = self.base
@@ -831,7 +969,7 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
         try:
             for i in range(nd):
                 newdims[i] = shape[i]
-            res = new_GpuArray(self.__class__)
+            res = new_GpuArray(self.__class__, self.context)
             array_reshape(res, self, nd, newdims, to_ga_order(order), 0)
         finally:
             free(newdims)
@@ -902,7 +1040,7 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
                 base = self.base
             else:
                 base = self
-            res = new_GpuArray(self.__class__)
+            res = new_GpuArray(self.__class__, self.context)
             array_index(res, self, starts, stops, steps)
             res.base = base
         finally:
@@ -944,7 +1082,7 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
             try:
                 for i in range(nd):
                     newdims[i] = newshape[i]
-                res = new_GpuArray(GpuArray)
+                res = new_GpuArray(GpuArray, self.context)
                 array_reshape(res, self, nd, newdims, GA_C_ORDER, 1)
             finally:
                 free(newdims)
@@ -1018,23 +1156,13 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
         def __get__(self):
             return <size_t>self.ga.data
 
-    property kind:
-        "Return the kind string for the object backing this array."
-        def __get__(self):
-            return ops_kind(self.ga.ops)
-
-    property context:
-        "Return the context with which this array is associated."
-        def __get__(self):
-            return ctx_object(array_context(self))
-
 cdef class GpuKernel:
     cdef _GpuKernel k
 
     def __dealloc__(self):
         kernel_clear(self)
 
-    def __cinit__(self, source, name, kind=None, context=None, cluda=True,
+    def __cinit__(self, source, name, GpuContext context=None, cluda=True,
                   have_double=False, have_small=False, have_complex=False,
                   have_half=False, *a, **kwa):
         cdef const_char_p s[1]
@@ -1047,15 +1175,7 @@ cdef class GpuKernel:
         if not isinstance(name, (str, unicode)):
             raise TypeError("Expected a string for the kernel name")
 
-        if kind is None:
-            ops = GpuArray_ops
-        else:
-            ops = get_ops(kind)
-
-        if context is None:
-            ctx = GpuArray_ctx
-        else:
-            ctx = get_ctx(context)
+        context = ensure_context(context)
 
         if cluda:
             flags |= GA_USE_CLUDA
@@ -1068,16 +1188,9 @@ cdef class GpuKernel:
         if have_half:
             flags |= GA_USE_HALF
 
-        # This is required under CUDA otherwise the function is compiled
-        # as a C++ mangled name and is irretriveable
-        if kind == "cuda":
-            ss = 'extern "C" {%s}'%(source,)
-        else:
-            ss = source
-
-        s[0] = ss
-        l = len(ss)
-        kernel_init(self, ops, ctx, 1, s, &l, name, flags)
+        s[0] = source
+        l = len(source)
+        kernel_init(self, context.ops, context.ctx, 1, s, &l, name, flags)
 
     def __call__(self, *args, n=0, ls=0, gs=0):
         if n == 0 and (ls == 0 or gs == 0):

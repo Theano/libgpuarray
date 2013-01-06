@@ -18,28 +18,16 @@ dtypes_no_complex = ["float32", "float64",
                      "int8", "int16", "uint8", "uint16",
                      "int32", "int64", "uint32", "uint64"]
 
-kind = "opencl"
-devnum = 0
-
 def get_env_dev():
     for name in ['COMPYTE_TEST_DEVICE', 'DEVICE']:
         if name in os.environ:
             return os.environ[name]
+    return "opencl0:0"
 
-test_dev = get_env_dev()
-if test_dev:
-    if test_dev.startswith('cuda'):
-        kind = "cuda"
-        devnum = int(test_dev[4:])
-    elif test_dev.startswith('opencl'):
-        kind = "opencl"
-        devspec = test_dev[6:].split(':')
-        devnum = int(devspec[0]) << 16 | int(devspec[1])
-    else:
-        print >>sys.stderr, "Unknown device format", test_dev, ", using defaults"
 
-context = gpuarray.init(kind, devnum)
-print >>sys.stderr, "*** Testing for", gpuarray.get_devname(kind, context)
+context = gpuarray.init(get_env_dev())
+print >>sys.stderr, "*** Testing for", context.devname
+
 
 def guard_devsup(func):
     def f(*args, **kwargs):
@@ -94,7 +82,7 @@ def check_all(x, y):
 
 def gen_gpuarray(shape_orig, dtype='float32', offseted_outer=False,
                  offseted_inner=False, sliced=1, order='c', nozeros=False,
-                 incr=0, kind=None, ctx=None, cls=None):
+                 incr=0, ctx=None, cls=None):
     if sliced is True:
         sliced = 2
     elif sliced is False:
@@ -118,7 +106,7 @@ def gen_gpuarray(shape_orig, dtype='float32', offseted_outer=False,
     assert order in ['c', 'f']
     if order == 'f' and len(shape) > 0:
         a = numpy.asfortranarray(a)
-    b = gpuarray.array(a, context=ctx, kind=kind, cls=cls)
+    b = gpuarray.array(a, context=ctx, cls=cls)
     if order == 'f' and len(shape) > 0 and b.size > 1:
         assert b.flags['F_CONTIGUOUS']
 

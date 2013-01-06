@@ -5,7 +5,7 @@ import numpy
 import pygpu.gpuarray as gpu_ndarray
 
 from .support import (guard_devsup, check_meta, check_flags, check_all,
-                      gen_gpuarray, kind, context as ctx, dtypes_all,
+                      gen_gpuarray, context as ctx, dtypes_all,
                       dtypes_no_complex, skip_single_f)
 
 
@@ -21,7 +21,7 @@ def product(*args, **kwds):
 
 
 def test_hash():
-    g = gpu_ndarray.empty((2, 3), kind=kind, context=ctx)
+    g = gpu_ndarray.empty((2, 3), context=ctx)
     exc = None
     try:
         h = hash(g)
@@ -38,8 +38,7 @@ def test_transfer():
 
 
 def transfer(shp, dtype, offseted):
-    a, b = gen_gpuarray(shp, dtype, offseted,
-                        kind=kind, ctx=ctx)
+    a, b = gen_gpuarray(shp, dtype, offseted, ctx=ctx)
     c = numpy.asarray(b)
 
     assert numpy.allclose(c, a)
@@ -56,7 +55,7 @@ def test_cast():
 
 @guard_devsup
 def cast(shp, dtype1, dtype2):
-    a, b = gen_gpuarray(shp, dtype1, False, kind=kind, ctx=ctx)
+    a, b = gen_gpuarray(shp, dtype1, False, ctx=ctx)
     ac = a.astype(dtype2)
     bc = b.astype(dtype2)
 
@@ -79,7 +78,7 @@ def test_transfer_not_contiguous():
 def transfer_not_contiguous(shp, dtype):
     a = numpy.random.rand(*shp) * 10
     a = a[::-1]
-    b = gpu_ndarray.array(a, context=ctx, kind=kind)
+    b = gpu_ndarray.array(a, context=ctx)
     c = numpy.asarray(b)
 
     assert numpy.allclose(c, a)
@@ -103,7 +102,7 @@ def transfer_fortran(shp, dtype):
     if len(shp) > 1:
         assert a_.strides != a.strides
     a = a_
-    b = gpu_ndarray.array(a, context=ctx, kind=kind)
+    b = gpu_ndarray.array(a, context=ctx)
     c = numpy.asarray(b)
 
     assert a.shape == b.shape == c.shape
@@ -128,7 +127,7 @@ def test_ascontiguousarray():
 @guard_devsup
 def ascontiguousarray(shp, dtype, offseted_o, offseted_i, sliced, order):
     cpu, gpu = gen_gpuarray(shp, dtype, offseted_o, offseted_i, sliced, order,
-                            kind=kind, ctx=ctx)
+                            ctx=ctx)
 
     a = numpy.ascontiguousarray(cpu)
     b = gpu_ndarray.ascontiguousarray(gpu)
@@ -165,7 +164,7 @@ def test_asfortranarray():
 @guard_devsup
 def asfortranarray(shp, dtype, offseted_outer, offseted_inner, sliced, order):
     cpu, gpu = gen_gpuarray(shp, dtype, offseted_outer, offseted_inner, sliced,
-                            order, kind=kind, ctx=ctx)
+                            order, ctx=ctx)
 
     a = numpy.asfortranarray(cpu)
     b = gpu_ndarray.asfortranarray(gpu)
@@ -202,15 +201,14 @@ def test_zeros():
 
 @guard_devsup
 def zeros(shp, order, dtype):
-    x = gpu_ndarray.zeros(shp, dtype, order, context=ctx,
-                          kind=kind)
+    x = gpu_ndarray.zeros(shp, dtype, order, context=ctx)
     y = numpy.zeros(shp, dtype, order)
     check_all(x, y)
 
 
 def test_zeros_no_dtype():
     # no dtype and order param
-    x = gpu_ndarray.zeros((), context=ctx, kind=kind)
+    x = gpu_ndarray.zeros((), context=ctx)
     y = numpy.zeros(())
     check_meta(x, y)
 
@@ -234,14 +232,13 @@ def test_empty():
 
 
 def empty(shp, order, dtype):
-    x = gpu_ndarray.empty(shp, dtype, order, context=ctx,
-                          kind=kind)
+    x = gpu_ndarray.empty(shp, dtype, order, context=ctx)
     y = numpy.empty(shp, dtype, order)
     check_meta(x, y)
 
 
 def test_empty_no_dtype():
-    x = gpu_ndarray.empty((), context=ctx, kind=kind)# no dtype and order param
+    x = gpu_ndarray.empty((), context=ctx)# no dtype and order param
     y = numpy.empty(())
     check_meta(x, y)
 
@@ -262,8 +259,7 @@ def test_mapping_getitem_ellipsis():
 
 
 def mapping_getitem_ellipsis(shp, dtype, offseted):
-    a, a_gpu = gen_gpuarray(shp, dtype, offseted,
-                            kind=kind, ctx=ctx)
+    a, a_gpu = gen_gpuarray(shp, dtype, offseted, ctx=ctx)
     b = a_gpu[...]
     assert b.gpudata == a_gpu.gpudata
     assert b.strides == a.strides
@@ -302,8 +298,7 @@ def check_memory_region(a, a_op, b, b_op):
 @guard_devsup
 def copy_view(shp, dtype, offseted, order1, order2):
     #TODO test copy unbroadcast!
-    a, b = gen_gpuarray(shp, dtype, offseted, order=order1,
-                        kind=kind, ctx=ctx)
+    a, b = gen_gpuarray(shp, dtype, offseted, order=order1, ctx=ctx)
 
     assert numpy.allclose(a, numpy.asarray(b))
     check_flags(b, a)
@@ -345,8 +340,7 @@ def test_shape():
 
 
 def shape_(shps, offseted, order):
-    ac, ag = gen_gpuarray(shps[0], 'float32', offseted, order=order,
-                          kind=kind, ctx=ctx)
+    ac, ag = gen_gpuarray(shps[0], 'float32', offseted, order=order, ctx=ctx)
     try:
         ac.shape = shps[1]
     except AttributeError:
@@ -358,8 +352,7 @@ def shape_(shps, offseted, order):
 
 
 def reshape(shps, offseted, order1, order2):
-    ac, ag = gen_gpuarray(shps[0], 'float32', offseted, order=order1,
-                          kind=kind, ctx=ctx)
+    ac, ag = gen_gpuarray(shps[0], 'float32', offseted, order=order1, ctx=ctx)
     outc = ac.reshape(shps[1], order=order2)
     outg = ag.reshape(shps[1], order=order2)
     assert outc.shape == outg.shape
@@ -375,7 +368,7 @@ def test_len():
 
 
 def len_(shp, dtype, offseted):
-    a, a_gpu = gen_gpuarray(shp, dtype, offseted, kind=kind, ctx=ctx)
+    a, a_gpu = gen_gpuarray(shp, dtype, offseted, ctx=ctx)
     assert len(a_gpu) == shp[0]
 
 
@@ -389,7 +382,7 @@ def test_mapping_getitem_w_int():
 def mapping_getitem_w_int(dtype, offseted):
     # test vector
     dim = (2,)
-    a, _a = gen_gpuarray(dim, dtype, offseted, kind=kind, ctx=ctx)
+    a, _a = gen_gpuarray(dim, dtype, offseted, ctx=ctx)
 
     import sys
     init_ref_count = sys.getrefcount(_a)
@@ -409,14 +402,14 @@ def mapping_getitem_w_int(dtype, offseted):
 
     # test scalar
     dim = ()
-    a, _a = gen_gpuarray(dim, dtype, offseted, kind=kind, ctx=ctx)
+    a, _a = gen_gpuarray(dim, dtype, offseted, ctx=ctx)
     _cmp(_a[...], a[...])
     _cmpf(_a, 0)
     _cmpf(_a, slice(1))
 
     # test 4d-tensor
     dim = (5, 4, 3, 2)
-    a, _a = gen_gpuarray(dim, dtype, offseted, kind=kind, ctx=ctx)
+    a, _a = gen_gpuarray(dim, dtype, offseted, ctx=ctx)
     _cmpf(_a, slice(-1), slice(-1), 10, -10)
     _cmpf(_a, slice(-1), slice(-1), -10, slice(-1))
     _cmpf(_a, 0, slice(0, -1, -20), -10)
