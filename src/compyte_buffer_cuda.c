@@ -1102,7 +1102,7 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
     if (arch == NULL) return res;
 
     if (asprintf(&strs[count], ELEM_HEADER_PTX, arch,
-                 bits, bits, bits, in_t, out_t, nEls) == -1)
+		 bits, bits, bits, in_t, out_t, nEls) == -1)
         goto fail;
     count++;
 
@@ -1114,13 +1114,13 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
     if (asprintf(&strs[count], "ld.param.u%u rp1, [a_data];\n"
                  "cvt.u32.u32 rp2, a_p;\n"
                  "add.u%u rp1, rp1, rp2;\n"
-                 "ld.global.%s tmpa, [rp1];\n"
+                 "ld.global.%s tmpa, [rp1+%" SPREFIX "u];\n"
                  "cvt%s.%s.%s tmpb, tmpa;\n"
                  "ld.param.u%u rp1, [b_data];\n"
                  "cvt.u32.u32 rp2, b_p;\n"
                  "add.u%u rp1, rp1, rp2;\n"
-                 "st.global.%s [rp1], tmpb;\n", bits, bits, in_t, rmod,
-                 out_t, in_t, bits, bits, out_t) == -1)
+                 "st.global.%s [rp1+%" SPREFIX "u], tmpb;\n", bits, bits,
+		 in_t, ioff, rmod, out_t, in_t, bits, bits, out_t, ooff) == -1)
         goto fail;
     count++;
 
@@ -1152,13 +1152,9 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
     k = cuda_newkernel(input->ctx, count, (const char **)strs, NULL, "elemk",
                        flags, &res);
     if (k == NULL) goto fail;
-    input->ptr += ioff;
     res = cuda_setkernelarg(k, 0, GA_BUFFER, input);
-    input->ptr -= ioff;
     if (res != GA_NO_ERROR) goto failk;
-    output->ptr += ooff;
     res = cuda_setkernelarg(k, 1, GA_BUFFER, output);
-    output->ptr -= ooff;
     if (res != GA_NO_ERROR) goto failk;
 
     /* Cheap kernel scheduling */
