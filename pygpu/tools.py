@@ -1,3 +1,9 @@
+import collections
+import functools
+from itertools import ifilterfalse
+from heapq import nsmallest
+from operator import itemgetter
+
 import numpy
 from dtypes import dtype_to_ctype, _fill_dtype_registry
 from gpuarray import GpuArray
@@ -19,6 +25,14 @@ class Argument(object):
 
     def ctype(self):
         return dtype_to_ctype(self.dtype)
+
+    def __hash__(self):
+        return hash(type(self)) ^ hash(self.dtype) ^ hash(self.name)
+
+    def __eq__(self, other):
+        return (type(self) == type(other) and
+                self.dtype == other.dtype and
+                self.name == other.name)
 
 
 class ArrayArg(Argument):
@@ -99,4 +113,54 @@ def check_args(args, collapse=True):
         dims = tuple(dims)
         strs = [tuple(str) if str is not None else None for str in strs]
 
-    return n, nd, dims, strs, offsets, contig
+    return n, nd, dims, tuple(strs), tuple(offsets), contig
+
+class Counter(dict):
+    'Mapping where default values are zero'
+    def __missing__(self, key):
+        return 0
+
+def lfu_cache(maxsize=20):
+    def decorating_function(user_function):
+        cache = {}
+        use_count = Counter()
+
+        @functools.wraps(user_function)
+        def wrapper(*key):
+            use_count[key] += 1
+
+            try:
+                result = cache[key]
+                wrapper.hits += 1
+            except KeyError:
+                result = user_function(*key)
+                cache[key] = result
+                wrapper.misses += 1
+
+                # purge least frequently used cache entry
+                if len(cache) > wrapper.maxsize:
+                    for key, _ in nsmallest(maxsize // 10,
+                                            use_count.iteritems(),
+                                            key=itemgetter(1)):
+                        del cache[key], use_count[key]
+
+            return result
+
+        def clear():
+            cache.clear()
+            use_count.clear()
+            wrapper.hits = wrapper.misses = 0
+
+        @functools.wraps(user_function)
+        def get(*key):
+            result = cache[key]
+            use_count[key] += 1
+            wrapper.hits += 1
+            return result
+
+        wrapper.hits = wrapper.misses = 0
+        wrapper.maxsize = maxsize
+        wrapper.clear = clear
+        wrapper.get = get
+        return wrapper
+    return decorating_function

@@ -1,6 +1,6 @@
 from mako.template import Template
 
-from tools import ScalarArg, ArrayArg, as_argument, check_args
+from tools import ScalarArg, ArrayArg, as_argument, check_args, lfu_cache
 from dtypes import parse_c_arg_backend
 from dtypes import dtype_to_ctype, get_np_obj, get_common_dtype
 
@@ -222,8 +222,8 @@ KERNEL void ${name}(
 
 
 def parse_c_args(arguments):
-    return [parse_c_arg_backend(arg, ScalarArg, ArrayArg)
-            for arg in arguments.split(',')]
+    return tuple(parse_c_arg_backend(arg, ScalarArg, ArrayArg)
+            for arg in arguments.split(','))
 
 
 import re
@@ -240,7 +240,7 @@ class ElemwiseKernel(object):
         if isinstance(arguments, str):
             self.arguments = parse_c_args(arguments)
         else:
-            self.arguments = arguments
+            self.arguments = tuple(arguments)
 
         self.operation = operation
         self.expression = massage_op(operation)
@@ -276,31 +276,41 @@ class ElemwiseKernel(object):
                                            cluda=True, **self.flags)
         self._speckey = None
         self._dims = None
-        self._cache_basic = {}
-        self._cache_dimspec = {}
 
-    def prepare_args_contig(self, args, offsets):
+    def __hash__(self):
+        return (hash(self.arguments) ^ hash(self.operation) ^
+                hash(self.context) ^ hash(self.preamble))
+
+    def __eq__(self, other):
+        return (type(self) == type(other) and
+                self.arguments == other.arguments and
+                self.operation == other.operation and
+                self.context == other.context and
+                self.preamble == other.preamble)
+
+    def clear_caches(self):
+        self._make_basic.clear()
+        self._make_dimspec.clear()
+        self._make_specialized.clear()
+
+    def prepare_args_contig(self, args, n, offsets):
         kernel_args = []
         for i, arg in enumerate(args):
             kernel_args.append(arg)
             if isinstance(arg, gpuarray.GpuArray):
                 kernel_args.append(numpy.asarray(offsets[i], dtype='uint32'))
-        self.kernel_args = kernel_args
-        self.kernel_args.insert(0, numpy.asarray(self.n, dtype='uint32'))
+        kernel_args.insert(0, numpy.asarray(n, dtype='uint32'))
+        return kernel_args
 
-    def get_basic(self, args, nd, dims, strs, offsets):
-        self.prepare_args_basic(args, dims, strs, offsets)
-        if nd not in self._cache_basic:
-            src = basic_kernel.render(preamble=self.preamble, name="elemk",
-                                      nd=nd, arguments=self.arguments,
-                                      expression=self.expression)
-            self._cache_basic[nd] = gpuarray.GpuKernel(src, "elemk",
-                                                       cluda=True,
-                                                       context=self.context,
-                                                       **self.flags)
-        return self._cache_basic[nd]
+    @lfu_cache()
+    def _make_basic(self, nd):
+        src = basic_kernel.render(preamble=self.preamble, name="elemk",
+                                  nd=nd, arguments=self.arguments,
+                                  expression=self.expression)
+        return gpuarray.GpuKernel(src, "elemk", context=self.context,
+                                  cluda=True, **self.flags)
 
-    def prepare_args_basic(self, args, dims, strs, offsets):
+    def prepare_args_basic(self, args, n, dims, strs, offsets):
         kernel_args = []
         for i, arg in enumerate(args):
             if isinstance(arg, gpuarray.GpuArray):
@@ -314,22 +324,26 @@ class ElemwiseKernel(object):
         for d in reversed(dims):
             kernel_args.insert(0, numpy.asarray(d, dtype='uint32'))
 
-        kernel_args.insert(0, numpy.asarray(self.n, dtype='uint32'))
+        kernel_args.insert(0, numpy.asarray(n, dtype='uint32'))
+        return kernel_args
 
-        self.kernel_args = kernel_args
+    def get_basic(self, args, n, nd, dims, strs, offsets):
+        args = self.prepare_args_basic(args, n, dims, strs, offsets)
+        return self._make_basic(nd), args
 
-    def get_dimspec(self, args, nd, dims, strs, offsets):
-        self.prepare_args_dimspec(args, strs, offsets)
-        if dims not in self._cache_dimspec:
-            src = dimspec_kernel.render(preamble=self.preamble, name="elemk",
-                                        n=self.n, nd=nd, dims=dims,
-                                        arguments=self.arguments,
-                                        expression=self.expression)
-            self._cache_dimspec[dims] = gpuarray.GpuKernel(src, "elemk",
-                                                           cluda=True,
-                                                           context=self.context,
-                                                           **self.flags)
-        return self._cache_dimspec[dims]
+    def try_basic(self, args, n, nd, dims, strs, offsets):
+        k = self._make.basic.get(self, nd)
+        args = self.prepare_args_basic(args, n, dims, strs, offsets)
+        return k, args
+
+    @lfu_cache()
+    def _make_dimspec(self, n, nd, dims):
+        src = dimspec_kernel.render(preamble=self.preamble, name="elemk",
+                                    n=n, nd=nd, dims=dims,
+                                    arguments=self.arguments,
+                                    expression=self.expression)
+        return gpuarray.GpuKernel(src, "elemk", context=self.context,
+                                  cluda=True, **self.flags)
 
     def prepare_args_dimspec(self, args, strs, offsets):
         kernel_args = []
@@ -342,12 +356,24 @@ class ElemwiseKernel(object):
             else:
                 kernel_args.append(arg)
 
-        self.kernel_args = kernel_args
+        return kernel_args
 
-    def get_specialized(self, args, nd, dims, strs, offsets):
-        self.prepare_args_specialized(args)
+    def get_dimspec(self, args, n, nd, dims, strs, offsets):
+        args = self.prepare_args_dimspec(args, strs, offsets)
+        return self._make_dimspec(n, nd, dims), args
+
+    def try_dimspec(self, args, n, nd, dims, strs, offsets):
+        k = self._make_dimspec.get(self, n, nd, dims)
+        args = self.prepare_args_dimspec(args, strs, offsets)
+        return k, args
+
+    def prepare_args_specialized(self, args):
+        return args
+
+    @lfu_cache()
+    def _make_specialized(self, n, nd, dims, strs, offsets):
         src = specialized_kernel.render(preamble=self.preamble,
-                                        name="elemk", n=self.n, nd=nd,
+                                        name="elemk", n=n, nd=nd,
                                         dim=dims, strs=strs,
                                         arguments=self.arguments,
                                         expression=self.expression,
@@ -355,85 +381,84 @@ class ElemwiseKernel(object):
         return gpuarray.GpuKernel(src, "elemk", context=self.context,
                                   cluda=True, **self.flags)
 
-    def prepare_args_specialized(self, args):
-        self.kernel_args = args
+    def get_specialized(self, args, n, nd, dims, strs, offsets):
+        args = self.prepare_args_specialized(args)
+        return self._make_specialized(n, nd, dims, strs, offsets), args
+
+    def try_specialized(self, args, n, nd, dims, strs, offsets):
+        k = self._make_specialized.get(self, n, nd, dims, strs, offsets)
+        args = self.prepare_args_specialized(args)
+        return k, args
 
     def select_kernel(self, args):
-        self.n, nd, dims, strs, offsets, contig = check_args(args)
+        n, nd, dims, strs, offsets, contig = check_args(args)
         if contig:
-            self.prepare_args_contig(args, offsets)
-            return self.contig_k
+            return (self.contig_k, self.prepare_args_contig(args, n, offsets)), n
 
-        # If you call self._spec_limit times (default: 3) in a row
-        # with the same (or compatible) arguments then we will compile
-        # a specialized kernel and use it otherwise we just note the
-        # fact and use the basic one.
-        key = nd, dims, strs
-        if key == self._speckey:
-            if self._speck:
-                self.prepare_args_specialized(args)
-                return self._speck
-            else:
-                self._numcall += 1
+        try:
+            return self.try_specialized(args, n, nd, dims, strs, offsets), n
+        except KeyError:
+            key = dims, strs, offsets
+            if key == self._speckey:
                 if self._numcall > self._spec_limit:
-                    self._speck = self.get_specialized(args, nd, dims, strs,
-                                                       offsets)
-                    return self._speck
-        elif dims in self._cache_dimspec:
-            self.prepare_args_dimspec(args, strs, offsets)
-            return self._cache_dimspec[dims]
-        elif dims == self._dims:
-            self._dimcall += 1
-            if self._dimcall > self._dimspec_limit:
-                return self.get_dimspec(args, nd, dims, strs, offsets)
-        else:
-            self._dims = dims
-            self._dimcall = 1
-            self._speckey = key
-            self._speck = None
-            self._numcall = 1
+                    return self.get_specialized(args, n, nd, dims, strs, offsets), n
+                self._numcall += 1
+            else:
+                self._speckey = key
+                self._numcall = 1
 
-        return self.get_basic(args, nd, dims, strs, offsets)
+        try:
+            return self.try_dimspec(args, n, nd, dims, strs, offsets), n
+        except KeyError:
+            if dims == self._dims:
+                if self._dimcall > self._dimspec_limit:
+                    return self.get_dimspec(args, nd, dims, strs, offsets), n
+                self._dimcall += 1
+            else:
+                self._dims = dims
+                self._dimcall = 1
+
+        return self.get_basic(args, n, nd, dims, strs, offsets), n
 
     def prepare(self, *args):
-        self.n, nd, dims, strs, contig = check_args(args)
+        n, nd, dims, strs, offsets, contig = check_args(args)
         if contig:
-            self.prepare_args_contig(args)
+            args = self.prepare_args_contig(args, n, offsets)
             self._prepare_k = self.contig_k
         else:
-            self.prepare_args_specialized(args)
-            self._prepare_k = self.get_specialized(args, nd, dims, strs)
+            args = self.prepare_args_specialized(args)
+            self._prepare_k = self.get_specialized(args, n, nd, dims, strs, offsets)
 
-        self._prepare_k.setargs(self.kernel_args)
+        self._prepare_k.setargs(args)
+        self._prepare_n = n
 
     def prepared_call(self):
-        self._prepare_k.call(self.n)
+        self._prepare_k.call(self._prepare_n, 0, 0)
 
     def __call__(self, *args):
-        k = self.select_kernel(args)
-        k(*self.kernel_args, n=self.n)
+        (k, args), n = self.select_kernel(args)
+        k(*args, n=n)
 
     def call_contig(self, *args):
-        self.n, nd, dims, strs, offsets, contig = check_args(args)
+        n, nd, dims, strs, offsets, contig = check_args(args)
         if not contig:
             raise ValueError("Can't call contig on non-contiguous data")
-        self.prepare_args_contig(args, offsets)
-        self.contig_k(*self.kernel_args, n=self.n)
+        self.contig_k(*self.prepare_args_contig(args, offsets), n=self.n)
 
     def call_basic(self, *args):
-        self.n, nd, dims, strs, offsets, _ = check_args(args)
-        k = self.get_basic(args, nd, dims, strs, offsets)
-        k(*self.kernel_args, n=self.n)
+        n, nd, dims, strs, offsets, _ = check_args(args)
+        k, args = self.get_basic(args, n, nd, dims, strs, offsets)
+        k(*args, n=n)
 
     def call_dimspec(self, *args):
-        self.n, nd, dims, strs, offsets, _ = check_args(args)
-        k = self.get_dimspec(args, nd, dims, strs, offsets)
-        k(*self.kernel_args, n=self.n)
+        n, nd, dims, strs, offsets, _ = check_args(args)
+        k, args = self.get_dimspec(args, n, nd, dims, strs, offsets)
+        k(*args, n=n)
 
     def call_specialized(self, *args):
-        self.n, nd, dims, strs, offsets, _ = check_args(args)
-        k = self.get_specialized(args, nd, dims, strs, offsets)
-        k(*self.kernel_args, n=self.n)
+        n, nd, dims, strs, offsets, _ = check_args(args)
+        k, args = self.get_specialized(args, n, nd, dims, strs, offsets)
+        k(*args, n=n)
 
 
 def elemwise1(a, op, oper=None, op_tmpl="res[i] = %(op)sa[i]"):
