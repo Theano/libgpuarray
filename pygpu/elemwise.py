@@ -7,6 +7,8 @@ from dtypes import dtype_to_ctype, get_np_obj, get_common_dtype
 import numpy
 import gpuarray
 
+__all__ = ['ElemwiseKernel', 'elemwise1', 'elemwise2', 'ielemwise2', 'compare']
+
 # parameters: preamble, name, nd, arguments, expression
 basic_kernel = Template("""
 ${preamble}
@@ -289,6 +291,9 @@ class ElemwiseKernel(object):
                 self.preamble == other.preamble)
 
     def clear_caches(self):
+        """
+        Clears the compiled kernel caches.
+        """
         self._make_basic.clear()
         self._make_dimspec.clear()
         self._make_specialized.clear()

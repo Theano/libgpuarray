@@ -9,6 +9,7 @@ cdef extern from *:
 
 cdef extern from "stdlib.h":
     void *memcpy(void *dst, void *src, size_t n)
+    void *memset(void *b, int c, size_t sz)
 
 cimport numpy as np
 
@@ -550,7 +551,8 @@ def init(dev):
     :type dev: string
     :rtype: GpuContext
 
-    Device specifiers are composed of the type string and the device id like sor::
+    Device specifiers are composed of the type string and the device
+    id like so::
 
         "cuda0"
         "opencl0:1"
@@ -716,6 +718,36 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
                  strides=None, writable=True, base=None, cls=None):
     """
     from_gpudata(data, offset, dtype, shape, context=None, strides=None, writable=True, base=None, cls=None)
+
+    Build a GpuArray from pre-allocated gpudata
+
+    :param data: pointer to a gpudata structure
+    :type data: int
+    :param offset: offset to the data location inside the gpudata
+    :type offset: int
+    :param dtype: data type of the gpudata elements
+    :type dtype: numpy.dtype
+    :param shape: shape to use for the result
+    :type shape: iterable of ints
+    :param context: context of the gpudata
+    :type context: GpuContext
+    :param strides: strides for the results
+    :type strides: iterable of ints
+    :param writable: is the data writable?
+    :type writeable: bool
+    :param base: base object that keeps gpudata alive
+    :param cls: view type of the result
+
+    .. warning::
+        This function is intended for advanced use and will crash the
+        interpreter if used improperly.
+
+    .. note::
+        This function might be deprecated in a later relase since the
+        only way to create gpudata pointers is through libcompyte
+        functions that aren't exposed at the python level. It can be
+        used with the value of the `gpudata` attribute of an existing
+        GpuArray.
     """
     cdef GpuArray res
     cdef size_t *cdims
@@ -761,6 +793,34 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0,
           GpuContext context=None, cls=None):
     """
     array(obj, dtype='float64', copy=True, order=None, ndmin=0, context=None, cls=None)
+
+    Create a GpuArray from existing data
+
+    :param obj: data to initialize the result
+    :type obj: array-like
+    :param dtype: data type of the result elements
+    :type dtype: string or numpy.dtype or int
+    :param copy: return a copy?
+    :type copy: bool
+    :param order: memory layout of the result
+    :type order: string
+    :param ndmin: minimum number of result dimensions
+    :type ndmin: int
+    :param context: allocation context
+    :type context: GpuContext
+    :param cls: result class (must inherit from GpuArray)
+    :type cls: class
+    :rtype: GpuArray
+
+    This function creates a new GpuArray from the data provided in
+    `obj` except if `obj` is already a GpuArray and all the parameters
+    match its properties and `copy` is False.
+
+    The properties of the resulting array depend on the input data
+    except if overriden by other parameters.
+
+    This function is similar to :meth:`numpy.array` except that it returns
+    GpuArrays.
     """
     cdef GpuArray res
     cdef GpuArray arg
@@ -828,7 +888,9 @@ cdef public class GpuContext [type GpuContextType, object GpuContextObject]:
     """
     Class that holds all the information pertaining to a context.
 
-    GpuContext(kind, devno)
+    .. code-block:: python
+
+        GpuContext(kind, devno)
 
     :param kind: module name for the context
     :type kind: string
@@ -838,6 +900,8 @@ cdef public class GpuContext [type GpuContextType, object GpuContextObject]:
     The currently implemented modules (for the `kind` parameter) are
     "cuda" and "opencl".  Which are available depends on the build
     options for libcompyte.
+
+    If you want an alternative interface check :meth:`~pygpu.gpuarray.init`.
     """
     cdef compyte_buffer_ops *ops
     cdef void* ctx
@@ -914,6 +978,24 @@ cdef public GpuArray new_GpuArray(cls, GpuContext ctx):
     return res
 
 cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
+    """
+    Device array
+
+    To create instances of this class use
+    :meth:`~pygpu.gpuarray.zeros`, :meth:`~pygpu.gpuarray.empty` or
+    :meth:`~pygpu.gpuarray.array`.  It cannot be instanciated
+    directly.
+
+    You can also subclass this class and make the module create your
+    instances by passing the `cls` agument to any method that return a
+    new GpuArray.  This way of creating the class will NOT call your
+    :meth:`__init__` method.
+
+    You can also implement your own :meth:`__init__` method, but you
+    must take care to ensure you properly initialized the GpuArray C
+    fields before using it or you will most likely crash the
+    interpreter.
+    """
     cdef _GpuArray ga
     cdef readonly GpuContext context
     cdef readonly object base
@@ -921,6 +1003,9 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
 
     def __dealloc__(self):
         array_clear(self)
+
+    def __cinit__(self):
+        memset(&self.ga, 0, sizeof(_GpuArray))
 
     def __init__(self):
         if type(self) is GpuArray:
@@ -957,6 +1042,13 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
             raise IndexError("cannot index with: %s"%(key,))
 
     def __array__(self):
+        """
+        __array__()
+
+        Return a :class:`numpy.ndarray` with the same content.
+
+        Automatically used by :meth:`numpy.asarray`.
+        """
         cdef np.ndarray res
 
         if not py_ISONESEGMENT(self):
@@ -973,6 +1065,12 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
         return res
 
     def _empty_like_me(self, dtype=None, order='C'):
+        """
+        _empty_like_me(dtype=None, order='C')
+
+        Returns an empty (uninitialized) GpuArray with the same
+        properties except if overridden by parameters.
+        """
         cdef int typecode
         cdef GpuArray res
         cdef ga_order ord = to_ga_order(order)
@@ -997,6 +1095,9 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
         return res
 
     cpdef copy(self, order='C'):
+        """
+        copy(order='C')
+        """
         cdef GpuArray res
         res = new_GpuArray(self.__class__, self.context)
         array_copy(res, self, to_ga_order(order))
@@ -1012,9 +1113,15 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
             return self.copy()
 
     def sync(self):
+        """
+        sync()
+        """
         array_sync(self)
 
     def view(self, cls=None):
+        """
+        view(cls=None)
+        """
         cdef GpuArray res = new_GpuArray(cls, self.context)
         array_view(res, self)
         if self.base is not None:
@@ -1024,6 +1131,9 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
         return res
 
     def astype(self, dtype, order='A', copy=True):
+        """
+        astype(dtype, order='A', copy=True)
+        """
         cdef GpuArray res
         cdef int typecode = dtype_to_typecode(dtype)
         cdef ga_order ord = to_ga_order(order)
@@ -1037,7 +1147,10 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
         array_move(res, self)
         return res
 
-    def reshape(self, shape, order=GA_C_ORDER):
+    def reshape(self, shape, order='C'):
+        """
+        reshape(shape, order='C')
+        """
         cdef size_t *newdims
         cdef unsigned int nd
         cdef unsigned int i
@@ -1235,6 +1348,9 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
             return <size_t>self.ga.data
 
 cdef class GpuKernel:
+    """
+    GpuKernel(source, name, context=None, cluda=True, have_double=False, have_small=False, have_complex=False, have_half=False)
+    """
     cdef _GpuKernel k
 
     def __dealloc__(self):
@@ -1277,11 +1393,17 @@ cdef class GpuKernel:
         self.call(n, ls, gs)
 
     cpdef setargs(self, args):
+        """
+        setargs(args)
+        """
         # Work backwards to avoid a lot of reallocations in the argument code.
         for i in range(len(args)-1, -1, -1):
             self.setarg(i, args[i])
 
     def setarg(self, unsigned int index, o):
+        """
+        setarg(index, o)
+        """
         if isinstance(o, GpuArray):
             self.setbufarg(index, o)
         else:
@@ -1289,6 +1411,9 @@ cdef class GpuKernel:
             self._setarg(index, o.dtype, o)
 
     def setbufarg(self, unsigned int index, GpuArray a not None):
+        """
+        setbufarg(index, a)
+        """
         kernel_setbufarg(self, index, a)
 
     cdef _setarg(self, unsigned int index, np.dtype t, object o):
@@ -1338,21 +1463,27 @@ cdef class GpuKernel:
             raise ValueError("Can't set argument of this type")
 
     cpdef call(self, size_t n, size_t ls, size_t gs):
+        """
+        call(n, ls, gs)
+        """
         kernel_call(self, n, ls, gs)
 
     property maxlsize:
+        "Maximum for ls for this kernel"
         def __get__(self):
             cdef size_t res
             kernel_property(self, GA_KERNEL_PROP_MAXLSIZE, &res)
             return res
 
     property preflsize:
+        "Preferred multiple for ls for this kernel"
         def __get__(self):
             cdef size_t res
             kernel_property(self, GA_KERNEL_PROP_PREFLSIZE, &res)
             return res
 
     property maxgsize:
+        "Maximum for gs for this kernel"
         def __get__(self):
             cdef size_t res
             kernel_property(self, GA_KERNEL_PROP_MAXGSIZE, &res)

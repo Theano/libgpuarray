@@ -1,11 +1,11 @@
 Python module reference
 =======================
 
-.. automodule:: pygpu.gpuarray
+.. automodule:: pygpu
    :members:
 
-   .. autoclass:: GpuArray
+   .. automodule:: pygpu.gpuarray
       :members:
 
-   .. autoclass:: GpuKernel
-      :members:
+   .. automodule:: pygpu.elemwise
+      :members: ElemwiseKernel
