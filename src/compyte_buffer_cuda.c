@@ -926,7 +926,7 @@ static int cuda_sync(gpudata *b) {
 }
 
 static const char ELEM_HEADER_PTX[] = ".version 3.0\n.target %s\n\n"
-    ".entry elemk (\n"
+    ".entry extcpy (\n"
     ".param .u%u a_data,\n"
     ".param .u%u b_data ) {\n"
     ".reg .u16 rh1, rh2;\n"
@@ -991,6 +991,7 @@ static const char ELEM_FOOTER_PTX[] = "add.u32 i, i, numThreads;\n"
     "setp.lt.u32 p, i, %" SPREFIX "uU;\n"
     "@p bra $loop_begin;\n"
     "$end:\n"
+    "ret;\n"
     "}\n";
 
 static inline const char *map_t(int typecode) {
@@ -1149,7 +1150,7 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
         flags |= GA_USE_COMPLEX;
     }
 
-    k = cuda_newkernel(input->ctx, count, (const char **)strs, NULL, "elemk",
+    k = cuda_newkernel(input->ctx, count, (const char **)strs, NULL, "extcpy",
                        flags, &res);
     if (k == NULL) goto fail;
     res = cuda_setkernelarg(k, 0, GA_BUFFER, input);
