@@ -720,6 +720,7 @@ static int cl_setkernelarg(gpukernel *k, unsigned int index, int typecode,
     val = &b->buf;
   } else {
     sz = compyte_get_elsize(typecode);
+    k->bs[index] = NULL;
   }
   k->ctx->err = clSetKernelArg(k->k, index, sz, val);
   if (k->ctx->err != CL_SUCCESS) {
