@@ -346,6 +346,7 @@ static gpudata *cuda_alloc(void *c, size_t size, int *ret) {
 static void cuda_free(gpudata *d) {
   /* We ignore errors on free */
   cuda_enter(d->ctx);
+  cuEventSynchronize(d->ev);
   if (!(d->flags & DONTFREE))
     cuMemFree(d->ptr);
   cuEventDestroy(d->ev);
