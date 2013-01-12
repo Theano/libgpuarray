@@ -826,6 +826,7 @@ static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
         val = &b->ptr;
     } else {
         sz = compyte_get_elsize(typecode);
+        k->bs[index] = NULL;
     }
 
     tmp = malloc(sz);
@@ -835,7 +836,6 @@ static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
 #if CUDA_VERSION < 4000
     k->types[index] = typecode;
 #endif
-    k->bs[index] = NULL;
     return GA_NO_ERROR;
 }
 
