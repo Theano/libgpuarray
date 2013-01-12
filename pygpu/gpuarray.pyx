@@ -1448,6 +1448,7 @@ cdef class GpuKernel:
     limits of `k.maxlsize` and `k.maxgsize` or the call will fail.
     """
     cdef _GpuKernel k
+    cdef list _buffers
 
     def __dealloc__(self):
         kernel_clear(self)
@@ -1521,17 +1522,17 @@ cdef class GpuKernel:
 
         Arguments which are not wrapped will raise an exception.
         """
+        if len(self._buffers) <= index:
+            self._buffers.extend([None]*(index - len(self._buffers) + 1))
         if isinstance(o, GpuArray):
-            self.setbufarg(index, o)
+            kernel_setbufarg(self, index, o)
+            # This is to keep the reference alive
+            self._buffers[index] = o
         else:
-            # this will break for objects that are not numpy-like, but meh.
-            self._setarg(index, o.dtype, o)
-
-    def setbufarg(self, unsigned int index, GpuArray a not None):
-        """
-        setbufarg(index, a)
-        """
-        kernel_setbufarg(self, index, a)
+            try:
+                self._setarg(index, o.dtype, o)
+            except AttributeError:
+                raise TypeError("Wrap your scalar arguments in numpy objects")
 
     cdef _setarg(self, unsigned int index, np.dtype t, object o):
         cdef float f
@@ -1577,7 +1578,7 @@ cdef class GpuKernel:
             ul = o
             kernel_setarg(self, index, typecode, &ul)
         else:
-            raise ValueError("Can't set argument of this type")
+            raise TypeError("Can't set argument of this type", t)
 
     cpdef call(self, size_t n, size_t ls, size_t gs):
         """
