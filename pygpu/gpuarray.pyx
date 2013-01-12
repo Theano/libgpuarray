@@ -1097,6 +1097,11 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
     cpdef copy(self, order='C'):
         """
         copy(order='C')
+
+        Return a copy if this array.
+
+        :param order: memory layout of the copy
+        :type order: string
         """
         cdef GpuArray res
         res = new_GpuArray(self.__class__, self.context)
@@ -1115,12 +1120,24 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
     def sync(self):
         """
         sync()
+
+        Wait for all pending operations on this array.
+
+        This is done automatically when reading or writing from it,
+        but can be useful as a separate operation for timings.
         """
         array_sync(self)
 
-    def view(self, cls=None):
+    def view(self, cls=GpuArray):
         """
-        view(cls=None)
+        view(cls=GpuArray)
+
+        Return a view of this array.
+
+        :param cls: class of the view (must inherit from GpuArray)
+
+        The returned array shares device data with this one and both
+        will reflect changes made to the other.
         """
         cdef GpuArray res = new_GpuArray(cls, self.context)
         array_view(res, self)
@@ -1133,6 +1150,21 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
     def astype(self, dtype, order='A', copy=True):
         """
         astype(dtype, order='A', copy=True)
+
+        Cast the elements of this array to a new type.
+
+        :param dtype: type of the elements of the result
+        :type dtype: string or numpy.dtype or int
+        :param order: memory layout of the result
+        :type order: string
+        :param copy: Always return a copy?
+        :type copy: bool
+
+        This function returns a new array will all elements cast to
+        the supplied `dtype`, but otherwise unchanged.
+
+        If `copy` is False and the type and order match `self` is
+        returned.
         """
         cdef GpuArray res
         cdef int typecode = dtype_to_typecode(dtype)
@@ -1150,6 +1182,11 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
     def reshape(self, shape, order='C'):
         """
         reshape(shape, order='C')
+
+        Returns a new array with the given shape and order.
+
+        The new shape must have the same size (total number of
+        elements) as the current one.
         """
         cdef size_t *newdims
         cdef unsigned int nd
@@ -1349,7 +1386,66 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
 
 cdef class GpuKernel:
     """
-    GpuKernel(source, name, context=None, cluda=True, have_double=False, have_small=False, have_complex=False, have_half=False)
+    .. code-block:: python
+
+        GpuKernel(source, name, context=None, cluda=True, have_double=False, have_small=False, have_complex=False, have_half=False)
+
+    Compile a kernel on the device
+
+    :param source: complete kernel source code
+    :type source: string
+    :param name: function name of the kernel
+    :type name: string
+    :param context: device on which the kernel is compiled
+    :type context: GpuContext
+    :param cluda: use cluda layer?
+    :param have_double: ensure working doubles?
+    :param have_small: ensure types smaller than float will work?
+    :param have_complex: ensure complex types will work?
+    :param have_half: ensure half-floats will work?
+
+    The kernel function is retrieved using the provided `name` which
+    must match what you named your kernel in `source`.  You can safely
+    reuse the same name multiple times.
+
+    .. note::
+
+        With the cuda backend, unless you use `cluda=True`, you must
+        either pass the mangled name of your kernel or declare the
+        function 'extern "C"', because cuda uses a C++ compiler
+        unconditionally.
+
+    The `have_*` parameter are there to tell libcompyte that we need
+    the particular type or feature to work for this kernel.  If the
+    request can't be satified a
+    :class:`~pygpu.gpuarray.GpuArrayException` will be raised in the
+    constructor.
+
+    .. warning::
+
+        If you do not set the `have_` flags properly, you will either
+        get a device-specific error (the good case) or silent
+        completly bogus data (the bad case).
+
+    Once you have the kernel object you can simply call it like so::
+
+        k = GpuKernel(...)
+        k(param1, param2, n=n)
+
+    where `n` is the minimum number of threads to run.  libcompyte
+    will try to stay close to this number but may run a few more
+    threads to match the hardware preferred multiple and stay
+    efficient.  You should watch out for this in your code and make
+    sure to test against the size of your data.
+
+    If you want more control over thread allocation you can use the
+    `ls` and `gs` parameters like so::
+
+        k = GpuKernel(...)
+        k(param1, param2, ls=ls, gs=gs)
+
+    If you choose to use this interface, make sure to stay within the
+    limits of `k.maxlsize` and `k.maxgsize` or the call will fail.
     """
     cdef _GpuKernel k
 
@@ -1395,6 +1491,11 @@ cdef class GpuKernel:
     cpdef setargs(self, args):
         """
         setargs(args)
+
+        Sets the arguments of the kernel to prepare for a :meth:`.call`
+
+        :param args: kernel arguments
+        :type args: tuple or list
         """
         # Work backwards to avoid a lot of reallocations in the argument code.
         for i in range(len(args)-1, -1, -1):
@@ -1403,6 +1504,22 @@ cdef class GpuKernel:
     def setarg(self, unsigned int index, o):
         """
         setarg(index, o)
+
+        Set argument `index` to `o`.
+
+        :param index: argument index
+        :type index: int
+        :param o: argument value
+        :type o: GpuArray or numpy.ndarray
+
+        This overwrites any previous argument set for that index.
+
+        The type of scalar arguments is indicated by wrapping them in
+        a numpy.ndarray like this::
+
+            param1 = numpy.asarray(1.0, dtype='float32')
+
+        Arguments which are not wrapped will raise an exception.
         """
         if isinstance(o, GpuArray):
             self.setbufarg(index, o)
@@ -1465,25 +1582,38 @@ cdef class GpuKernel:
     cpdef call(self, size_t n, size_t ls, size_t gs):
         """
         call(n, ls, gs)
+
+        Call the kernel with the prepered arguments
+
+        :param n: number of work elements
+        :param ls: local size
+        :param gs: global size
+
+        Either `n` or `gs` and `ls` must be set (not 0).  You can also
+        set `n` and one of `ls` or `gs` and the other will be filled
+        in.
+
+        For a friendlier interface try just calling the object
+        (documentation is in the class doc :class:`.GpuKernel`)
         """
         kernel_call(self, n, ls, gs)
 
     property maxlsize:
-        "Maximum for ls for this kernel"
+        "Maximum local size for this kernel"
         def __get__(self):
             cdef size_t res
             kernel_property(self, GA_KERNEL_PROP_MAXLSIZE, &res)
             return res
 
     property preflsize:
-        "Preferred multiple for ls for this kernel"
+        "Preferred multiple for local size for this kernel"
         def __get__(self):
             cdef size_t res
             kernel_property(self, GA_KERNEL_PROP_PREFLSIZE, &res)
             return res
 
     property maxgsize:
-        "Maximum for gs for this kernel"
+        "Maximum global size for this kernel"
         def __get__(self):
             cdef size_t res
             kernel_property(self, GA_KERNEL_PROP_MAXGSIZE, &res)
