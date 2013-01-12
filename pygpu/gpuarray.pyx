@@ -1448,7 +1448,6 @@ cdef class GpuKernel:
     limits of `k.maxlsize` and `k.maxgsize` or the call will fail.
     """
     cdef _GpuKernel k
-    cdef list _buffers
 
     def __dealloc__(self):
         kernel_clear(self)
@@ -1522,12 +1521,9 @@ cdef class GpuKernel:
 
         Arguments which are not wrapped will raise an exception.
         """
-        if len(self._buffers) <= index:
-            self._buffers.extend([None]*(index - len(self._buffers) + 1))
         if isinstance(o, GpuArray):
             kernel_setbufarg(self, index, o)
             # This is to keep the reference alive
-            self._buffers[index] = o
         else:
             try:
                 self._setarg(index, o.dtype, o)
