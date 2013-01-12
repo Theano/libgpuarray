@@ -968,19 +968,15 @@ static int cuda_perdim_ptx(char *strs[], unsigned int *count, unsigned int nd,
 
         for (i = nd-1; i > 0; i--) {
             if (asprintf(&strs[*count], "rem.u32 r1, %si, %" SPREFIX "uU;\n"
-                         "mul.lo.u32 r1, r1, %" SPREFIX "d;\n"
-                         "%s.u32 %s, %s, r1;\n"
+                         "mad.lo.s32 %s, r1, %" SPREFIX "d, %s;\n"
                          "div.u32 %si, %si, %" SPREFIX "uU;\n",
-                         id, dims[i], ssabs(str[i]),
-                         (str[i] < 0 ? "sub" : "add"), id, id, id, id,
-                         dims[i]) == -1)
+                         id, dims[i], id, str[i], id, id, id, dims[i]) == -1)
                 return -1;
             (*count)++;
         }
 
-        if (asprintf(&strs[*count], "mul.lo.u32 r1, %si, %" SPREFIX "d;\n"
-                     "%s.u32 %s, %s, r1;\n", id, ssabs(str[0]),
-                     (str[0] < 0 ? "sub" : "add"), id, id) == -1)
+        if (asprintf(&strs[*count], "mad.lo.s32 %s, %si, %" SPREFIX "d, %s;\n",
+                     id, id, str[0], id) == -1)
             return -1;
         (*count)++;
     }
@@ -1113,13 +1109,13 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
         goto fail;
 
     if (asprintf(&strs[count], "ld.param.u%u rp1, [a_data];\n"
-                 "cvt.u32.u32 rp2, a_p;\n"
-                 "add.u%u rp1, rp1, rp2;\n"
+                 "cvt.s32.s32 rp2, a_p;\n"
+                 "add.s%u rp1, rp1, rp2;\n"
                  "ld.global.%s tmpa, [rp1+%" SPREFIX "u];\n"
                  "cvt%s.%s.%s tmpb, tmpa;\n"
                  "ld.param.u%u rp1, [b_data];\n"
-                 "cvt.u32.u32 rp2, b_p;\n"
-                 "add.u%u rp1, rp1, rp2;\n"
+                 "cvt.s32.s32 rp2, b_p;\n"
+                 "add.s%u rp1, rp1, rp2;\n"
                  "st.global.%s [rp1+%" SPREFIX "u], tmpb;\n", bits, bits,
 		 in_t, ioff, rmod, out_t, in_t, bits, bits, out_t, ooff) == -1)
         goto fail;
