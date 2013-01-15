@@ -16,6 +16,7 @@
 #include "compyte/error.h"
 #include "compyte/util.h"
 
+/* Value below which a size_t multiplication will never overflow. */
 #define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
 
 int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
@@ -35,6 +36,7 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
 
   for (i = 0; (unsigned)i < nd; i++) {
     size_t d = dims[i];
+    /* Check for overflow */
     if ((d >= MUL_NO_OVERFLOW || size >= MUL_NO_OVERFLOW) &&
 	d > 0 && SIZE_MAX / d < size)
       return GA_VALUE_ERROR;
@@ -227,6 +229,7 @@ int GpuArray_reshape(GpuArray *res, GpuArray *a, unsigned int nd,
 
   for (i = 0; i < nd; i++) {
     size_t d = newdims[i];
+    /* Check for overflow */
     if ((d >= MUL_NO_OVERFLOW || newsize >= MUL_NO_OVERFLOW) &&
 	d > 0 && SIZE_MAX / d < newsize)
       return GA_INVALID_ERROR;
