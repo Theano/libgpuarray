@@ -931,23 +931,27 @@ static const char ELEM_HEADER_PTX[] = ".version 3.0\n.target %s\n\n"
     ".param .u%u a_data,\n"
     ".param .u%u b_data ) {\n"
     ".reg .u16 rh1, rh2;\n"
-    ".reg .u%s numThreads, i, a_pi, b_pi, a_p, b_p, r1;\n"
+    ".reg .u32 r1;\n"
+    ".reg .u%u numThreads, i, a_pi, b_pi, a_p, b_p, rl1;\n"
     ".reg .u%u rp1, rp2;\n"
     ".reg .%s tmpa;\n"
     ".reg .%s tmpb;\n"
     ".reg .pred p;\n"
     "mov.u16 rh1, %%ntid.x;\n"
     "mov.u16 rh2, %%ctaid.x;\n"
-    "mul.wide.u16 i, rh1, rh2;\n"
-    "mov.u16 r1, %%tid.x;\n"
-    "add.u%s i, i, r1;\n"
+    "mul.wide.u16 r1, rh1, rh2;\n"
+    "cvt.u%u.u32 i, r1;\n"
+    "mov.u32 r1, %%tid.x;\n"
+    "cvt.u%u.u32 rl1, r1;\n"
+    "add.u%u i, i, rl1;\n"
     "mov.u16 rh2, %%nctaid.x;\n"
-    "mul.wide.u16 numThreads, rh2, rh1;\n"
-    "setp.ge.u%s p, i, %" SPREFIX "uU;\n"
+    "mul.wide.u16 r1, rh2, rh1;\n"
+    "cvt.u%u.u32 numThreads, r1;\n"
+    "setp.ge.u%u p, i, %" SPREFIX "uU;\n"
     "@p bra $end;\n"
     "$loop_begin:\n"
-    "mov.u32 a_p, 0U;\n"
-    "mov.u32 b_p, 0U;\n";
+    "mov.u%u a_p, 0U;\n"
+    "mov.u%u b_p, 0U;\n";
 
 static inline ssize_t ssabs(ssize_t v) {
     return (v < 0 ? -v : v);
@@ -964,8 +968,8 @@ static int cuda_perdim_ptx(char *strs[], unsigned int *count, unsigned int nd,
         (*count)++;
 
         for (i = nd-1; i > 0; i--) {
-            if (asprintf(&strs[*count], "rem.u%u r1, %si, %" SPREFIX "uU;\n"
-                         "mad.lo.s%u %s, r1, %" SPREFIX "d, %s;\n"
+            if (asprintf(&strs[*count], "rem.u%u rl1, %si, %" SPREFIX "uU;\n"
+                         "mad.lo.s%u %s, rl1, %" SPREFIX "d, %s;\n"
                          "div.u%u %si, %si, %" SPREFIX "uU;\n",
                          bits, id, dims[i],
                          bits, id, str[i], id,
@@ -1097,8 +1101,9 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
     arch = detect_arch(&res);
     if (arch == NULL) return res;
 
-    if (asprintf(&strs[count], ELEM_HEADER_PTX, arch, bits,
-                 bits, bits, bits, in_t, out_t, bits, nEls) == -1)
+    if (asprintf(&strs[count], ELEM_HEADER_PTX, arch, bits, bits, bits,
+		 bits, in_t, out_t, bits, bits, bits, bits, bits, nEls,
+		 bits, bits) == -1)
         goto fail;
     count++;
 
