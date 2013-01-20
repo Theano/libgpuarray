@@ -1041,7 +1041,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     if (ctx->err != GA_NO_ERROR)
       return GA_IMPL_ERROR;
     if (ui == 32) {
-      sz = 4294967295/sz;
+      sz = 4294967295UL/sz;
     } else if (ui == 64) {
       sz = 18446744073709551615ULL/sz;
     } else {
