@@ -931,11 +931,7 @@ static const char ELEM_HEADER_PTX[] = ".version 3.0\n.target %s\n\n"
     ".param .u%u a_data,\n"
     ".param .u%u b_data ) {\n"
     ".reg .u16 rh1, rh2;\n"
-    ".reg .u32 numThreads;\n"
-    ".reg .u32 i;\n"
-    ".reg .u32 a_pi, b_pi;\n"
-    ".reg .u32 a_p, b_p;\n"
-    ".reg .u32 r1;\n"
+    ".reg .u%s numThreads, i, a_pi, b_pi, a_p, b_p, r1;\n"
     ".reg .u%u rp1, rp2;\n"
     ".reg .%s tmpa;\n"
     ".reg .%s tmpb;\n"
@@ -943,11 +939,11 @@ static const char ELEM_HEADER_PTX[] = ".version 3.0\n.target %s\n\n"
     "mov.u16 rh1, %%ntid.x;\n"
     "mov.u16 rh2, %%ctaid.x;\n"
     "mul.wide.u16 i, rh1, rh2;\n"
-    "mov.u32 r1, %%tid.x;\n"
-    "add.u32 i, i, r1;\n"
+    "mov.u16 r1, %%tid.x;\n"
+    "add.u%s i, i, r1;\n"
     "mov.u16 rh2, %%nctaid.x;\n"
     "mul.wide.u16 numThreads, rh2, rh1;\n"
-    "setp.ge.u32 p, i, %" SPREFIX "uU;\n"
+    "setp.ge.u%s p, i, %" SPREFIX "uU;\n"
     "@p bra $end;\n"
     "$loop_begin:\n"
     "mov.u32 a_p, 0U;\n"
@@ -959,33 +955,35 @@ static inline ssize_t ssabs(ssize_t v) {
 
 static int cuda_perdim_ptx(char *strs[], unsigned int *count, unsigned int nd,
                            const size_t *dims, const ssize_t *str,
-                           const char *id) {
+                           const char *id, unsigned int bits) {
     int i;
 
     if (nd > 0) {
-        if (asprintf(&strs[*count], "mov.u32 %si, i;\n", id) == -1)
+        if (asprintf(&strs[*count], "mov.u%u %si, i;\n", bits, id) == -1)
             return -1;
         (*count)++;
 
         for (i = nd-1; i > 0; i--) {
-            if (asprintf(&strs[*count], "rem.u32 r1, %si, %" SPREFIX "uU;\n"
-                         "mad.lo.s32 %s, r1, %" SPREFIX "d, %s;\n"
-                         "div.u32 %si, %si, %" SPREFIX "uU;\n",
-                         id, dims[i], id, str[i], id, id, id, dims[i]) == -1)
+            if (asprintf(&strs[*count], "rem.u%u r1, %si, %" SPREFIX "uU;\n"
+                         "mad.lo.s%u %s, r1, %" SPREFIX "d, %s;\n"
+                         "div.u%u %si, %si, %" SPREFIX "uU;\n",
+                         bits, id, dims[i],
+                         bits, id, str[i], id,
+                         bits, id, id, dims[i]) == -1)
                 return -1;
             (*count)++;
         }
 
-        if (asprintf(&strs[*count], "mad.lo.s32 %s, %si, %" SPREFIX "d, %s;\n",
-                     id, id, str[0], id) == -1)
+        if (asprintf(&strs[*count], "mad.lo.s%u %s, %si, %" SPREFIX "d, %s;\n",
+                     bits, id, id, str[0], id) == -1)
             return -1;
         (*count)++;
     }
     return 0;
 }
 
-static const char ELEM_FOOTER_PTX[] = "add.u32 i, i, numThreads;\n"
-    "setp.lt.u32 p, i, %" SPREFIX "uU;\n"
+static const char ELEM_FOOTER_PTX[] = "add.u%u i, i, numThreads;\n"
+    "setp.lt.u%u p, i, %" SPREFIX "uU;\n"
     "@p bra $loop_begin;\n"
     "$end:\n"
     "ret;\n"
@@ -1099,30 +1097,37 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
     arch = detect_arch(&res);
     if (arch == NULL) return res;
 
-    if (asprintf(&strs[count], ELEM_HEADER_PTX, arch,
-		 bits, bits, bits, in_t, out_t, nEls) == -1)
+    if (asprintf(&strs[count], ELEM_HEADER_PTX, arch, bits,
+                 bits, bits, bits, in_t, out_t, bits, nEls) == -1)
         goto fail;
     count++;
 
-    if (cuda_perdim_ptx(strs, &count, a_nd, a_dims, a_str, "a_p") == -1)
+    if (cuda_perdim_ptx(strs, &count, a_nd, a_dims, a_str, "a_p", bits) == -1)
         goto fail;
-    if (cuda_perdim_ptx(strs, &count, b_nd, b_dims, b_str, "b_p") == -1)
+    if (cuda_perdim_ptx(strs, &count, b_nd, b_dims, b_str, "b_p", bits) == -1)
         goto fail;
 
     if (asprintf(&strs[count], "ld.param.u%u rp1, [a_data];\n"
-                 "cvt.s32.s32 rp2, a_p;\n"
+                 "cvt.s%u.s%u rp2, a_p;\n"
                  "add.s%u rp1, rp1, rp2;\n"
                  "ld.global.%s tmpa, [rp1+%" SPREFIX "u];\n"
                  "cvt%s.%s.%s tmpb, tmpa;\n"
                  "ld.param.u%u rp1, [b_data];\n"
-                 "cvt.s32.s32 rp2, b_p;\n"
+                 "cvt.s%u.s%u rp2, b_p;\n"
                  "add.s%u rp1, rp1, rp2;\n"
-                 "st.global.%s [rp1+%" SPREFIX "u], tmpb;\n", bits, bits,
-		 in_t, ioff, rmod, out_t, in_t, bits, bits, out_t, ooff) == -1)
+                 "st.global.%s [rp1+%" SPREFIX "u], tmpb;\n", bits,
+                 bits, bits,
+                 bits,
+		 in_t, ioff,
+                 rmod, out_t, in_t,
+                 bits,
+                 bits, bits,
+                 bits,
+                 out_t, ooff) == -1)
         goto fail;
     count++;
 
-    if (asprintf(&strs[count], ELEM_FOOTER_PTX, nEls) == -1)
+    if (asprintf(&strs[count], ELEM_FOOTER_PTX, bits, bits, nEls) == -1)
         goto fail;
     count++;
 
