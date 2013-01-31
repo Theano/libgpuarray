@@ -20,7 +20,9 @@ void GpuKernel_clear(GpuKernel *k) {
 }
 
 void *GpuKernel_context(GpuKernel *k) {
-  return k->ops->buffer_get_kernel_context(k->k);
+  void *res;
+  (void)k->ops->buffer_property(NULL, NULL, k->k, GA_KERNEL_PROP_CTX, &res);
+  return res;
 }
 
 int GpuKernel_setarg(GpuKernel *k, unsigned int index, int typecode,

@@ -379,10 +379,6 @@ static void cl_free(gpudata *b) {
   free(b);
 }
 
-static void *cl_get_context(gpudata *b) {
-  return b->ctx;
-}
-
 static int cl_share(gpudata *a, gpudata *b, int *ret) {
 #ifdef CL_VERSION_1_1
   cl_ctx *ctx;
@@ -704,10 +700,6 @@ static void cl_freekernel(gpukernel *k) {
   free(k);
 }
 
-static void *cl_get_kernel_context(gpukernel *k) {
-  return k->ctx;
-}
-
 static int cl_setkernelarg(gpukernel *k, unsigned int index, int typecode,
 			   const void *val) {
   size_t sz;
@@ -988,6 +980,10 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
       return GA_IMPL_ERROR;
     *((unsigned int *)res) = ui;
     return GA_NO_ERROR;
+  case GA_BUFFER_PROP_CTX:
+  case GA_KERNEL_PROP_CTX:
+    *((void **)res) = (void *)ctx;
+    return GA_NO_ERROR;
   case GA_KERNEL_PROP_MAXLSIZE:
     ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
                                 &id, NULL);
@@ -1066,7 +1062,6 @@ compyte_buffer_ops opencl_ops = {cl_init,
                                  cl_deinit,
                                  cl_alloc,
                                  cl_free,
-                                 cl_get_context,
                                  cl_share,
                                  cl_move,
                                  cl_read,
@@ -1074,7 +1069,6 @@ compyte_buffer_ops opencl_ops = {cl_init,
                                  cl_memset,
                                  cl_newkernel,
                                  cl_freekernel,
-                                 cl_get_kernel_context,
                                  cl_setkernelarg,
                                  cl_callkernel,
                                  cl_sync,

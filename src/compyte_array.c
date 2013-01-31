@@ -377,7 +377,9 @@ int GpuArray_share(GpuArray *a, GpuArray *b) {
 }
 
 void *GpuArray_context(GpuArray *a) {
-  return a->ops->buffer_get_context(a->data);
+  void *res;
+  (void)a->ops->buffer_property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &res);
+  return res;
 }
 
 int GpuArray_move(GpuArray *dst, GpuArray *src) {
@@ -434,7 +436,9 @@ int GpuArray_copy(GpuArray *res, GpuArray *a, ga_order order) {
 }
 
 const char *GpuArray_error(GpuArray *a, int err) {
-  return Gpu_error(a->ops, a->ops->buffer_get_context(a->data), err);
+  void *ctx;
+  a->ops->buffer_property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
+  return Gpu_error(a->ops, ctx, err);
 }
 
 void GpuArray_fprintf(FILE *fd, const GpuArray *a) {

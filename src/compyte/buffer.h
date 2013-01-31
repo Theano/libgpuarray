@@ -29,7 +29,6 @@ typedef struct _compyte_buffer_ops {
   void (*buffer_deinit)(void *ctx);
   gpudata *(*buffer_alloc)(void *ctx, size_t sz, int *ret);
   void (*buffer_free)(gpudata *);
-  void *(*buffer_get_context)(gpudata *);
   int (*buffer_share)(gpudata *, gpudata *, int *ret);
   
   /* device to device copy, no overlap */
@@ -49,8 +48,6 @@ typedef struct _compyte_buffer_ops {
   /* Free the kernel and all associated memory (including argument buffers) */
   void (*buffer_freekernel)(gpukernel *k);
 
-  void *(*buffer_get_kernel_context)(gpukernel *k);
-  
   /* Copy the passed value to a kernel argument buffer */
   int (*buffer_setkernelarg)(gpukernel *k, unsigned int index,
 			     int typecode, const void *val);
@@ -83,11 +80,13 @@ typedef struct _compyte_buffer_ops {
 #define GA_CTX_PROP_NUMPROCS 4
 
 /* Start at 512 for GA_BUFFER_PROP_ */
+#define GA_BUFFER_PROP_CTX 512
 
 /* Start at 1024 for GA_KERNEL_PROP_ */
-#define GA_KERNEL_PROP_MAXLSIZE  1024
-#define GA_KERNEL_PROP_PREFLSIZE 1025
-#define GA_KERNEL_PROP_MAXGSIZE  1026
+#define GA_KERNEL_PROP_CTX       1024
+#define GA_KERNEL_PROP_MAXLSIZE  1025
+#define GA_KERNEL_PROP_PREFLSIZE 1026
+#define GA_KERNEL_PROP_MAXGSIZE  1027
 
 typedef enum _ga_usefl {
   GA_USE_CLUDA =      0x01,
