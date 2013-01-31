@@ -1,4 +1,4 @@
-/**
+/** \file buffer.h
  * This file contain the header for ALL code that depends on cuda or opencl.
  */
 #ifndef COMPYTE_BUFFER_H
@@ -18,24 +18,124 @@ extern "C" {
 #endif
 
 struct _gpudata;
+
+/**
+ * Opaque struct for buffer data.
+ */
 typedef struct _gpudata gpudata;
 
 struct _gpukernel;
+
+/**
+ * Opaque struct for kernel data.
+ */
 typedef struct _gpukernel gpukernel;
 
 typedef struct _compyte_buffer_ops {
-  /* This allocates a buffer of size sz in context ctx */
+  /**
+   * Create a context on the specified device.
+   *
+   * ### Parameters
+   * - `dev` the device number.  The precise meaning of the device
+   *   number is backend-dependent
+   * - `ret` error return location.  Will be ignored if set to NULL.
+   *
+   * ### Return Value
+   * An opaque pointer to the created context or NULL if an error occured.
+   */
   void *(*buffer_init)(int dev, int *ret);
+  /**
+   * Destroy a context.
+   *
+   * This removes the external reference to the context and as soon as
+   * all buffer and kernels associated with it are free all its
+   * resources will be released.
+   *
+   * Do not call this function more than once on a given context.
+   *
+   * ### Parameters
+   * - `ctx` a valid context pointer.
+   */
   void (*buffer_deinit)(void *ctx);
+  /**
+   * Allocates a buffer of size `sz` in context `ctx`.
+   *
+   * ### Parameters
+   * - `ctx` a context pointer
+   * - `sz` the requested size
+   * - `ret` error return pointer
+   *
+   * ### Return Value
+   * A non-NULL pointer to a gpudata structure.  This structure is
+   * intentionally opaque as its content may change according to the
+   * backend used.
+   */
   gpudata *(*buffer_alloc)(void *ctx, size_t sz, int *ret);
-  void (*buffer_free)(gpudata *);
+  /**
+   * Free a buffer.
+   *
+   * Release all ressources associated with `b`.
+   *
+   * If this function is called on a buffer that is in use by a kernel
+   * the results are undefined.  (The current backend either block
+   * until kernel completion or maintain a reference to the buffer,
+   * but you should not rely on this behavior.)
+   */
+  void (*buffer_free)(gpudata *b);
+  /**
+   * Check if two buffers may overlap.
+   *
+   * ### Return Value
+   * Return 1 if the buffers may overlap and 0 otherwise.  If there is
+   * an error during processing -1 is returned and `ret`is set to the
+   * appropriate error code if not NULL.
+   */
   int (*buffer_share)(gpudata *, gpudata *, int *ret);
   
-  /* device to device copy, no overlap */
-  int (*buffer_move)(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff, size_t sz);
-  /* device to host */
+  /**
+   * Copy the content of a buffer to another.
+   *
+   * Both buffers must be in the same context.  Additionally the
+   * buffer must not overlap otherwise the content of the destination
+   * buffer is not defined.
+   *
+   * ### Parameters
+   * - `dst` destination buffer
+   * - `dstoff` offset inside the destination buffer
+   * - `src` source buffer
+   * - `srcoff` offset inside the source buffer
+   * - `sz` size of data to copy (in bytes)
+   *
+   * ### Return Value
+   * GA_NO_ERROR or an error code if an error occurred.
+   */
+  int (*buffer_move)(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff,
+                     size_t sz);
+  /**
+   * Transfer data from a buffer to memory.
+   *
+   * ### Parameters
+   * - `dst` destination in memory
+   * - `src` source buffer
+   * - `srcoff` offset inside the source buffer
+   * - `sz` size of data to copy (in bytes)
+   *
+   * ### Return Value
+   * GA_NO_ERROR or an error code if an error occurred.
+   */
   int (*buffer_read)(void *dst, gpudata *src, size_t srcoff, size_t sz);
-  /* host to device */
+  /**
+   * Transfer data from memory to a buffer.
+   *
+   * ### Parameters
+   * - `dst` destination buffer
+   * - `dstoff` offset inside the destination buffer
+   * - `src` source in memory
+   * - `sz` size of data to copy (in bytes)
+   *
+   * ### Return Value
+   * GA_NO_ERROR or an error code if an error occurred.
+   */
   int (*buffer_write)(gpudata *dst, size_t dstoff, const void *src, size_t sz);
   /* Set buffer to a single-byte pattern (like C memset) */
   int (*buffer_memset)(gpudata *dst, size_t dstoff, int data);

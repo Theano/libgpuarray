@@ -1,5 +1,8 @@
 #ifndef COMPYTE_ERROR_H
 #define COMPYTE_ERROR_H
+/** \file error.h
+ *  \brief Error functions.
+ */
 
 #include <compyte/compat.h>
 

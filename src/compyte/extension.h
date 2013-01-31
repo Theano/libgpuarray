@@ -1,5 +1,8 @@
 #ifndef COMPYTE_EXTENSIONS_H
 #define COMPYTE_EXTENSIONS_H
+/** \file extension.h
+ *  \brief Extensions access.
+ */
 
 #include <compyte/compat.h>
 

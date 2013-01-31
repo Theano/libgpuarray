@@ -1,5 +1,8 @@
 #ifndef COMPYTE_KERNEL_H
 #define COMPYTE_KERNEL_H
+/** \file kernel.h
+ *  \brief Kernel functions.
+ */
 
 #include <compyte/buffer.h>
 #include <compyte/array.h>

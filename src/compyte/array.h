@@ -1,5 +1,8 @@
 #ifndef COMPYTE_ARRAY_H
 #define COMPYTE_ARRAY_H
+/** \file array.h
+ *  \brief Array functions.
+ */
 
 #include <compyte/buffer.h>
 
