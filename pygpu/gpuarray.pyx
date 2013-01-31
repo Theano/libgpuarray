@@ -74,7 +74,6 @@ cdef extern from "compyte/buffer.h":
         void *buffer_init(int devno, int *ret)
         void buffer_deinit(void *ctx)
         char *buffer_error(void *ctx)
-        void *buffer_get_context(gpudata *)
         int buffer_property(void *c, gpudata *b, gpukernel *k, int prop_id,
                             void *res)
 
@@ -82,6 +81,8 @@ cdef extern from "compyte/buffer.h":
     int GA_CTX_PROP_MAXLSIZE
     int GA_CTX_PROP_LMEMSIZE
     int GA_CTX_PROP_NUMPROCS
+    int GA_BUFFER_PROP_CTX
+    int GA_KERNEL_PROP_CTX
     int GA_KERNEL_PROP_MAXLSIZE
     int GA_KERNEL_PROP_PREFLSIZE
     int GA_KERNEL_PROP_MAXGSIZE
@@ -377,10 +378,12 @@ cdef array_fromdata(GpuArray a, compyte_buffer_ops *ops, gpudata *data,
                     size_t offset, int typecode, unsigned int nd, size_t *dims,
                     ssize_t *strides, int writeable):
     cdef int err
+    cdef void *ctx
     err = GpuArray_fromdata(&a.ga, ops, data, offset, typecode, nd, dims,
                             strides, writeable)
     if err != GA_NO_ERROR:
-        raise GpuArrayException(Gpu_error(ops, ops.buffer_get_context(data), err), err)
+        ops.buffer_property(NULL, data, NULL, GA_BUFFER_PROP_CTX, &ctx)
+        raise GpuArrayException(Gpu_error(ops, ctx, err), err)
 
 cdef array_view(GpuArray v, GpuArray a):
     cdef int err
