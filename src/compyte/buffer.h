@@ -1,5 +1,11 @@
 /** \file buffer.h
- * This file contain the header for ALL code that depends on cuda or opencl.
+ * \brief This file contains the interface definition for the backends.
+ *
+ * For normal use you should not call the functions defined in this
+ * file directly.
+ *
+ * \see array.h For managing buffers
+ * \see kernel.h For using kernels
  */
 #ifndef COMPYTE_BUFFER_H
 #define COMPYTE_BUFFER_H
@@ -31,19 +37,25 @@ struct _gpukernel;
  */
 typedef struct _gpukernel gpukernel;
 
+/**
+ * Function table that a backend must provide.
+ * \headerfile compyte/buffer.h
+ */
 typedef struct _compyte_buffer_ops {
   /**
    * Create a context on the specified device.
    *
-   * ### Parameters
-   * - `dev` the device number.  The precise meaning of the device
-   *   number is backend-dependent
-   * - `ret` error return location.  Will be ignored if set to NULL.
+   * \warning This function is not thread-safe.
    *
-   * ### Return Value
-   * An opaque pointer to the created context or NULL if an error occured.
+   * \param dev the device number.  The precise meaning of the device
+   *   number is backend-dependent
+   * \param ret error return location.  Will be ignored if set to NULL.
+   *
+   * \returns An opaque pointer to the created context or NULL if an
+   * error occured.
    */
   void *(*buffer_init)(int dev, int *ret);
+
   /**
    * Destroy a context.
    *
@@ -53,45 +65,51 @@ typedef struct _compyte_buffer_ops {
    *
    * Do not call this function more than once on a given context.
    *
-   * ### Parameters
-   * - `ctx` a valid context pointer.
+   * \param ctx a valid context pointer.
    */
   void (*buffer_deinit)(void *ctx);
+
   /**
    * Allocates a buffer of size `sz` in context `ctx`.
    *
-   * ### Parameters
-   * - `ctx` a context pointer
-   * - `sz` the requested size
-   * - `ret` error return pointer
+   * \param ctx a context pointer
+   * \param sz the requested size
+   * \param ret error return pointer
    *
-   * ### Return Value
-   * A non-NULL pointer to a gpudata structure.  This structure is
-   * intentionally opaque as its content may change according to the
-   * backend used.
+   * \returns A non-NULL pointer to a gpudata structure.  This
+   * structure is intentionally opaque as its content may change
+   * according to the backend used.
    */
   gpudata *(*buffer_alloc)(void *ctx, size_t sz, int *ret);
+
   /**
    * Free a buffer.
    *
    * Release all ressources associated with `b`.
    *
    * If this function is called on a buffer that is in use by a kernel
-   * the results are undefined.  (The current backend either block
+   * the results are undefined.  (The current backends either block
    * until kernel completion or maintain a reference to the buffer,
    * but you should not rely on this behavior.)
    */
   void (*buffer_free)(gpudata *b);
+
   /**
    * Check if two buffers may overlap.
    *
-   * ### Return Value
-   * Return 1 if the buffers may overlap and 0 otherwise.  If there is
-   * an error during processing -1 is returned and `ret`is set to the
-   * appropriate error code if not NULL.
+   * Both buffers must have been created with the same backend.
+   *
+   * \param a first buffer
+   * \param b second buffer
+   * \param ret error return pointer
+   *
+   * \retval 1 The buffers may overlap
+   * \retval 0 The buffers do not overlap.
+   * \retval -1 An error was encoutered, `ret` contains a detailed
+   * error code if not NULL.
    */
-  int (*buffer_share)(gpudata *, gpudata *, int *ret);
-  
+  int (*buffer_share)(gpudata *a, gpudata *b, int *ret);
+
   /**
    * Copy the content of a buffer to another.
    *
@@ -99,108 +117,345 @@ typedef struct _compyte_buffer_ops {
    * buffer must not overlap otherwise the content of the destination
    * buffer is not defined.
    *
-   * ### Parameters
-   * - `dst` destination buffer
-   * - `dstoff` offset inside the destination buffer
-   * - `src` source buffer
-   * - `srcoff` offset inside the source buffer
-   * - `sz` size of data to copy (in bytes)
+   * \param dst destination buffer
+   * \param dstoff offset inside the destination buffer
+   * \param src source buffer
+   * \param srcoff offset inside the source buffer
+   * \param sz size of data to copy (in bytes)
    *
-   * ### Return Value
-   * GA_NO_ERROR or an error code if an error occurred.
+   * \returns GA_NO_ERROR or an error code if an error occurred.
    */
   int (*buffer_move)(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff,
                      size_t sz);
+
   /**
    * Transfer data from a buffer to memory.
    *
-   * ### Parameters
-   * - `dst` destination in memory
-   * - `src` source buffer
-   * - `srcoff` offset inside the source buffer
-   * - `sz` size of data to copy (in bytes)
+   * \param dst destination in memory
+   * \param src source buffer
+   * \param srcoff offset inside the source buffer
+   * \param sz size of data to copy (in bytes)
    *
-   * ### Return Value
-   * GA_NO_ERROR or an error code if an error occurred.
+   * \returns GA_NO_ERROR or an error code if an error occurred.
    */
   int (*buffer_read)(void *dst, gpudata *src, size_t srcoff, size_t sz);
+
   /**
    * Transfer data from memory to a buffer.
    *
-   * ### Parameters
-   * - `dst` destination buffer
-   * - `dstoff` offset inside the destination buffer
-   * - `src` source in memory
-   * - `sz` size of data to copy (in bytes)
+   * \param dst destination buffer
+   * \param dstoff offset inside the destination buffer
+   * \param src source in memory
+   * \param sz size of data to copy (in bytes)
    *
-   * ### Return Value
-   * GA_NO_ERROR or an error code if an error occurred.
+   * \returns GA_NO_ERROR or an error code if an error occurred.
    */
   int (*buffer_write)(gpudata *dst, size_t dstoff, const void *src, size_t sz);
-  /* Set buffer to a single-byte pattern (like C memset) */
+
+  /**
+   * Set a buffer to a byte pattern.
+   *
+   * This function acts like the C function memset() for device buffers.
+   *
+   * \param dst destination buffer
+   * \param dstoff offset into the destination buffer
+   * \param data byte value to write into the destination.
+   *
+   * \returns GA_NO_ERROR or an error code if an error occurred.
+   */
   int (*buffer_memset)(gpudata *dst, size_t dstoff, int data);
-  /* Compile the kernel composed of the concatenated strings and return
-     a callable kernel.  If lengths is NULL then all the strings must 
-     be NUL-terminated.  Otherwise, it doesn't matter. */
+
+  /**
+   * Compile a kernel.
+   *
+   * Compile the kernel composed of the concatenated strings in
+   * `strings` and return a callable kernel.  If lengths is NULL then
+   * all the strings must be NUL-terminated.  Otherwise, it doesn't
+   * matter (but the lengths must not include the final NUL byte if
+   * provided).
+   *
+   * \param ctx context to work in
+   * \param count number of input strings
+   * \param strings table of string pointers
+   * \param lengths (optional) length for each string in the table
+   * \param fname name of the kernel function (as defined in the code)
+   * \param flags flags for compilation (see #ga_usefl)
+   * \param ret error return pointer
+   *
+   * \returns Allocated kernel structure or NULL if an error occured.
+   * `ret` will be updated with the error code if not NULL.
+   */
   gpukernel *(*buffer_newkernel)(void *ctx, unsigned int count, 
 				 const char **strings, const size_t *lengths,
 				 const char *fname, int flags, int *ret);
-  /* Free the kernel and all associated memory (including argument buffers) */
+
+  /**
+   * Free a kernel.
+   *
+   * Releases all resources associated with `k`.
+   *
+   * If you free a kernel while it is running, the results are
+   * undefined.
+   */
   void (*buffer_freekernel)(gpukernel *k);
 
-  /* Copy the passed value to a kernel argument buffer */
+  /**
+   * Set a kernel argument.
+   *
+   * `val` is a pointer to the actual argument value except for the
+   * pseudo-type GA_BUFFER where val is the gpudata pointer itself.
+   *
+   * \param k kernel
+   * \param index argument index (0-based)
+   * \param typecode argument type
+   * \param val pointer to argument value
+   *
+   * \returns GA_NO_ERROR or an error code if an error occurred.
+   */
   int (*buffer_setkernelarg)(gpukernel *k, unsigned int index,
 			     int typecode, const void *val);
-  
-  /* Call the kernel with the previously specified arguments
-     (this is synchronous only for now, might make async later) */
+
+  /**
+   * Call a kernel.
+   *
+   * All arguments must have been specified by a previous call to
+   * buffer_setkernelarg().  Arguments may be reused between call.
+   *
+   * \param k kernel
+   * \param bs block size for this call (also known as local size)
+   * \param gs grid size for this call (also known as global size)
+   *
+   * \returns GA_NO_ERROR or an error code if an error occurred.
+   */
   int (*buffer_callkernel)(gpukernel *k, size_t bs, size_t gs);
-  /* Make sure all compute operations involving this buffer are finished. */
+
+  /**
+   * Synchronize a buffer.
+   *
+   * Waits for all previous read, writes, copies and kernel calls
+   * involving this buffer to be finished.
+   *
+   * This call is not required for normal use of the library as all
+   * exposed operations will properly synchronize amongst themselves.
+   * This call may be useful in a performance timing context to ensure
+   * that the work is really done, or before interaction with another
+   * library to wait for pending operations.
+   */
   int (*buffer_sync)(gpudata *b);
 
-  /* Function to facilitate copy and cast operations*/
-  int (*buffer_extcopy)(gpudata *input, size_t ioff, gpudata *output, size_t ooff,
-                        int intype, int outtype, unsigned int a_nd,
-                        const size_t *a_dims, const ssize_t *a_str,
+  /**
+   * Copy non-contiguous buffers.
+   *
+   * Specialized kernel to copy memory from a generic array structure
+   * to another.  May be used to perform casts on the data and/or
+   * change data layout.
+   *
+   * This function requires that the input and output buffers have the
+   * same number of items.
+   *
+   * \param input input data buffer
+   * \param ioff offset into input buffer
+   * \param output output data buffer
+   * \param ooff offset into output buffer
+   * \param intype data type of input
+   * \param outtype data type of output
+   * \param a_nd order of input (number of dimensions)
+   * \param a_dims dimensions of input
+   * \param a_str strides of input
+   * \param b_nd order of output (number of dimensions)
+   * \param b_dims dimensions of output
+   * \param b_str strides of output
+   *
+   * \returns GA_NO_ERROR or an error code if an error occurred.
+   */
+  int (*buffer_extcopy)(gpudata *input, size_t ioff,
+                        gpudata *output, size_t ooff,
+                        int intype, int outtype,
+                        unsigned int a_nd, const size_t *a_dims,
+                        const ssize_t *a_str,
                         unsigned int b_nd, const size_t *b_dims,
                         const ssize_t *b_str);
 
+  /**
+   * Returns a property.
+   *
+   * Can be used to get a property of a context, a buffer or a kernel.
+   * The element corresponding to the property category must be given
+   * as argument and the other two are ignored.  The currently defined
+   * properties and their type are defined in \ref props "Properties".
+   *
+   * \param ctx context
+   * \param buf buffer
+   * \param k kernel
+   * \param prop_id property id (from \ref props "Properties")
+   * \param res pointer to the return space of the appropriate type
+   *
+   * \returns GA_NO_ERROR or an error code if an error occurred.
+   */
   int (*buffer_property)(void *ctx, gpudata *buf, gpukernel *k, int prop_id,
                          void *res);
 
-  /* Get a string describing the last error that happened
-     (may change if you make other api calls) */
+  /**
+   * Get a string describing the last error that happened.
+   *
+   * This function will return a string description of the last
+   * backend error to happen on the specified context.
+   *
+   * If you need to get a description of a error that occurred during
+   * context creation, call this function using NULL as the context.
+   * This version of the call is not thread-safe.
+   *
+   * \param ctx context for which to query the error
+   *
+   * \returns string description of the last error
+   */
   const char *(*buffer_error)(void *ctx);
 } compyte_buffer_ops;
 
+/**
+ * \defgroup props Properties
+ * @{
+ */
 /* Start at 1 for GA_CTX_PROP_ */
+/**
+ * Get the device name for the context.
+ *
+ * \note The returned string is allocated and must be freed by the caller.
+ *
+ * Type: `char *`
+ */
 #define GA_CTX_PROP_DEVNAME  1
+
+/**
+ * Get the maximum block size (also known as local size) for a kernel
+ * call in the context.
+ *
+ * Type: `size_t`
+ */
 #define GA_CTX_PROP_MAXLSIZE 2
+
+/**
+ * Get the local memory size available for a call in the context.
+ *
+ * Type: `size_t`
+ */
 #define GA_CTX_PROP_LMEMSIZE 3
+
+/**
+ * Number of compute units in this context.
+ *
+ * compute units times local size is more or less the expected
+ * parallelism available on the device, but this is a very rough
+ * estimate.
+ *
+ * Type: `unsigned int`
+ */
 #define GA_CTX_PROP_NUMPROCS 4
 
 /* Start at 512 for GA_BUFFER_PROP_ */
+/**
+ * Get the context in which this buffer was allocated.
+ *
+ * Type: `void *`
+ */
 #define GA_BUFFER_PROP_CTX 512
 
 /* Start at 1024 for GA_KERNEL_PROP_ */
+/**
+ * Get the context for which this kernel was compiled.
+ *
+ * Type: `void *`
+ */
 #define GA_KERNEL_PROP_CTX       1024
-#define GA_KERNEL_PROP_MAXLSIZE  1025
-#define GA_KERNEL_PROP_PREFLSIZE 1026
-#define GA_KERNEL_PROP_MAXGSIZE  1027
 
+/**
+ * Get the maximum block size (also known as local size) for a call of
+ * this kernel.
+ *
+ * Type: `size_t`
+ */
+#define GA_KERNEL_PROP_MAXLSIZE  1025
+
+/**
+ * Get the prefered multiple of the block size for a call to this
+ * kernel.
+ *
+ * Type: `size_t`
+ */
+#define GA_KERNEL_PROP_PREFLSIZE 1026
+
+/**
+ * Get the maximum group size for a call of this kernel.
+ *
+ * Type: `size_t`
+ */
+#define GA_KERNEL_PROP_MAXGSIZE  1027
+/**
+ * @}
+ */
+
+/**
+ * Flags for compyte_buffer_ops#buffer_newkernel.
+ *
+ * It is important to specify these properly as the compilation
+ * machinery will ensure that the proper configuration is made to
+ * support the requested features or error out if the demands cannot
+ * be met.
+ *
+ * \warning Failure to properly specify the feature flags will in most
+ * cases result in silent data corruption (especially on ATI cards).
+ */
 typedef enum _ga_usefl {
+  /**
+   * The kernel source uses CLUDA unified language.
+   */
   GA_USE_CLUDA =      0x01,
+  /**
+   * The kernel makes use of small (size is smaller than 4 bytes) types.
+   */
   GA_USE_SMALL =      0x02,
+  /**
+   * The kernel makes use of double or complex doubles.
+   */
   GA_USE_DOUBLE =     0x04,
+  /**
+   * The kernel makes use of complex of complex doubles.
+   */
   GA_USE_COMPLEX =    0x08,
+  /**
+   * The kernel makes use of half-floats (also known as float16)
+   */
   GA_USE_HALF =       0x10,
   /* If you add a new flag, don't forget to update both
      compyte_buffer_{cuda,opencl}.c with the implementation of your flag */
+  /**
+   * The kernel is made of PTX code.
+   */
   GA_USE_PTX =      0x1000,
 } ga_usefl;
 
+/**
+ * Get the error string corresponding to `err`.
+ *
+ * \param o operations vector for the backend that produced the error.
+ * \param ctx the context in which the error occured or NULL if the
+ *            error occured outside a context (like during context
+ *            creation).
+ * \param err error code
+ *
+ * \returns A string description of the error.
+ */
 COMPYTE_PUBLIC const char *Gpu_error(compyte_buffer_ops *o, void *ctx,
 				     int err);
+/**
+ * Get operations vector for a backend.
+ *
+ * The available backends depend on how the library was built.
+ *
+ * \param name backend name, currently one of `"cuda"`  or `"opencl"`
+ *
+ * \returns the operation vector or NULL if the backend name is unrecognized.
+ */
 COMPYTE_PUBLIC compyte_buffer_ops *compyte_get_ops(const char *name);
 
 #ifdef __cplusplus
