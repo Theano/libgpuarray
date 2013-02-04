@@ -239,6 +239,44 @@ def set_cuda_compiler_fn(fn):
     else:
         raise ValueError("needs a callable")
 
+def cl_wrap_ctx(size_t ptr):
+    """
+    cl_wrap_ctx(ptr)
+
+    Wrap an existing OpenCL context (the cl_context struct) into a
+    GpuContext class.
+    """
+    cdef void *(*cl_make_ctx)(void *)
+    cdef GpuContext res
+    cl_make_ctx = <void *(*)(void *)>compyte_get_extension("cl_make_ctx")
+    if cl_make_ctx == NULL:
+        raise RuntimeError("cl_make_ctx extension is absent")
+    res = GpuContext.__new__(GpuContext)
+    res.ops = get_ops('opencl')
+    res.ctx = cl_make_ctx(<void *>ptr)
+    if res.ctx == NULL:
+        raise RuntimeError("cl_make_ctx call failed")
+    return res
+
+def cuda_wrap_ctx(size_t ptr):
+    """
+    cuda_wrap_ctx(ptr)
+
+    Wrap an existing CUDA driver context (CUcontext) into a GpuContext
+    class.
+    """
+    cdef void *(*cuda_make_ctx)(void *)
+    cdef GpuContext res
+    cuda_make_ctx = <void *(*)(void *)>compyte_get_extension("cuda_make_ctx")
+    if cuda_make_ctx == NULL:
+        raise RuntimeError("cuda_make_ctx extension is absent")
+    res = GpuContext.__new__(GpuContext)
+    res.ops = get_ops('cuda')
+    res.ctx = cuda_make_ctx(<void *>ptr)
+    if res.ctx == NULL:
+        raise RuntimeError("cuda_make_ctx call failed")
+    return res
+
 import numpy
 
 cdef dict NP_TO_TYPE = {
@@ -913,7 +951,14 @@ cdef public class GpuContext [type GpuContextType, object GpuContextObject]:
         if self.ctx != NULL:
             self.ops.buffer_deinit(self.ctx)
 
-    def __cinit__(self, kind, devno, *args, **kwargs):
+    def __cinit__(self):
+        self.ops = NULL
+        self.ctx = NULL
+
+    def __init__(self, kind, devno):
+        """
+        __init__(self, kind, devno)
+        """
         cdef int err = GA_NO_ERROR
         cdef void *ctx
         self.ops = get_ops(kind)
