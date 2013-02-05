@@ -448,7 +448,7 @@ class ElemwiseKernel(object):
         n, nd, dims, strs, offsets, contig = check_args(args)
         if not contig:
             raise ValueError("Can't call contig on non-contiguous data")
-        self.contig_k(*self.prepare_args_contig(args, offsets), n=n)
+        self.contig_k(*self.prepare_args_contig(args, n, offsets), n=n)
 
     def call_basic(self, *args):
         n, nd, dims, strs, offsets, _ = check_args(args)
