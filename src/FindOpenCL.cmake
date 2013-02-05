@@ -66,12 +66,13 @@ ELSE (APPLE)
 
             GET_FILENAME_COMPONENT(OPENCL_LIB_DIR ${OPENCL_LIBRARIES} PATH)
             GET_FILENAME_COMPONENT(_OPENCL_INC_CAND ${OPENCL_LIB_DIR}/../../include ABSOLUTE)
+            GET_FILENAME_COMPONENT(_OPENCL_INC_INTEL ${OPENCL_LIB_DIR}/../include ABSOLUTE)
 
             # The AMD SDK currently does not place its headers
             # in /usr/include, therefore also search relative
             # to the library
-            FIND_PATH(OPENCL_INCLUDE_DIRS CL/cl.h PATHS ${_OPENCL_INC_CAND} "/usr/local/cuda/include")
-            FIND_PATH(_OPENCL_CPP_INCLUDE_DIRS CL/cl.hpp PATHS ${_OPENCL_INC_CAND} "/usr/local/cuda/include")
+            FIND_PATH(OPENCL_INCLUDE_DIRS CL/cl.h PATHS ${_OPENCL_INC_CAND} ${_OPENCL_INC_INTEL} "/usr/local/cuda/include")
+            FIND_PATH(_OPENCL_CPP_INCLUDE_DIRS CL/cl.hpp PATHS ${_OPENCL_INC_CAND} ${_OPENCL_INC_INTEL} "/usr/local/cuda/include")
 
 	ENDIF (WIN32)
 
