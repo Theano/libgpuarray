@@ -57,7 +57,7 @@ class ScalarArg(Argument):
         return False
 
 
-def check_args(args, collapse=True):
+def check_args(args, collapse=False, broadcast=False):
     arrays = []
     strs = []
     offsets = []
@@ -71,25 +71,55 @@ def check_args(args, collapse=True):
             offsets.append(None)
 
         if len(arrays) < 1:
-            raise ArugmentError("No arrays in kernel arguments, "
-                                "something is wrong")
+            raise TypeError("No arrays in kernel arguments, "
+                            "something is wrong")
     n = arrays[0].size
     nd = arrays[0].ndim
     dims = arrays[0].shape
+    tdims = dims
     c_contig = True
     f_contig = True
-    for ary in arrays:
-        if dims != ary.shape:
-            raise ValueError("Some array differs from the others in shape")
-        c_contig = c_contig and ary.flags['C_CONTIGUOUS']
-        f_contig = f_contig and ary.flags['F_CONTIGUOUS']
+
+    if broadcast or collapse:
+        # make the strides and dims editable
+        dims = list(dims)
+        strs = [list(str) if str is not None else str for str in strs]
+
+    if broadcast and 1 in dims:
+        # Get the full shape in dims (no ones unless all arrays have it).
+        for ary in arrays:
+            shp = ary.shape
+            if len(dims) != len(shp):
+                raise ValueError("Array order differs")
+            for i, d in enumerate(shp):
+                if dims[i] != d and dims[i] == 1:
+                    dims[i] = d
+        tdims = tuple(dims)
+
+    for i, ary in enumerate(arrays):
+        fl = ary.flags
+        shp = ary.shape
+        c_contig = c_contig and fl['C_CONTIGUOUS']
+        f_contig = f_contig and fl['F_CONTIGUOUS']
+        if tdims != shp:
+            if broadcast:
+                # we checked for matching order in the
+                # broadcast preparation loop above
+                for j, d in enumerate(shp):
+                    if dims[j] != d:
+                        # Might want to add a per-dimension enable mechanism
+                        if d == 1:
+                            strs[i][j] = 0
+                            c_contig = False
+                            f_contig = False
+                        else:
+                            raise ValueError("Array shape differs")
+            else:
+                raise ValueError("Array shape differs")
 
     contig = c_contig or f_contig
 
     if not contig and collapse and nd > 1:
-        # make the strides and dims editable
-        dims = list(dims)
-        strs = [list(str) if str is not None else str for str in strs]
         # remove dimensions that are of size 1
         for i in range(nd-1, -1, -1):
             if dims[i] == 1:
@@ -109,6 +139,7 @@ def check_args(args, collapse=True):
                         str[i-1] = str[i]
                         del str[i]
                 nd -= 1
+    if broadcast or collapse:
         # re-wrap dims and tuples
         dims = tuple(dims)
         strs = [tuple(str) if str is not None else None for str in strs]
