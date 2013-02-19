@@ -396,7 +396,7 @@ class ElemwiseKernel(object):
         return k, args
 
     def select_kernel(self, args):
-        n, nd, dims, strs, offsets, contig = check_args(args, collapse=True)
+        n, nd, dims, strs, offsets, contig = check_args(args, collapse=None)
         if contig:
             return (self.contig_k, self.prepare_args_contig(args, n, offsets)), n
 
@@ -426,7 +426,7 @@ class ElemwiseKernel(object):
         return self.get_basic(args, n, nd, dims, strs, offsets), n
 
     def prepare(self, *args):
-        n, nd, dims, strs, offsets, contig = check_args(args, collapse=True)
+        n, nd, dims, strs, offsets, contig = check_args(args, collapse=None)
         if contig:
             args = self.prepare_args_contig(args, n, offsets)
             self._prepare_k = self.contig_k
@@ -445,23 +445,35 @@ class ElemwiseKernel(object):
         k(*args, n=n)
 
     def call_contig(self, *args):
-        n, nd, dims, strs, offsets, contig = check_args(args)
+        n, nd, dims, strs, offsets, contig = check_args(args, collapse=False)
         if not contig:
             raise ValueError("Can't call contig on non-contiguous data")
         self.contig_k(*self.prepare_args_contig(args, n, offsets), n=n)
 
-    def call_basic(self, *args):
-        n, nd, dims, strs, offsets, _ = check_args(args, collapse=True)
+    def call_basic(self, *args, **kwargs):
+        collapse = kwargs.pop('collapse', True)
+        if len(kwargs) != 0:
+            raise TypeError("call_dimspec() got an unexpected "
+                            "keywork argument '%s'" % (kwargs.keys()[0]))
+        n, nd, dims, strs, offsets, _ = check_args(args, collapse=collapse)
         k, args = self.get_basic(args, n, nd, dims, strs, offsets)
         k(*args, n=n)
 
-    def call_dimspec(self, *args):
-        n, nd, dims, strs, offsets, _ = check_args(args, collapse=True)
+    def call_dimspec(self, *args, **kwargs):
+        collapse = kwargs.pop('collapse', True)
+        if len(kwargs) != 0:
+            raise TypeError("call_dimspec() got an unexpected "
+                            "keywork argument '%s'" % (kwargs.keys()[0]))
+        n, nd, dims, strs, offsets, _ = check_args(args, collapse=collapse)
         k, args = self.get_dimspec(args, n, nd, dims, strs, offsets)
         k(*args, n=n)
 
-    def call_specialized(self, *args):
-        n, nd, dims, strs, offsets, _ = check_args(args, collapse=True)
+    def call_specialized(self, *args, **kwargs):
+        collapse = kwargs.pop('collapse', True)
+        if len(kwargs) != 0:
+            raise TypeError("call_dimspec() got an unexpected "
+                            "keywork argument '%s'" % (kwargs.keys()[0]))
+        n, nd, dims, strs, offsets, _ = check_args(args, collapse=collapse)
         k, args = self.get_specialized(args, n, nd, dims, strs, offsets)
         k(*args, n=n)
 

@@ -58,6 +58,17 @@ class ScalarArg(Argument):
 
 
 def check_args(args, collapse=False, broadcast=False):
+    """
+    Returns the properties of arguments and checks if they all match
+    (are all the same shape)
+
+    If `collapse` is True dimension collapsing will be performed.
+    If `collapse` is None dimension collapsing will be perform if some
+    arguments are non-contiguous.
+    If `collapse` is False dimension collapsing will not be performed.
+
+    `broadcast` is untested and should be left to the default value (False).
+    """
     arrays = []
     strs = []
     offsets = []
@@ -119,7 +130,13 @@ def check_args(args, collapse=False, broadcast=False):
 
     contig = c_contig or f_contig
 
-    if not contig and collapse and nd > 1:
+    if not contig and collapse is None:
+        # make the strides and dims editable
+        dims = list(dims)
+        strs = [list(str) if str is not None else str for str in strs]
+        collapse = True
+
+    if nd > 1 and collapse:
         # remove dimensions that are of size 1
         for i in range(nd-1, -1, -1):
             if dims[i] == 1:
