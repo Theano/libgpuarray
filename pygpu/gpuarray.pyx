@@ -1549,7 +1549,7 @@ cdef class GpuKernel:
         for i in range(len(args)-1, -1, -1):
             self.setarg(i, args[i])
 
-    def setarg(self, unsigned int index, o):
+    cpdef setarg(self, unsigned int index, o):
         """
         setarg(index, o)
 
