@@ -9,3 +9,9 @@ Python module reference
 
    .. automodule:: pygpu.elemwise
       :members: ElemwiseKernel
+
+   .. automodule:: pygpu.reduction
+      :members: ReductionKernel
+
+   .. automodule:: pygpu.array
+      :members:

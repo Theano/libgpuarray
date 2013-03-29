@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.abspath('..'))
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest', 'sphinx.ext.todo',
-              'sphinx.ext.ifconfig']
+              'sphinx.ext.ifconfig', 'breathe']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -184,7 +184,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'compyte.tex', u'compyte Documentation',
+  ('index', 'compyte.tex', u'Compyte Documentation',
    u'Arnaud Bergeron', 'manual'),
 ]
 
@@ -241,3 +241,13 @@ texinfo_documents = [
 
 # How to display URL addresses: 'footnote', 'no', or 'inline'.
 #texinfo_show_urls = 'footnote'
+
+breathe_projects = {
+    "compyte": "_doxybuild/xml/",
+}
+breathe_default_project = "compyte"
+
+breathe_domain_by_extension = {
+    "h": "c",
+    "c": "c",
+}
