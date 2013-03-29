@@ -36,6 +36,20 @@ import numpy as np
 NAME_TO_DTYPE = {}
 
 def register_dtype(dtype, c_names):
+    """
+    Associate a numpy dtype with its C equivalents.
+
+    :param dtype: type to associate
+    :type dtype: numpy.dtype or string
+    :param c_names: list of C type names
+    :type c_names: str or list
+
+    Will register `dtype` for use with the gpuarray module.  If the
+    c_names argument is a list then the first element of that list is
+    taken as the primary association and will be used for generated C
+    code.  The other types will be mapped to the provided dtype when
+    going in the other direction.
+    """
     if isinstance(c_names, str):
         c_names = [c_names]
 
@@ -96,6 +110,11 @@ def _fill_dtype_registry(respect_windows):
 # {{{ dtype -> ctype
 
 def dtype_to_ctype(dtype, with_fp_tex_hack=False):
+    """
+    Return the C type that corresponds to `dtype`.
+
+    :param dtype: a numpy dtype
+    """
     if dtype is None:
         raise ValueError("dtype may not be None")
 
@@ -144,6 +163,14 @@ def parse_c_arg_backend(c_arg, scalar_arg_class, vec_arg_class):
 
 
 def get_np_obj(obj):
+    """
+    Returns a numpy object of the same dtype and comportement as the
+    source suitable for output dtype determination.
+
+    This is used since the casting rules of numpy are rather obscure
+    and the best way to imitate them is to try an operation ans see
+    what it does.
+    """
     if isinstance(obj, np.ndarray) and obj.shape == ():
         return obj
     try:
@@ -153,6 +180,14 @@ def get_np_obj(obj):
 
 
 def get_common_dtype(obj1, obj2, allow_double):
+    """
+    Returns the proper output type for a numpy operation involving the
+    two provided objects.  This may not be suitable for certain
+    obscure numpy operations.
+
+    If `allow_double` is False, a return type of float64 will be
+    forced to float32 and complex128 will be forced to complex64.
+    """
     # Yes, numpy behaves differently depending on whether
     # we're dealing with arrays or scalars.
 

@@ -8,6 +8,17 @@ from tools import as_argument, ArrayArg
 import gpuarray as array
 
 class gpuarray(array.GpuArray):
+    """
+    Extension class for gpuarray.GpuArray to add numpy mathematical
+    operations between arrays.  These operations are all performed on
+    the GPU but this is not the most efficient way since it will
+    involve the creation of temporaries (just like numpy) for all
+    intermediate results.
+
+    This class may help transition code from numpy to pygpu by acting
+    more like a drop-in replacement for numpy.ndarray than the raw
+    GpuArray class.
+    """
     ### add
     def __add__(self, other):
         return elemwise2(self, '+', other, self)
