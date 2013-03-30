@@ -14,8 +14,17 @@ extern "C" {
 }
 #endif
 
+/**
+ * Kernel information structure.
+ */
 typedef struct _GpuKernel {
+  /**
+   * Device kernel reference.
+   */
   gpukernel *k;
+  /**
+   * Backend operations vector.
+   */
   compyte_buffer_ops *ops;
 } GpuKernel;
 

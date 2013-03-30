@@ -137,11 +137,54 @@ static inline int GpuArray_CHKFLAGS(GpuArray *a, int flags) {
   return (a->flags & flags) == flags;
 }
 /* Add tests here when you need them */
+/**
+ * Checks if the array owns its data (is responsible for freeing it
+ * when freed itself).
+ *
+ * \param a array
+ *
+ * \returns true if `a` owns its data
+ */
 #define GpuArray_OWNSDATA(a) GpuArray_CHKFLAGS(a, GA_OWNDATA)
+/**
+ * Checks if the array data is writable.
+ *
+ * \param a array
+ *
+ * \returns true if the data area of `a` is writable
+ */
 #define GpuArray_ISWRITEABLE(a) GpuArray_CHKFLAGS(a, GA_WRITEABLE)
+/**
+ * Checks if the array elements are aligned.
+ *
+ * \param a array
+ *
+ * \returns true if the elements of `a` are aligned.
+ */
 #define GpuArray_ISALIGNED(a) GpuArray_CHKFLAGS(a, GA_ALIGNED)
+/**
+ * Checks if the array elements are contiguous in memory.
+ *
+ * \param a array
+ *
+ * \returns true if the data area of `a` is contiguous
+ */
 #define GpuArray_ISONESEGMENT(a) ((a)->flags & (GA_C_CONTIGUOUS|GA_F_CONTIGUOUS))
+/**
+ * Checks if the array elements are laid out if Fortran order.
+ *
+ * \param a array
+ *
+ * \returns true if the data area of `a` is Fortran-contiguous
+ */
 #define GpuArray_ISFORTRAN(a) GpuArray_CHKFLAGS(a, GA_F_CONTIGUOUS)
+/**
+ * Retrive the size of the elements in the array.
+ *
+ * \param a array
+ *
+ * \returns the size of the array elements.
+ */
 #define GpuArray_ITEMSIZE(a) compyte_get_elsize((a)->typecode)
 
 /**
@@ -216,17 +259,123 @@ COMPYTE_PUBLIC int GpuArray_fromdata(GpuArray *a, compyte_buffer_ops *ops,
                                      size_t *dims, ssize_t *strides,
                                      int writeable);
 
+/**
+ * Initialize an array structure to provide a view of another.
+ *
+ * The new structure will point to the same data area and have the
+ * same values of properties as the source one.  The data area is
+ * shared and writes from one array will be reflected in the other.
+ * The properties are copied and not shared and can be modified
+ * independantly.
+ *
+ * \param v the result array
+ * \param a the source array
+ *
+ * \return GA_NO_ERROR the operation was succesful.
+ * \return "other value" an error occured and the operation was aborted.
+ */
 COMPYTE_PUBLIC int GpuArray_view(GpuArray *v, GpuArray *a);
+/**
+ * Blocks until all operations (kernels, copies) involving `a` are finished.
+ *
+ * \param a the array to synchronize
+ *
+ * \return GA_NO_ERROR the operation was succesful.
+ * \return "other value" an error occured and the operation was aborted.
+ */
 COMPYTE_PUBLIC int GpuArray_sync(GpuArray *a);
-COMPYTE_PUBLIC int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
-                   ssize_t *steps);
+/**
+ * Returns a sub-view of a source array.
+ *
+ * The indexing follows simple basic model where each dimension is
+ * indexed separately.  For a single dimension the indexing selects
+ * from the start index (included) to the end index (excluded) while
+ * selecting one over step elements. As an example for the array `[ 0
+ * 1 2 3 4 5 6 7 8 9 ]` indexed with start index 1 stop index 8 and
+ * step 2 the result would be `[ 1 3 5 7 ]`.
+ *
+ * The special value 0 for step means that only one element
+ * corresponding to the start index and the resulting array order will
+ * be one smaller.
+ *
+ * \param r the result array
+ * \param a the source array
+ * \param starts the start of the subsection for each dimension (length must be a->nd)
+ * \param stops the end of the subsection for each dimension (length must be a->nd)
+ * \param steps the steps for the subsection for each dimension (length must be a->nd)
+ *
+ * \return GA_NO_ERROR the operation was succesful.
+ * \return "other value" an error occured and the operation was aborted.
+ */
+COMPYTE_PUBLIC int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts,
+                                  ssize_t *stops, ssize_t *steps);
 
-COMPYTE_PUBLIC int GpuArray_reshape(GpuArray *res, GpuArray *a, unsigned int nd, size_t *newdims, ga_order ord, int nocopy);
+/**
+ * Change the dimensions of an array.
+ *
+ * Return a new array with the desired dimensions. The new dimensions
+ * must have the same total size as the old ones. A copy of the
+ * underlying data may be performed if necessary, unless `nocopy` is
+ * 0.
+ *
+ * \param res the result array
+ * \param a the source array
+ * \param nd new dimensions order
+ * \param newdims new dimensions (length is nd)
+ * \param ord the desired resulting order
+ * \param nocopy if 0 error out if a data copy is required.
+ *
+ * \return GA_NO_ERROR the operation was succesful.
+ * \return "other value" an error occured and the operation was aborted.
+ */
+COMPYTE_PUBLIC int GpuArray_reshape(GpuArray *res, GpuArray *a,
+                                    unsigned int nd, size_t *newdims,
+                                    ga_order ord, int nocopy);
+/**
+ * Relase all device and host memory associated with `a`.
+ *
+ * This function frees all host memory, and releases the device memory
+ * if it is the owner. In case an array has views it is the
+ * responsability of the caller to ensure a base array is not cleared
+ * before its views.
+ *
+ * This function will also zero out the structure to prevent
+ * accidental reuse.
+ *
+ * \param a the array to clear
+ */
 COMPYTE_PUBLIC void GpuArray_clear(GpuArray *a);
 
+/**
+ * Checks if to array share device memory.
+ *
+ * \param a an array
+ * \param b an array
+ *
+ * \returns 1 if `a` and `b` may share a portion of their data.
+ */
 COMPYTE_PUBLIC int GpuArray_share(GpuArray *a, GpuArray *b);
+/**
+ * Retursns the context of an array.
+ *
+ * \param a an array
+ *
+ * \returns the context in which `a` was allocated.
+ */
 COMPYTE_PUBLIC void *GpuArray_context(GpuArray *a);
 
+/**
+ * Copies all the elements of and array to another.
+ *
+ * The arrays `src` and `dst` must have the same size (total number of
+ * elements) and be in the same context.
+ *
+ * \param dst destination array
+ * \param src source array
+ *
+ * \return GA_NO_ERROR the operation was succesful.
+ * \return "other value" an error occured and the operation was aborted.
+ */
 COMPYTE_PUBLIC int GpuArray_move(GpuArray *dst, GpuArray *src);
 COMPYTE_PUBLIC int GpuArray_write(GpuArray *dst, void *src, size_t src_sz);
 COMPYTE_PUBLIC int GpuArray_read(void *dst, size_t dst_sz, GpuArray *src);
