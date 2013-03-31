@@ -13,6 +13,9 @@ extern "C" {
 }
 #endif
 
+/**
+ * List of all the possible error codes.
+ */
 enum ga_error {
   GA_NO_ERROR = 0,
   GA_MEMORY_ERROR,
@@ -27,6 +30,12 @@ enum ga_error {
   /* Don't forget to sync with Gpu_error() */
 };
 
+/**
+ * Returns a user-readable description for most error codes.
+ *
+ * Some errors only happen in a context and in those cases Gpu_error()
+ * will provide more details as to the reason for the error.
+ */
 COMPYTE_PUBLIC const char *compyte_error_str(int err);
 
 #ifdef __cplusplus

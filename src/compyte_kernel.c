@@ -9,6 +9,8 @@ int GpuKernel_init(GpuKernel *k, compyte_buffer_ops *ops, void *ctx,
 
   k->ops = ops;
   k->k = k->ops->buffer_newkernel(ctx, count, strs, lens, name, flags, &res);
+  if (res != GA_NO_ERROR)
+    GpuKernel_clear(k);
   return res;
 }
 

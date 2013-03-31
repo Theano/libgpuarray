@@ -13,6 +13,11 @@ extern "C" {
 }
 #endif
 
+/**
+ * Obtain a function pointer for an extension.
+ *
+ * \returns A function pointer or NULL if the extension was not found.
+ */
 COMPYTE_PUBLIC void * compyte_get_extension(const char *name);
 
 #ifdef __cplusplus

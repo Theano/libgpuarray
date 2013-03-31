@@ -22,7 +22,7 @@ int compyte_register_type(compyte_type *t, int *ret) {
   return t->typecode;
 }
 
-compyte_type *compyte_get_type(int typecode) {
+const compyte_type *compyte_get_type(int typecode) {
   if (typecode < GA_DELIM) {
     assert(scalar_types[typecode].typecode == typecode);
     return &scalar_types[typecode];

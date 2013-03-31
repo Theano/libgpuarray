@@ -271,8 +271,8 @@ COMPYTE_PUBLIC int GpuArray_fromdata(GpuArray *a, compyte_buffer_ops *ops,
  * \param v the result array
  * \param a the source array
  *
- * \return GA_NO_ERROR the operation was succesful.
- * \return "other value" an error occured and the operation was aborted.
+ * \return GA_NO_ERROR if the operation was succesful.
+ * \return an error code otherwise
  */
 COMPYTE_PUBLIC int GpuArray_view(GpuArray *v, GpuArray *a);
 /**
@@ -280,8 +280,8 @@ COMPYTE_PUBLIC int GpuArray_view(GpuArray *v, GpuArray *a);
  *
  * \param a the array to synchronize
  *
- * \return GA_NO_ERROR the operation was succesful.
- * \return "other value" an error occured and the operation was aborted.
+ * \return GA_NO_ERROR if the operation was succesful.
+ * \return an error code otherwise
  */
 COMPYTE_PUBLIC int GpuArray_sync(GpuArray *a);
 /**
@@ -304,8 +304,8 @@ COMPYTE_PUBLIC int GpuArray_sync(GpuArray *a);
  * \param stops the end of the subsection for each dimension (length must be a->nd)
  * \param steps the steps for the subsection for each dimension (length must be a->nd)
  *
- * \return GA_NO_ERROR the operation was succesful.
- * \return "other value" an error occured and the operation was aborted.
+ * \return GA_NO_ERROR if the operation was succesful.
+ * \return an error code otherwise
  */
 COMPYTE_PUBLIC int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts,
                                   ssize_t *stops, ssize_t *steps);
@@ -325,8 +325,8 @@ COMPYTE_PUBLIC int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts,
  * \param ord the desired resulting order
  * \param nocopy if 0 error out if a data copy is required.
  *
- * \return GA_NO_ERROR the operation was succesful.
- * \return "other value" an error occured and the operation was aborted.
+ * \return GA_NO_ERROR if the operation was succesful.
+ * \return an error code otherwise
  */
 COMPYTE_PUBLIC int GpuArray_reshape(GpuArray *res, GpuArray *a,
                                     unsigned int nd, size_t *newdims,
@@ -373,19 +373,79 @@ COMPYTE_PUBLIC void *GpuArray_context(GpuArray *a);
  * \param dst destination array
  * \param src source array
  *
- * \return GA_NO_ERROR the operation was succesful.
- * \return "other value" an error occured and the operation was aborted.
+ * \return GA_NO_ERROR if the operation was succesful.
+ * \return an error code otherwise
  */
 COMPYTE_PUBLIC int GpuArray_move(GpuArray *dst, GpuArray *src);
+/**
+ * Copy data from the host memory to the device memory.
+ *
+ * \param dst destination array (must be contiguous)
+ * \param src source host memory
+ * \param src_sz size of data to copy (in bytes)
+ *
+ * \return GA_NO_ERROR if the operation was succesful.
+ * \return an error code otherwise
+ */
 COMPYTE_PUBLIC int GpuArray_write(GpuArray *dst, void *src, size_t src_sz);
+/**
+ * Copy data from the device memory to the host memory.
+ *
+ * \param dst dstination host memory
+ * \param dst_sz size of data to copy (in bytes)
+ * \param src source array (must be contiguous)
+ *
+ * \return GA_NO_ERROR if the operation was succesful.
+ * \return an error code otherwise
+ */
 COMPYTE_PUBLIC int GpuArray_read(void *dst, size_t dst_sz, GpuArray *src);
 
+/**
+ * Set all of an array's data to a byte pattern.
+ *
+ * \param a an array (must be contiguous)
+ * \param data the byte to repeat
+ *
+ * \return GA_NO_ERROR if the operation was succesful.
+ * \return an error code otherwise
+ */
 COMPYTE_PUBLIC int GpuArray_memset(GpuArray *a, int data);
 
+/**
+ * Make a copy of an array.
+ *
+ * This is analogue to GpuArray_view() except it copies the device
+ * memory and no data is shared.
+ *
+ * \return GA_NO_ERROR if the operation was succesful.
+ * \return an error code otherwise
+ */
 COMPYTE_PUBLIC int GpuArray_copy(GpuArray *res, GpuArray *a, ga_order order);
 
+/**
+ * Get a description of the last error in the context of `a`.
+ *
+ * The description may reflect operations with other arrays in the
+ * same context if other operations were performed between the
+ * occurence of the error and the call to this function.
+ *
+ * Operations in other contexts, however have no incidence on the
+ * return value.
+ *
+ * \param a an array
+ * \param err the error code returned
+ *
+ * \returns A user-readable string describing the nature of the error.
+ */
 COMPYTE_PUBLIC const char *GpuArray_error(GpuArray *a, int err);
 
+/**
+ * Print a textual description of `a` to the specified file
+ * descriptor.
+ *
+ * \param fd a file descriptior open for writing
+ * \param a an array
+ */
 COMPYTE_PUBLIC void GpuArray_fprintf(FILE *fd, const GpuArray *a);
 COMPYTE_LOCAL int GpuArray_is_c_contiguous(const GpuArray *a);
 COMPYTE_LOCAL int GpuArray_is_f_contiguous(const GpuArray *a);
