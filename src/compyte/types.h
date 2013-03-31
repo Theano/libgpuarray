@@ -3,8 +3,8 @@
  *  \brief Type declarations and access.
  */
 
-#ifndef COMPYTE_TYPES
-#define COMPYTE_TYPES
+#ifndef COMPYTE_TYPES_H
+#define COMPYTE_TYPES_H
 #include <sys/types.h>
 #include <stddef.h>
 
@@ -37,6 +37,9 @@ typedef struct _compyte_type {
   int typecode;
 } compyte_type;
 
+/**
+ * List of all built-in types.
+ */
 enum COMPYTE_TYPES {
   GA_BUFFER = -1,
   GA_BOOL = 0,
