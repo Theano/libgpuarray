@@ -162,19 +162,25 @@ enum COMPYTE_TYPES {
 % for i, v in sorted(TYPEMAP.items()):
   GA_${v[1].upper()} = ${i},
 % endfor
+/** \\cond INTERNAL_DOCS */
   GA_NBASE = ${ntypes},
 
   GA_DELIM = 255, /* To be forward-compatible with numpy */
+/** \\endcond */
 
 % for i, v in sorted(VECTORMAP.items()):
   GA_${v[1].upper()},
 % endfor
 
+/** \\cond INTERNAL_DOCS */
   GA_ENDVEC = 512
+/** \\endcond */
 };
 
+/** \\cond INTERNAL_DOCS */
 extern compyte_type scalar_types[];
 extern compyte_type vector_types[];
+/** \\endcond */
 
 #ifdef __cplusplus
 }

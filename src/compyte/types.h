@@ -60,9 +60,11 @@ enum COMPYTE_TYPES {
   GA_CDOUBLE = 15,
   GA_CQUAD = 16,
   GA_HALF = 23,
+/** \cond INTERNAL_DOCS */
   GA_NBASE = 24,
 
   GA_DELIM = 255, /* To be forward-compatible with numpy */
+/** \endcond */
 
   GA_BYTE2,
   GA_UBYTE2,
@@ -117,11 +119,15 @@ enum COMPYTE_TYPES {
   GA_HALF8,
   GA_HALF16,
 
+/** \cond INTERNAL_DOCS */
   GA_ENDVEC = 512
+/** \endcond */
 };
 
+/** \cond INTERNAL_DOCS */
 extern compyte_type scalar_types[];
 extern compyte_type vector_types[];
+/** \endcond */
 
 #ifdef __cplusplus
 }

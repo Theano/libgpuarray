@@ -42,11 +42,20 @@ COMPYTE_PUBLIC int compyte_register_type(compyte_type *t, int *ret);
  * \returns A type structure pointer or NULL
  */
 COMPYTE_PUBLIC const compyte_type *compyte_get_type(int typecode);
+/**
+ * Get the size of one element of a type.
+ *
+ * The type MUST exist or the program will crash.
+ *
+ * \param typecode the type to get the element size for
+ *
+ * \returns the size
+ */
 COMPYTE_PUBLIC size_t compyte_get_elsize(int typecode);
 
-COMPYTE_LOCAL int compyte_elem_perdim(char *strs[], unsigned int *count, unsigned int nd,
-			const size_t *dims, const ssize_t *str,
-			const char *id);
+COMPYTE_LOCAL int compyte_elem_perdim(char *strs[], unsigned int *count,
+                                      unsigned int nd, const size_t *dims,
+                                      const ssize_t *str, const char *id);
 
 #ifdef __cplusplus
 }

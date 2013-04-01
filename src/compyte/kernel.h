@@ -52,15 +52,68 @@ COMPYTE_PUBLIC int GpuKernel_init(GpuKernel *k, compyte_buffer_ops *ops,
                                   const char **strs, size_t *lens,
                                   const char *name, int flags);
 
+/**
+ * Clear and release data associated with a kernel.
+ *
+ * \param k the kernel to release
+ */
 COMPYTE_PUBLIC void GpuKernel_clear(GpuKernel *k);
 
+/**
+ * Returns the context in which a kernel was built.
+ *
+ * \param k a kernel
+ *
+ * \returns a context pointer
+ */
 COMPYTE_PUBLIC void *GpuKernel_context(GpuKernel *k);
 
+/**
+ * Set a scalar argument for a kernel.
+ *
+ * \param k a kernel
+ * \param index argument index to set
+ * \param typecode type of the argument to set
+ * \param arg pointer to the scalar value
+ *
+ * \return GA_NO_ERROR if the operation is successful
+ * \return any other value if an error occured
+ */
 COMPYTE_PUBLIC int GpuKernel_setarg(GpuKernel *k, unsigned int index,
                                     int typecode, void *arg);
+/**
+ * Set an array argument for a kernel.
+ *
+ * \param k a kernel
+ * \param index argument index to set
+ * \param a array argument
+ *
+ * \return GA_NO_ERROR if the operation is successful
+ * \return any other value if an error occured
+ */
 COMPYTE_PUBLIC int GpuKernel_setbufarg(GpuKernel *k, unsigned int index,
                                        GpuArray *a);
 
+/**
+ * Launch the execution of a kernel.
+ *
+ * You either specify the block and grid sizes (`ls` and `gs`) or the
+ * total size (`n`). Set a value to `0` to indicate it is
+ * unspecified. You can also specify the total size (`n`) and one of
+ * the block (`ls`) or grid (`gs`) size.
+ *
+ * If you leave one or both of `ls` or `gs`, it will be filled
+ * according to a heuristic to get a good performance out of your
+ * hardware. However the number of kernel instances that will be run
+ * can be slightly higher than the total size you specified in order
+ * to avoid performance degradation. Your kernel should be ready to
+ * handle this.
+ *
+ * \param k the kernel to launch
+ * \param n number of instances to launch
+ * \param ls size of launch blocks
+ * \param gs size of launch grid
+ */
 COMPYTE_PUBLIC int GpuKernel_call(GpuKernel *k, size_t n,
                                   size_t ls, size_t gs);
 
