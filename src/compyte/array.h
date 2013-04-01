@@ -381,7 +381,7 @@ COMPYTE_PUBLIC int GpuArray_move(GpuArray *dst, GpuArray *src);
  * Copy data from the host memory to the device memory.
  *
  * \param dst destination array (must be contiguous)
- * \param src source host memory
+ * \param src source host memory (contiguous block)
  * \param src_sz size of data to copy (in bytes)
  *
  * \return GA_NO_ERROR if the operation was succesful.
@@ -391,7 +391,7 @@ COMPYTE_PUBLIC int GpuArray_write(GpuArray *dst, void *src, size_t src_sz);
 /**
  * Copy data from the device memory to the host memory.
  *
- * \param dst dstination host memory
+ * \param dst dstination host memory (contiguous block)
  * \param dst_sz size of data to copy (in bytes)
  * \param src source array (must be contiguous)
  *
