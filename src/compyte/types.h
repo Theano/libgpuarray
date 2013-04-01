@@ -24,7 +24,7 @@ typedef struct _compyte_type {
   */
   const char *cluda_name;
  /**
-  * Size of one element.
+  * Size of one element (in bytes).
   */
   size_t size;
  /**

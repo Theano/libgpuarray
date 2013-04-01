@@ -347,7 +347,7 @@ COMPYTE_PUBLIC int GpuArray_reshape(GpuArray *res, GpuArray *a,
 COMPYTE_PUBLIC void GpuArray_clear(GpuArray *a);
 
 /**
- * Checks if to array share device memory.
+ * Checks if two arrays may share device memory.
  *
  * \param a an array
  * \param b an array
