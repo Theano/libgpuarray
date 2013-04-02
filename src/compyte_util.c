@@ -27,11 +27,11 @@ const compyte_type *compyte_get_type(int typecode) {
     assert(scalar_types[typecode].typecode == typecode);
     return &scalar_types[typecode];
   } else if (typecode < GA_ENDVEC) {
-    assert(vector_types[typecode - 256].typecode = typecode);
+    assert(vector_types[typecode - 256].typecode == typecode);
     return &vector_types[typecode - 256];
   } else {
     if ((typecode - 512) < n_types) {
-      assert(custom_types[typecode - 512]->typecode = typecode);
+      assert(custom_types[typecode - 512]->typecode == typecode);
       return custom_types[typecode - 512];
     } else {
       return &no_type;
