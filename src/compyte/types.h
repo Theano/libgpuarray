@@ -8,6 +8,8 @@
 #include <sys/types.h>
 #include <stddef.h>
 
+#include "compyte/compat.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -125,8 +127,8 @@ enum COMPYTE_TYPES {
 };
 
 /** \cond INTERNAL_DOCS */
-extern compyte_type scalar_types[];
-extern compyte_type vector_types[];
+COMPYTE_LOCAL extern const compyte_type scalar_types[];
+COMPYTE_LOCAL extern const compyte_type vector_types[];
 /** \endcond */
 
 #ifdef __cplusplus
