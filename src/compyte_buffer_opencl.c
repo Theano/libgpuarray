@@ -1058,20 +1058,21 @@ static const char *cl_error(void *c) {
     return get_error_string(ctx->err);
 }
 
-compyte_buffer_ops opencl_ops = {cl_init,
-                                 cl_deinit,
-                                 cl_alloc,
-                                 cl_free,
-                                 cl_share,
-                                 cl_move,
-                                 cl_read,
-                                 cl_write,
-                                 cl_memset,
-                                 cl_newkernel,
-                                 cl_freekernel,
-                                 cl_setkernelarg,
-                                 cl_callkernel,
-                                 cl_sync,
-                                 cl_extcopy,
-                                 cl_property,
-                                 cl_error};
+COMPYTE_LOCAL
+const compyte_buffer_ops opencl_ops = {cl_init,
+                                       cl_deinit,
+                                       cl_alloc,
+                                       cl_free,
+                                       cl_share,
+                                       cl_move,
+                                       cl_read,
+                                       cl_write,
+                                       cl_memset,
+                                       cl_newkernel,
+                                       cl_freekernel,
+                                       cl_setkernelarg,
+                                       cl_callkernel,
+                                       cl_sync,
+                                       cl_extcopy,
+                                       cl_property,
+                                       cl_error};

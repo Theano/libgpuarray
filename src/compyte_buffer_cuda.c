@@ -1329,20 +1329,21 @@ static const char *cuda_error(void *c) {
     return get_error_string(ctx->err);
 }
 
-compyte_buffer_ops cuda_ops = {cuda_init,
-                               cuda_deinit,
-                               cuda_alloc,
-                               cuda_free,
-                               cuda_share,
-                               cuda_move,
-                               cuda_read,
-                               cuda_write,
-                               cuda_memset,
-                               cuda_newkernel,
-                               cuda_freekernel,
-                               cuda_setkernelarg,
-                               cuda_callkernel,
-                               cuda_sync,
-                               cuda_extcopy,
-                               cuda_property,
-                               cuda_error};
+COMPYTE_LOCAL
+const compyte_buffer_ops cuda_ops = {cuda_init,
+                                     cuda_deinit,
+                                     cuda_alloc,
+                                     cuda_free,
+                                     cuda_share,
+                                     cuda_move,
+                                     cuda_read,
+                                     cuda_write,
+                                     cuda_memset,
+                                     cuda_newkernel,
+                                     cuda_freekernel,
+                                     cuda_setkernelarg,
+                                     cuda_callkernel,
+                                     cuda_sync,
+                                     cuda_extcopy,
+                                     cuda_property,
+                                     cuda_error};
