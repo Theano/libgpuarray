@@ -407,7 +407,6 @@ static int cl_move(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff,
   cl_event ev;
   cl_event evw[2];
   cl_event *evl = NULL;
-  int res;
   cl_uint num_ev = 0;
 
   if (dst->ctx != src->ctx) return GA_VALUE_ERROR;
@@ -445,7 +444,6 @@ static int cl_read(void *dst, gpudata *src, size_t srcoff, size_t sz) {
   cl_event ev[1];
   cl_event *evl = NULL;
   cl_uint num_ev = 0;
-  int res;
 
   if (sz == 0) return GA_NO_ERROR;
 
@@ -469,7 +467,6 @@ static int cl_write(gpudata *dst, size_t dstoff, const void *src, size_t sz) {
   cl_event ev[1];
   cl_event *evl = NULL;
   cl_uint num_ev = 0;
-  int res;
 
   if (sz == 0) return GA_NO_ERROR;
 

@@ -150,7 +150,6 @@ int GpuArray_sync(GpuArray *a) {
 
 int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
 		   ssize_t *steps) {
-  int err;
   unsigned int i, r_i;
   unsigned int new_nd = a->nd;
 
@@ -166,10 +165,6 @@ int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
   r->flags = a->flags & ~GA_OWNDATA;
   r->nd = new_nd;
   r->offset = a->offset;
-  if (r->data == NULL) {
-    GpuArray_clear(r);
-    return err;
-  }
   r->dimensions = calloc(r->nd, sizeof(size_t));
   r->strides = calloc(r->nd, sizeof(ssize_t));
   if (r->dimensions == NULL || r->strides == NULL) {
