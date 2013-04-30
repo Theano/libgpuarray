@@ -536,7 +536,7 @@ cdef kernel_property(GpuKernel k, int prop_id, void *res):
     if err != GA_NO_ERROR:
         raise GpuArrayException(kernel_error(k, err), err)
 
-cdef GpuContext GpuArray_default_context = None
+cdef public GpuContext GpuArray_default_context = None
 
 cdef ctx_property(GpuContext c, int prop_id, void *res):
     cdef int err
@@ -1563,6 +1563,7 @@ cdef class GpuKernel:
         :param args: kernel arguments
         :type args: tuple or list
         """
+        cdef unsigned int i
         # Work backwards to avoid a lot of reallocations in the argument code.
         for i in range(len(args)-1, -1, -1):
             self.setarg(i, args[i])
