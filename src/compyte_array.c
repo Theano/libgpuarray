@@ -199,6 +199,60 @@ int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
   return GA_NO_ERROR;
 }
 
+int GpuArray_setarray(GpuArray *a, GpuArray *v) {
+  GpuArray tmp;
+  int i;
+  int err = GA_NO_ERROR;
+  void *t;
+
+  if (a->nd < v->nd)
+    return GA_VALUE_ERROR;
+
+  for (i = 0; i < v->nd; i++) {
+    if (v->dimensions[i] != 1 && v->dimensions[i] != a->dimensions[i])
+      return GA_VALUE_ERROR;
+  }
+
+  err = GpuArray_view(&tmp, v);
+  if (err != GA_NO_ERROR)
+    return err;
+
+  for (i = 0; i < tmp.nd; i++) {
+    if (tmp.dimensions[i] == 1  && a->dimensions[i] != 1) {
+      tmp.strides[i] = 0;
+      tmp.dimensions[i] = a->dimensions[i];
+      // Mark non-contiguous if we make broadcast dimensions
+      tmp.flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
+    }
+  }
+
+  if (a->nd > tmp.nd) {
+    t = realloc(tmp.dimensions, a->nd*sizeof(size_t));
+    if (t == NULL) {
+      err = GA_NO_ERROR;
+      goto exit;
+    }
+    tmp.dimensions = (size_t *)t;
+    t = realloc(tmp.strides, a->nd*sizeof(size_t));
+    if (t == NULL) {
+      err = GA_NO_ERROR;
+      goto exit;
+    }
+    tmp.strides = (ssize_t *)t;
+    for (i = tmp.nd; i < a->nd; i++) {
+      tmp.dimensions[i] = a->dimensions[i];
+      tmp.strides[i] = 0;
+    }
+      // Mark non-contiguous if we make broadcast dimensions
+    tmp.flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
+  }
+
+  err = GpuArray_move(a, &tmp);
+  exit:
+  GpuArray_clear(&tmp);
+  return err;
+}
+
 int GpuArray_reshape(GpuArray *res, GpuArray *a, unsigned int nd,
                       size_t *newdims, ga_order ord, int nocopy) {
   ssize_t *newstrides;

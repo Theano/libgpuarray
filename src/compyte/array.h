@@ -311,6 +311,24 @@ COMPYTE_PUBLIC int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts,
                                   ssize_t *stops, ssize_t *steps);
 
 /**
+ * Sets the content of an array to the content of another array.
+ *
+ * The value array must be smaller or equal in number of dimensions to
+ * the destination array.  Each of its dimensions' size must be either
+ * exactly equal to the destination array's corresponding dimensions
+ * or 1.  Dimensions of size 1 will be repeated to fill the full size
+ * of the destination array. Extra size 1 dimensions will be added at
+ * the end to make the two arrays shape-equivalent.
+ *
+ * \param a the destination array
+ * \param v the value array
+ *
+ * \return GA_NO_ERROR if the operation was succesful.
+ * \return an error code otherwise
+ */
+COMPYTE_PUBLIC int GpuArray_setarray(GpuArray *a, GpuArray *v);
+
+/**
  * Change the dimensions of an array.
  *
  * Return a new array with the desired dimensions. The new dimensions
