@@ -1337,9 +1337,9 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
         cdef GpuArray gv
 
         if isinstance(v, GpuArray):
-           gv = <GpuArray>v
+            gv = <GpuArray>v
         else:
-            gv = array(v, dtype=self.ga.typecode, context=self.context)
+            gv = array(v, dtype=self.dtype, context=self.context)
 
         array_setarray(tmp, gv)
 

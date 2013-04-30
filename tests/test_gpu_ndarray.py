@@ -268,6 +268,21 @@ def mapping_getitem_ellipsis(shp, dtype, offseted):
     assert numpy.allclose(a, b_cpu)
 
 
+def test_mapping_setitem_ellipsis():
+    for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
+        for dtype in dtypes_all:
+            for offseted in [True, False]:
+                yield mapping_getitem_ellipsis, shp, dtype, offseted
+
+
+@guard_devsup
+def mapping_getitem_ellipsis(shp, dtype, offseted):
+    a, a_gpu = gen_gpuarray(shp, dtype, offseted, ctx=ctx)
+    a[...] = 2
+    a_gpu[...] = 2
+    assert numpy.allclose(a, numpy.asarray(a_gpu))
+
+
 def test_copy_view():
     for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:

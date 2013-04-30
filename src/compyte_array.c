@@ -218,7 +218,7 @@ int GpuArray_setarray(GpuArray *a, GpuArray *v) {
     return err;
 
   for (i = 0; i < tmp.nd; i++) {
-    if (tmp.dimensions[i] == 1  && a->dimensions[i] != 1) {
+    if (tmp.dimensions[i] == 1 && a->dimensions[i] != 1) {
       tmp.strides[i] = 0;
       tmp.dimensions[i] = a->dimensions[i];
       // Mark non-contiguous if we make broadcast dimensions
@@ -243,6 +243,7 @@ int GpuArray_setarray(GpuArray *a, GpuArray *v) {
       tmp.dimensions[i] = a->dimensions[i];
       tmp.strides[i] = 0;
     }
+    tmp.nd = a->nd;
       // Mark non-contiguous if we make broadcast dimensions
     tmp.flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
   }
