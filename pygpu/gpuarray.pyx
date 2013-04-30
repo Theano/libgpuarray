@@ -146,6 +146,7 @@ cdef extern from "compyte/array.h":
     int GpuArray_sync(_GpuArray *a)
     int GpuArray_index(_GpuArray *r, _GpuArray *a, ssize_t *starts,
                        ssize_t *stops, ssize_t *steps)
+    int GpuArray_setarray(_GpuArray *v, _GpuArray *a)
     int GpuArray_reshape(_GpuArray *res, _GpuArray *a, unsigned int nd,
                          size_t *newdims, ga_order ord, int nocopy)
 
@@ -441,6 +442,12 @@ cdef array_index(GpuArray r, GpuArray a, ssize_t *starts, ssize_t *stops,
     err = GpuArray_index(&r.ga, &a.ga, starts, stops, steps)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
+
+cdef array_setarray(GpuArray v, GpuArray a):
+    cdef int err
+    err = GpuArray_setarray(&v.ga, &a.ga)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(GpuArray_error(&v.ga, err), err)
 
 cdef array_reshape(GpuArray res, GpuArray a, unsigned int nd, size_t *newdims,
                    ga_order ord, int nocopy):
@@ -1324,6 +1331,17 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
             free(stops)
             free(steps)
         return res
+
+    def __setitem__(self, idx, v):
+        cdef GpuArray tmp = self.__getitem__(idx)
+        cdef GpuArray gv
+
+        if isinstance(v, GpuArray):
+           gv = <GpuArray>v
+        else:
+            gv = array(v, dtype=self.ga.typecode, context=self.context)
+
+        array_setarray(tmp, gv)
 
     def __hash__(self):
         raise TypeError("unhashable type '%s'"%self.__class__)
