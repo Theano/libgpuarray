@@ -1563,7 +1563,7 @@ cdef class GpuKernel:
         :param args: kernel arguments
         :type args: tuple or list
         """
-        cdef unsigned int i
+        cdef int i
         # Work backwards to avoid a lot of reallocations in the argument code.
         for i in range(len(args)-1, -1, -1):
             self.setarg(i, args[i])
