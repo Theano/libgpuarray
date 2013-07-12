@@ -63,11 +63,14 @@ def check_args(args, collapse=False, broadcast=False):
     (are all the same shape)
 
     If `collapse` is True dimension collapsing will be performed.
-    If `collapse` is None dimension collapsing will be perform if some
-    arguments are non-contiguous.
+    If `collapse` is None dimension collapsing will be performed if
+    some arguments are non-contiguous.
     If `collapse` is False dimension collapsing will not be performed.
 
-    `broadcast` is untested and should be left to the default value (False).
+    If `broadcast` is True array broadcasting will be performed which
+    means that dimensions which are of size 1 in some arrays but not
+    others will be repeated to match the size of the other arrays.
+    If `broadcast` is False no broadcasting takes place.
     """
     arrays = []
     strs = []
@@ -105,6 +108,7 @@ def check_args(args, collapse=False, broadcast=False):
             for i, d in enumerate(shp):
                 if dims[i] != d and dims[i] == 1:
                     dims[i] = d
+                    n *= d
         tdims = tuple(dims)
 
     for i, ary in enumerate(arrays):
