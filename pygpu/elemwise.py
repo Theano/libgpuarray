@@ -419,7 +419,7 @@ class ElemwiseKernel(object):
         except KeyError:
             if dims == self._dims:
                 if self._dimcall > self._dimspec_limit:
-                    return self.get_dimspec(args, nd, dims, strs, offsets), n
+                    return self.get_dimspec(args, n, nd, dims, strs, offsets), n
                 self._dimcall += 1
             else:
                 self._dims = dims
