@@ -135,9 +135,10 @@ def check_args(args, collapse=False, broadcast=False):
     contig = c_contig or f_contig
 
     if not contig and collapse is None:
-        # make the strides and dims editable
-        dims = list(dims)
-        strs = [list(str) if str is not None else str for str in strs]
+        # make the strides and dims editable if needed
+        if type(dims) is not list:
+            dims = list(dims)
+            strs = [list(str) if str is not None else str for str in strs]
         collapse = True
 
     if nd > 1 and collapse:
