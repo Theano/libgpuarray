@@ -118,8 +118,8 @@ def check_args(args, collapse=False, broadcast=False):
         f_contig = f_contig and fl['F_CONTIGUOUS']
         if tdims != shp:
             if broadcast:
-                # we checked for matching order in the
-                # broadcast preparation loop above
+                if len(shp) != len(dims):
+                    raise ValueError("Array order differs")
                 for j, d in enumerate(shp):
                     if dims[j] != d:
                         # Might want to add a per-dimension enable mechanism
