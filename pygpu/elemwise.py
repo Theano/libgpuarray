@@ -428,14 +428,7 @@ class ElemwiseKernel(object):
         return self.get_basic(args, n, nd, dims, strs, offsets), n
 
     def prepare(self, *args, **kwargs):
-        collapse = kwargs.pop('collapse', None)
-        broadcast = kwargs.pop('broadcast', False)
-        if len(kwargs) != 0:
-            raise TypeError("prepare() got an unexpected "
-                            "keywork argument '%s'" % (kwargs.keys()[0]))
-        n, nd, dims, strs, offsets, contig = check_args(args,
-                                                        collapse=collapse,
-                                                        broadcast=broadcast)
+        n, nd, dims, strs, offsets, contig = check_args(args, **kwargs)
         if contig:
             args = self.prepare_args_contig(args, n, offsets)
             self._prepare_k = self.contig_k
@@ -450,13 +443,7 @@ class ElemwiseKernel(object):
         self._prepare_k.call(self._prepare_n, 0, 0)
 
     def __call__(self, *args, **kwargs):
-        collapse = kwargs.pop('collapse', None)
-        broadcast = kwargs.pop('broadcast', False)
-        if len(kwargs) != 0:
-            raise TypeError("__call__() got an unexpected "
-                            "keywork argument '%s'" % (kwargs.keys()[0]))
-        (k, args), n = self.select_kernel(args, collapse=collapse,
-                                          broadcast=broadcast)
+        (k, args), n = self.select_kernel(args, **kwargs)
         k(*args, n=n)
 
     def call_contig(self, *args):
@@ -467,35 +454,17 @@ class ElemwiseKernel(object):
         self.contig_k(*self.prepare_args_contig(args, n, offsets), n=n)
 
     def call_basic(self, *args, **kwargs):
-        collapse = kwargs.pop('collapse', True)
-        broadcast = kwargs.pop('broadcast', False)
-        if len(kwargs) != 0:
-            raise TypeError("call_dimspec() got an unexpected "
-                            "keywork argument '%s'" % (kwargs.keys()[0]))
-        n, nd, dims, strs, offsets, _ = check_args(args, collapse=collapse,
-                                                   broadcast=broadcast)
+        n, nd, dims, strs, offsets, _ = check_args(args, **kwargs)
         k, args = self.get_basic(args, n, nd, dims, strs, offsets)
         k(*args, n=n)
 
     def call_dimspec(self, *args, **kwargs):
-        collapse = kwargs.pop('collapse', True)
-        broadcast = kwargs.pop('broadcast', False)
-        if len(kwargs) != 0:
-            raise TypeError("call_dimspec() got an unexpected "
-                            "keywork argument '%s'" % (kwargs.keys()[0]))
-        n, nd, dims, strs, offsets, _ = check_args(args, collapse=collapse,
-                                                   broadcast=broadcast)
+        n, nd, dims, strs, offsets, _ = check_args(args, **kwargs)
         k, args = self.get_dimspec(args, n, nd, dims, strs, offsets)
         k(*args, n=n)
 
     def call_specialized(self, *args, **kwargs):
-        collapse = kwargs.pop('collapse', True)
-        broadcast = kwargs.pop('broadcast', False)
-        if len(kwargs) != 0:
-            raise TypeError("call_dimspec() got an unexpected "
-                            "keywork argument '%s'" % (kwargs.keys()[0]))
-        n, nd, dims, strs, offsets, _ = check_args(args, collapse=collapse,
-                                                   broadcast=broadcast)
+        n, nd, dims, strs, offsets, _ = check_args(args, **kwargs)
         k, args = self.get_specialized(args, n, nd, dims, strs, offsets)
         k(*args, n=n)
 
