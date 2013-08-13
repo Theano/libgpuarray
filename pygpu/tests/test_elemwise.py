@@ -4,6 +4,7 @@ import numpy
 from pygpu import gpuarray
 from pygpu.array import gpuarray as elemary
 from pygpu.elemwise import ElemwiseKernel
+from pygpu.tools import check_args, ArrayArg, ScalarArg
 
 from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
                       context, gen_gpuarray, dtypes_no_complex,
@@ -294,6 +295,7 @@ def test_broadcast():
                            ((), ())]:
         yield broadcast, shapea, shapeb
 
+
 def broadcast(shapea, shapeb):
     ac, ag = gen_gpuarray(shapea, 'float32', ctx=context, cls=elemary)
     bc, bg = gen_gpuarray(shapeb, 'float32', ctx=context, cls=elemary)
@@ -302,3 +304,117 @@ def broadcast(shapea, shapeb):
     rg = ag + bg
 
     check_meta_content(rg, rc)
+
+
+def test_elemwise_collapse():
+    for dtype1 in dtypes_no_complex:
+        for dtype2 in dtypes_no_complex:
+            for shape1, shape2, expected in [
+                # 1d to test this special case
+                ((40,), (40,), 1),
+                ((40,), (1,), 1),
+                # No broadcastable dimensions
+                ((4, 5, 6, 9), (4, 5, 6, 9), 1),
+                # All inputs have one(and the same) broadcastable dimension
+                ((1, 4, 5, 9), (1, 4, 5, 9), 1),
+                ((4, 1, 5, 9), (4, 1, 5, 9), 1),
+                ((4, 5, 1, 9), (4, 5, 1, 9), 1),
+                ((4, 5, 9, 1), (4, 5, 9, 1), 1),
+                # One inputs have one broadcastable dimension
+                ((1, 5, 6, 9), (4, 5, 6, 9), 2),
+                ((4, 1, 6, 9), (4, 5, 6, 9), 3),
+                ((4, 5, 1, 9), (4, 5, 6, 9), 3),
+                ((4, 5, 6, 1), (4, 5, 6, 9), 2),
+                # One inputs have two broadcastable dimension
+                ((1, 1, 6, 9), (4, 5, 6, 9), 2),
+                ((1, 5, 1, 9), (4, 5, 6, 9), 4),
+                ((1, 5, 6, 1), (4, 5, 6, 9), 3),
+                ((4, 1, 1, 9), (4, 5, 6, 9), 3),
+                ((4, 1, 6, 1), (4, 5, 6, 9), 4),
+                ((4, 5, 1, 1), (4, 5, 6, 9), 2),
+                # One inputs have tree broadcastable dimension
+                ((1, 1, 1, 9), (4, 5, 6, 9), 2),
+                ((1, 1, 6, 1), (4, 5, 6, 9), 3),
+                ((1, 5, 1, 1), (4, 5, 6, 9), 3),
+                ((4, 1, 1, 1), (4, 5, 6, 9), 2),
+                # One scalar
+                ((1, 1, 1, 1), (4, 5, 6, 9), 1),
+                # One scalar, the other 1 broadcast dims
+                ((1, 1, 1, 1), (4, 5, 6, 1), 1),
+                ]:
+                yield elemwise_collapse, dtype1, dtype2, shape1, shape2, \
+                    expected
+
+
+def elemwise_collapse(dtype1, dtype2, shape1, shape2, expected):
+    assert len(shape1) == len(shape2)
+
+    # int8 does not cause problematic upcasts
+    scalar = numpy.asarray(1, dtype='int8')
+
+    a_cpu, a_gpu = gen_gpuarray(shape1, dtype1, ctx=context)
+    b_cpu, b_gpu = gen_gpuarray(shape2, dtype2, ctx=context)
+
+    o_shape = []
+    for i in range(len(shape1)):
+        o_shape.append(max(shape1[i], shape2[i]))
+
+    o = gpuarray.empty(o_shape, dtype=(a_cpu + b_cpu).dtype, context=context)
+
+    n, nd, dims, strs, offsets, contig = check_args((a_gpu, b_gpu),
+                                                    collapse=True,
+                                                    broadcast=True)
+
+    assert nd == expected, (shape1, shape2, dims, nd, expected)
+
+    k = ElemwiseKernel(context, [ArrayArg(numpy.dtype(dtype1), 'a'),
+                                 ArrayArg(numpy.dtype(dtype2), 'b'),
+                                 ArrayArg(o.dtype, 'o')], "o[i] = a[i] + b[i]")
+    out_cpu = a_cpu + b_cpu
+    k(a_gpu, b_gpu, o, collapse=True, broadcast=True)
+
+    assert numpy.allclose(numpy.asarray(o), out_cpu)
+
+    k(a_gpu, b_gpu, o, collapse=False, broadcast=True)
+
+    assert numpy.allclose(numpy.asarray(o), out_cpu)
+
+    broadcast = any([True for i in shape1 + shape2
+                     if i == 1])
+
+    n, nd, dims, strs, offsets, contig = check_args((a_gpu, b_gpu, scalar),
+                                                    collapse=True,
+                                                    broadcast=True)
+    assert nd == expected
+
+    k = ElemwiseKernel(context, [ArrayArg(numpy.dtype(dtype1), 'a'),
+                                 ArrayArg(numpy.dtype(dtype2), 'b'),
+                                 ScalarArg(scalar.dtype, 's'),
+                                 ArrayArg(o.dtype, 'o')],
+                       "o[i] = a[i] + b[i] + s")
+    out_cpu = a_cpu + b_cpu + scalar
+    k(a_gpu, b_gpu, scalar, o, collapse=True, broadcast=True)
+
+    assert numpy.allclose(numpy.asarray(o), out_cpu)
+
+    k(a_gpu, b_gpu, scalar, o, collapse=False, broadcast=True)
+
+    assert numpy.allclose(numpy.asarray(o), out_cpu)
+
+    if expected == 1:
+        expected2 = 2
+    else:
+        expected2 = expected
+
+    if len(shape1) != 4:
+        return
+
+    if shape1[0] != 1:
+        c_cpu, c_gpu = gen_gpuarray(shape1, dtype=dtype1, sliced=2, ctx=context)
+        n, nd, dims, strs, offsets,contig = check_args((c_gpu, b_gpu),
+                                                       collapse=True,
+                                                       broadcast=True)
+        if broadcast:
+            assert nd >= expected
+        else:
+            assert nd == expected2
