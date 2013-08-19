@@ -837,7 +837,7 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
         free(cstrides)
     return res
 
-def array(proto, dtype=None, copy=True, order=None, ndmin=0,
+def array(proto, dtype=None, copy=True, order=None, int ndmin=0,
           GpuContext context=None, cls=None):
     """
     array(obj, dtype='float64', copy=True, order=None, ndmin=0, context=None, cls=None)
@@ -884,15 +884,17 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0,
 
         if (not copy
             and (dtype is None or dtype_to_typecode(dtype) == arg.typecode)
-            and (arg.ga.nd >= ndmin)
             and (order is None or order == 'A' or
                  (order == 'C' and py_CHKFLAGS(arg, GA_C_CONTIGUOUS)) or
                  (order == 'F' and py_CHKFLAGS(arg, GA_F_CONTIGUOUS)))):
-            if cls is None or arg.__class__ is cls:
-                return arg
-            else:
-                return arg.view(cls)
-
+            if arg.ga.nd < ndmin:
+                shp = arg.shape
+                idx = (1,)*(ndmin-len(shp))
+                shp = idx + shp
+                arg = arg.reshape(shp)
+            if not (cls is None or arg.__class__ is cls):
+                arg = arg.view(cls)
+            return arg
         shp = arg.shape
         if len(shp) < ndmin:
             idx = (1,)*(ndmin-len(shp))
@@ -915,8 +917,7 @@ def array(proto, dtype=None, copy=True, order=None, ndmin=0,
 
     context = ensure_context(context)
 
-    a = numpy.array(proto, dtype=dtype, order=order, ndmin=ndmin,
-                    copy=False)
+    a = numpy.array(proto, dtype=dtype, order=order, ndmin=ndmin, copy=False)
 
     if not np.PyArray_ISONESEGMENT(a):
         a = np.PyArray_GETCONTIGUOUS(a)
@@ -1336,10 +1337,7 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
         cdef GpuArray tmp = self.__getitem__(idx)
         cdef GpuArray gv
 
-        if isinstance(v, GpuArray):
-            gv = <GpuArray>v
-        else:
-            gv = array(v, dtype=self.dtype, context=self.context)
+        gv = array(v, context=self.context, copy=False, ndmin=self.ga.nd)
 
         array_setarray(tmp, gv)
 
