@@ -349,6 +349,25 @@ COMPYTE_PUBLIC int GpuArray_setarray(GpuArray *a, GpuArray *v);
 COMPYTE_PUBLIC int GpuArray_reshape(GpuArray *res, GpuArray *a,
                                     unsigned int nd, size_t *newdims,
                                     ga_order ord, int nocopy);
+
+/**
+ * Rearrange the axes of an array.
+ *
+ * Return a new array with its shape and strides swapped accordingly
+ * to the `new_axes` parameter.  If `new_axes` is NULL then the order
+ * is reversed.  The returned array is a view on the data of the old
+ * one.
+ *
+ * \param res the result array
+ * \param a the source array
+ * \param new_axes either NULL or a list of a->nd elements
+ *
+ * \return GA_NO_ERROR if the operation was successful.
+ * \return an error code otherwise
+ */
+COMPYTE_PUBLIC int GpuArray_transpose(GpuArray *res, GpuArray *a,
+                                      unsigned int *new_axes);
+
 /**
  * Relase all device and host memory associated with `a`.
  *

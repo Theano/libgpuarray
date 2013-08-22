@@ -255,7 +255,7 @@ int GpuArray_setarray(GpuArray *a, GpuArray *v) {
 }
 
 int GpuArray_reshape(GpuArray *res, GpuArray *a, unsigned int nd,
-                      size_t *newdims, ga_order ord, int nocopy) {
+                     size_t *newdims, ga_order ord, int nocopy) {
   ssize_t *newstrides;
   size_t np;
   size_t op;
@@ -408,6 +408,35 @@ int GpuArray_reshape(GpuArray *res, GpuArray *a, unsigned int nd,
     res->flags |= GA_F_CONTIGUOUS;
   else
     res->flags &= ~GA_F_CONTIGUOUS;
+  return GA_NO_ERROR;
+}
+
+int GpuArray_transpose(GpuArray *res, GpuArray *a, unsigned int *new_axes) {
+  unsigned int i;
+  unsigned int j;
+
+  res->ops = a->ops;
+  res->data = a->data;
+  res->offset = a->offset;
+  res->nd = a->nd;
+  res->flags = a->flags & ~GA_OWNDATA;
+  res->typecode = a->typecode;
+  res->dimensions = calloc(res->nd, sizeof(size_t));
+  res->strides = calloc(res->nd, sizeof(ssize_t));
+  if (res->dimensions == NULL || res->strides == NULL) {
+    GpuArray_clear(res);
+    return GA_MEMORY_ERROR;
+  }
+
+  for (i = 0; i < res->nd; i++) {
+    if (new_axes == NULL) {
+      j = res->nd - i - 1;
+    } else {
+      j = new_axes[i];
+    }
+    res->dimensions[i] = a->dimensions[j];
+    res->strides[i] = a->strides[i];
+  }
   return GA_NO_ERROR;
 }
 
