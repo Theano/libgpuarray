@@ -19,6 +19,14 @@ def product(*args, **kwds):
     for prod in result:
         yield tuple(prod)
 
+def permutations(elements):
+    if len(elements) <= 1:
+        yield elements
+    else:
+        for perm in permutations(elements[1:]):
+            for i in range(len(elements)):
+                yield perm[:i] + elements[:1] + perm[i:]
+
 
 def test_hash():
     g = gpu_ndarray.empty((2, 3), context=ctx)
@@ -381,6 +389,43 @@ def reshape(shps, offseted, order1, order2):
     assert outc.shape == outg.shape
     assert outc.strides == outg.strides
     assert numpy.allclose(outc, numpy.asarray(outg))
+
+
+def test_transpose():
+    for shp in [(2, 3), (4, 8, 9), (1, 2, 3, 4)]:
+        for offseted in [True, False]:
+            for order in ['c', 'f']:
+                for sliced in [1, 2, -2, -1]:
+                    yield transpose, shp, offseted, sliced, order
+                    for perm in permutations(range(len(shp))):
+                        yield transpose_perm, shp, perm, offseted, sliced, order
+
+
+def transpose(shp, offseted, sliced, order):
+    ac, ag = gen_gpuarray(shp, 'float32', offseted, sliced=sliced,
+                          order=order, ctx=ctx)
+    rc = ac.transpose()
+    rg = ag.transpose()
+
+    assert numpy.all(rc == numpy.asarray(rg))
+
+
+def transpose_perm(shp, perm, offseted, sliced, order):
+    ac, ag = gen_gpuarray(shp, 'float32', offseted, sliced=sliced,
+                          order=order, ctx=ctx)
+    rc = ac.transpose(perm)
+    rg = ag.transpose(perm)
+
+    assert numpy.all(rc == numpy.asarray(rg))
+
+
+def test_transpose_args():
+    ac, ag = gen_gpuarray((4, 3, 2), 'float32', ctx=ctx)
+
+    rc = ac.transpose(0, 2, 1)
+    rg = ag.transpose(0, 2, 1)
+
+    assert numpy.all(rc == numpy.asarray(rg))
 
 
 def test_len():

@@ -149,6 +149,8 @@ cdef extern from "compyte/array.h":
     int GpuArray_setarray(_GpuArray *v, _GpuArray *a)
     int GpuArray_reshape(_GpuArray *res, _GpuArray *a, unsigned int nd,
                          size_t *newdims, ga_order ord, int nocopy)
+    int GpuArray_transpose(_GpuArray *res, _GpuArray *a,
+                           unsigned int *new_axes)
 
     void GpuArray_clear(_GpuArray *a)
 
@@ -453,6 +455,12 @@ cdef array_reshape(GpuArray res, GpuArray a, unsigned int nd, size_t *newdims,
                    ga_order ord, int nocopy):
     cdef int err
     err = GpuArray_reshape(&res.ga, &a.ga, nd, newdims, ord, nocopy)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(GpuArray_error(&a.ga, err), err)
+
+cdef array_transpose(GpuArray res, GpuArray a, unsigned int *new_axes):
+    cdef int err
+    err = GpuArray_transpose(&res.ga, &a.ga, new_axes)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
@@ -1262,6 +1270,31 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
                 res.base = self.base
             else:
                 res.base = self
+        return res
+
+    def transpose(self, *params):
+        cdef GpuArray res
+        cdef unsigned int *new_axes
+        cdef unsigned int i
+        if len(params) is 1 and isinstance(params[0], (tuple, list)):
+            params = params[0]
+        res = new_GpuArray(self.__class__, self.context)
+        if params is ():
+            array_transpose(res, self, NULL)
+        else:
+            if len(params) != self.ga.nd:
+                raise ValueError("axes don't match")
+            new_axes = <unsigned int *>calloc(self.ga.nd, sizeof(unsigned int))
+            try:
+                for i in range(self.ga.nd):
+                    new_axes[i] = params[i]
+                array_transpose(res, self, new_axes)
+            finally:
+                free(new_axes)
+        if self.base is not None:
+            res.base = self.base
+        else:
+            res.base = self
         return res
 
     def __len__(self):
