@@ -414,12 +414,13 @@ int GpuArray_reshape(GpuArray *res, GpuArray *a, unsigned int nd,
 int GpuArray_transpose(GpuArray *res, GpuArray *a, unsigned int *new_axes) {
   unsigned int i;
   unsigned int j;
+  unsigned int k;
 
   res->ops = a->ops;
   res->data = a->data;
   res->offset = a->offset;
   res->nd = a->nd;
-  res->flags = a->flags & ~GA_OWNDATA;
+  res->flags = a->flags & ~(GA_OWNDATA|GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
   res->typecode = a->typecode;
   res->dimensions = calloc(res->nd, sizeof(size_t));
   res->strides = calloc(res->nd, sizeof(ssize_t));
@@ -433,10 +434,26 @@ int GpuArray_transpose(GpuArray *res, GpuArray *a, unsigned int *new_axes) {
       j = res->nd - i - 1;
     } else {
       j = new_axes[i];
+      // Repeated axes will lead to a broken output
+      for (k = 0; k < i; k++)
+        if (j == new_axes[k]) {
+          GpuArray_clear(res);
+          return GA_VALUE_ERROR;
+        }
     }
     res->dimensions[i] = a->dimensions[j];
-    res->strides[i] = a->strides[i];
+    res->strides[i] = a->strides[j];
   }
+  if (new_axes == NULL) {
+    if (a->flags & GA_C_CONTIGUOUS) res->flags &= GA_F_CONTIGUOUS;
+    if (a->flags & GA_F_CONTIGUOUS) res->flags &= GA_C_CONTIGUOUS;
+  } else {
+  if (GpuArray_is_c_contiguous(res))
+    res->flags |= GA_C_CONTIGUOUS;
+  if (GpuArray_is_f_contiguous(res))
+    res->flags |= GA_F_CONTIGUOUS;
+  }
+
   return GA_NO_ERROR;
 }
 
