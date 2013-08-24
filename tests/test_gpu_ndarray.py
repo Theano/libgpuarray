@@ -182,7 +182,7 @@ def asfortranarray(shp, dtype, offseted_outer, offseted_inner, sliced, order):
         (order != 'f' and len(shp) > 1)):
         assert b is not gpu
         if (sliced == 1 and not offseted_outer and order != 'c'):
-            assert ((a.data is cpu.data) ==
+            assert ((a.data == cpu.data) ==
                     (b.gpudata == gpu.gpudata))
     else:
         assert b is gpu
