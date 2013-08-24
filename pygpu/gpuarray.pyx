@@ -345,6 +345,11 @@ cdef public np.dtype typecode_to_dtype(int typecode):
     else:
         raise NotImplementedError("TODO")
 
+# This is a stupid wrapper to avoid the extra argument introduced by having
+# dtype_to_typecode declared 'cpdef'.
+cdef public int get_typecode(dtype) except -1:
+    return dtype_to_typecode(dtype)
+
 cpdef int dtype_to_typecode(dtype) except -1:
     """
     dtype_to_typecode(dtype)
