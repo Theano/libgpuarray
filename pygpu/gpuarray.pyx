@@ -1,176 +1,16 @@
 cimport libc.stdio
 from libc.stdlib cimport malloc, calloc, free
 
-# This is used in a hack to silence some over-eager warnings.
-cdef extern from *:
-    ctypedef object slice_object "PySliceObject *"
-    ctypedef char **const_char_pp "const char **"
-    ctypedef char *const_char_p "const char *"
-
-cdef extern from "stdlib.h":
-    void *memcpy(void *dst, void *src, size_t n)
-    void *memset(void *b, int c, size_t sz)
-
 cimport numpy as np
 
 from cpython cimport Py_INCREF, PyNumber_Index
 
 np.import_array()
 
-cdef extern from "numpy/arrayobject.h":
-    object _PyArray_Empty "PyArray_Empty" (int, np.npy_intp *, np.dtype, int)
-
 # Numpy API steals dtype references and this breaks cython
 cdef object PyArray_Empty(int a, np.npy_intp *b, np.dtype c, int d):
     Py_INCREF(c)
     return _PyArray_Empty(a, b, c, d)
-
-cdef extern from "Python.h":
-    int PySlice_GetIndicesEx(slice_object slice, Py_ssize_t length,
-                             Py_ssize_t *start, Py_ssize_t *stop,
-                             Py_ssize_t *step,
-                             Py_ssize_t *slicelength) except -1
-
-cdef extern from "compyte/types.h":
-    ctypedef struct compyte_type:
-        const_char_p cluda_name
-        size_t size
-        size_t align
-        int typecode
-
-    enum COMPYTE_TYPES:
-        GA_BOOL,
-        GA_BYTE,
-        GA_UBYTE,
-        GA_SHORT,
-        GA_USHORT,
-        GA_INT,
-        GA_UINT,
-        GA_LONG,
-        GA_ULONG,
-        GA_FLOAT,
-        GA_DOUBLE,
-        GA_CFLOAT,
-        GA_CDOUBLE,
-        GA_NBASE
-
-cdef extern from "compyte/util.h":
-    int compyte_register_type(compyte_type *t, int *ret)
-    size_t compyte_get_elsize(int typecode)
-    compyte_type *compyte_get_type(int typecode)
-
-cdef extern from "compyte/error.h":
-    cdef enum ga_error:
-        GA_NO_ERROR, GA_MEMORY_ERROR, GA_VALUE_ERROR, GA_IMPL_ERROR,
-        GA_INVALID_ERROR, GA_UNSUPPORTED_ERROR, GA_SYS_ERROR, GA_RUN_ERROR
-
-cdef extern from "compyte/buffer.h":
-    ctypedef struct gpudata:
-        pass
-    ctypedef struct gpukernel:
-        pass
-
-    ctypedef struct compyte_buffer_ops:
-        void *buffer_init(int devno, int *ret)
-        void buffer_deinit(void *ctx)
-        char *buffer_error(void *ctx)
-        int buffer_property(void *c, gpudata *b, gpukernel *k, int prop_id,
-                            void *res)
-
-    int GA_CTX_PROP_DEVNAME
-    int GA_CTX_PROP_MAXLSIZE
-    int GA_CTX_PROP_LMEMSIZE
-    int GA_CTX_PROP_NUMPROCS
-    int GA_BUFFER_PROP_CTX
-    int GA_KERNEL_PROP_CTX
-    int GA_KERNEL_PROP_MAXLSIZE
-    int GA_KERNEL_PROP_PREFLSIZE
-    int GA_KERNEL_PROP_MAXGSIZE
-
-    cdef enum ga_usefl:
-        GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF
-
-    char *Gpu_error(compyte_buffer_ops *o, void *ctx, int err)
-    compyte_buffer_ops *compyte_get_ops(const_char_p) nogil
-
-cdef extern from "compyte/kernel.h":
-    ctypedef struct _GpuKernel "GpuKernel":
-        gpukernel *k
-        compyte_buffer_ops *ops
-
-    int GpuKernel_init(_GpuKernel *k, compyte_buffer_ops *ops, void *ctx,
-                       unsigned int count, char **strs, size_t *lens,
-                       char *name, int flags)
-    void GpuKernel_clear(_GpuKernel *k)
-    void *GpuKernel_context(_GpuKernel *k)
-    int GpuKernel_setarg(_GpuKernel *k, unsigned int index, int typecode,
-                         void *arg)
-    int GpuKernel_setbufarg(_GpuKernel *k, unsigned int index,
-                            _GpuArray *a)
-    int GpuKernel_call(_GpuKernel *, size_t n, size_t ls, size_t gs)
-
-cdef extern from "compyte/array.h":
-    ctypedef struct _GpuArray "GpuArray":
-        gpudata *data
-        compyte_buffer_ops *ops
-        size_t offset
-        size_t *dimensions
-        ssize_t *strides
-        unsigned int nd
-        int flags
-        int typecode
-
-
-    cdef int GA_C_CONTIGUOUS
-    cdef int GA_F_CONTIGUOUS
-    cdef int GA_OWNDATA
-    cdef int GA_ENSURECOPY
-    cdef int GA_ALIGNED
-    cdef int GA_WRITEABLE
-    cdef int GA_BEHAVED
-    cdef int GA_CARRAY
-    cdef int GA_FARRAY
-
-    bint GpuArray_CHKFLAGS(_GpuArray *a, int fl)
-    bint GpuArray_ISONESEGMENT(_GpuArray *a)
-
-    ctypedef enum ga_order:
-        GA_ANY_ORDER, GA_C_ORDER, GA_F_ORDER
-
-    int GpuArray_empty(_GpuArray *a, compyte_buffer_ops *ops, void *ctx,
-                       int typecode, int nd, size_t *dims, ga_order ord)
-    int GpuArray_fromdata(_GpuArray *a, compyte_buffer_ops *ops, gpudata *data,
-                          size_t offset, int typecode, unsigned int nd, size_t *dims,
-                          ssize_t *strides, int writable)
-    int GpuArray_view(_GpuArray *v, _GpuArray *a)
-    int GpuArray_sync(_GpuArray *a)
-    int GpuArray_index(_GpuArray *r, _GpuArray *a, ssize_t *starts,
-                       ssize_t *stops, ssize_t *steps)
-    int GpuArray_setarray(_GpuArray *v, _GpuArray *a)
-    int GpuArray_reshape(_GpuArray *res, _GpuArray *a, unsigned int nd,
-                         size_t *newdims, ga_order ord, int nocopy)
-    int GpuArray_transpose(_GpuArray *res, _GpuArray *a,
-                           unsigned int *new_axes)
-
-    void GpuArray_clear(_GpuArray *a)
-
-    int GpuArray_share(_GpuArray *a, _GpuArray *b)
-    void *GpuArray_context(_GpuArray *a)
-
-    int GpuArray_move(_GpuArray *dst, _GpuArray *src)
-    int GpuArray_write(_GpuArray *dst, void *src, size_t src_sz)
-    int GpuArray_read(void *dst, size_t dst_sz, _GpuArray *src)
-    int GpuArray_memset(_GpuArray *a, int data)
-    int GpuArray_copy(_GpuArray *res, _GpuArray *a, ga_order order)
-
-    char *GpuArray_error(_GpuArray *a, int err)
-
-    void GpuArray_fprintf(libc.stdio.FILE *fd, _GpuArray *a)
-    int GpuArray_is_c_contiguous(_GpuArray *a)
-    int GpuArray_is_f_contiguous(_GpuArray *a)
-
-cdef extern from "compyte/extension.h":
-    void *compyte_get_extension(const_char_p) nogil
 
 cdef object call_compiler_fn = None
 
@@ -965,9 +805,6 @@ cdef public class GpuContext [type GpuContextType, object GpuContextObject]:
 
     If you want an alternative interface check :meth:`~pygpu.gpuarray.init`.
     """
-    cdef compyte_buffer_ops *ops
-    cdef void* ctx
-
     def __dealloc__(self):
         if self.ctx != NULL:
             self.ops.buffer_deinit(self.ctx)
@@ -1065,11 +902,6 @@ cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
     fields before using it or you will most likely crash the
     interpreter.
     """
-    cdef _GpuArray ga
-    cdef readonly GpuContext context
-    cdef readonly object base
-    cdef object __weakref__
-
     def __dealloc__(self):
         array_clear(self)
 
@@ -1549,8 +1381,6 @@ cdef class GpuKernel:
     If you choose to use this interface, make sure to stay within the
     limits of `k.maxlsize` and `k.maxgsize` or the call will fail.
     """
-    cdef _GpuKernel k
-
     def __dealloc__(self):
         kernel_clear(self)
 
