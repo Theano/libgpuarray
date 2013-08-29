@@ -164,7 +164,8 @@ cdef extern from "compyte/array.h":
 cdef extern from "compyte/extension.h":
     void *compyte_get_extension(const_char_p) nogil
 
-cdef public np.dtype typecode_to_dtype(int typecode)
+cdef api np.dtype typecode_to_dtype(int typecode)
+cdef api int get_typecode(dtype) except -1
 cpdef int dtype_to_typecode(dtype) except -1
 
 cdef ga_order to_ga_order(ord) except <ga_order>-2
@@ -205,20 +206,20 @@ cdef kernel_setbufarg(GpuKernel k, unsigned int index, GpuArray a)
 cdef kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs)
 cdef kernel_property(GpuKernel k, int prop_id, void *res)
 
-cdef public GpuContext GpuArray_default_context
+cdef api GpuContext get_default_context()
 
 cdef ctx_property(GpuContext c, int prop_id, void *res)
 cdef compyte_buffer_ops *get_ops(kind) except NULL
 cdef ops_kind(compyte_buffer_ops *ops)
 cdef GpuContext ensure_context(GpuContext c)
 
-cdef public class GpuContext [type GpuContextType, object GpuContextObject]:
+cdef api class GpuContext [type GpuContextType, object GpuContextObject]:
     cdef compyte_buffer_ops *ops
     cdef void* ctx
 
-cdef public GpuArray new_GpuArray(cls, GpuContext ctx)
+cdef api GpuArray new_GpuArray(cls, GpuContext ctx)
 
-cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
+cdef api class GpuArray [type GpuArrayType, object GpuArrayObject]:
     cdef _GpuArray ga
     cdef readonly GpuContext context
     cdef readonly object base

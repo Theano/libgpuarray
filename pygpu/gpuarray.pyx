@@ -178,7 +178,7 @@ def register_dtype(np.dtype dtype, cname):
     NP_TO_TYPE[dtype] = typecode
     TYPE_TO_NP[typecode] = dtype
 
-cdef public np.dtype typecode_to_dtype(int typecode):
+cdef np.dtype typecode_to_dtype(int typecode):
     res = TYPE_TO_NP.get(typecode, None)
     if res is not None:
         return res
@@ -187,7 +187,7 @@ cdef public np.dtype typecode_to_dtype(int typecode):
 
 # This is a stupid wrapper to avoid the extra argument introduced by having
 # dtype_to_typecode declared 'cpdef'.
-cdef public int get_typecode(dtype) except -1:
+cdef int get_typecode(dtype) except -1:
     return dtype_to_typecode(dtype)
 
 cpdef int dtype_to_typecode(dtype) except -1:
@@ -389,7 +389,10 @@ cdef kernel_property(GpuKernel k, int prop_id, void *res):
     if err != GA_NO_ERROR:
         raise GpuArrayException(kernel_error(k, err), err)
 
-cdef public GpuContext GpuArray_default_context = None
+cdef GpuContext get_default_context():
+    return default_context
+
+cdef GpuContext default_context = None
 
 cdef ctx_property(GpuContext c, int prop_id, void *res):
     cdef int err
@@ -432,14 +435,14 @@ def set_default_context(GpuContext ctx):
     context. It is strongly discouraged to use this function when
     working with multiple contexts at once.
     """
-    global GpuArray_default_context
-    GpuArray_default_context = ctx
+    global default_context
+    default_context = ctx
 
 cdef GpuContext ensure_context(GpuContext c):
     if c is None:
-        if GpuArray_default_context is None:
+        if default_context is None:
             raise TypeError("No context specified.")
-        return GpuArray_default_context
+        return default_context
     return c
 
 def init(dev):
@@ -786,7 +789,7 @@ def array(proto, dtype=None, copy=True, order=None, int ndmin=0,
     array_write(res, np.PyArray_DATA(a), np.PyArray_NBYTES(a))
     return res
 
-cdef public class GpuContext [type GpuContextType, object GpuContextObject]:
+cdef class GpuContext:
     """
     Class that holds all the information pertaining to a context.
 
@@ -871,7 +874,7 @@ cdef public class GpuContext [type GpuContextType, object GpuContextObject]:
             ctx_property(self, GA_CTX_PROP_NUMPROCS, &res)
             return res
 
-cdef public GpuArray new_GpuArray(cls, GpuContext ctx):
+cdef GpuArray new_GpuArray(cls, GpuContext ctx):
     cdef GpuArray res
     if ctx is None:
         raise RuntimeError("ctx is None in new_GpuArray")
@@ -883,7 +886,7 @@ cdef public GpuArray new_GpuArray(cls, GpuContext ctx):
     res.context = ctx
     return res
 
-cdef public class GpuArray [type GpuArrayType, object GpuArrayObject]:
+cdef class GpuArray:
     """
     Device array
 
