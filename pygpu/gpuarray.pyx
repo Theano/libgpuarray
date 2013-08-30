@@ -14,7 +14,7 @@ cdef object PyArray_Empty(int a, np.npy_intp *b, np.dtype c, int d):
 
 cdef object call_compiler_fn = None
 
-cdef void *call_compiler_python(const_char_p src, size_t sz,
+cdef void *call_compiler_python(const char *src, size_t sz,
                                 int *ret) with gil:
     cdef bytes res
     cdef void *buf
@@ -35,7 +35,7 @@ cdef void *call_compiler_python(const_char_p src, size_t sz,
             ret[0] = GA_RUN_ERROR
         return NULL
 
-ctypedef void *(*comp_f)(const_char_p, size_t, int*)
+ctypedef void *(*comp_f)(const char *, size_t, int*)
 
 def set_cuda_compiler_fn(fn):
     """
@@ -221,7 +221,7 @@ def dtype_to_ctype(dtype):
     :rtype: string
     """
     cdef int typecode = dtype_to_typecode(dtype)
-    cdef compyte_type *t = compyte_get_type(typecode)
+    cdef const compyte_type *t = compyte_get_type(typecode)
     if t.cluda_name == NULL:
         raise ValueError("No mapping for %s"%(dtype,))
     return t.cluda_name
@@ -348,11 +348,11 @@ cdef array_copy(GpuArray res, GpuArray a, ga_order order):
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
-cdef const_char_p kernel_error(GpuKernel k, int err):
+cdef const char *kernel_error(GpuKernel k, int err):
     return Gpu_error(k.k.ops, kernel_context(k), err)
 
 cdef kernel_init(GpuKernel k, compyte_buffer_ops *ops, void *ctx,
-                 unsigned int count, const_char_pp strs, size_t *len,
+                 unsigned int count, const char **strs, size_t *len,
                  char *name, int flags):
     cdef int err
     err = GpuKernel_init(&k.k, ops, ctx, count, strs, len, name, flags)
@@ -1397,7 +1397,7 @@ cdef class GpuKernel:
     def __cinit__(self, source, name, GpuContext context=None, cluda=True,
                   have_double=False, have_small=False, have_complex=False,
                   have_half=False, *a, **kwa):
-        cdef const_char_p s[1]
+        cdef const char *s[1]
         cdef size_t l
         cdef compyte_buffer_ops *ops
         cdef int flags = 0
@@ -1440,10 +1440,10 @@ cdef class GpuKernel:
         :param args: kernel arguments
         :type args: tuple or list
         """
-        cdef int i
+        cdef unsigned int i
         # Work backwards to avoid a lot of reallocations in the argument code.
-        for i in range(len(args)-1, -1, -1):
-            self.setarg(i, args[i])
+        for i in range(len(args), 0, -1):
+            self.setarg(i-1, args[i-1])
 
     cpdef setarg(self, unsigned int index, o):
         """

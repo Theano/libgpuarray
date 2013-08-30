@@ -3,8 +3,6 @@ cimport libc
 # This is used in a hack to silence some over-eager warnings.
 cdef extern from *:
     ctypedef object slice_object "PySliceObject *"
-    ctypedef char **const_char_pp "const char **"
-    ctypedef char *const_char_p "const char *"
 
 cdef extern from "stdlib.h":
     void *memcpy(void *dst, void *src, size_t n)
@@ -25,7 +23,7 @@ cdef extern from "Python.h":
 
 cdef extern from "compyte/types.h":
     ctypedef struct compyte_type:
-        const_char_p cluda_name
+        const char *cluda_name
         size_t size
         size_t align
         int typecode
@@ -83,7 +81,7 @@ cdef extern from "compyte/buffer.h":
         GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF
 
     char *Gpu_error(compyte_buffer_ops *o, void *ctx, int err)
-    compyte_buffer_ops *compyte_get_ops(const_char_p) nogil
+    compyte_buffer_ops *compyte_get_ops(const char *) nogil
 
 cdef extern from "compyte/kernel.h":
     ctypedef struct _GpuKernel "GpuKernel":
@@ -162,7 +160,7 @@ cdef extern from "compyte/array.h":
     int GpuArray_is_f_contiguous(_GpuArray *a)
 
 cdef extern from "compyte/extension.h":
-    void *compyte_get_extension(const_char_p) nogil
+    void *compyte_get_extension(const char *) nogil
 
 cdef api np.dtype typecode_to_dtype(int typecode)
 cdef api int get_typecode(dtype) except -1
@@ -195,9 +193,9 @@ cdef array_read(void *dst, size_t sz, GpuArray src)
 cdef array_memset(GpuArray a, int data)
 cdef array_copy(GpuArray res, GpuArray a, ga_order order)
 
-cdef const_char_p kernel_error(GpuKernel k, int err)
+cdef const char *kernel_error(GpuKernel k, int err)
 cdef kernel_init(GpuKernel k, compyte_buffer_ops *ops, void *ctx,
-                 unsigned int count, const_char_pp strs, size_t *len,
+                 unsigned int count, const char **strs, size_t *len,
                  char *name, int flags)
 cdef kernel_clear(GpuKernel k)
 cdef void *kernel_context(GpuKernel k)
