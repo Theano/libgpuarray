@@ -50,8 +50,8 @@ static int do_sched(GpuKernel *k, size_t n, size_t *ls, size_t *gs) {
                                 &min_l);
   if (err != GA_NO_ERROR)
     return err;
-  err = k->ops->buffer_property(NULL, NULL, k->k, GA_KERNEL_PROP_MAXGSIZE,
-                                &max_g);
+  err = k->ops->buffer_property(GpuKernel_context(k), NULL, NULL,
+                                GA_CTX_PROP_MAXGSIZE, &max_g);
   if (err != GA_NO_ERROR)
     return err;
   if (*gs == 0) {

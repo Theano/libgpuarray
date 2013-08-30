@@ -1273,6 +1273,21 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((unsigned int *)res) = i;
     cuda_exit(ctx);
     return GA_NO_ERROR;
+  case GA_CTX_PROP_MAXGSIZE:
+    ctx->err = cuCtxGetDevice(&id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    ctx->err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_X,
+                                    id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    *((size_t *)res) = i;
+    cuda_exit(ctx);
+    return GA_NO_ERROR;
   case GA_BUFFER_PROP_CTX:
   case GA_KERNEL_PROP_CTX:
     *((void **)res) = (void *)ctx;
@@ -1293,21 +1308,6 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
       return GA_IMPL_ERROR;
     }
     ctx->err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_WARP_SIZE, id);
-    if (ctx->err != CUDA_SUCCESS) {
-      cuda_exit(ctx);
-      return GA_IMPL_ERROR;
-    }
-    *((size_t *)res) = i;
-    cuda_exit(ctx);
-    return GA_NO_ERROR;
-  case GA_KERNEL_PROP_MAXGSIZE:
-    ctx->err = cuCtxGetDevice(&id);
-    if (ctx->err != CUDA_SUCCESS) {
-      cuda_exit(ctx);
-      return GA_IMPL_ERROR;
-    }
-    ctx->err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_X,
-                                    id);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;

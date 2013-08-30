@@ -352,6 +352,13 @@ typedef struct _compyte_buffer_ops {
  */
 #define GA_CTX_PROP_NUMPROCS 4
 
+/**
+ * Get the maximum group size for a kernel call in this context.
+ *
+ * Type: `size_t`
+ */
+#define GA_CTX_PROP_MAXGSIZE  5
+
 /* Start at 512 for GA_BUFFER_PROP_ */
 /**
  * Get the context in which this buffer was allocated.
@@ -384,12 +391,6 @@ typedef struct _compyte_buffer_ops {
  */
 #define GA_KERNEL_PROP_PREFLSIZE 1026
 
-/**
- * Get the maximum group size for a call of this kernel.
- *
- * Type: `size_t`
- */
-#define GA_KERNEL_PROP_MAXGSIZE  1027
 /**
  * @}
  */

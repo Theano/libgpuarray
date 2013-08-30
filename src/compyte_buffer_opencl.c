@@ -977,6 +977,28 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
       return GA_IMPL_ERROR;
     *((unsigned int *)res) = ui;
     return GA_NO_ERROR;
+  case GA_CTX_PROP_MAXGSIZE:
+    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id), &id,
+                                NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_ADDRESS_BITS, sizeof(ui), &ui,
+                               NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(sz),
+                               &sz, NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    if (ui == 32) {
+      sz = 4294967295UL/sz;
+    } else if (ui == 64) {
+      sz = 18446744073709551615ULL/sz;
+    } else {
+      assert(0 && "This should not be reached!");
+    }
+    *((size_t *)res) = sz;
+    return GA_NO_ERROR;
   case GA_BUFFER_PROP_CTX:
   case GA_KERNEL_PROP_CTX:
     *((void **)res) = (void *)ctx;
@@ -1018,28 +1040,6 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     */
     sz = (64 < sz) ? 64 : sz;
 #endif
-    *((size_t *)res) = sz;
-    return GA_NO_ERROR;
-  case GA_KERNEL_PROP_MAXGSIZE:
-    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id), &id,
-                                NULL);
-    if (ctx->err != GA_NO_ERROR)
-      return GA_IMPL_ERROR;
-    ctx->err = clGetDeviceInfo(id, CL_DEVICE_ADDRESS_BITS, sizeof(ui), &ui,
-                               NULL);
-    if (ctx->err != GA_NO_ERROR)
-      return GA_IMPL_ERROR;
-    ctx->err = clGetDeviceInfo(id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(sz),
-                               &sz, NULL);
-    if (ctx->err != GA_NO_ERROR)
-      return GA_IMPL_ERROR;
-    if (ui == 32) {
-      sz = 4294967295UL/sz;
-    } else if (ui == 64) {
-      sz = 18446744073709551615ULL/sz;
-    } else {
-      assert(0 && "This should not be reached!");
-    }
     *((size_t *)res) = sz;
     return GA_NO_ERROR;
   default:
