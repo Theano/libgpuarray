@@ -3,13 +3,14 @@ import sys
 have_cython = False
 
 try:
-    from Cython.Distutils import build_ext
+    import Cython
+    if Cython.__version__ < '0.19':
+        raise Exception('cython is too old')
+    from Cython.Build import cythonize
     have_cython = True
-except ImportError:
-    try:
-        from setuptools.command.build_ext import build_ext
-    except ImportError:
-        from distutils.command.build_ext import build_ext
+except Exception:
+    def cythonize(arg):
+        return arg
 
 try:
     from setuptools import setup, Extension
@@ -35,15 +36,16 @@ if have_cython:
 else:
     srcs = ['pygpu/gpuarray.c']
 
+exts = [Extension('pygpu.gpuarray',
+                sources = srcs,
+                include_dirs = [np.get_include()],
+                libraries = ['compyte'],
+                )]
+
 setup(name='pygpu',
       version='0.2.0',
       description='numpy-like wrapper on libcompyte for GPU computations',
-      cmdclass = {'build_ext': build_ext},
       packages = ['pygpu'],
       data_files = [('pygpu', ['pygpu/gpuarray.h', 'pygpu/gpuarray_api.h'])],
-      ext_modules=[Extension('pygpu.gpuarray',
-                             sources = srcs,
-                             include_dirs = [np.get_include(), 'src'],
-                             libraries = ['compyte'],
-                             )
-                   ])
+      ext_modules=cythonize(exts),
+      )
