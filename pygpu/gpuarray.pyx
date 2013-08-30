@@ -874,6 +874,13 @@ cdef class GpuContext:
             ctx_property(self, GA_CTX_PROP_NUMPROCS, &res)
             return res
 
+    property maxgsize:
+        "Maximum group size for kernel calls"
+        def __get__(self):
+            cdef size_t res
+            ctx_property(self, GA_CTX_PROP_MAXGSIZE, &res)
+            return res
+
 cdef GpuArray new_GpuArray(cls, GpuContext ctx):
     cdef GpuArray res
     if ctx is None:
@@ -1382,7 +1389,7 @@ cdef class GpuKernel:
         k(param1, param2, ls=ls, gs=gs)
 
     If you choose to use this interface, make sure to stay within the
-    limits of `k.maxlsize` and `k.maxgsize` or the call will fail.
+    limits of `k.maxlsize` and `ctx.maxgsize` or the call will fail.
     """
     def __dealloc__(self):
         kernel_clear(self)
@@ -1400,7 +1407,7 @@ cdef class GpuKernel:
         if not isinstance(name, (str, unicode)):
             raise TypeError("Expected a string for the kernel name")
 
-        context = ensure_context(context)
+        self.context = ensure_context(context)
 
         if cluda:
             flags |= GA_USE_CLUDA
@@ -1415,7 +1422,8 @@ cdef class GpuKernel:
 
         s[0] = source
         l = len(source)
-        kernel_init(self, context.ops, context.ctx, 1, s, &l, name, flags)
+        kernel_init(self, self.context.ops, self.context.ctx, 1, s, &l, name,
+                    flags)
 
     def __call__(self, *args, n=0, ls=0, gs=0):
         if n == 0 and (ls == 0 or gs == 0):
@@ -1543,11 +1551,4 @@ cdef class GpuKernel:
         def __get__(self):
             cdef size_t res
             kernel_property(self, GA_KERNEL_PROP_PREFLSIZE, &res)
-            return res
-
-    property maxgsize:
-        "Maximum global size for this kernel"
-        def __get__(self):
-            cdef size_t res
-            kernel_property(self, GA_KERNEL_PROP_MAXGSIZE, &res)
             return res

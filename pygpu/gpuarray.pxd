@@ -73,11 +73,11 @@ cdef extern from "compyte/buffer.h":
     int GA_CTX_PROP_MAXLSIZE
     int GA_CTX_PROP_LMEMSIZE
     int GA_CTX_PROP_NUMPROCS
+    int GA_CTX_PROP_MAXGSIZE
     int GA_BUFFER_PROP_CTX
     int GA_KERNEL_PROP_CTX
     int GA_KERNEL_PROP_MAXLSIZE
     int GA_KERNEL_PROP_PREFLSIZE
-    int GA_KERNEL_PROP_MAXGSIZE
 
     cdef enum ga_usefl:
         GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF
@@ -230,8 +230,9 @@ cdef api class GpuArray [type GpuArrayType, object GpuArrayObject]:
 
     cpdef copy(self, order=*)
 
-cdef class GpuKernel:
+cdef api class GpuKernel [type GpuKernelType, object GpuKernelObject]:
     cdef _GpuKernel k
+    cdef readonly GpuContext context
 
     cpdef setargs(self, args)
     cpdef setarg(self, unsigned int index, o)
