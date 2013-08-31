@@ -319,7 +319,7 @@ class ElemwiseKernel(object):
         kernel_args = []
         for i, arg in enumerate(args):
             if isinstance(arg, gpuarray.GpuArray):
-                kernel_args.append(arg),
+                kernel_args.append(arg)
                 kernel_args.append(numpy.asarray(offsets[i], dtype='uint32'))
                 kernel_args.extend(numpy.asarray(s, dtype='int32')
                                    for s in strs[i])
