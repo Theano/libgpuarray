@@ -43,7 +43,7 @@ exts = [Extension('pygpu.gpuarray',
                 )]
 
 setup(name='pygpu',
-      version='0.2.0',
+      version='0.2.1',
       description='numpy-like wrapper on libcompyte for GPU computations',
       packages = ['pygpu'],
       data_files = [('pygpu', ['pygpu/gpuarray.h', 'pygpu/gpuarray_api.h'])],
