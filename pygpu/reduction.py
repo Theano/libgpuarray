@@ -1,17 +1,20 @@
+import math
+
 from mako.template import Template
 
-from tools import ArrayArg, check_args
+from tools import ArrayArg, check_args, prod
 from elemwise import parse_c_args, massage_op
 
 import numpy
 import gpuarray
+
 
 basic_kernel = Template("""
 ${preamble}
 
 #define REDUCE(a, b) (${reduce_expr})
 
-KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} *out
+KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} out
 % for d in range(nd):
                     , const unsigned int dim${d}
 % endfor
@@ -29,8 +32,6 @@ KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} *out
 ) {
   LOCAL_MEM ${out_arg.ctype()} ldata[${local_size}];
   const unsigned int lid = LID_0;
-  const unsigned int idx = LDIM_0 * GID_0 + lid;
-  const unsigned int numThreads = LDIM_0 * GDIM_0;
   unsigned int i;
   GLOBAL_MEM char *tmp;
 
@@ -41,8 +42,21 @@ KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} *out
   % endif
 % endfor
 
+  i = GID_0;
+% for i in range(nd-1, -1, -1):
+  % if not redux[i]:
+    % if i > 0:
+  const unsigned int pos${i} = i % dim${i};
+  i = i / dim${i};
+    % else:
+  const unsigned int pos${i} = i;
+    % endif
+  % endif
+% endfor
+
   ${out_arg.ctype()} acc = ${neutral};
-  for (i = idx; i < n; i += numThreads) {
+
+  for (i = lid; i < n; i += LDIM_0) {
     int ii = i;
     int pos;
 % for arg in arguments:
@@ -51,24 +65,32 @@ KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} *out
     % endif
 % endfor
 % for i in range(nd-1, -1, -1):
-    % if i > 0:
+    % if redux[i]:
+        % if i > 0:
         pos = ii % dim${i};
         ii = ii / dim${i};
-    % else:
+        % else:
         pos = ii;
-    % endif
-    % for arg in arguments:
-        % if arg.isarray():
-            ${arg.name}_p += pos * ${arg.name}_str_${i};
         % endif
-    % endfor
+        % for arg in arguments:
+            % if arg.isarray():
+        ${arg.name}_p += pos * ${arg.name}_str_${i};
+            % endif
+        % endfor
+    % else:
+        % for arg in arguments:
+            % if arg.isarray():
+        ${arg.name}_p += pos${i} * ${arg.name}_str_${i};
+            % endif
+        % endfor
+    % endif
 % endfor
 % for arg in arguments:
     % if arg.isarray():
     ${arg.decltype()} ${arg.name} = (${arg.decltype()})${arg.name}_p;
     % endif
 % endfor
-    acc = REDUCE(acc, ${expression});
+    acc = REDUCE((acc), (${map_expr}));
   }
   ldata[lid] = acc;
 
@@ -84,87 +106,15 @@ KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} *out
 }
 """)
 
-contig_kernel = Template("""
-${preamble}
-
-#define REDUCE(a, b) (${reduce_expr})
-
-KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} out
-% for arg in arguments:
-                    , ${arg.decltype()} ${arg.name}
-    % if arg.isarray():
-                    , const unsigned int ${arg.name}_offset
-    % endif
-% endfor
-) {
-  LOCAL_MEM ${out_arg.ctype()} ldata[${local_size}];
-  const unsigned int lid = LID_0;
-  const unsigned int idx = LDIM_0 * GID_0 + lid;
-  const unsigned int numThreads = LDIM_0 * GDIM_0;
-  unsigned int i;
-  GLOBAL_MEM char *tmp;
-
-% for arg in arguments:
-  % if arg.isarray():
-  tmp = (GLOBAL_MEM char *)${arg.name}; tmp += ${arg.name}_offset;
-  ${arg.name} = (${arg.decltype()})tmp;
-  % endif
-% endfor
-
-  ${out_arg.ctype()} acc = ${neutral};
-  for (i = idx; i < n; i += numThreads) {
-    acc = REDUCE(acc, ${expression});
-  }
-  ldata[lid] = acc;
-
-  <% cur_size = local_size %>
-  % while cur_size > 1:
-    <% cur_size = cur_size / 2 %>
-    local_barrier();
-    if (lid < ${cur_size}) {
-      ldata[lid] = REDUCE(ldata[lid], ldata[lid+${cur_size}]);
-    }
-  % endwhile
-  if (lid == 0) out[GID_0] = ldata[0];
-}
-""")
-
-stage2_kernel = Template("""
-${preamble}
-
-#define REDUCE(a, b) (${reduce_expr})
-
-KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} out,
-                    ${out_arg.decltype()} in) {
-  LOCAL_MEM ${out_arg.ctype()} ldata[${local_size}];
-  const unsigned int lid = LID_0;
-  const unsigned int idx = LDIM_0 * GID_0 + lid;
-  const unsigned int numThreads = LDIM_0 * GDIM_0;
-  unsigned int i;
-
-  ${out_arg.ctype()} acc = ${neutral};
-  for (i = idx; i < n; i += numThreads) {
-    acc = REDUCE(acc, in[i]);
-  }
-  ldata[lid] = acc;
-
-  <% cur_size = local_size %>
-  % while cur_size > 1:
-    <% cur_size = cur_size / 2 %>
-    local_barrier();
-    if (lid < ${cur_size}) {
-      ldata[lid] = REDUCE(ldata[lid], ldata[lid+${cur_size}]);
-    }
-  % endwhile
-  if (lid == 0) out[GID_0] = ldata[0];
-}
-""")
 
 class ReductionKernel(object):
-    def __init__(self, context, dtype_out, neutral, reduce_expr,
+    def __init__(self, context, dtype_out, neutral, reduce_expr, redux,
                  map_expr=None, arguments=None, preamble=""):
         self.context = context
         self.neutral = neutral
+        self.redux = tuple(redux)
+        if not any(self.redux):
+            raise ValueError("Reduction is along no axes")
         self.dtype_out = dtype_out
         self.out_arg = ArrayArg(numpy.dtype(self.dtype_out), 'out')
 
@@ -182,7 +132,7 @@ class ReductionKernel(object):
                                  "argument. Specify map_expr to explicitly "
                                  "state what you want.")
             self.operation = "%s[i]" % (self.arguments[0].name,)
-            self.expresssion = "%s[0]" % (self.arguments[0].name,)
+            self.expression = "%s[0]" % (self.arguments[0].name,)
         else:
             self.operation = map_expr
             self.expression = massage_op(map_expr)
@@ -207,90 +157,48 @@ class ReductionKernel(object):
                           have_complex=have_complex)
         self.preamble = preamble
 
-        local_size = min(int(context.lmemsize /
-                             self.out_arg.dtype.itemsize),
-                         context.maxlsize)
+        self.init_local_size = min(context.lmemsize //
+                                   self.out_arg.dtype.itemsize,
+                                   context.maxlsize)
+
+    def _find_kernel_ls(self, tmpl, max_ls, *tmpl_args):
+        local_size = min(self.init_local_size, max_ls)
+        # nearest power of 2 (going up)
+        count_lim = int(math.ceil(math.log(local_size, 2)))
+        local_size = 2**count_lim
         loop_count = 0
-        while True:
-            src = contig_kernel.render(preamble=self.preamble,
-                                       name="reduk",
-                                       reduce_expr=self.reduce_expr,
-                                       out_arg=self.out_arg,
-                                       arguments=self.arguments,
-                                       local_size=local_size,
-                                       neutral=self.neutral,
-                                       expression=self.operation)
-            try:
-                k = gpuarray.GpuKernel(src, "reduk", context=self.context,
-                                       cluda=True, **self.flags)
-            except gpuarray.GpuArrayException:
-                print "Failed kernel was:"
-                print src
-                raise
+        while loop_count <= count_lim:
+            k = tmpl(local_size, *tmpl_args)
+
             if local_size <= k.maxlsize:
-                self.contig_k = k
-                self.contig_ls = local_size
-                break
-            local_size = k.maxlsize
-            
+                return k, local_size
+            else:
+                local_size /= 2
+
             loop_count += 1
-            if loop_count > 2:
-                raise RuntimeError("Can't stabilize the local_size for kernel."
-                                   " Please report this along with your "
-                                   "reduction code.")
 
-        src = stage2_kernel.render(preamble=self.preamble,
-                                   name="reduk_2",
-                                   reduce_expr=self.reduce_expr,
-                                   out_arg=self.out_arg,
-                                   local_size=local_size,
-                                   neutral=self.neutral)
-        self.stage2_k = gpuarray.GpuKernel(src, "reduk_2",
-                                           context=self.context, cluda=True,
-                                           **self.flags)
-        self.stage2_ls = local_size
-        if self.stage2_k.maxlsize < local_size:
-            raise RuntimeError("Stage 2 kernel will not run. Please "
-                               "report this along with your reduction code.")
-    def _get_gs(self, n, ls, k):
-        np = self.context.numprocs
+        raise RuntimeError("Can't stabilize the local_size for kernel."
+                           " Please report this along with your "
+                           "reduction code.")
 
-        # special cases for OpenCL on CPU where the max local size is 1
-        if n == np:
-            return 1
-        if ls == 1:
-            return min(np, k.maxgsize)
+    def _gen_basic(self, ls, nd):
+        src = basic_kernel.render(preamble=self.preamble,
+                                  reduce_expr=self.reduce_expr,
+                                  name="reduk",
+                                  out_arg=self.out_arg,
+                                  nd=nd, arguments=self.arguments,
+                                  local_size=ls,
+                                  redux=self.redux,
+                                  neutral=self.neutral,
+                                  map_expr=self.expression)
+        k = gpuarray.GpuKernel(src, "reduk", context=self.context,
+                               cluda=True, **self.flags)
+        return k
 
-        # Run enough threads to fully occupy the device but not so much
-        # that it will take a large number of stage2 calls
-        gs = np * 8
+    def _get_basic_kernel(self, maxls, nd):
+        return self._find_kernel_ls(self._gen_basic, maxls, nd)
 
-        # But don't run a bunch of useless threads
-        gs = min(int(((n-1)/ls)+1), gs)
-
-        # And don't go over the maximum
-        return min(gs, k.maxgsize)
-
-    def _alloc_out(self, gs):
-        if gs == 1:
-            out = gpuarray.empty((), context=self.context,
-                                 dtype=self.dtype_out)
-        else:
-            out = gpuarray.empty((gs,), context=self.context,
-                                 dtype=self.dtype_out)
-        return out
-        
-    def call_stage2(self, n, inp):
-        while n > 1:
-            gs = self._get_gs(n, self.stage2_ls, self.stage2_k)
-            out = self._alloc_out(gs)
-            self.stage2_k(numpy.asarray(n, dtype='uint32'), out, inp,
-                          ls=self.stage2_ls, gs=gs)
-            n = gs
-            inp = out
-        return inp
-
-    def _call_contig(self, n, args, offsets):
+    def _call_basic(self, n, args, offsets):
         gs = self._get_gs(n, self.contig_ls, self.contig_k)
         out = self._alloc_out(gs)
         kernel_args = [numpy.asarray(n, dtype='uint32'), out]
@@ -301,11 +209,40 @@ class ReductionKernel(object):
         self.contig_k(*kernel_args, ls=self.contig_ls, gs=gs)
         return gs, out
 
-    def call_stage1(self, args):
-        n, nd, dims, strs, offsets, contig = check_args(args)
-        if not contig:
-            raise NotImplementedError("not contig")
-        return self._call_contig(n, args, offsets)
+    def __call__(self, *args, **kwargs):
+        _, nd, dims, strs, offsets, contig = check_args(args, collapse=False,
+                                                        broadcast=False)
+        out = kwargs.pop('out', None)
+        if len(kwargs) != 0:
+            raise TypeError('Unexpected keyword argument: %s' %
+                            kwargs.keys()[0])
+        n = prod(dims)
+        out_shape = tuple(d for i, d in enumerate(dims) if not self.redux[i])
+        gs = prod(out_shape)
+        n /= gs
+        if gs > self.context.maxgsize:
+            raise ValueError("Array to big to be reduced along the "
+                             "selected axes")
 
-    def __call__(self, *args):
-        return self.call_stage2(*self.call_stage1(args))
+
+        if out is None:
+            out = gpuarray.empty(out_shape, context=self.context,
+                                 dtype=self.dtype_out)
+        else:
+            assert out.shape == out_shape
+        k, ls = self._get_basic_kernel(n, nd)
+
+        kargs = [numpy.asarray(n, dtype='uint32'), out]
+        kargs.extend(numpy.asarray(d, dtype='uint32') for d in dims)
+        for i, arg in enumerate(args):
+            if isinstance(arg, gpuarray.GpuArray):
+                kargs.append(arg)
+                kargs.append(numpy.asarray(offsets[i], dtype='uint32'))
+                kargs.extend(numpy.asarray(s, dtype='int32') for s in strs[i])
+            else:
+                kargs.append(arg)
+
+        print ls, gs
+        k(*kargs, ls=ls, gs=gs)
+
+        return out

@@ -2,7 +2,7 @@ import collections
 import functools
 from itertools import ifilterfalse
 from heapq import nsmallest
-from operator import itemgetter
+from operator import itemgetter, mul
 
 import numpy
 from dtypes import dtype_to_ctype, _fill_dtype_registry
@@ -217,3 +217,6 @@ def lfu_cache(maxsize=20):
         wrapper.get = get
         return wrapper
     return decorating_function
+
+def prod(iterable):
+    return reduce(mul, iterable, 1)

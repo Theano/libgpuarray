@@ -18,6 +18,10 @@ dtypes_no_complex = ["float32", "float64",
                      "int8", "int16", "uint8", "uint16",
                      "int32", "int64", "uint32", "uint64"]
 
+# Sometimes int8 is just a source of trouble (like with overflows)
+dtypes_no_complex_big = ["float32", "float64", "int16", "uint16",
+                         "int32", "int64", "uint32", "uint64"]
+
 def get_env_dev():
     for name in ['COMPYTE_TEST_DEVICE', 'DEVICE']:
         if name in os.environ:
