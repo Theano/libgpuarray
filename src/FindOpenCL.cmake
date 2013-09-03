@@ -3,7 +3,7 @@
 #
 # - Try to find OpenCL
 # This module tries to find an OpenCL implementation on your system. It supports
-# AMD / ATI, Apple and NVIDIA implementations, but shoudl work, too.
+# AMD / ATI, Apple and NVIDIA implementations, but should work, too.
 #
 # Once done this will define
 #  OPENCL_FOUND        - system has OpenCL
@@ -90,4 +90,3 @@ ENDIF( _OPENCL_CPP_INCLUDE_DIRS )
 MARK_AS_ADVANCED(
   OPENCL_INCLUDE_DIRS
 )
-
