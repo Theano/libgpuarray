@@ -464,7 +464,7 @@ def init(dev):
     For cuda the device id is the numeric identifier.  You can see
     what devices are available by running nvidia-smi on the machine.
     If you don't specify a number (e.g. 'cuda') the ambient context,
-    which must has been initialized prior to this call, will be used.
+    which must have been initialized prior to this call, will be used.
 
     For opencl the device id is the platform number, a colon (:) and
     the device number.  There are no widespread and/or easy way to
