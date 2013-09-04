@@ -445,8 +445,8 @@ int GpuArray_transpose(GpuArray *res, GpuArray *a, unsigned int *new_axes) {
     res->strides[i] = a->strides[j];
   }
   if (new_axes == NULL) {
-    if (a->flags & GA_C_CONTIGUOUS) res->flags &= GA_F_CONTIGUOUS;
-    if (a->flags & GA_F_CONTIGUOUS) res->flags &= GA_C_CONTIGUOUS;
+    if (a->flags & GA_C_CONTIGUOUS) res->flags |= GA_F_CONTIGUOUS;
+    if (a->flags & GA_F_CONTIGUOUS) res->flags |= GA_C_CONTIGUOUS;
   } else {
   if (GpuArray_is_c_contiguous(res))
     res->flags |= GA_C_CONTIGUOUS;

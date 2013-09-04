@@ -407,6 +407,8 @@ def transpose(shp, offseted, sliced, order):
     rc = ac.transpose()
     rg = ag.transpose()
 
+    check_all(rg, rc)
+    # also check that we are exactly equal since this only a copy op
     assert numpy.all(rc == numpy.asarray(rg))
 
 
@@ -416,6 +418,8 @@ def transpose_perm(shp, perm, offseted, sliced, order):
     rc = ac.transpose(perm)
     rg = ag.transpose(perm)
 
+    check_all(rg, rc)
+    # also check that we are exactly equal since this only a copy op
     assert numpy.all(rc == numpy.asarray(rg))
 
 
@@ -425,6 +429,8 @@ def test_transpose_args():
     rc = ac.transpose(0, 2, 1)
     rg = ag.transpose(0, 2, 1)
 
+    check_all(rg, rc)
+    # also check that we are exactly equal since this only a copy op
     assert numpy.all(rc == numpy.asarray(rg))
 
 
