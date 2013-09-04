@@ -463,6 +463,8 @@ def init(dev):
 
     For cuda the device id is the numeric identifier.  You can see
     what devices are available by running nvidia-smi on the machine.
+    If you don't specify a number (e.g. 'cuda') the ambient context,
+    which must has been initialized prior to this call, will be used.
 
     For opencl the device id is the platform number, a colon (:) and
     the device number.  There are no widespread and/or easy way to
@@ -472,7 +474,10 @@ def init(dev):
     """
     if dev.startswith('cuda'):
         kind = "cuda"
-        devnum = int(dev[4:])
+        if dev[4:] == '':
+            devnum = -1
+        else:
+            devnum = int(dev[4:])
     elif dev.startswith('opencl'):
         kind = "opencl"
         devspec = dev[6:].split(':')
@@ -812,14 +817,7 @@ cdef class GpuContext:
         if self.ctx != NULL:
             self.ops.buffer_deinit(self.ctx)
 
-    def __cinit__(self):
-        self.ops = NULL
-        self.ctx = NULL
-
-    def __init__(self, kind, devno):
-        """
-        __init__(self, kind, devno)
-        """
+    def __cinit__(self, kind, devno):
         cdef int err = GA_NO_ERROR
         cdef void *ctx
         self.ops = get_ops(kind)

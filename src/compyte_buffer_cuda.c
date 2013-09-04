@@ -280,6 +280,17 @@ static void *cuda_init(int ord, int *ret) {
     cuda_context *res;
     static int init_done = 0;
 
+    if (ord == -1) {
+      /* Grab the ambient context */
+      err = cuCtxGetCurrent(&ctx);
+      CHKFAIL(NULL);
+      res = cuda_make_ctx(ctx);
+      if (res == NULL) {
+        FAIL(NULL, GA_IMPL_ERROR);
+      }
+      return res;
+    }
+
     if (!init_done) {
       err = cuInit(0);
       CHKFAIL(NULL);
