@@ -1,6 +1,6 @@
 #define _CRT_SECURE_NO_WARNINGS
 
-#include "compyte/compat.h"
+#include "private.h"
 #include "compyte/buffer.h"
 #include "compyte/util.h"
 #include "compyte/error.h"

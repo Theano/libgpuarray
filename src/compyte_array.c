@@ -12,6 +12,7 @@
 #include <string.h>
 #include <errno.h>
 
+#include "private.h"
 #include "compyte/array.h"
 #include "compyte/error.h"
 #include "compyte/util.h"

@@ -69,8 +69,8 @@ endif()
 execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_SOURCE_DIR}/../lib)
 
 configure_file(
-  ${PROJECT_SOURCE_DIR}/compyte/compat.h.in
-  ${PROJECT_SOURCE_DIR}/compyte/compat.h
+  ${PROJECT_SOURCE_DIR}/private.h.in
+  ${PROJECT_SOURCE_DIR}/private.h
   )
 
 add_library(compyte SHARED ${COMPYTE_SRC})

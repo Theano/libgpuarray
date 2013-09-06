@@ -4,7 +4,7 @@
  *  \brief Extensions access.
  */
 
-#include <compyte/compat.h>
+#include <compyte/config.h>
 
 #ifdef __cplusplus
 extern "C" {

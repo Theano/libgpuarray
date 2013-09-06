@@ -1,5 +1,5 @@
 #define _CRT_SECURE_NO_WARNINGS
-#include "compyte/compat.h"
+#include "private.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>

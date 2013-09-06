@@ -1,5 +1,6 @@
 #include <assert.h>
 
+#include "private.h"
 #include "compyte/util.h"
 #include "compyte/error.h"
 

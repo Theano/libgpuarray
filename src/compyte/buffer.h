@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include <compyte/compat.h>
+#include <compyte/config.h>
 
 #ifdef __cplusplus
 extern "C" {

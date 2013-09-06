@@ -11,7 +11,7 @@ extern "C" {
 }
 #endif
 
-#include <compyte/compat.h>
+#include <compyte/config.h>
 #include <compyte/types.h>
 
 /**
@@ -32,6 +32,7 @@ extern "C" {
  * On error this function will return -1.
  */
 COMPYTE_PUBLIC int compyte_register_type(compyte_type *t, int *ret);
+
 /**
  * Get the type structure for a type.
  *
@@ -42,6 +43,7 @@ COMPYTE_PUBLIC int compyte_register_type(compyte_type *t, int *ret);
  * \returns A type structure pointer or NULL
  */
 COMPYTE_PUBLIC const compyte_type *compyte_get_type(int typecode);
+
 /**
  * Get the size of one element of a type.
  *
@@ -52,10 +54,6 @@ COMPYTE_PUBLIC const compyte_type *compyte_get_type(int typecode);
  * \returns the size
  */
 COMPYTE_PUBLIC size_t compyte_get_elsize(int typecode);
-
-COMPYTE_LOCAL int compyte_elem_perdim(char *strs[], unsigned int *count,
-                                      unsigned int nd, const size_t *dims,
-                                      const ssize_t *str, const char *id);
 
 #ifdef __cplusplus
 }

@@ -484,8 +484,6 @@ COMPYTE_PUBLIC const char *GpuArray_error(GpuArray *a, int err);
  * \param a an array
  */
 COMPYTE_PUBLIC void GpuArray_fprintf(FILE *fd, const GpuArray *a);
-COMPYTE_LOCAL int GpuArray_is_c_contiguous(const GpuArray *a);
-COMPYTE_LOCAL int GpuArray_is_f_contiguous(const GpuArray *a);
 
 #ifdef __cplusplus
 }

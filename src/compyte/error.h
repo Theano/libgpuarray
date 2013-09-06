@@ -4,7 +4,7 @@
  *  \brief Error functions.
  */
 
-#include <compyte/compat.h>
+#include <compyte/config.h>
 
 #ifdef __cplusplus
 extern "C" {
