@@ -129,25 +129,12 @@ int main() {
 #include <string.h>
 #include <limits.h>
 
-/* compiler specific configuration */
+/* This config block was modified to use the configs that come with compyte */
+#include "private.h"
+typedef uint32_t khint32_t;
+typedef uint64_t khint64_t;
 
-#if UINT_MAX == 0xffffffffu
-typedef unsigned int khint32_t;
-#elif ULONG_MAX == 0xffffffffu
-typedef unsigned long khint32_t;
-#endif
-
-#if ULONG_MAX == ULLONG_MAX
-typedef unsigned long khint64_t;
-#else
-typedef unsigned long long khint64_t;
-#endif
-
-#ifdef _MSC_VER
-#define kh_inline __inline
-#else
 #define kh_inline inline
-#endif
 
 typedef khint32_t khint_t;
 typedef khint_t khiter_t;
