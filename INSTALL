@@ -1,0 +1,24 @@
+This library should build without problems on Mac OS X (10.5+), Linux,
+and Windows.  If you encounter a build problem, please report it along
+with a log of the build messages to abergeron@gmail.com.
+
+Requirements:
+
+ - either an OpenCL runtime (with headers) or the CUDA toolkit
+ - CMake [ http://cmake.org ] (to build)
+
+Run CMake on the CMakeList.txt file in src/ and build according to
+your platform.  Set CMAKE_INSTALL_PREFIX to your desired path if you
+don't want the platform default.
+
+('cmake -DCMAKE_INSTALL_PREFIX=<prefix>' for unix-like platforms)
+
+Pay attention to the messages from CMake since the library might still
+build if no backends are found, but it won't be very useful.
+
+There are instruction for installation in the CMake file which make
+'make install' work on unix-like platforms.  I have no idea how to
+install on Windows.
+
+If you also want the python bindings, run 'python setup.py install'
+after building and installing the library which will install pygpu.
