@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "private.h"
+#include "buf.h"
 
 #define DOUBLE_NO_OVERFLOW (1UL << ((sizeof(size_t) * 8) - 1))
 #define SAFE_DOUBLE(a, ret) if ((a) >= DOUBLE_NO_OVERFLOW) { return ret; } else a *= 2
@@ -16,7 +17,11 @@ int buf_alloc(buf *b, size_t sz) {
        doing it a lot */
     req = b->a;
     SAFE_DOUBLE(req, -1);
-    while (req < sz) SAFE_DOUBLE(req, -1);
+    if (req == 0)
+      req = INIT_SIZE;
+    while (req < sz) {
+      SAFE_DOUBLE(req, -1);
+    }
     tmp = realloc(b->s, req);
     if (tmp == NULL)
       return -1;
@@ -44,24 +49,25 @@ void buf_clear(buf *b) {
   b->i = 0;
 }
 
-int buf_append(buf *r, buf *b) {
+int buf_append(buf *r, const buf *b) {
   return buf_appendb(r, b->s, b->i);
 }
 
-int buf_appends(buf *r, char *s) {
+int buf_appends(buf *r, const char *s) {
   return buf_appendb(r, s, strlen(s));
 }
 
-int buf_appendb(buf *r, void *b, size_t sz) {
-  if (buf_ensurefree(b, sz))
+int buf_appendb(buf *r, const void *b, size_t sz) {
+  if (buf_ensurefree(r, sz))
     return -1;
-  memcpy(b->s+b->i, b, sz);
-  b->i += sz;
+  memcpy(r->s+r->i, b, sz);
+  r->i += sz;
+  return 0;
 }
 
 int buf_appendc(buf *r, char c) {
-  if (buf_ensurefree(b, 1))
+  if (buf_ensurefree(r, 1))
     return -1;
-  b->s[b->i] = c;
-  b->i += 1;
+  r->s[r->i++] = c;
+  return 0;
 }
