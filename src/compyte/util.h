@@ -47,7 +47,7 @@ COMPYTE_PUBLIC const compyte_type *compyte_get_type(int typecode);
 /**
  * Get the size of one element of a type.
  *
- * The type MUST exist or the program will crash.
+ * If the type does not exists this function returns (size_t)-1.
  *
  * \param typecode the type to get the element size for
  *
