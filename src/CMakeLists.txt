@@ -1,19 +1,11 @@
-PROJECT(compyte C)
-
 include(CheckFunctionExists)
 
-cmake_minimum_required(VERSION 2.8)
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR})
-
-set(CMAKE_OSX_ARCHITECTURES i386 x86_64)
-set(CMAKE_OSX_SYSROOT /)
-set(LIBRARY_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../lib)
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
 
 find_package(CUDA)
 find_package(OpenCL)
 
-include_directories("${PROJECT_SOURCE_DIR}")
+include_directories("${CMAKE_SOURCE_DIR}")
 
 SET(COMPYTE_SRC
 compyte_types.c
@@ -66,11 +58,9 @@ if(OPENCL_FOUND)
   include_directories("${OPENCL_INCLUDE_DIRS}")
 endif()
 
-execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_SOURCE_DIR}/../lib)
-
 configure_file(
-  ${PROJECT_SOURCE_DIR}/private.h.in
-  ${PROJECT_SOURCE_DIR}/private.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/private.h.in
+  ${CMAKE_CURRENT_SOURCE_DIR}/private.h
   )
 
 add_library(compyte SHARED ${COMPYTE_SRC})
