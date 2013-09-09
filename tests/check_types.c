@@ -73,7 +73,7 @@ END_TEST
 START_TEST(test_get_elsize)
 {
   ck_assert(compyte_get_elsize(GA_INT) == 4);
-  ck_assert(compyte_get_elsize(GA_DELIM) == (size_t)-1);
+  ck_assert(compyte_get_elsize(GA_DELIM) == 0);
 }
 END_TEST
 
@@ -82,6 +82,7 @@ Suite *get_suite(void) {
   TCase *tc = tcase_create("All");
   tcase_add_test(tc, test_register_type);
   tcase_add_test(tc, test_get_type);
+  tcase_add_test(tc, test_get_elsize);
   suite_add_tcase(s, tc);
   return s;
 }
