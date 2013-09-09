@@ -16,3 +16,4 @@ distribute*tar.gz
 *.bbl
 *.blg
 *.log
+src/private.h
