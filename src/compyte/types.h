@@ -122,6 +122,8 @@ enum COMPYTE_TYPES {
   GA_HALF16,
 
 /** \cond INTERNAL_DOCS */
+  GA_NVEC,
+
   GA_ENDVEC = 512
 /** \endcond */
 };
