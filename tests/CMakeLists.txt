@@ -11,10 +11,12 @@ set(LIBS ${LIBS} ${CHECK_LIBRARIES})
 include_directories(. ../src)
 
 add_executable(check_buf main.c check_buf.c)
-
 target_link_libraries(check_buf ${LIBS})
-
 add_test(test_buf ${CMAKE_CURRENT_BINARY_DIR}/check_buf)
+
+add_executable(check_types main.c check_types.c)
+target_link_libraries(check_types ${LIBS} compyte)
+add_test(test_types ${CMAKE_CURRENT_BINARY_DIR}/check_types)
 
 ELSE(CHECK_FOUND)
 
