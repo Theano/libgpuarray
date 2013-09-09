@@ -4,7 +4,7 @@
 #include "compyte/buffer.h"
 #include "compyte/error.h"
 
-const char *Gpu_error(compyte_buffer_ops *o, void *ctx, int err) {
+const char *Gpu_error(const compyte_buffer_ops *o, void *ctx, int err) {
   if (err == GA_IMPL_ERROR)
     return o->buffer_error(ctx);
   else
@@ -18,7 +18,7 @@ extern compyte_buffer_ops cuda_ops;
 extern compyte_buffer_ops opencl_ops;
 #endif
 
-compyte_buffer_ops *compyte_get_ops(const char *name) {
+const compyte_buffer_ops *compyte_get_ops(const char *name) {
 #ifdef WITH_CUDA
   if (strcmp("cuda", name) == 0) return &cuda_ops;
 #endif

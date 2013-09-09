@@ -446,7 +446,7 @@ typedef enum _ga_usefl {
  *
  * \returns A string description of the error.
  */
-COMPYTE_PUBLIC const char *Gpu_error(compyte_buffer_ops *o, void *ctx,
+COMPYTE_PUBLIC const char *Gpu_error(const compyte_buffer_ops *o, void *ctx,
 				     int err);
 /**
  * Get operations vector for a backend.
@@ -457,7 +457,7 @@ COMPYTE_PUBLIC const char *Gpu_error(compyte_buffer_ops *o, void *ctx,
  *
  * \returns the operation vector or NULL if the backend name is unrecognized.
  */
-COMPYTE_PUBLIC compyte_buffer_ops *compyte_get_ops(const char *name);
+COMPYTE_PUBLIC const compyte_buffer_ops *compyte_get_ops(const char *name);
 
 #ifdef __cplusplus
 }

@@ -25,7 +25,7 @@ typedef struct _GpuKernel {
   /**
    * Backend operations vector.
    */
-  compyte_buffer_ops *ops;
+  const compyte_buffer_ops *ops;
 } GpuKernel;
 
 /**
@@ -47,7 +47,7 @@ typedef struct _GpuKernel {
  * \return GA_NO_ERROR if the operation is successful
  * \return any other value if an error occured
  */
-COMPYTE_PUBLIC int GpuKernel_init(GpuKernel *k, compyte_buffer_ops *ops,
+COMPYTE_PUBLIC int GpuKernel_init(GpuKernel *k, const compyte_buffer_ops *ops,
                                   void *ctx, unsigned int count,
                                   const char **strs, size_t *lens,
                                   const char *name, int flags);

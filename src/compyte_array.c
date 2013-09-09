@@ -20,7 +20,7 @@
 /* Value below which a size_t multiplication will never overflow. */
 #define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
 
-int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
+int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
 		   int typecode, unsigned int nd, size_t *dims, ga_order ord) {
   size_t size = compyte_get_elsize(typecode);
   unsigned int i;
@@ -88,7 +88,7 @@ int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
   return GA_NO_ERROR;
 }
 
-int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
+int GpuArray_zeros(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
                    int typecode, unsigned int nd, size_t *dims, ga_order ord) {
   int err;
   err = GpuArray_empty(a, ops, ctx, typecode, nd, dims, ord);
@@ -101,9 +101,10 @@ int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops, void *ctx,
   return err;
 }
 
-int GpuArray_fromdata(GpuArray *a, compyte_buffer_ops *ops, gpudata *data,
-                      size_t offset, int typecode, unsigned int nd, size_t *dims,
-                      ssize_t *strides, int writeable) {
+int GpuArray_fromdata(GpuArray *a, const compyte_buffer_ops *ops,
+                      gpudata *data, size_t offset, int typecode,
+                      unsigned int nd, size_t *dims, ssize_t *strides,
+                      int writeable) {
   a->ops = ops;
   assert(data != NULL);
   a->data = data;

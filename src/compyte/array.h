@@ -25,7 +25,7 @@ typedef struct _GpuArray {
   /**
    * Backend operations vector.
    */
-  compyte_buffer_ops *ops;
+  const compyte_buffer_ops *ops;
   /**
    * Size of each dimension.  The number of elements is #nd.
    */
@@ -205,7 +205,7 @@ static inline int GpuArray_CHKFLAGS(GpuArray *a, int flags) {
  * the device.  Any other error code means that the structure is
  * left uninitialized.
  */
-COMPYTE_PUBLIC int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops,
+COMPYTE_PUBLIC int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops,
                                   void *ctx, int typecode, unsigned int nd,
                                   size_t *dims, ga_order ord);
 
@@ -227,7 +227,7 @@ COMPYTE_PUBLIC int GpuArray_empty(GpuArray *a, compyte_buffer_ops *ops,
  * the device.  Any other error code means that the structure is
  * left uninitialized.
  */
-COMPYTE_PUBLIC int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops,
+COMPYTE_PUBLIC int GpuArray_zeros(GpuArray *a, const compyte_buffer_ops *ops,
                                   void *ctx, int typecode, unsigned int nd,
                                   size_t *dims, ga_order ord);
 
@@ -253,7 +253,8 @@ COMPYTE_PUBLIC int GpuArray_zeros(GpuArray *a, compyte_buffer_ops *ops,
  * properly initialized. Any other error code means that the structure
  * is left uninitialized and the provided buffer is deallocated.
  */
-COMPYTE_PUBLIC int GpuArray_fromdata(GpuArray *a, compyte_buffer_ops *ops,
+COMPYTE_PUBLIC int GpuArray_fromdata(GpuArray *a,
+                                     const compyte_buffer_ops *ops,
                                      gpudata *data, size_t offset,
                                      int typecode, unsigned int nd,
                                      size_t *dims, ssize_t *strides,

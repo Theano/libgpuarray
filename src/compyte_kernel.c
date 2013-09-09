@@ -2,7 +2,7 @@
 #include "compyte/error.h"
 #include "compyte/types.h"
 
-int GpuKernel_init(GpuKernel *k, compyte_buffer_ops *ops, void *ctx,
+int GpuKernel_init(GpuKernel *k, const compyte_buffer_ops *ops, void *ctx,
 		   unsigned int count, const char **strs, size_t *lens,
 		   const char *name, int flags) {
   int res = GA_NO_ERROR;
