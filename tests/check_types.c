@@ -70,6 +70,13 @@ START_TEST(test_get_type)
 }
 END_TEST
 
+START_TEST(test_get_elsize)
+{
+  ck_assert(compyte_get_elsize(GA_INT) == 4);
+  ck_assert(compyte_get_elsize(GA_DELIM) == (size_t)-1);
+}
+END_TEST
+
 Suite *get_suite(void) {
   Suite *s = suite_create("types");
   TCase *tc = tcase_create("All");
