@@ -80,15 +80,15 @@ cdef extern from "compyte/buffer.h":
     cdef enum ga_usefl:
         GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF
 
-    char *Gpu_error(compyte_buffer_ops *o, void *ctx, int err)
-    compyte_buffer_ops *compyte_get_ops(const char *) nogil
+    char *Gpu_error(const compyte_buffer_ops *o, void *ctx, int err)
+    const compyte_buffer_ops *compyte_get_ops(const char *) nogil
 
 cdef extern from "compyte/kernel.h":
     ctypedef struct _GpuKernel "GpuKernel":
         gpukernel *k
-        compyte_buffer_ops *ops
+        const compyte_buffer_ops *ops
 
-    int GpuKernel_init(_GpuKernel *k, compyte_buffer_ops *ops, void *ctx,
+    int GpuKernel_init(_GpuKernel *k, const compyte_buffer_ops *ops, void *ctx,
                        unsigned int count, char **strs, size_t *lens,
                        char *name, int flags)
     void GpuKernel_clear(_GpuKernel *k)
@@ -102,7 +102,7 @@ cdef extern from "compyte/kernel.h":
 cdef extern from "compyte/array.h":
     ctypedef struct _GpuArray "GpuArray":
         gpudata *data
-        compyte_buffer_ops *ops
+        const compyte_buffer_ops *ops
         size_t offset
         size_t *dimensions
         ssize_t *strides
@@ -126,12 +126,12 @@ cdef extern from "compyte/array.h":
     ctypedef enum ga_order:
         GA_ANY_ORDER, GA_C_ORDER, GA_F_ORDER
 
-    int GpuArray_empty(_GpuArray *a, compyte_buffer_ops *ops, void *ctx,
+    int GpuArray_empty(_GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
                        int typecode, int nd, size_t *dims, ga_order ord)
-    int GpuArray_fromdata(_GpuArray *a, compyte_buffer_ops *ops, gpudata *data,
-                          size_t offset, int typecode, unsigned int nd, size_t \
-*dims,
-                          ssize_t *strides, int writable)
+    int GpuArray_fromdata(_GpuArray *a, const compyte_buffer_ops *ops,
+                          gpudata *data, size_t offset, int typecode,
+                          unsigned int nd, size_t *dims, ssize_t *strides,
+                          int writable)
     int GpuArray_view(_GpuArray *v, _GpuArray *a)
     int GpuArray_sync(_GpuArray *a)
     int GpuArray_index(_GpuArray *r, _GpuArray *a, ssize_t *starts,
@@ -171,9 +171,9 @@ cdef ga_order to_ga_order(ord) except <ga_order>-2
 cdef bint py_CHKFLAGS(GpuArray a, int flags)
 cdef bint py_ISONESEGMENT(GpuArray a)
 
-cdef array_empty(GpuArray a, compyte_buffer_ops *ops, void *ctx, int typecode,
-                 unsigned int nd, size_t *dims, ga_order ord)
-cdef array_fromdata(GpuArray a, compyte_buffer_ops *ops, gpudata *data,
+cdef array_empty(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
+                 int typecode, unsigned int nd, size_t *dims, ga_order ord)
+cdef array_fromdata(GpuArray a, const compyte_buffer_ops *ops, gpudata *data,
                     size_t offset, int typecode, unsigned int nd, size_t *dims,
                     ssize_t *strides, int writeable)
 cdef array_view(GpuArray v, GpuArray a)
@@ -194,7 +194,7 @@ cdef array_memset(GpuArray a, int data)
 cdef array_copy(GpuArray res, GpuArray a, ga_order order)
 
 cdef const char *kernel_error(GpuKernel k, int err)
-cdef kernel_init(GpuKernel k, compyte_buffer_ops *ops, void *ctx,
+cdef kernel_init(GpuKernel k, const compyte_buffer_ops *ops, void *ctx,
                  unsigned int count, const char **strs, size_t *len,
                  char *name, int flags)
 cdef kernel_clear(GpuKernel k)
@@ -207,12 +207,12 @@ cdef kernel_property(GpuKernel k, int prop_id, void *res)
 cdef api GpuContext GpuArray_default_context()
 
 cdef ctx_property(GpuContext c, int prop_id, void *res)
-cdef compyte_buffer_ops *get_ops(kind) except NULL
-cdef ops_kind(compyte_buffer_ops *ops)
+cdef const compyte_buffer_ops *get_ops(kind) except NULL
+cdef ops_kind(const compyte_buffer_ops *ops)
 cdef GpuContext ensure_context(GpuContext c)
 
 cdef api class GpuContext [type GpuContextType, object GpuContextObject]:
-    cdef compyte_buffer_ops *ops
+    cdef const compyte_buffer_ops *ops
     cdef void* ctx
 
 cdef api GpuArray new_GpuArray(cls, GpuContext ctx)

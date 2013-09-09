@@ -253,14 +253,14 @@ cdef bint py_CHKFLAGS(GpuArray a, int flags):
 cdef bint py_ISONESEGMENT(GpuArray a):
     return GpuArray_ISONESEGMENT(&a.ga)
 
-cdef array_empty(GpuArray a, compyte_buffer_ops *ops, void *ctx, int typecode,
-                 unsigned int nd, size_t *dims, ga_order ord):
+cdef array_empty(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
+                 int typecode, unsigned int nd, size_t *dims, ga_order ord):
     cdef int err
     err = GpuArray_empty(&a.ga, ops, ctx, typecode, nd, dims, ord)
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(ops, ctx, err), err)
 
-cdef array_fromdata(GpuArray a, compyte_buffer_ops *ops, gpudata *data,
+cdef array_fromdata(GpuArray a, const compyte_buffer_ops *ops, gpudata *data,
                     size_t offset, int typecode, unsigned int nd, size_t *dims,
                     ssize_t *strides, int writeable):
     cdef int err
@@ -351,7 +351,7 @@ cdef array_copy(GpuArray res, GpuArray a, ga_order order):
 cdef const char *kernel_error(GpuKernel k, int err):
     return Gpu_error(k.k.ops, kernel_context(k), err)
 
-cdef kernel_init(GpuKernel k, compyte_buffer_ops *ops, void *ctx,
+cdef kernel_init(GpuKernel k, const compyte_buffer_ops *ops, void *ctx,
                  unsigned int count, const char **strs, size_t *len,
                  char *name, int flags):
     cdef int err
@@ -400,14 +400,14 @@ cdef ctx_property(GpuContext c, int prop_id, void *res):
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(c.ops, c.ctx, err), err)
 
-cdef compyte_buffer_ops *get_ops(kind) except NULL:
-    cdef compyte_buffer_ops *res
+cdef const compyte_buffer_ops *get_ops(kind) except NULL:
+    cdef const compyte_buffer_ops *res
     res = compyte_get_ops(kind)
     if res == NULL:
         raise RuntimeError("Unsupported kind: %s"%(kind,))
     return res
 
-cdef ops_kind(compyte_buffer_ops *ops):
+cdef ops_kind(const compyte_buffer_ops *ops):
     if ops == compyte_get_ops("opencl"):
         return "opencl"
     if ops == compyte_get_ops("cuda"):
@@ -1397,7 +1397,7 @@ cdef class GpuKernel:
                   have_half=False, *a, **kwa):
         cdef const char *s[1]
         cdef size_t l
-        cdef compyte_buffer_ops *ops
+        cdef const compyte_buffer_ops *ops
         cdef int flags = 0
 
         if not isinstance(source, (str, unicode)):
