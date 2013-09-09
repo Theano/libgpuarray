@@ -4,7 +4,7 @@
 
 #include <string.h>
 
-#define nelems(a) (sizeof(a)/sizeof(a[0]))
+#include "private.h"
 
 static size_t SIZES[] = {23, INIT_SIZE-1, INIT_SIZE, INIT_SIZE+1};
 

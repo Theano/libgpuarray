@@ -77,7 +77,7 @@ COMPYTE_LOCAL int compyte_elem_perdim(char *strs[], unsigned int *count,
                                       unsigned int nd, const size_t *dims,
                                       const ssize_t *str, const char *id);
 
-#define nitems(a) (sizeof(a)/sizeof(a[0]))
+#define nelems(a) (sizeof(a)/sizeof(a[0]))
 
 /** \endcond */
 

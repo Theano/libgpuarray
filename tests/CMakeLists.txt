@@ -22,6 +22,10 @@ add_executable(check_error main.c check_error.c)
 target_link_libraries(check_error ${LIBS} compyte)
 add_test(test_error ${CMAKE_CURRENT_BINARY_DIR}/check_error)
 
+add_executable(check_buffer main.c check_buffer.c)
+target_link_libraries(check_buffer ${LIBS} compyte)
+add_test(test_buffer ${CMAKE_CURRENT_BINARY_DIR}/check_buffer)
+
 ELSE(CHECK_FOUND)
 
 MESSAGE("Tests disabled because Check was not found")
