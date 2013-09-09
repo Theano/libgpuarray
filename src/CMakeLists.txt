@@ -5,7 +5,7 @@ set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
 find_package(CUDA)
 find_package(OpenCL)
 
-include_directories("${CMAKE_SOURCE_DIR}")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
 SET(COMPYTE_SRC
 compyte_types.c
