@@ -12,10 +12,10 @@ const char *Gpu_error(const compyte_buffer_ops *o, void *ctx, int err) {
 }
 
 #ifdef WITH_CUDA
-extern compyte_buffer_ops cuda_ops;
+extern const compyte_buffer_ops cuda_ops;
 #endif
 #ifdef WITH_OPENCL
-extern compyte_buffer_ops opencl_ops;
+extern const compyte_buffer_ops opencl_ops;
 #endif
 
 const compyte_buffer_ops *compyte_get_ops(const char *name) {
