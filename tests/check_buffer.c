@@ -72,9 +72,6 @@ START_TEST(test_buffer_alloc)
   gpudata *d;
 
   if (setup(_i)) {
-    d = ops->buffer_alloc(ctx, (size_t)-1, NULL);
-    ck_assert(d == NULL);
-
     d = ops->buffer_alloc(ctx, 0, NULL);
     ck_assert(d != NULL);
     ops->buffer_free(d);
