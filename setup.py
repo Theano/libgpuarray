@@ -40,10 +40,11 @@ else:
     srcs = ['pygpu/gpuarray.c']
 
 exts = [Extension('pygpu.gpuarray',
-                sources = srcs,
-                include_dirs = [np.get_include()],
-                libraries = ['compyte'],
-                )]
+                  sources = srcs,
+                  include_dirs = [np.get_include()],
+                  libraries = ['compyte'],
+                  define_macros = [('COMPYTE_SHARED', None)],
+                  )]
 
 setup(name='pygpu',
       version='0.2.1',
