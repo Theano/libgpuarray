@@ -101,21 +101,30 @@ def cl_wrap_ctx(size_t ptr):
         raise RuntimeError("cl_make_ctx call failed")
     return res
 
-def cuda_wrap_ctx(size_t ptr):
+def cuda_wrap_ctx(size_t ptr, bint own):
     """
     cuda_wrap_ctx(ptr)
 
     Wrap an existing CUDA driver context (CUcontext) into a GpuContext
     class.
+
+    If `own` is true, libcompyte is now reponsible for the context and
+    it will be destroyed once there are no references to it.
+    Otherwise, the context will not be destroyed and it is the calling
+    code's reponsability.
     """
-    cdef void *(*cuda_make_ctx)(void *)
+    cdef void *(*cuda_make_ctx)(void *, int)
+    cdef int flags
     cdef GpuContext res
-    cuda_make_ctx = <void *(*)(void *)>compyte_get_extension("cuda_make_ctx")
+    cuda_make_ctx = <void *(*)(void *, int)>compyte_get_extension("cuda_make_ctx")
     if cuda_make_ctx == NULL:
         raise RuntimeError("cuda_make_ctx extension is absent")
     res = GpuContext.__new__(GpuContext)
     res.ops = get_ops('cuda')
-    res.ctx = cuda_make_ctx(<void *>ptr)
+    flags = 0
+    if own:
+        flags |= COMPYTE_CUDA_CTX_NOFREE
+    res.ctx = cuda_make_ctx(<void *>ptr, flags)
     if res.ctx == NULL:
         raise RuntimeError("cuda_make_ctx call failed")
     return res

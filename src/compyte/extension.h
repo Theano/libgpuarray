@@ -13,6 +13,9 @@ extern "C" {
 }
 #endif
 
+/* Keep in sync with the flags in compyte_buffer_cuda.c */
+#define COMPYTE_CUDA_CTX_NOFREE 0x1
+
 /**
  * Obtain a function pointer for an extension.
  *

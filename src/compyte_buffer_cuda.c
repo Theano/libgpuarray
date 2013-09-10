@@ -59,9 +59,10 @@ typedef struct _cuda_context {
   CUresult err;
   CUstream s;
   unsigned int refcnt;
+  int flags;
 } cuda_context;
 
-COMPYTE_LOCAL void *cuda_make_ctx(CUcontext ctx) {
+COMPYTE_LOCAL void *cuda_make_ctx(CUcontext ctx, int flags) {
   cuda_context *res;
   res = malloc(sizeof(*res));
   if (res == NULL)
@@ -69,6 +70,7 @@ COMPYTE_LOCAL void *cuda_make_ctx(CUcontext ctx) {
   res->ctx = ctx;
   res->err = CUDA_SUCCESS;
   res->refcnt = 1;
+  res->flags = flags;
   err = cuStreamCreate(&res->s, 0);
   if (err != CUDA_SUCCESS) {
     free(res);
@@ -81,7 +83,8 @@ static void cuda_free_ctx(cuda_context *ctx) {
   ctx->refcnt--;
   if (ctx->refcnt == 0) {
     cuStreamDestroy(ctx->s);
-    cuCtxDestroy(ctx->ctx);
+    if (!(ctx->flags & DONTFREE))
+      cuCtxDestroy(ctx->ctx);
     free(ctx);
   }
 }
@@ -284,7 +287,7 @@ static void *cuda_init(int ord, int *ret) {
       /* Grab the ambient context */
       err = cuCtxGetCurrent(&ctx);
       CHKFAIL(NULL);
-      res = cuda_make_ctx(ctx);
+      res = cuda_make_ctx(ctx, DONTFREE);
       if (res == NULL) {
         FAIL(NULL, GA_IMPL_ERROR);
       }
@@ -300,7 +303,7 @@ static void *cuda_init(int ord, int *ret) {
     CHKFAIL(NULL);
     err = cuCtxCreate(&ctx, CU_CTX_SCHED_YIELD, dev);
     CHKFAIL(NULL);
-    res = cuda_make_ctx(ctx);
+    res = cuda_make_ctx(ctx, 0);
     if (res == NULL) {
       cuCtxDestroy(ctx);
       FAIL(NULL, GA_IMPL_ERROR);

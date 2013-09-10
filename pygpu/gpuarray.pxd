@@ -156,11 +156,12 @@ cdef extern from "compyte/array.h":
     char *GpuArray_error(_GpuArray *a, int err)
 
     void GpuArray_fprintf(libc.stdio.FILE *fd, _GpuArray *a)
-    int GpuArray_is_c_contiguous(_GpuArray *a)
-    int GpuArray_is_f_contiguous(_GpuArray *a)
+    bint GpuArray_is_c_contiguous(_GpuArray *a)
+    bint GpuArray_is_f_contiguous(_GpuArray *a)
 
 cdef extern from "compyte/extension.h":
     void *compyte_get_extension(const char *) nogil
+    cdef int COMPYTE_CUDA_CTX_NOFREE
 
 cdef api np.dtype typecode_to_dtype(int typecode)
 cdef api int get_typecode(dtype) except -1
