@@ -52,4 +52,5 @@ setup(name='pygpu',
       packages = ['pygpu'],
       data_files = [('pygpu', ['pygpu/gpuarray.h', 'pygpu/gpuarray_api.h'])],
       ext_modules=cythonize(exts),
+      requires=['mako (>=0.7)'],
       )
