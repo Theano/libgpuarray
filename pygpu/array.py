@@ -233,10 +233,14 @@ class gpuarray(array.GpuArray):
 
     # reductions
     def all(self, axis=None, out=None):
+        if self.ndim == 0:
+            return self.copy()
         return reduce1(self, '&&', '1', np.dtype('bool'),
                        axis=axis, out=out)
 
     def any(self, axis=None, out=None):
+        if self.ndim == 0:
+            return self.copy()
         return reduce1(self, '||', '0', np.dtype('bool'),
                        axis=axis, out=out)
 
