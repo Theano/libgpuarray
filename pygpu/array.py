@@ -2,6 +2,7 @@ from __future__ import division
 import numpy as np
 
 from elemwise import elemwise1, elemwise2, ielemwise2, compare, ElemwiseKernel
+from reduction import reduce1, ReductionKernel
 from dtypes import dtype_to_ctype, get_np_obj, get_common_dtype
 from tools import as_argument, ArrayArg
 import gpuarray as array
@@ -214,3 +215,73 @@ class gpuarray(array.GpuArray):
 
     def __gt__(self, other):
         return compare(self, '>', other, broadcast=True)
+
+    # misc other things
+    @property
+    def T(self):
+        if self.ndim < 2:
+            return self
+        return self.transpose()
+
+    def clip(self, a_min, a_max, out=None):
+        oper='res[i] = a[i] > %(max)s ? %(max)s : '
+        '(a[i] < %(min)s ? %(min)s : a[i])' % dict(min=a_min, max=a_max)
+        return elemwise1(self, '', oper=oper, out=out)
+
+    def fill(self, value):
+        self[:] = value
+
+    # reductions
+    def all(self, axis=None, out=None):
+        return reduce1(self, '&&', '1', numpy.dtype('bool'),
+                       axis=axis, out=out)
+
+    def any(self, axis=None, out=None):
+        return reduce1(self, '||', '0', numpy.dtype('bool'),
+                       axis=axis, out=out)
+
+    def prod(self, axis=None, dtype=None, out=None):
+        if dtype is None:
+            dtype = self.dtype
+            # we only upcast integers that are smaller than the plaform default
+            if dtype.kind == 'i':
+                di = numpy.dtype('int')
+                if di.itemsize > dtype.itemsize:
+                    dtype = di
+            if dtype.kind == 'u':
+                di = numpy.dtype('uint')
+                if di.itemsize > dtype.itemsize:
+                    dtype = di
+        return reduce1(self, '*', '1', dtype, axis=axis, out=out)
+
+    def max(self, axis=None, out=None):
+        nd = self.ndim
+        if nd == 0:
+            return self.copy()
+        idx = (0,) * nd
+        n = str(self.__getitem__(idx).__array__())
+        return reduce1(self, '', n, self.dtype, axis=axis, out=out,
+                       oper='max(a, b)')
+
+    def min(self, axis=None, out=None):
+        nd = self.ndim
+        if nd == 0:
+            return self.copy()
+        idx = (0,) * nd
+        n = str(self.__getitem__(idx).__array__())
+        return reduce1(self, '', n, self.dtype, axis=axis, out=out,
+                       oper='min(a, b)')
+
+    def sum(self, axis=None, out=None):
+        if dtype is None:
+            dtype = self.dtype
+            # we only upcast integers that are smaller than the plaform default
+            if dtype.kind == 'i':
+                di = numpy.dtype('int')
+                if di.itemsize > dtype.itemsize:
+                    dtype = di
+            if dtype.kind == 'u':
+                di = numpy.dtype('uint')
+                if di.itemsize > dtype.itemsize:
+                    dtype = di
+        return reduce1(self, '+', '0', dtype, axis=axis, out=out)

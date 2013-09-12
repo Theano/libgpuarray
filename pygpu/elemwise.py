@@ -473,10 +473,13 @@ class ElemwiseKernel(object):
         k(*args, n=n)
 
 
-def elemwise1(a, op, oper=None, op_tmpl="res[i] = %(op)sa[i]"):
+def elemwise1(a, op, oper=None, op_tmpl="res[i] = %(op)sa[i]", out=None):
     a_arg = as_argument(a, 'a')
     args = [ArrayArg(a.dtype, 'res'), a_arg]
-    res = a._empty_like_me()
+    if out is None:
+        res = a._empty_like_me()
+    else:
+        res = out
 
     if oper is None:
         oper = op_tmpl % {'op': op}

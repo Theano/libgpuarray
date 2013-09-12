@@ -246,3 +246,28 @@ class ReductionKernel(object):
         k(*kargs, ls=ls, gs=gs)
 
         return out
+
+
+def reduce1(ary, op, neutral, out_type, axis=None, out=None, oper=None):
+    nd = ary.ndim
+    if axis is None:
+        redux = [True] * nd
+    else:
+        if not isintance(axis, (list, tuple)):
+            axis = (axis,)
+
+        for ax in axis:
+            if ax < 0:
+                ax += nd
+            if ax < 0 of ax >= nd:
+                raise ValueError('axis out of bounds')
+            redux[ax] = True
+
+    if oper is None:
+        reduce_expr = "a %s b" % (op,)
+    else:
+        reduce_expr = oper
+
+    r = ReductionKernel(ary.context, dtype_out=out_type, neutral=neutral,
+                        reduce_expr=reduce_expr, redux=redux)
+    return r(ary, out=out)
