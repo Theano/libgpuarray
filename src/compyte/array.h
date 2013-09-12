@@ -133,7 +133,7 @@ typedef enum _ga_order {
  *
  * \returns true if all flags in `flags` are set and false otherwise.
  */
-static inline int GpuArray_CHKFLAGS(GpuArray *a, int flags) {
+static inline int GpuArray_CHKFLAGS(const GpuArray *a, int flags) {
   return (a->flags & flags) == flags;
 }
 /* Add tests here when you need them */
@@ -207,7 +207,7 @@ static inline int GpuArray_CHKFLAGS(GpuArray *a, int flags) {
  */
 COMPYTE_PUBLIC int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops,
                                   void *ctx, int typecode, unsigned int nd,
-                                  size_t *dims, ga_order ord);
+                                  const size_t *dims, ga_order ord);
 
 /**
  * Initialize and allocate a new zero-initialized array.
@@ -229,7 +229,7 @@ COMPYTE_PUBLIC int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops,
  */
 COMPYTE_PUBLIC int GpuArray_zeros(GpuArray *a, const compyte_buffer_ops *ops,
                                   void *ctx, int typecode, unsigned int nd,
-                                  size_t *dims, ga_order ord);
+                                  const size_t *dims, ga_order ord);
 
 /**
  * Initialize and allocate a new array structure from a pre-existing buffer.
@@ -257,8 +257,8 @@ COMPYTE_PUBLIC int GpuArray_fromdata(GpuArray *a,
                                      const compyte_buffer_ops *ops,
                                      gpudata *data, size_t offset,
                                      int typecode, unsigned int nd,
-                                     size_t *dims, ssize_t *strides,
-                                     int writeable);
+                                     const size_t *dims,
+                                     const ssize_t *strides, int writeable);
 
 /**
  * Initialize an array structure to provide a view of another.
@@ -275,7 +275,8 @@ COMPYTE_PUBLIC int GpuArray_fromdata(GpuArray *a,
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_view(GpuArray *v, GpuArray *a);
+COMPYTE_PUBLIC int GpuArray_view(GpuArray *v, const GpuArray *a);
+
 /**
  * Blocks until all operations (kernels, copies) involving `a` are finished.
  *
@@ -285,6 +286,7 @@ COMPYTE_PUBLIC int GpuArray_view(GpuArray *v, GpuArray *a);
  * \return an error code otherwise
  */
 COMPYTE_PUBLIC int GpuArray_sync(GpuArray *a);
+
 /**
  * Returns a sub-view of a source array.
  *
@@ -308,8 +310,9 @@ COMPYTE_PUBLIC int GpuArray_sync(GpuArray *a);
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts,
-                                  ssize_t *stops, ssize_t *steps);
+COMPYTE_PUBLIC int GpuArray_index(GpuArray *r, const GpuArray *a,
+                                  const ssize_t *starts, const ssize_t *stops,
+                                  const ssize_t *steps);
 
 /**
  * Sets the content of an array to the content of another array.
@@ -327,7 +330,7 @@ COMPYTE_PUBLIC int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts,
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_setarray(GpuArray *a, GpuArray *v);
+COMPYTE_PUBLIC int GpuArray_setarray(GpuArray *a, const GpuArray *v);
 
 /**
  * Change the dimensions of an array.
@@ -347,8 +350,8 @@ COMPYTE_PUBLIC int GpuArray_setarray(GpuArray *a, GpuArray *v);
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_reshape(GpuArray *res, GpuArray *a,
-                                    unsigned int nd, size_t *newdims,
+COMPYTE_PUBLIC int GpuArray_reshape(GpuArray *res, const GpuArray *a,
+                                    unsigned int nd, const size_t *newdims,
                                     ga_order ord, int nocopy);
 
 /**
@@ -366,8 +369,8 @@ COMPYTE_PUBLIC int GpuArray_reshape(GpuArray *res, GpuArray *a,
  * \return GA_NO_ERROR if the operation was successful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_transpose(GpuArray *res, GpuArray *a,
-                                      unsigned int *new_axes);
+COMPYTE_PUBLIC int GpuArray_transpose(GpuArray *res, const GpuArray *a,
+                                      const unsigned int *new_axes);
 
 /**
  * Relase all device and host memory associated with `a`.
@@ -392,7 +395,8 @@ COMPYTE_PUBLIC void GpuArray_clear(GpuArray *a);
  *
  * \returns 1 if `a` and `b` may share a portion of their data.
  */
-COMPYTE_PUBLIC int GpuArray_share(GpuArray *a, GpuArray *b);
+COMPYTE_PUBLIC int GpuArray_share(const GpuArray *a, const GpuArray *b);
+
 /**
  * Retursns the context of an array.
  *
@@ -400,7 +404,7 @@ COMPYTE_PUBLIC int GpuArray_share(GpuArray *a, GpuArray *b);
  *
  * \returns the context in which `a` was allocated.
  */
-COMPYTE_PUBLIC void *GpuArray_context(GpuArray *a);
+COMPYTE_PUBLIC void *GpuArray_context(const GpuArray *a);
 
 /**
  * Copies all the elements of and array to another.
@@ -414,7 +418,8 @@ COMPYTE_PUBLIC void *GpuArray_context(GpuArray *a);
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_move(GpuArray *dst, GpuArray *src);
+COMPYTE_PUBLIC int GpuArray_move(GpuArray *dst, const GpuArray *src);
+
 /**
  * Copy data from the host memory to the device memory.
  *
@@ -425,7 +430,9 @@ COMPYTE_PUBLIC int GpuArray_move(GpuArray *dst, GpuArray *src);
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_write(GpuArray *dst, void *src, size_t src_sz);
+COMPYTE_PUBLIC int GpuArray_write(GpuArray *dst, const void *src,
+                                  size_t src_sz);
+
 /**
  * Copy data from the device memory to the host memory.
  *
@@ -436,7 +443,8 @@ COMPYTE_PUBLIC int GpuArray_write(GpuArray *dst, void *src, size_t src_sz);
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_read(void *dst, size_t dst_sz, GpuArray *src);
+COMPYTE_PUBLIC int GpuArray_read(void *dst, size_t dst_sz,
+                                 const GpuArray *src);
 
 /**
  * Set all of an array's data to a byte pattern.
@@ -458,7 +466,8 @@ COMPYTE_PUBLIC int GpuArray_memset(GpuArray *a, int data);
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_copy(GpuArray *res, GpuArray *a, ga_order order);
+COMPYTE_PUBLIC int GpuArray_copy(GpuArray *res, const GpuArray *a,
+                                 ga_order order);
 
 /**
  * Get a description of the last error in the context of `a`.
@@ -475,7 +484,7 @@ COMPYTE_PUBLIC int GpuArray_copy(GpuArray *res, GpuArray *a, ga_order order);
  *
  * \returns A user-readable string describing the nature of the error.
  */
-COMPYTE_PUBLIC const char *GpuArray_error(GpuArray *a, int err);
+COMPYTE_PUBLIC const char *GpuArray_error(const GpuArray *a, int err);
 
 /**
  * Print a textual description of `a` to the specified file

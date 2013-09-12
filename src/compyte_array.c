@@ -21,7 +21,8 @@
 #define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
 
 int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
-		   int typecode, unsigned int nd, size_t *dims, ga_order ord) {
+		   int typecode, unsigned int nd, const size_t *dims,
+                   ga_order ord) {
   size_t size = compyte_get_elsize(typecode);
   unsigned int i;
   int res = GA_NO_ERROR;
@@ -89,7 +90,8 @@ int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
 }
 
 int GpuArray_zeros(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
-                   int typecode, unsigned int nd, size_t *dims, ga_order ord) {
+                   int typecode, unsigned int nd, const size_t *dims,
+                   ga_order ord) {
   int err;
   err = GpuArray_empty(a, ops, ctx, typecode, nd, dims, ord);
   if (err != GA_NO_ERROR)
@@ -103,8 +105,8 @@ int GpuArray_zeros(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
 
 int GpuArray_fromdata(GpuArray *a, const compyte_buffer_ops *ops,
                       gpudata *data, size_t offset, int typecode,
-                      unsigned int nd, size_t *dims, ssize_t *strides,
-                      int writeable) {
+                      unsigned int nd, const size_t *dims,
+                      const ssize_t *strides, int writeable) {
   a->ops = ops;
   assert(data != NULL);
   a->data = data;
@@ -128,7 +130,7 @@ int GpuArray_fromdata(GpuArray *a, const compyte_buffer_ops *ops,
   return GA_NO_ERROR;
 }
 
-int GpuArray_view(GpuArray *v, GpuArray *a) {
+int GpuArray_view(GpuArray *v, const GpuArray *a) {
   v->ops = a->ops;
   v->data = a->data;
   v->nd = a->nd;
@@ -150,8 +152,8 @@ int GpuArray_sync(GpuArray *a) {
   return a->ops->buffer_sync(a->data);
 }
 
-int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
-		   ssize_t *steps) {
+int GpuArray_index(GpuArray *r, const GpuArray *a, const ssize_t *starts,
+                   const ssize_t *stops, const ssize_t *steps) {
   unsigned int i, r_i;
   unsigned int new_nd = a->nd;
 
@@ -201,7 +203,7 @@ int GpuArray_index(GpuArray *r, GpuArray *a, ssize_t *starts, ssize_t *stops,
   return GA_NO_ERROR;
 }
 
-int GpuArray_setarray(GpuArray *a, GpuArray *v) {
+int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
   GpuArray tmp;
   int i;
   int err = GA_NO_ERROR;
@@ -256,8 +258,8 @@ int GpuArray_setarray(GpuArray *a, GpuArray *v) {
   return err;
 }
 
-int GpuArray_reshape(GpuArray *res, GpuArray *a, unsigned int nd,
-                     size_t *newdims, ga_order ord, int nocopy) {
+int GpuArray_reshape(GpuArray *res, const GpuArray *a, unsigned int nd,
+                     const size_t *newdims, ga_order ord, int nocopy) {
   ssize_t *newstrides;
   size_t np;
   size_t op;
@@ -413,7 +415,8 @@ int GpuArray_reshape(GpuArray *res, GpuArray *a, unsigned int nd,
   return GA_NO_ERROR;
 }
 
-int GpuArray_transpose(GpuArray *res, GpuArray *a, unsigned int *new_axes) {
+int GpuArray_transpose(GpuArray *res, const GpuArray *a,
+                       const unsigned int *new_axes) {
   unsigned int i;
   unsigned int j;
   unsigned int k;
@@ -467,20 +470,20 @@ void GpuArray_clear(GpuArray *a) {
   memset(a, 0, sizeof(*a));
 }
 
-int GpuArray_share(GpuArray *a, GpuArray *b) {
+int GpuArray_share(const GpuArray *a, const GpuArray *b) {
   if (a->ops != b->ops) return 0;
   /* XXX: redefine buffer_share to mean: is it possible to share?
           and use offset to make sure */
   return a->ops->buffer_share(a->data, b->data, NULL);
 }
 
-void *GpuArray_context(GpuArray *a) {
+void *GpuArray_context(const GpuArray *a) {
   void *res;
   (void)a->ops->buffer_property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &res);
   return res;
 }
 
-int GpuArray_move(GpuArray *dst, GpuArray *src) {
+int GpuArray_move(GpuArray *dst, const GpuArray *src) {
   size_t sz;
   unsigned int i;
   if (dst->ops != src->ops)
@@ -502,7 +505,7 @@ int GpuArray_move(GpuArray *dst, GpuArray *src) {
                                sz);
 }
 
-int GpuArray_write(GpuArray *dst, void *src, size_t src_sz) {
+int GpuArray_write(GpuArray *dst, const void *src, size_t src_sz) {
   if (!GpuArray_ISWRITEABLE(dst))
     return GA_VALUE_ERROR;
   if (!GpuArray_ISONESEGMENT(dst))
@@ -510,7 +513,7 @@ int GpuArray_write(GpuArray *dst, void *src, size_t src_sz) {
   return dst->ops->buffer_write(dst->data, dst->offset, src, src_sz);
 }
 
-int GpuArray_read(void *dst, size_t dst_sz, GpuArray *src) {
+int GpuArray_read(void *dst, size_t dst_sz, const GpuArray *src) {
   if (!GpuArray_ISONESEGMENT(src))
     return GA_UNSUPPORTED_ERROR;
   return src->ops->buffer_read(dst, src->data, src->offset, dst_sz);
@@ -522,7 +525,7 @@ int GpuArray_memset(GpuArray *a, int data) {
   return a->ops->buffer_memset(a->data, a->offset, data);
 }
 
-int GpuArray_copy(GpuArray *res, GpuArray *a, ga_order order) {
+int GpuArray_copy(GpuArray *res, const GpuArray *a, ga_order order) {
   int err;
   err = GpuArray_empty(res, a->ops, GpuArray_context(a), a->typecode,
                        a->nd, a->dimensions, order);
@@ -533,7 +536,7 @@ int GpuArray_copy(GpuArray *res, GpuArray *a, ga_order order) {
   return err;
 }
 
-const char *GpuArray_error(GpuArray *a, int err) {
+const char *GpuArray_error(const GpuArray *a, int err) {
   void *ctx;
   a->ops->buffer_property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
   return Gpu_error(a->ops, ctx, err);
