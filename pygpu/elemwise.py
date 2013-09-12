@@ -487,7 +487,8 @@ def elemwise1(a, op, oper=None, op_tmpl="res[i] = %(op)sa[i]"):
 
 
 def elemwise2(a, op, b, ary, odtype=None, oper=None,
-              op_tmpl="res[i] = (%(out_t)s)%(a)s %(op)s (%(out_t)s)%(b)s"):
+              op_tmpl="res[i] = (%(out_t)s)%(a)s %(op)s (%(out_t)s)%(b)s",
+              broadcast=False):
     if not isinstance(a, gpuarray.GpuArray):
         a = numpy.asarray(a)
     if not isinstance(b, gpuarray.GpuArray):
@@ -506,11 +507,12 @@ def elemwise2(a, op, b, ary, odtype=None, oper=None,
                           'out_t': dtype_to_ctype(odtype)}
 
     k = ElemwiseKernel(ary.context, args, oper)
-    k(res, a, b)
+    k(res, a, b, broadcast=broadcast)
     return res
 
 
-def ielemwise2(a, op, b, oper=None, op_tmpl="a[i] = a[i] %(op)s %(b)s"):
+def ielemwise2(a, op, b, oper=None, op_tmpl="a[i] = a[i] %(op)s %(b)s",
+               broadcast=False):
     if not isinstance(b, gpuarray.GpuArray):
         b = numpy.asarray(b)
 
@@ -523,9 +525,10 @@ def ielemwise2(a, op, b, oper=None, op_tmpl="a[i] = a[i] %(op)s %(b)s"):
         oper = op_tmpl % {'op': op, 'b': b_arg.expr()}
 
     k = ElemwiseKernel(a.context, args, oper)
-    k(a, b)
+    k(a, b, broadcast=broadcast)
     return a
 
-def compare(a, op, b):
+def compare(a, op, b, broadcast=False):
     return elemwise2(a, op, b, a, odtype=numpy.dtype('bool'),
-                     op_tmpl="res[i] = (%(a)s %(op)s %(b)s)")
+                     op_tmpl="res[i] = (%(a)s %(op)s %(b)s)",
+                     broadcast=broadcast)

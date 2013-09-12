@@ -20,60 +20,60 @@ class gpuarray(array.GpuArray):
     """
     ### add
     def __add__(self, other):
-        return elemwise2(self, '+', other, self)
+        return elemwise2(self, '+', other, self, broadcast=True)
 
     def __radd__(self, other):
-        return elemwise2(other, '+', self, self)
+        return elemwise2(other, '+', self, self, broadcast=True)
 
     def __iadd__(self, other):
-        return ielemwise2(self, '+', other)
+        return ielemwise2(self, '+', other, broadcast=True)
 
     ### sub
     def __sub__(self, other):
-        return elemwise2(self, '-', other, self)
+        return elemwise2(self, '-', other, self, broadcast=True)
 
     def __rsub__(self, other):
-        return elemwise2(other, '-', self, self)
+        return elemwise2(other, '-', self, self, broadcast=True)
 
     def __isub__(self, other):
-        return ielemwise2(self, '-', other)
+        return ielemwise2(self, '-', other, broadcast=True)
 
     ### mul
     def __mul__(self, other):
-        return elemwise2(self, '*', other, self)
+        return elemwise2(self, '*', other, self, broadcast=True)
 
     def __rmul__(self, other):
-        return elemwise2(other, '*', self, self)
+        return elemwise2(other, '*', self, self, broadcast=True)
 
     def __imul__(self, other):
-        return ielemwise2(self, '*', other)
+        return ielemwise2(self, '*', other, broadcast=True)
 
     ### div
     def __div__(self, other):
-        return elemwise2(self, '/', other, self)
+        return elemwise2(self, '/', other, self, broadcast=True)
 
     def __rdiv__(self, other):
-        return elemwise2(other, '/', self, self)
+        return elemwise2(other, '/', self, self, broadcast=True)
 
     def __idiv__(self, other):
-        return ielemwise2(self, '/', other)
+        return ielemwise2(self, '/', other, broadcast=True)
 
     ### truediv
     def __truediv__(self, other):
         np1 = get_np_obj(self)
         np2 = get_np_obj(other)
         res = (np1.__truediv__(np2)).dtype
-        return elemwise2(self, '/', other, self, odtype=res)
+        return elemwise2(self, '/', other, self, odtype=res, broadcast=True)
 
     def __rtruediv__(self, other):
         np1 = get_np_obj(self)
         np2 = get_np_obj(other)
         res = (np2.__truediv__(np1)).dtype
-        return elemwise2(other, '/', self, self, odtype=res)
+        return elemwise2(other, '/', self, self, odtype=res, broadcast=True)
 
     def __itruediv__(self, other):
         np2 = get_np_obj(other)
-        kw = {}
+        kw = {'broadcast' = True}
         if self.dtype == np.float32 or np2.dtype == np.float32:
             kw['op_tmpl'] = "a[i] = (float)a[i] / (float)%(b)s"
         if self.dtype == np.float64 or np2.dtype == np.float64:
@@ -83,21 +83,21 @@ class gpuarray(array.GpuArray):
     ### floordiv
     def __floordiv__(self, other):
         out_dtype = get_common_dtype(self, other, True)
-        kw = {}
+        kw = {'broadcast' = True}
         if out_dtype.kind == 'f':
             kw['op_tmpl'] = "res[i] = floor((%(out_t)s)%(a)s / (%(out_t)s)%(b)s)"
         return elemwise2(self, '/', other, self, odtype=out_dtype, **kw)
 
     def __rfloordiv__(self, other):
         out_dtype = get_common_dtype(other, self, True)
-        kw = {}
+        kw = {'broadcast' = True}
         if out_dtype.kind == 'f':
             kw['op_tmpl'] = "res[i] = floor((%(out_t)s)%(a)s / (%(out_t)s)%(b)s)"
         return elemwise2(other, '/', self, self, odtype=out_dtype, **kw)
 
     def __ifloordiv__(self, other):
         out_dtype = self.dtype
-        kw = {}
+        kw = {'broadcast' = True}
         if out_dtype == np.float32:
             kw['op_tmpl'] = "a[i] = floor((float)a[i] / (float)%(b)s)"
         if out_dtype == np.float64:
@@ -107,21 +107,21 @@ class gpuarray(array.GpuArray):
     ### mod
     def __mod__(self, other):
         out_dtype = get_common_dtype(self, other, True)
-        kw = {}
+        kw = {'broadcast' = True}
         if out_dtype.kind == 'f':
             kw['op_tmpl'] = "res[i] = fmod((%(out_t)s)%(a)s, (%(out_t)s)%(b)s)"
         return elemwise2(self, '%', other, self, odtype=out_dtype, **kw)
 
     def __rmod__(self, other):
         out_dtype = get_common_dtype(other, self, True)
-        kw = {}
+        kw = {'broadcast' = True}
         if out_dtype.kind == 'f':
             kw['op_tmpl'] = "res[i] = fmod((%(out_t)s)%(a)s, (%(out_t)s)%(b)s)"
         return elemwise2(other, '%', self, self, odtype=out_dtype, **kw)
 
     def __imod__(self, other):
         out_dtype = get_common_dtype(self, other, self.dtype == np.float64)
-        kw = {}
+        kw = {'broadcast' = True}
         if out_dtype == np.float32:
             kw['op_tmpl'] = "a[i] = fmod((float)a[i], (float)%(b)s)"
         if out_dtype == np.float64:
@@ -152,7 +152,7 @@ class gpuarray(array.GpuArray):
                        'out_t': dtype_to_ctype(odtype)}
 
         k = ElemwiseKernel(self.context, args, ksrc)
-        k(div, mod, self, other)
+        k(div, mod, self, other, broadcast=True)
         return (div, mod)
 
     def __rdivmod__(self, other):
@@ -178,7 +178,7 @@ class gpuarray(array.GpuArray):
                        'out_t': dtype_to_ctype(odtype)}
 
         k = ElemwiseKernel(self.context, args, ksrc)
-        k(div, mod, other, self)
+        k(div, mod, other, self, broadcast=True)
         return (div, mod)
 
     def __neg__(self):
@@ -198,19 +198,19 @@ class gpuarray(array.GpuArray):
 
     ### richcmp
     def __lt__(self, other):
-        return compare(self, '<', other)
+        return compare(self, '<', other, broadcast=True)
 
     def __le__(self, other):
-        return compare(self, '<=', other)
+        return compare(self, '<=', other, broadcast=True)
 
     def __eq__(self, other):
-        return compare(self, '==', other)
+        return compare(self, '==', other, broadcast=True)
 
     def __ne__(self, other):
-        return compare(self, '!=', other)
+        return compare(self, '!=', other, broadcast=True)
 
     def __ge__(self, other):
-        return compare(self, '>=', other)
+        return compare(self, '>=', other, broadcast=True)
 
     def __gt__(self, other):
-        return compare(self, '>', other)
+        return compare(self, '>', other, broadcast=True)
