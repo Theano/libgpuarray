@@ -198,17 +198,6 @@ class ReductionKernel(object):
     def _get_basic_kernel(self, maxls, nd):
         return self._find_kernel_ls(self._gen_basic, maxls, nd)
 
-    def _call_basic(self, n, args, offsets):
-        gs = self._get_gs(n, self.contig_ls, self.contig_k)
-        out = self._alloc_out(gs)
-        kernel_args = [numpy.asarray(n, dtype='uint32'), out]
-        for i, arg in enumerate(args):
-            kernel_args.append(arg)
-            if isinstance(arg, gpuarray.GpuArray):
-                kernel_args.append(numpy.asarray(offsets[i], dtype='uint32'))
-        self.contig_k(*kernel_args, ls=self.contig_ls, gs=gs)
-        return gs, out
-
     def __call__(self, *args, **kwargs):
         _, nd, dims, strs, offsets, contig = check_args(args, collapse=False,
                                                         broadcast=False)
@@ -242,7 +231,6 @@ class ReductionKernel(object):
             else:
                 kargs.append(arg)
 
-        print ls, gs
         k(*kargs, ls=ls, gs=gs)
 
         return out
