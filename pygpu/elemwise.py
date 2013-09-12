@@ -492,10 +492,13 @@ def elemwise1(a, op, oper=None, op_tmpl="res[i] = %(op)sa[i]", out=None):
 def elemwise2(a, op, b, ary, odtype=None, oper=None,
               op_tmpl="res[i] = (%(out_t)s)%(a)s %(op)s (%(out_t)s)%(b)s",
               broadcast=False):
+    ndim_extend = True
     if not isinstance(a, gpuarray.GpuArray):
         a = numpy.asarray(a)
+        ndim_extend = False
     if not isinstance(b, gpuarray.GpuArray):
         b = numpy.asarray(b)
+        ndim_extend = False
     if odtype is None:
         odtype = get_common_dtype(a, b, True)
 
@@ -503,19 +506,21 @@ def elemwise2(a, op, b, ary, odtype=None, oper=None,
     b_arg = as_argument(b, 'b')
 
     args = [ArrayArg(odtype, 'res'), a_arg, b_arg]
-    out_shape = list(ary.shape)
-    for n, s in enumerate(out_shape):
-        # this would not catch the case where a.shape[n] > b.shape[n],
-        # but both are bigger than s.  But it does not matter as in
-        # that case the kernel call will fail because arguments shape
-        # differ after broadcast.
-        if a.ndim > n:
-            out_shape[n] = max(a.shape[n], s)
-        if b.ndim > n:
-            out_shape[n] = max(b.shape[n], s)
-    res = gpuarray.empty(out_shape, dtype=odtype, context=ary.context,
-                         cls=ary.__class__)
 
+    if ndim_extend:
+        if a.ndim != b.ndim:
+            nd = max(a.ndim, b.ndim)
+            if a.ndim < nd:
+                a = a.reshape(((1,) * (nd - a.ndim))+a.shape)
+            if b.ndim < nd:
+                b = b.reshape(((1,) * (nd - b.ndim))+b.shape)
+        out_shape = tuple(max(sa, sb) for sa, sb in zip(a.shape, b.shape))
+        res = gpuarray.empty(out_shape, dtype=odtype, context=ary.context,
+                             cls=ary.__class__)
+    else:
+        res = ary._empty_like_me(dtype=odtype)
+
+    print res.shape
     if oper is None:
         oper = op_tmpl % {'a': a_arg.expr(), 'op': op, 'b': b_arg.expr(),
                           'out_t': dtype_to_ctype(odtype)}
