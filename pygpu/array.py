@@ -74,7 +74,7 @@ class gpuarray(array.GpuArray):
 
     def __itruediv__(self, other):
         np2 = get_np_obj(other)
-        kw = {'broadcast' = True}
+        kw = {'broadcast': True}
         if self.dtype == np.float32 or np2.dtype == np.float32:
             kw['op_tmpl'] = "a[i] = (float)a[i] / (float)%(b)s"
         if self.dtype == np.float64 or np2.dtype == np.float64:
@@ -84,21 +84,21 @@ class gpuarray(array.GpuArray):
     ### floordiv
     def __floordiv__(self, other):
         out_dtype = get_common_dtype(self, other, True)
-        kw = {'broadcast' = True}
+        kw = {'broadcast': True}
         if out_dtype.kind == 'f':
             kw['op_tmpl'] = "res[i] = floor((%(out_t)s)%(a)s / (%(out_t)s)%(b)s)"
         return elemwise2(self, '/', other, self, odtype=out_dtype, **kw)
 
     def __rfloordiv__(self, other):
         out_dtype = get_common_dtype(other, self, True)
-        kw = {'broadcast' = True}
+        kw = {'broadcast': True}
         if out_dtype.kind == 'f':
             kw['op_tmpl'] = "res[i] = floor((%(out_t)s)%(a)s / (%(out_t)s)%(b)s)"
         return elemwise2(other, '/', self, self, odtype=out_dtype, **kw)
 
     def __ifloordiv__(self, other):
         out_dtype = self.dtype
-        kw = {'broadcast' = True}
+        kw = {'broadcast': True}
         if out_dtype == np.float32:
             kw['op_tmpl'] = "a[i] = floor((float)a[i] / (float)%(b)s)"
         if out_dtype == np.float64:
@@ -108,21 +108,21 @@ class gpuarray(array.GpuArray):
     ### mod
     def __mod__(self, other):
         out_dtype = get_common_dtype(self, other, True)
-        kw = {'broadcast' = True}
+        kw = {'broadcast': True}
         if out_dtype.kind == 'f':
             kw['op_tmpl'] = "res[i] = fmod((%(out_t)s)%(a)s, (%(out_t)s)%(b)s)"
         return elemwise2(self, '%', other, self, odtype=out_dtype, **kw)
 
     def __rmod__(self, other):
         out_dtype = get_common_dtype(other, self, True)
-        kw = {'broadcast' = True}
+        kw = {'broadcast': True}
         if out_dtype.kind == 'f':
             kw['op_tmpl'] = "res[i] = fmod((%(out_t)s)%(a)s, (%(out_t)s)%(b)s)"
         return elemwise2(other, '%', self, self, odtype=out_dtype, **kw)
 
     def __imod__(self, other):
         out_dtype = get_common_dtype(self, other, self.dtype == np.float64)
-        kw = {'broadcast' = True}
+        kw = {'broadcast': True}
         if out_dtype == np.float32:
             kw['op_tmpl'] = "a[i] = fmod((float)a[i], (float)%(b)s)"
         if out_dtype == np.float64:
