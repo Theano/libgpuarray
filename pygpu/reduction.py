@@ -253,13 +253,15 @@ def reduce1(ary, op, neutral, out_type, axis=None, out=None, oper=None):
     if axis is None:
         redux = [True] * nd
     else:
-        if not isintance(axis, (list, tuple)):
+        redux = [False] * nd
+
+        if not isinstance(axis, (list, tuple)):
             axis = (axis,)
 
         for ax in axis:
             if ax < 0:
                 ax += nd
-            if ax < 0 of ax >= nd:
+            if ax < 0 or ax >= nd:
                 raise ValueError('axis out of bounds')
             redux[ax] = True
 
@@ -269,5 +271,6 @@ def reduce1(ary, op, neutral, out_type, axis=None, out=None, oper=None):
         reduce_expr = oper
 
     r = ReductionKernel(ary.context, dtype_out=out_type, neutral=neutral,
-                        reduce_expr=reduce_expr, redux=redux)
+                        reduce_expr=reduce_expr, redux=redux,
+                        arguments=[ArrayArg(ary.dtype, 'a')])
     return r(ary, out=out)

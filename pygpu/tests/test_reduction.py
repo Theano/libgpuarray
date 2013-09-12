@@ -3,9 +3,11 @@ import numpy
 
 from pygpu import gpuarray
 from pygpu.reduction import ReductionKernel
+from pygpu.array import gpuarray as elemary
 
 from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
-                      context, gen_gpuarray, dtypes_no_complex_big)
+                      check_meta_content, context, gen_gpuarray,
+                      dtypes_no_complex_big, dtypes_no_complex)
 
 def test_red_array_basic():
     for dtype in dtypes_no_complex_big:
@@ -49,3 +51,28 @@ def test_red_big_array():
                   [False, True, True],
                   [False, True, False]]:
         yield red_array_sum, 'float32', (2000, 30, 100), redux
+
+
+def test_reduction_ops():
+    for axis in [None, 0, 1]:
+        for op in ['all', 'any']:
+            yield reduction_op, op, 'bool', axis
+        for op in ['prod', 'sum']: # 'min', 'max']:
+            for dtype in dtypes_no_complex:
+                yield reduction_op, op, dtype, axis
+
+def reduction_op(op, dtype, axis):
+    c, g = gen_gpuarray((2, 3), dtype=dtype, ctx=context, cls=elemary)
+
+    rc = getattr(c, op)(axis=axis)
+    rg = getattr(g, op)(axis=axis)
+
+    check_meta_content(rg, rc)
+
+    outc = numpy.empty(rc.shape, dtype=rc.dtype)
+    outg = gpuarray.empty(rg.shape, dtype=rg.dtype, context=context)
+
+    rc = getattr(c, op)(axis=axis, out=outc)
+    rg = getattr(g, op)(axis=axis, out=outg)
+
+    check_meta_content(outg, outc)

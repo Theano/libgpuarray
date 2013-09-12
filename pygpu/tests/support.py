@@ -69,19 +69,32 @@ def check_flags(x, y):
     assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
 
 
-def check_meta(x, y):
+def check_meta_only(x, y):
     assert isinstance(x, gpuarray.GpuArray)
     assert x.shape == y.shape
     assert x.dtype == y.dtype
     if y.size != 0:
         assert x.strides == y.strides
+
+
+def check_content(x, y):
+    assert isinstance(x, gpuarray.GpuArray)
+    assert numpy.allclose(numpy.asarray(x), numpy.asarray(y))
+
+
+def check_meta(x, y):
+    check_meta_only(x, y)
     check_flags(x, y)
 
 
 def check_all(x, y):
-    assert isinstance(x, gpuarray.GpuArray)
     check_meta(x, y)
-    assert numpy.allclose(numpy.asarray(x), numpy.asarray(y))
+    check_content(x, y)
+
+
+def check_meta_content(x, y):
+    check_meta_only(x, y)
+    check_content(x, y)
 
 
 def gen_gpuarray(shape_orig, dtype='float32', offseted_outer=False,
