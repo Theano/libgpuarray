@@ -76,3 +76,20 @@ def reduction_op(op, dtype, axis):
     rg = getattr(g, op)(axis=axis, out=outg)
 
     check_meta_content(outg, outc)
+
+def test_reduction_wrong_type():
+    c, g = gen_gpuarray((2, 3), dtype='float32', ctx=context, cls=elemary)
+    out1 = gpuarray.empty((2, 3), dtype='int32', context=context)
+    out2 = gpuarray.empty((3, 2), dtype='float32', context=context)
+
+    try:
+        r = g.sum(out=out1)
+        assert False, "Expected a TypeError out of the sum"
+    except TypeError:
+        pass
+
+    try:
+        r = g.sum(out=out2)
+        assert False, "Expected a TypeError out of the sum"
+    except TypeError:
+        pass

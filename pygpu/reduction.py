@@ -218,7 +218,9 @@ class ReductionKernel(object):
             out = gpuarray.empty(out_shape, context=self.context,
                                  dtype=self.dtype_out)
         else:
-            assert out.shape == out_shape
+            if out.shape != out_shape or out.dtype != self.dtype_out:
+                raise TypeError("Out array is not of expected type "
+                                "(differring shape or dtype)")
         k, ls = self._get_basic_kernel(n, nd)
 
         kargs = [numpy.asarray(n, dtype='uint32'), out]
