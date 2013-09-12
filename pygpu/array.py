@@ -224,12 +224,12 @@ class gpuarray(array.GpuArray):
         return self.transpose()
 
     def clip(self, a_min, a_max, out=None):
-        oper='res[i] = a[i] > %(max)s ? %(max)s : '
-        '(a[i] < %(min)s ? %(min)s : a[i])' % dict(min=a_min, max=a_max)
+        oper=('res[i] = a[i] > %(max)s ? %(max)s : '
+              '(a[i] < %(min)s ? %(min)s : a[i])' % dict(min=a_min, max=a_max))
         return elemwise1(self, '', oper=oper, out=out)
 
     def fill(self, value):
-        self[:] = value
+        self[...] = value
 
     # reductions
     def all(self, axis=None, out=None):
