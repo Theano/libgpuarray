@@ -93,3 +93,17 @@ def test_reduction_wrong_type():
         assert False, "Expected a TypeError out of the sum"
     except TypeError:
         pass
+
+
+def test_reduction_0d():
+    c, g = gen_gpuarray((), dtype='bool', ctx=context, cls=elemary)
+
+    rc = c.any()
+    rg = g.any()
+
+    assert numpy.all(rc == numpy.asarray(rg))
+
+    rc = c.all()
+    rg = g.all()
+
+    assert numpy.all(rc == numpy.asarray(rg))
