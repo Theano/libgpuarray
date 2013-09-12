@@ -362,7 +362,7 @@ def copy_view(shp, dtype, offseted, order1, order2):
 
 def test_shape():
     for shps in [((), (1,)), ((5,), (1, 5)), ((5,), (5, 1)), ((2, 3), (6,)),
-                 ((6,), (2, 3))]:
+                 ((6,), (2, 3)), ((1,), ())]:
         for offseted in [True, False]:
             for order1 in ['c', 'f']:
                 yield shape_, shps, offseted, order1

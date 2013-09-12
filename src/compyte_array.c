@@ -300,7 +300,7 @@ int GpuArray_reshape(GpuArray *res, const GpuArray *a, unsigned int nd,
 
   /* If the source and desired layouts are the same, then just copy
      strides and dimensions */
-  if ((ord != GA_F_ORDER && GpuArray_CHKFLAGS(a, GA_C_CONTIGUOUS)) ||
+  if ((ord == GA_C_ORDER && GpuArray_CHKFLAGS(a, GA_C_CONTIGUOUS)) ||
       (ord == GA_F_ORDER && GpuArray_CHKFLAGS(a, GA_F_CONTIGUOUS))) {
     goto do_final_copy;
   }
@@ -389,17 +389,17 @@ int GpuArray_reshape(GpuArray *res, const GpuArray *a, unsigned int nd,
     return GA_MEMORY_ERROR;
   }
   memcpy(res->dimensions, newdims, res->nd*sizeof(size_t));
-  if (ord == GA_F_ORDER) {
-    if (res->nd > 0)
+  if (res->nd > 0) {
+    if (ord == GA_F_ORDER) {
       res->strides[0] = compyte_get_elsize(res->typecode);
-    for (i = 1; i < res->nd; i++) {
-      res->strides[i] = res->strides[i-1] * res->dimensions[i-1];
-    }
-  } else {
-    if (res->nd > 0)
+      for (i = 1; i < res->nd; i++) {
+        res->strides[i] = res->strides[i-1] * res->dimensions[i-1];
+      }
+    } else {
       res->strides[res->nd-1] = compyte_get_elsize(res->typecode);
-    for (i = res->nd-1; i > 0; i--) {
-      res->strides[i-1] = res->strides[i] * res->dimensions[i];
+      for (i = res->nd-1; i > 0; i--) {
+        res->strides[i-1] = res->strides[i] * res->dimensions[i];
+      }
     }
   }
 
