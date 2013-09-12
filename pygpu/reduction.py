@@ -220,7 +220,8 @@ class ReductionKernel(object):
         else:
             if out.shape != out_shape or out.dtype != self.dtype_out:
                 raise TypeError("Out array is not of expected type "
-                                "(differring shape or dtype)")
+                                "(expected %s %s, got %s %s)" % (
+                        out_shape, self.dtype_out, out.shape, out.dtype))
         k, ls = self._get_basic_kernel(n, nd)
 
         kargs = [numpy.asarray(n, dtype='uint32'), out]
