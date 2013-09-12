@@ -503,7 +503,18 @@ def elemwise2(a, op, b, ary, odtype=None, oper=None,
     b_arg = as_argument(b, 'b')
 
     args = [ArrayArg(odtype, 'res'), a_arg, b_arg]
-    res = ary._empty_like_me(dtype=odtype)
+    out_shape = list(ary.shape)
+    for n, s in enumerate(out_shape):
+        # this would not catch the case where a.shape[n] > b.shape[n],
+        # but both are bigger than s.  But it does not matter as in
+        # that case the kernel call will fail because arguments shape
+        # differ after broadcast.
+        if a.ndim > n:
+            out_shape[n] = max(a.shape[n], s)
+        if b.ndim > n:
+            out_shape[n] = max(b.shape[n], s)
+    res = gpuarray.empty(out_shape, dtype=odtype, context=ary.context,
+                         cls=ary.__class__)
 
     if oper is None:
         oper = op_tmpl % {'a': a_arg.expr(), 'op': op, 'b': b_arg.expr(),

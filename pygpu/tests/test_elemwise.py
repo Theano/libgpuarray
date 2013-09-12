@@ -6,7 +6,8 @@ from pygpu.array import gpuarray as elemary
 from pygpu.elemwise import ElemwiseKernel
 
 from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
-                      context, gen_gpuarray, dtypes_no_complex)
+                      context, gen_gpuarray, dtypes_no_complex,
+                      check_meta_content)
 
 
 operators1 = [operator.neg, operator.pos, operator.abs]
@@ -278,3 +279,22 @@ def test_elemwise_bool():
     assert bool(a) == False
     a = gpuarray.zeros((), context=context)
     assert bool(a) == False
+
+
+def test_broadcast():
+    for shapea, shapeb in [((3, 5), (3, 5)),
+                           ((1, 5), (3, 5)),
+                           ((3, 5), (3, 1)),
+                           ((1, 5), (3, 1)),
+                           ((1, 1), (1, 1)),
+                           ((), ())]:
+        yield broadcast, shapea, shapeb
+
+def broadcast(shapea, shapeb):
+    ac, ag = gen_gpuarray(shapea, 'float32', ctx=context, cls=elemary)
+    bc, bg = gen_gpuarray(shapeb, 'float32', ctx=context, cls=elemary)
+
+    rc = ac + bc
+    rg = ag + bg
+
+    check_meta_content(rg, rc)
