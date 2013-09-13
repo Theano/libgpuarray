@@ -546,13 +546,14 @@ void GpuArray_fprintf(FILE *fd, const GpuArray *a) {
   unsigned int i;
   int comma = 0;
 
-  fprintf(fd, "GpuNdArray <%p, %p> nd=%d\n", a, a->data, a->nd);
+  fprintf(fd, "GpuNdArray <%p, %p, %p> nd=%d\n", a, a->data, a->ops, a->nd);
+  fprintf(fd, "\tdims: %p, str: %p\n", a->dimensions, a->strides);
   fprintf(fd, "\tITEMSIZE: %zd\n", GpuArray_ITEMSIZE(a));
   fprintf(fd, "\tTYPECODE: %d\n", a->typecode);
   fprintf(fd, "\tOFFSET: %" SPREFIX "u\n", a->offset);
   fprintf(fd, "\tHOST_DIMS:      ");
   for (i = 0; i < a->nd; ++i) {
-      fprintf(fd, "%zd\t", a->dimensions[i]);
+      fprintf(fd, "%zu\t", a->dimensions[i]);
   }
   fprintf(fd, "\n\tHOST_STRIDES: ");
   for (i = 0; i < a->nd; ++i) {

@@ -223,6 +223,8 @@ class gpuarray(array.GpuArray):
             return self
         return self.transpose()
 
+"""
+Since these functions are untested (thus probably wrong), we disable them.
     def clip(self, a_min, a_max, out=None):
         oper=('res[i] = a[i] > %(max)s ? %(max)s : '
               '(a[i] < %(min)s ? %(min)s : a[i])' % dict(min=a_min, max=a_max))
@@ -230,7 +232,7 @@ class gpuarray(array.GpuArray):
 
     def fill(self, value):
         self[...] = value
-
+"""
     # reductions
     def all(self, axis=None, out=None):
         if self.ndim == 0:
