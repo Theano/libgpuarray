@@ -4,6 +4,8 @@ PROJECT(compyte C)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMakeModules/")
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+
 enable_testing()
 
 execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/lib)

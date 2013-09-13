@@ -42,7 +42,6 @@ END_TEST
 START_TEST(test_get_type)
 {
   const compyte_type *pt;
-  int typecode;
 
   pt = compyte_get_type(0);
   ck_assert(pt->typecode == 0);
