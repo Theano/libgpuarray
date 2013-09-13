@@ -530,9 +530,7 @@ def _cmp(x,y):
         assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
     else:
         assert x.flags["F_CONTIGUOUS"]
-    # GpuArrays never own their data after indexing
-    if y.ndim != 0:
-        assert x.flags["OWNDATA"] == y.flags["OWNDATA"]
+    # GpuArrays always own their data so don't check that flag.
     if x.flags["WRITEABLE"] != y.flags["WRITEABLE"]:
         assert x.ndim == 0
     assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
@@ -559,10 +557,7 @@ def _cmpNs(x, y):
     assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
     assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"]
     assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
-    # GpuArrays never own their data after indexing
-    assert not x.flags["OWNDATA"]
-    # we don't check for y.flags["OWNDATA"] since the logic
-    # is a bit twisty and this is not a testsuite for numpy.
+    # we don't check owndata since it is always true for GpuArrays
     assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
     x_ = numpy.asarray(x)
     assert x_.shape == y.shape
