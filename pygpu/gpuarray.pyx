@@ -449,6 +449,15 @@ def set_default_context(GpuContext ctx):
     global default_context
     default_context = ctx
 
+def get_default_context():
+    """
+    get_default_context()
+
+    Return the currently defined default context (or `None`).
+    """
+
+    return default_context
+
 cdef GpuContext ensure_context(GpuContext c):
     if c is None:
         if default_context is None:
