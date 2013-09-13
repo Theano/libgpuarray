@@ -63,9 +63,8 @@ cdef extern from "compyte/buffer.h":
     ctypedef struct compyte_buffer_ops:
         void *buffer_init(int devno, int *ret)
         void buffer_deinit(void *ctx)
-        char *buffer_error(void *ctx)
-        int buffer_property(void *c, gpudata *b, gpukernel *k, int prop_id,
-                            void *res)
+        char *ctx_error(void *ctx)
+        int property(void *c, gpudata *b, gpukernel *k, int prop_id, void *res)
 
     int GA_CTX_PROP_DEVNAME
     int GA_CTX_PROP_MAXLSIZE
@@ -112,8 +111,6 @@ cdef extern from "compyte/array.h":
 
     cdef int GA_C_CONTIGUOUS
     cdef int GA_F_CONTIGUOUS
-    cdef int GA_OWNDATA
-    cdef int GA_ENSURECOPY
     cdef int GA_ALIGNED
     cdef int GA_WRITEABLE
     cdef int GA_BEHAVED
@@ -216,7 +213,7 @@ cdef api class GpuContext [type GpuContextType, object GpuContextObject]:
     cdef const compyte_buffer_ops *ops
     cdef void* ctx
 
-cdef api GpuArray new_GpuArray(cls, GpuContext ctx)
+cdef api GpuArray new_GpuArray(type cls, GpuContext ctx, object base)
 
 cdef api class GpuArray [type GpuArrayType, object GpuArrayObject]:
     cdef _GpuArray ga

@@ -279,7 +279,7 @@ cdef array_fromdata(GpuArray a, const compyte_buffer_ops *ops, gpudata *data,
     err = GpuArray_fromdata(&a.ga, ops, data, offset, typecode, nd, dims,
                             strides, writeable)
     if err != GA_NO_ERROR:
-        ops.buffer_property(NULL, data, NULL, GA_BUFFER_PROP_CTX, &ctx)
+        ops.property(NULL, data, NULL, GA_BUFFER_PROP_CTX, &ctx)
         raise GpuArrayException(Gpu_error(ops, ctx, err), err)
 
 cdef array_view(GpuArray v, GpuArray a):
@@ -396,7 +396,7 @@ cdef kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs):
 
 cdef kernel_property(GpuKernel k, int prop_id, void *res):
     cdef int err
-    err = k.k.ops.buffer_property(NULL, NULL, k.k.k, prop_id, res)
+    err = k.k.ops.property(NULL, NULL, k.k.k, prop_id, res)
     if err != GA_NO_ERROR:
         raise GpuArrayException(kernel_error(k, err), err)
 
@@ -407,7 +407,7 @@ cdef GpuContext default_context = None
 
 cdef ctx_property(GpuContext c, int prop_id, void *res):
     cdef int err
-    err = c.ops.buffer_property(c.ctx, NULL, NULL, prop_id, res)
+    err = c.ops.property(c.ctx, NULL, NULL, prop_id, res)
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(c.ops, c.ctx, err), err)
 
@@ -561,7 +561,7 @@ def empty(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
     try:
         for i, d in enumerate(shape):
             cdims[i] = d
-        res = new_GpuArray(cls, context)
+        res = new_GpuArray(cls, context, None)
         array_empty(res, context.ops, context.ctx, dtype_to_typecode(dtype),
                     <unsigned int>len(shape), cdims, to_ga_order(order))
     finally:
@@ -709,10 +709,9 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
                 strides[i] = size
                 size *= cdims[i]
 
-        res = new_GpuArray(cls, context)
+        res = new_GpuArray(cls, context, base)
         array_fromdata(res, context.ops, <gpudata *>data, offset, typecode,
                        nd, cdims, cstrides, <int>(1 if writable else 0))
-        res.base = base
     finally:
         free(cdims)
         free(cstrides)
@@ -786,9 +785,10 @@ def array(proto, dtype=None, copy=True, order=None, int ndmin=0,
             elif py_CHKFLAGS(arg, GA_F_CONTIGUOUS):
                 order = 'F'
         if cls is None:
-            cls = proto.__class__
+            cls = type(proto)
         res = empty(shp, dtype=(dtype or arg.dtype), order=order, cls=cls,
                     context=arg.context)
+        res.base = arg.base
         if len(shp) < ndmin:
             tmp = res[idx]
         else:
@@ -808,7 +808,7 @@ def array(proto, dtype=None, copy=True, order=None, int ndmin=0,
     else:
         ord = GA_C_ORDER
 
-    res = new_GpuArray(cls, context)
+    res = new_GpuArray(cls, context, None)
     array_empty(res, context.ops, context.ctx, dtype_to_typecode(a.dtype),
                 np.PyArray_NDIM(a), <size_t *>np.PyArray_DIMS(a), ord)
     array_write(res, np.PyArray_DATA(a), np.PyArray_NBYTES(a))
@@ -846,7 +846,7 @@ cdef class GpuContext:
             if err == GA_VALUE_ERROR:
                 raise GpuArrayException("No device %d"%(devno,), err)
             else:
-                raise GpuArrayException(self.ops.buffer_error(NULL), err)
+                raise GpuArrayException(self.ops.ctx_error(NULL), err)
 
     property kind:
         "Module name this context uses"
@@ -1010,12 +1010,14 @@ cdef class flags(object):
             return self.f_contiguous
 
     property updateifcopy:
+        # Not supported.
         def __get__(self):
             return False
 
     property owndata:
+        # There is no equivalent for GpuArrays and it is always "True".
         def __get__(self):
-            return bool(self.fl & GA_OWNDATA)
+            return True
 
     property aligned:
         def __get__(self):
@@ -1054,7 +1056,7 @@ cdef class flags(object):
         def __get__(self):
             return self.fl
 
-cdef GpuArray new_GpuArray(cls, GpuContext ctx):
+cdef GpuArray new_GpuArray(type cls, GpuContext ctx, object base):
     cdef GpuArray res
     if ctx is None:
         raise RuntimeError("ctx is None in new_GpuArray")
@@ -1062,7 +1064,7 @@ cdef GpuArray new_GpuArray(cls, GpuContext ctx):
         res = GpuArray.__new__(GpuArray)
     else:
         res = GpuArray.__new__(cls)
-    res.base = None
+    res.base = base
     res.context = ctx
     return res
 
@@ -1173,7 +1175,7 @@ cdef class GpuArray:
         else:
             typecode = dtype_to_typecode(dtype)
 
-        res = new_GpuArray(self.__class__, self.context)
+        res = new_GpuArray(self.__class__, self.context, self.base)
         array_empty(res, self.ga.ops, array_context(self), typecode,
                     self.ga.nd, self.ga.dimensions, ord)
         return res
@@ -1188,7 +1190,7 @@ cdef class GpuArray:
         :type order: string
         """
         cdef GpuArray res
-        res = new_GpuArray(self.__class__, self.context)
+        res = new_GpuArray(self.__class__, self.context, None)
         array_copy(res, self, to_ga_order(order))
         return res
 
@@ -1223,7 +1225,7 @@ cdef class GpuArray:
         The returned array shares device data with this one and both
         will reflect changes made to the other.
         """
-        cdef GpuArray res = new_GpuArray(cls, self.context)
+        cdef GpuArray res = new_GpuArray(cls, self.context, self.base)
         array_view(res, self)
         if self.base is not None:
             res.base = self.base
@@ -1281,15 +1283,10 @@ cdef class GpuArray:
         try:
             for i in range(nd):
                 newdims[i] = shape[i]
-            res = new_GpuArray(self.__class__, self.context)
+            res = new_GpuArray(self.__class__, self.context, self.base)
             array_reshape(res, self, nd, newdims, to_ga_order(order), 0)
         finally:
             free(newdims)
-        if not py_CHKFLAGS(res, GA_OWNDATA):
-            if self.base is not None:
-                res.base = self.base
-            else:
-                res.base = self
         return res
 
     def transpose(self, *params):
@@ -1298,7 +1295,7 @@ cdef class GpuArray:
         cdef unsigned int i
         if len(params) is 1 and isinstance(params[0], (tuple, list)):
             params = params[0]
-        res = new_GpuArray(self.__class__, self.context)
+        res = new_GpuArray(self.__class__, self.context, self.base)
         if params is ():
             array_transpose(res, self, NULL)
         else:
@@ -1311,10 +1308,6 @@ cdef class GpuArray:
                 array_transpose(res, self, new_axes)
             finally:
                 free(new_axes)
-        if self.base is not None:
-            res.base = self.base
-        else:
-            res.base = self
         return res
 
     def __len__(self):
@@ -1377,7 +1370,7 @@ cdef class GpuArray:
                 base = self.base
             else:
                 base = self
-            res = new_GpuArray(self.__class__, self.context)
+            res = new_GpuArray(self.__class__, self.context, self.base)
             array_index(res, self, starts, stops, steps)
             res.base = base
         finally:
@@ -1427,7 +1420,7 @@ cdef class GpuArray:
             try:
                 for i in range(nd):
                     newdims[i] = newshape[i]
-                res = new_GpuArray(GpuArray, self.context)
+                res = new_GpuArray(GpuArray, self.context, None)
                 array_reshape(res, self, nd, newdims, GA_C_ORDER, 1)
             finally:
                 free(newdims)
@@ -1436,9 +1429,10 @@ cdef class GpuArray:
             free(self.ga.strides)
             self.ga.dimensions = res.ga.dimensions
             self.ga.strides = res.ga.strides
-            self.ga.nd = nd
+            self.ga.nd = res.ga.nd
             res.ga.dimensions = NULL
             res.ga.strides = NULL
+            res.ga.nd = 0
             array_clear(res)
 
     property size:

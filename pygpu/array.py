@@ -223,7 +223,7 @@ class gpuarray(array.GpuArray):
             return self
         return self.transpose()
 
-"""
+    """
 Since these functions are untested (thus probably wrong), we disable them.
     def clip(self, a_min, a_max, out=None):
         oper=('res[i] = a[i] > %(max)s ? %(max)s : '
