@@ -65,14 +65,6 @@ typedef struct _GpuArray {
    */
 #define GA_F_CONTIGUOUS   0x0002
   /**
-   * Array owns the GpuArray#data element (is responsible for freeing it).
-   */
-#define GA_OWNDATA        0x0004
-  /**
-   * Unused.
-   */
-#define GA_ENSURECOPY     0x0020
-  /**
    * Buffer data is properly aligned for the type (currently this is
    * always assumed to be true).
    */

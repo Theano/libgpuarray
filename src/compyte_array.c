@@ -54,7 +54,7 @@ int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
   a->dimensions = calloc(nd, sizeof(size_t));
   a->strides = calloc(nd, sizeof(ssize_t));
   /* F/C distinction comes later */
-  a->flags = GA_OWNDATA|GA_BEHAVED;
+  a->flags = GA_BEHAVED;
   if (a->dimensions == NULL || a->strides == NULL) {
     GpuArray_clear(a);
     return GA_MEMORY_ERROR;
@@ -110,13 +110,14 @@ int GpuArray_fromdata(GpuArray *a, const compyte_buffer_ops *ops,
   a->ops = ops;
   assert(data != NULL);
   a->data = data;
+  ops->buffer_retain(a->data);
   a->nd = nd;
   a->offset = offset;
   a->typecode = typecode;
   a->dimensions = calloc(nd, sizeof(size_t));
   a->strides = calloc(nd, sizeof(ssize_t));
   /* XXX: We assume that the buffer is aligned */
-  a->flags = GA_OWNDATA|(writeable ? GA_WRITEABLE : 0)|GA_ALIGNED;
+  a->flags = (writeable ? GA_WRITEABLE : 0)|GA_ALIGNED;
   if (a->dimensions == NULL || a->strides == NULL) {
     GpuArray_clear(a);
     return GA_MEMORY_ERROR;
@@ -133,10 +134,11 @@ int GpuArray_fromdata(GpuArray *a, const compyte_buffer_ops *ops,
 int GpuArray_view(GpuArray *v, const GpuArray *a) {
   v->ops = a->ops;
   v->data = a->data;
+  v->ops->buffer_retain(a->data);
   v->nd = a->nd;
   v->offset = a->offset;
   v->typecode = a->typecode;
-  v->flags = a->flags & ~GA_OWNDATA;
+  v->flags = a->flags;
   v->dimensions = calloc(v->nd, sizeof(size_t));
   v->strides = calloc(v->nd, sizeof(ssize_t));
   if (v->dimensions == NULL || v->strides == NULL) {
@@ -165,8 +167,9 @@ int GpuArray_index(GpuArray *r, const GpuArray *a, const ssize_t *starts,
   }
   r->ops = a->ops;
   r->data = a->data;
+  r->ops->buffer_retain(r->data);
   r->typecode = a->typecode;
-  r->flags = a->flags & ~GA_OWNDATA;
+  r->flags = a->flags;
   r->nd = new_nd;
   r->offset = a->offset;
   r->dimensions = calloc(r->nd, sizeof(size_t));
@@ -294,9 +297,10 @@ int GpuArray_reshape(GpuArray *res, const GpuArray *a, unsigned int nd,
 
   res->ops = a->ops;
   res->data = a->data;
+  res->ops->buffer_retain(res->data);
   res->offset = a->offset;
   res->typecode = a->typecode;
-  res->flags = a->flags & ~GA_OWNDATA;
+  res->flags = a->flags;
 
   /* If the source and desired layouts are the same, then just copy
      strides and dimensions */
@@ -423,9 +427,10 @@ int GpuArray_transpose(GpuArray *res, const GpuArray *a,
 
   res->ops = a->ops;
   res->data = a->data;
+  res->ops->buffer_retain(a->data);
   res->offset = a->offset;
   res->nd = a->nd;
-  res->flags = a->flags & ~(GA_OWNDATA|GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
+  res->flags = a->flags & ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
   res->typecode = a->typecode;
   res->dimensions = calloc(res->nd, sizeof(size_t));
   res->strides = calloc(res->nd, sizeof(ssize_t));
@@ -463,8 +468,8 @@ int GpuArray_transpose(GpuArray *res, const GpuArray *a,
 }
 
 void GpuArray_clear(GpuArray *a) {
-  if (a->data && GpuArray_OWNSDATA(a))
-    a->ops->buffer_free(a->data);
+  if (a->data)
+    a->ops->buffer_release(a->data);
   free(a->dimensions);
   free(a->strides);
   memset(a, 0, sizeof(*a));
@@ -479,7 +484,7 @@ int GpuArray_share(const GpuArray *a, const GpuArray *b) {
 
 void *GpuArray_context(const GpuArray *a) {
   void *res;
-  (void)a->ops->buffer_property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &res);
+  (void)a->ops->property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &res);
   return res;
 }
 
@@ -538,7 +543,7 @@ int GpuArray_copy(GpuArray *res, const GpuArray *a, ga_order order) {
 
 const char *GpuArray_error(const GpuArray *a, int err) {
   void *ctx;
-  a->ops->buffer_property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
+  a->ops->property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
   return Gpu_error(a->ops, ctx, err);
 }
 
@@ -567,7 +572,6 @@ void GpuArray_fprintf(FILE *fd, const GpuArray *a) {
   }
   PRINTFLAG(GA_C_CONTIGUOUS);
   PRINTFLAG(GA_F_CONTIGUOUS);
-  PRINTFLAG(GA_OWNDATA);
   PRINTFLAG(GA_ALIGNED);
   PRINTFLAG(GA_WRITEABLE);
 #undef PRINTFLAG

@@ -72,6 +72,9 @@ typedef struct _compyte_buffer_ops {
   /**
    * Allocates a buffer of size `sz` in context `ctx`.
    *
+   * Buffers are reference counted internally and start with a
+   * reference count of 1.
+   *
    * \param ctx a context pointer
    * \param sz the requested size
    * \param ret error return pointer
@@ -83,16 +86,23 @@ typedef struct _compyte_buffer_ops {
   gpudata *(*buffer_alloc)(void *ctx, size_t sz, int *ret);
 
   /**
-   * Free a buffer.
+   * Increase the reference count to the passed buffer by 1.
    *
-   * Release all ressources associated with `b`.
-   *
-   * If this function is called on a buffer that is in use by a kernel
-   * the results are undefined.  (The current backends either block
-   * until kernel completion or maintain a reference to the buffer,
-   * but you should not rely on this behavior.)
+   * \param b a buffer
    */
-  void (*buffer_free)(gpudata *b);
+  void (*buffer_retain)(gpudata *b);
+
+  /**
+   * Release a buffer.
+   *
+   * This will decrement the reference count of the buffer by 1.  If
+   * that count reaches 0 all associated ressources will be released.
+   *
+   * Even if your application does not have any references left to a
+   * buffer it may still hang around if it is in use by internal
+   * mechanisms (kernel call, ...)
+   */
+  void (*buffer_release)(gpudata *b);
 
   /**
    * Check if two buffers may overlap.
@@ -114,7 +124,7 @@ typedef struct _compyte_buffer_ops {
    * Copy the content of a buffer to another.
    *
    * Both buffers must be in the same context.  Additionally the
-   * buffer must not overlap otherwise the content of the destination
+   * buffers must not overlap otherwise the content of the destination
    * buffer is not defined.
    *
    * \param dst destination buffer
@@ -185,25 +195,39 @@ typedef struct _compyte_buffer_ops {
    * \returns Allocated kernel structure or NULL if an error occured.
    * `ret` will be updated with the error code if not NULL.
    */
-  gpukernel *(*buffer_newkernel)(void *ctx, unsigned int count, 
-				 const char **strings, const size_t *lengths,
-				 const char *fname, int flags, int *ret);
+  gpukernel *(*kernel_alloc)(void *ctx, unsigned int count,
+                             const char **strings, const size_t *lengths,
+                             const char *fname, int flags, int *ret);
 
   /**
-   * Free a kernel.
+   * Retain a kernel.
    *
-   * Releases all resources associated with `k`.
+   * Increase the reference count of the passed kernel by 1.
    *
-   * If you free a kernel while it is running, the results are
-   * undefined.
+   * \param k a kernel
    */
-  void (*buffer_freekernel)(gpukernel *k);
+  void (*kernel_retain)(gpukernel *);
+
+  /**
+   * Release a kernel.
+   *
+   * Decrease the reference count of a kernel.  If it reaches 0, all
+   * resources associated with `k` will be released.
+   *
+   * If the reference count of a kernel reaches 0 while it is running,
+   * this call will block until completion.
+   */
+  void (*kernel_release)(gpukernel *k);
 
   /**
    * Set a kernel argument.
    *
    * `val` is a pointer to the actual argument value except for the
    * pseudo-type GA_BUFFER where val is the gpudata pointer itself.
+   *
+   * If the argument is a buffer it will be retained until either a
+   * new argument is set in its place (buffer or otherwise) or the
+   * kernel is freed (reference count reaches 0).
    *
    * \param k kernel
    * \param index argument index (0-based)
@@ -212,14 +236,14 @@ typedef struct _compyte_buffer_ops {
    *
    * \returns GA_NO_ERROR or an error code if an error occurred.
    */
-  int (*buffer_setkernelarg)(gpukernel *k, unsigned int index,
-			     int typecode, const void *val);
+  int (*kernel_setarg)(gpukernel *k, unsigned int index,
+                       int typecode, const void *val);
 
   /**
    * Call a kernel.
    *
    * All arguments must have been specified by a previous call to
-   * buffer_setkernelarg().  Arguments may be reused between call.
+   * kernel_setarg().  Arguments may be reused between call.
    *
    * \param k kernel
    * \param bs block size for this call (also known as local size)
@@ -227,7 +251,7 @@ typedef struct _compyte_buffer_ops {
    *
    * \returns GA_NO_ERROR or an error code if an error occurred.
    */
-  int (*buffer_callkernel)(gpukernel *k, size_t bs, size_t gs);
+  int (*kernel_call)(gpukernel *k, size_t bs, size_t gs);
 
   /**
    * Synchronize a buffer.
@@ -292,8 +316,8 @@ typedef struct _compyte_buffer_ops {
    *
    * \returns GA_NO_ERROR or an error code if an error occurred.
    */
-  int (*buffer_property)(void *ctx, gpudata *buf, gpukernel *k, int prop_id,
-                         void *res);
+  int (*property)(void *ctx, gpudata *buf, gpukernel *k, int prop_id,
+                  void *res);
 
   /**
    * Get a string describing the last error that happened.
@@ -309,7 +333,7 @@ typedef struct _compyte_buffer_ops {
    *
    * \returns string description of the last error
    */
-  const char *(*buffer_error)(void *ctx);
+  const char *(*ctx_error)(void *ctx);
 } compyte_buffer_ops;
 
 /**
@@ -365,7 +389,14 @@ typedef struct _compyte_buffer_ops {
  *
  * Type: `void *`
  */
-#define GA_BUFFER_PROP_CTX 512
+#define GA_BUFFER_PROP_CTX    512
+
+/**
+ * The reference count of the buffer.  Use only for debugging purposes.
+ *
+ * Type: `unsigned int`
+ */
+#define GA_BUFFER_PROP_REFCNT 513
 
 /* Start at 1024 for GA_KERNEL_PROP_ */
 /**

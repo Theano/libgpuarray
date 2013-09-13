@@ -6,7 +6,7 @@
 
 const char *Gpu_error(const compyte_buffer_ops *o, void *ctx, int err) {
   if (err == GA_IMPL_ERROR)
-    return o->buffer_error(ctx);
+    return o->ctx_error(ctx);
   else
     return compyte_error_str(err);
 }

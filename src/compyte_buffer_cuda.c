@@ -112,11 +112,12 @@ static void cuda_exit(cuda_context *ctx) {
 }
 
 struct _gpudata {
-    CUdeviceptr ptr;
-    CUevent ev;
-    size_t sz;
-    cuda_context *ctx;
-    int flags;
+  CUdeviceptr ptr;
+  CUevent ev;
+  size_t sz;
+  cuda_context *ctx;
+  int flags;
+  unsigned int refcnt;
 };
 
 COMPYTE_LOCAL gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
@@ -125,6 +126,7 @@ COMPYTE_LOCAL gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
 
     res = malloc(sizeof(*res));
     if (res == NULL) return NULL;
+    res->refcnt = 1;
 
     cuda_enter(ctx);
     if (ctx->err != CUDA_SUCCESS) {
@@ -159,6 +161,7 @@ COMPYTE_LOCAL size_t cuda_get_sz(gpudata *g) { return g->sz; }
 struct _gpukernel {
     CUmodule m;
     CUfunction k;
+    CUevent ev;
     void *args[NUM_ARGS];
 #if CUDA_VERSION < 4000
     size_t types[NUM_ARGS];
@@ -166,6 +169,7 @@ struct _gpukernel {
     unsigned int argcount;
     gpudata *bs[NUM_ARGS];
     cuda_context *ctx;
+    unsigned int refcnt;
 };
 
 #define FAIL(v, e) { if (ret) *ret = e; return v; }
@@ -323,6 +327,7 @@ static gpudata *cuda_alloc(void *c, size_t size, int *ret) {
 
     res = malloc(sizeof(*res));
     if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
+    res->refcnt = 1;
 
     res->sz = size;
     res->flags = 0;
@@ -357,22 +362,35 @@ static gpudata *cuda_alloc(void *c, size_t size, int *ret) {
     return res;
 }
 
+static void cuda_retain(gpudata *d) {
+  d->refcnt++;
+}
+
 static void cuda_free(gpudata *d) {
+  CUresult err;
   /* We ignore errors on free */
-  cuda_enter(d->ctx);
-  cuEventSynchronize(d->ev);
-  if (!(d->flags & DONTFREE))
-    cuMemFree(d->ptr);
-  cuEventDestroy(d->ev);
-  cuda_exit(d->ctx);
-  cuda_free_ctx(d->ctx);
-  free(d);
+  d->refcnt--;
+  if (d->refcnt == 0) {
+    cuda_enter(d->ctx);
+    err = cuEventQuery(d->ev);
+    if (err != CUDA_SUCCESS) {
+      fprintf(stderr, "ERROR: in cuda_release: buffer refcount reached 0 "
+              "but events are still pending.");
+      cuEventSynchronize(d->ev);
+    }
+    if (!(d->flags & DONTFREE))
+      cuMemFree(d->ptr);
+    cuEventDestroy(d->ev);
+    cuda_exit(d->ctx);
+    cuda_free_ctx(d->ctx);
+    free(d);
+  }
 }
 
 static int cuda_share(gpudata *a, gpudata *b, int *ret) {
-    return (a->ctx == b->ctx && a->sz != 0 && b->sz != 0 &&
-            ((a->ptr <= b->ptr && a->ptr + a->sz > b->ptr) ||
-             (b->ptr <= a->ptr && b->ptr + b->sz > a->ptr)));
+  return (a->ctx == b->ctx && a->sz != 0 && b->sz != 0 &&
+          ((a->ptr <= b->ptr && a->ptr + a->sz > b->ptr) ||
+           (b->ptr <= a->ptr && b->ptr + b->sz > a->ptr)));
 }
 
 static int cuda_move(gpudata *dst, size_t dstoff, gpudata *src,
@@ -776,6 +794,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
       cuda_exit(ctx);
       FAIL(NULL, GA_SYS_ERROR);
     }
+    res->refcnt = 1;
 
     memset(res, 0, sizeof(*res));
 
@@ -802,16 +821,27 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     return res;
 }
 
+static voud cuda_retainkernel(gpukernel *k) {
+  k->refcnt++;
+}
+
 static void cuda_freekernel(gpukernel *k) {
-    /* We don't check for errors on free */
-    unsigned int i;
+  /* We don't check for errors on free */
+  unsigned int i;
+
+  k->refcnt--;
+  if (k->refcnt == 0) {
     cuda_enter(k->ctx);
-    for (i = 0; i < k->argcount; i++)
-        free(k->args[i]);
+    for (i = 0; i < k->argcount; i++) {
+      free(k->args[i]);
+      if (k->bs[i] != NULL)
+        cuda_free(k->bs[i]);
+    }
     cuModuleUnload(k->m);
     cuda_exit(k->ctx);
     cuda_free_ctx(k->ctx);
     free(k);
+  }
 }
 
 static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
@@ -828,11 +858,16 @@ static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
         b = (gpudata *)val;
         if (k->ctx != b->ctx)
             return GA_VALUE_ERROR;
+        if (k->bs[index] != NULL)
+          cuda_free(k->bs[index]);
         k->bs[index] = b;
+        cuda_retain(k->bs[index]);
         sz = sizeof(CUdeviceptr);
         val = &b->ptr;
     } else {
         sz = compyte_get_elsize(typecode);
+        if (k->bs[index] != NULL)
+          cuda_free(k->bs[index]);
         k->bs[index] = NULL;
     }
 
@@ -915,6 +950,7 @@ static int cuda_callkernel(gpukernel *k, size_t bs, size_t gs) {
       if (k->bs[i] != NULL)
         cuEventRecord(k->bs[i]->ev, ctx->s);
     }
+    cuEventRecord(k->ev, ctx->s);
     cuda_exit(ctx);
     return GA_NO_ERROR;
 }
@@ -1302,6 +1338,9 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((size_t *)res) = i;
     cuda_exit(ctx);
     return GA_NO_ERROR;
+  case GA_BUFFER_PROP_REFCNT:
+    *((unsigned int *)res) = b->refcnt;
+    return GA_NO_ERROR;
   case GA_BUFFER_PROP_CTX:
   case GA_KERNEL_PROP_CTX:
     *((void **)res) = (void *)ctx;
@@ -1347,6 +1386,7 @@ COMPYTE_LOCAL
 const compyte_buffer_ops cuda_ops = {cuda_init,
                                      cuda_deinit,
                                      cuda_alloc,
+                                     cuda_retain,
                                      cuda_free,
                                      cuda_share,
                                      cuda_move,
@@ -1354,6 +1394,7 @@ const compyte_buffer_ops cuda_ops = {cuda_init,
                                      cuda_write,
                                      cuda_memset,
                                      cuda_newkernel,
+                                     cuda_retainkernel,
                                      cuda_freekernel,
                                      cuda_setkernelarg,
                                      cuda_callkernel,
