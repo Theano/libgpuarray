@@ -589,3 +589,28 @@ def _cmpfV(x, *y):
         pass
     else:
         raise Exception("Did not generate value error")
+
+def test_flags():
+    for fl in ['C', 'F', 'W', 'B', 'O', 'A', 'U', 'CA', 'FA', 'FNC', 'FORC',
+               'CARRAY', 'FARRAY', 'FORTRAN', 'BEHAVED', 'OWNDATA', 'ALIGNED',
+               'WRITEABLE', 'CONTIGUOUS', 'UPDATEIFCOPY', 'C_CONTIGUOUS',
+               'F_CONTIGUOUS']:
+        yield flag_dict, fl
+    for p in ['c_contiguous', 'f_contiguous', 'contiguous', 'fortran',
+              'updateifcopy', 'owndata', 'aligned', 'writeable', 'behaved',
+              'carray', 'forc', 'fnc', 'farray']:
+        yield flag_prop, p
+
+def flag_dict(fl):
+    c2, g2 = gen_gpuarray((2, 3), dtype='float32', ctx=ctx, order='c')
+    c3, g3 = gen_gpuarray((2, 3), dtype='float32', ctx=ctx, order='f')
+
+    assert c2.flags[fl] == g2.flags[fl]
+    assert c3.flags[fl] == g3.flags[fl]
+
+def flag_prop(p):
+    c2, g2 = gen_gpuarray((2, 3), dtype='float32', ctx=ctx, order='c')
+    c3, g3 = gen_gpuarray((2, 3), dtype='float32', ctx=ctx, order='f')
+
+    assert getattr(c2.flags, p) == getattr(g2.flags, p)
+    assert getattr(c3.flags, p) == getattr(g3.flags, p)

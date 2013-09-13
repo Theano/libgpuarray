@@ -1,9 +1,11 @@
 cimport libc.stdio
 from libc.stdlib cimport malloc, calloc, free
+from libc.string cimport strncmp
 
 cimport numpy as np
 
 from cpython cimport Py_INCREF, PyNumber_Index
+from cpython.object cimport Py_EQ, Py_NE
 
 np.import_array()
 
@@ -888,6 +890,161 @@ cdef class GpuContext:
             ctx_property(self, GA_CTX_PROP_MAXGSIZE, &res)
             return res
 
+cdef class flags(object):
+    cdef int fl
+
+    def __cinit__(self, fl):
+        self.fl = fl
+
+    def __getitem__(self, idx):
+        cdef const char *key
+        cdef size_t n
+        cdef char c
+
+        if isinstance(idx, unicode):
+            idx = idx.encode('UTF-8')
+        if isinstance(idx, bytes):
+            key = idx
+            n = len(idx)
+        else:
+            raise KeyError("Unknown flag")
+        if n == 1:
+            c = key[0]
+            if c == 'C':
+                return self.c_contiguous
+            elif c == 'F':
+                return self.f_contiguous
+            elif c == 'W':
+                return self.writeable
+            elif c == 'B':
+                return self.behaved
+            elif c == 'O':
+                return self.owndata
+            elif c == 'A':
+                return self.aligned
+            elif c == 'U':
+                return self.updateifcopy
+        elif n == 2:
+            if strncmp(key, "CA", n) == 0:
+                return self.carray
+            if strncmp(key, "FA", n) == 0:
+                return self.farray
+        elif n == 3:
+            if strncmp(key, "FNC", n) == 0:
+                return self.fnc
+        elif n == 4:
+            if strncmp(key, "FORC", n) == 0:
+                return self.forc
+        elif n == 6:
+            if strncmp(key, "CARRAY", n) == 0:
+                return self.carray
+            if strncmp(key, "FARRAY", n) == 0:
+                return self.farray
+        elif n == 7:
+            if strncmp(key, "FORTRAN", n) == 0:
+                return self.fortran
+            if strncmp(key, "BEHAVED", n) == 0:
+                return self.behaved
+            if strncmp(key, "OWNDATA", n) == 0:
+                return self.owndata
+            if strncmp(key, "ALIGNED", n) == 0:
+                return self.aligned
+        elif n == 9:
+            if strncmp(key, "WRITEABLE", n) == 0:
+                return self.writeable
+        elif n == 10:
+            if strncmp(key, "CONTIGUOUS", n) == 0:
+                return self.c_contiguous
+        elif n == 12:
+            if strncmp(key, "UPDATEIFCOPY", n) == 0:
+                return self.updateifcopy
+            if strncmp(key, "C_CONTIGUOUS", n) == 0:
+                return self.c_contiguous
+            if strncmp(key, "F_CONTIGUOUS", n) == 0:
+                return self.f_contiguous
+
+        raise KeyError("Unknown flag")
+
+    def __repr__(self):
+        return '\n'.join(" %s : %s" % (name.upper(), getattr(self, name))
+                         for name in ["c_contiguous", "f_contiguous",
+                                      "owndata", "writeable", "aligned",
+                                      "updateifcopy"])
+
+    def __richcmp__(self, other, int op):
+        cdef flags a
+        cdef flags b
+        if not isinstance(self, flags) or not isinstance(other, flags):
+            return NotImplemented
+        a = self
+        b = other
+        if op == Py_EQ:
+            return a.fl == b.fl
+        elif op == Py_NE:
+            return a.fl != b.fl
+        raise TypeError("undefined comparison for flag object")
+
+    property c_contiguous:
+        def __get__(self):
+            return bool(self.fl & GA_C_CONTIGUOUS)
+
+    property contiguous:
+        def __get__(self):
+            return self.c_contiguous
+
+    property f_contiguous:
+        def __get__(self):
+            return bool(self.fl & GA_F_CONTIGUOUS)
+
+    property fortran:
+        def __get__(self):
+            return self.f_contiguous
+
+    property updateifcopy:
+        def __get__(self):
+            return False
+
+    property owndata:
+        def __get__(self):
+            return bool(self.fl & GA_OWNDATA)
+
+    property aligned:
+        def __get__(self):
+            return bool(self.fl & GA_ALIGNED)
+
+    property writeable:
+        def __get__(self):
+            return bool(self.fl & GA_WRITEABLE)
+
+    property behaved:
+        def __get__(self):
+            return (self.fl & GA_BEHAVED) == GA_BEHAVED
+
+    property carray:
+        def __get__(self):
+            return (self.fl & GA_CARRAY) == GA_CARRAY
+
+    # Yes these are really defined like that according to numpy sources.
+    # I don't know why.
+    property forc:
+        def __get__(self):
+            return ((self.fl & GA_F_CONTIGUOUS) == GA_F_CONTIGUOUS or
+                    (self.fl & GA_C_CONTIGUOUS) == GA_C_CONTIGUOUS)
+
+    property fnc:
+        def __get__(self):
+            return ((self.fl & GA_F_CONTIGUOUS) == GA_F_CONTIGUOUS and
+                    not (self.fl & GA_C_CONTIGUOUS) == GA_C_CONTIGUOUS)
+
+    property farray:
+        def __get__(self):
+            return ((self.fl & GA_FARRAY) != 0 and
+                    not ((self.fl & GA_C_CONTIGUOUS) != 0))
+
+    property num:
+        def __get__(self):
+            return self.fl
+
 cdef GpuArray new_GpuArray(cls, GpuContext ctx):
     cdef GpuArray res
     if ctx is None:
@@ -1316,14 +1473,7 @@ cdef class GpuArray:
     property flags:
         "Return the flags as a dictionary"
         def __get__(self):
-            res = dict()
-            res["C_CONTIGUOUS"] = py_CHKFLAGS(self, GA_C_CONTIGUOUS)
-            res["F_CONTIGUOUS"] = py_CHKFLAGS(self, GA_F_CONTIGUOUS)
-            res["WRITEABLE"] = py_CHKFLAGS(self, GA_WRITEABLE)
-            res["ALIGNED"] = py_CHKFLAGS(self, GA_ALIGNED)
-            res["UPDATEIFCOPY"] = False  # Unsupported
-            res["OWNDATA"] = py_CHKFLAGS(self, GA_OWNDATA)
-            return res
+            return flags(self.ga.flags)
 
     property offset:
         "Return the offset into the gpudata pointer for this array."
