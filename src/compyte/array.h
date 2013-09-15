@@ -244,6 +244,13 @@ COMPYTE_PUBLIC int GpuArray_fromdata(GpuArray *a,
                                      const size_t *dims,
                                      const ssize_t *strides, int writeable);
 
+COMPYTE_PUBLIC int GpuArray_copy_from_host(GpuArray *a,
+                                           const compyte_buffer_ops *ops,
+                                           void *ctx, void *buf, size_t sz,
+                                           int typecode, unsigned int nd,
+                                           const size_t *dims,
+                                           const ssize_t *strides);
+
 /**
  * Initialize an array structure to provide a view of another.
  *
