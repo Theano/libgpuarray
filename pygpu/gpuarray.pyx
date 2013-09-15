@@ -455,13 +455,12 @@ def get_default_context():
 
     Return the currently defined default context (or `None`).
     """
-
     return default_context
 
 cdef GpuContext ensure_context(GpuContext c):
     if c is None:
         if default_context is None:
-            raise TypeError("No context specified.")
+            raise TypeError, "No context specified."
         return default_context
     return c
 

@@ -229,6 +229,7 @@ cdef api class GpuArray [type GpuArrayType, object GpuArrayObject]:
 cdef api class GpuKernel [type GpuKernelType, object GpuKernelObject]:
     cdef _GpuKernel k
     cdef readonly GpuContext context
+    cdef object __weakref__
 
     cpdef setargs(self, args)
     cpdef setarg(self, unsigned int index, o)
