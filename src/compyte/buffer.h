@@ -85,7 +85,7 @@ typedef struct _compyte_buffer_ops {
    * structure is intentionally opaque as its content may change
    * according to the backend used.
    */
-  gpudata *(*buffer_alloc)(void *ctx, size_t sz, int flags, void *data,
+  gpudata *(*buffer_alloc)(void *ctx, size_t sz, void *data, int flags,
                            int *ret);
 
 /**

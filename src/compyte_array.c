@@ -46,7 +46,7 @@ int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
   }
 
   a->ops = ops;
-  a->data = a->ops->buffer_alloc(ctx, size, &res);
+  a->data = a->ops->buffer_alloc(ctx, size, NULL, 0, &res);
   if (res != GA_NO_ERROR) return res;
   a->nd = nd;
   a->offset = 0;

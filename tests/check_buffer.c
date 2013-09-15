@@ -80,17 +80,17 @@ START_TEST(test_buffer_alloc)
   gpudata *d;
 
   if (setup(_i)) {
-    d = ops->buffer_alloc(ctx, 0, NULL);
+    d = ops->buffer_alloc(ctx, 0, NULL, 0, NULL);
     ck_assert(d != NULL);
     ck_assert_int_eq(refcnt(d), 1);
     ops->buffer_release(d);
 
-    d = ops->buffer_alloc(ctx, 1, NULL);
+    d = ops->buffer_alloc(ctx, 1, NULL, 0, NULL);
     ck_assert(d != NULL);
     ck_assert_int_eq(refcnt(d), 1);
     ops->buffer_release(d);
 
-    d = ops->buffer_alloc(ctx, 1024, NULL);
+    d = ops->buffer_alloc(ctx, 1024, NULL, 0, NULL);
     ck_assert(d != NULL);
     ck_assert_int_eq(refcnt(d), 1);
     ops->buffer_release(d);
@@ -105,11 +105,11 @@ START_TEST(test_buffer_retain_release)
   gpudata *d2;
 
   if (setup(_i)) {
-    d = ops->buffer_alloc(ctx, 1024, NULL);
+    d = ops->buffer_alloc(ctx, 1024, NULL, 0, NULL);
     ck_assert(d != NULL);
     ck_assert_int_eq(refcnt(d), 1);
 
-    d2 = ops->buffer_alloc(ctx, 1024, NULL);
+    d2 = ops->buffer_alloc(ctx, 1024, NULL, 0, NULL);
     ck_assert(d2 != NULL);
     ck_assert_int_eq(refcnt(d2), 1);
 
@@ -149,9 +149,9 @@ START_TEST(test_buffer_share)
   gpudata *d2;
 
   if (setup(_i)) {
-    d = ops->buffer_alloc(ctx, 1024, NULL);
+    d = ops->buffer_alloc(ctx, 1024, NULL, 0, NULL);
     ck_assert(d != NULL);
-    d2 = ops->buffer_alloc(ctx, 1024, NULL);
+    d2 = ops->buffer_alloc(ctx, 1024, NULL, 0, NULL);
     ck_assert(d2 != NULL);
 
     ck_assert_int_eq(ops->buffer_share(d, d2, NULL), 0);
@@ -172,7 +172,7 @@ START_TEST(test_buffer_read_write)
   unsigned int i;
 
   if (setup(_i)) {
-    d = ops->buffer_alloc(ctx, sizeof(data), NULL);
+    d = ops->buffer_alloc(ctx, sizeof(data), NULL, 0, NULL);
     ck_assert(d != NULL);
 
     err = ops->buffer_write(d, 0, data, sizeof(data));
@@ -221,9 +221,9 @@ START_TEST(test_buffer_move)
   unsigned int i;
 
   if (setup(_i)) {
-    d = ops->buffer_alloc(ctx, sizeof(data), NULL);
+    d = ops->buffer_alloc(ctx, sizeof(data), NULL, 0, NULL);
     ck_assert(d != NULL);
-    d2 = ops->buffer_alloc(ctx, sizeof(data)*2, NULL);
+    d2 = ops->buffer_alloc(ctx, sizeof(data)*2, NULL, 0, NULL);
     ck_assert(d != NULL);
 
     err = ops->buffer_write(d, 0, data, sizeof(data));
@@ -267,9 +267,9 @@ START_TEST(test_kernel_setargs)
     k = ops->kernel_alloc(ctx, 1, &KERNEL, NULL, "k", GA_USE_CLUDA, &err);
     printf("%s\n", Gpu_error(ops, ctx, err));
     ck_assert(k != NULL);
-    d = ops->buffer_alloc(ctx, 1024, NULL);
+    d = ops->buffer_alloc(ctx, 1024, NULL, 0, NULL);
     ck_assert(d != NULL);
-    d2 = ops->buffer_alloc(ctx, 1024, NULL);
+    d2 = ops->buffer_alloc(ctx, 1024, NULL, 0, NULL);
     ck_assert(d != NULL);
 
     ck_assert_int_eq(refcnt(d), 1);
