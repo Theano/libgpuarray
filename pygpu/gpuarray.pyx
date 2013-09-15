@@ -75,14 +75,14 @@ def set_cuda_compiler_fn(fn):
     cdef void (*set_comp)(comp_f f)
     set_comp = <void (*)(comp_f)>compyte_get_extension("cuda_set_compiler")
     if set_comp == NULL:
-        raise RuntimeError("cannot set compiler, extension is absent")
+        raise RuntimeError, "cannot set compiler, extension is absent"
     if callable(fn):
         call_compiler_fn = fn
         set_comp(call_compiler_python)
     elif fn is None:
         set_comp(NULL)
     else:
-        raise ValueError("needs a callable")
+        raise ValueError, "needs a callable"
 
 def cl_wrap_ctx(size_t ptr):
     """
@@ -95,12 +95,12 @@ def cl_wrap_ctx(size_t ptr):
     cdef GpuContext res
     cl_make_ctx = <void *(*)(void *)>compyte_get_extension("cl_make_ctx")
     if cl_make_ctx == NULL:
-        raise RuntimeError("cl_make_ctx extension is absent")
+        raise RuntimeError, "cl_make_ctx extension is absent"
     res = GpuContext.__new__(GpuContext)
     res.ops = get_ops('opencl')
     res.ctx = cl_make_ctx(<void *>ptr)
     if res.ctx == NULL:
-        raise RuntimeError("cl_make_ctx call failed")
+        raise RuntimeError, "cl_make_ctx call failed"
     return res
 
 def cuda_wrap_ctx(size_t ptr, bint own):
@@ -120,7 +120,7 @@ def cuda_wrap_ctx(size_t ptr, bint own):
     cdef GpuContext res
     cuda_make_ctx = <void *(*)(void *, int)>compyte_get_extension("cuda_make_ctx")
     if cuda_make_ctx == NULL:
-        raise RuntimeError("cuda_make_ctx extension is absent")
+        raise RuntimeError, "cuda_make_ctx extension is absent"
     res = GpuContext.__new__(GpuContext)
     res.ops = get_ops('cuda')
     flags = 0
@@ -128,7 +128,7 @@ def cuda_wrap_ctx(size_t ptr, bint own):
         flags |= COMPYTE_CUDA_CTX_NOFREE
     res.ctx = cuda_make_ctx(<void *>ptr, flags)
     if res.ctx == NULL:
-        raise RuntimeError("cuda_make_ctx call failed")
+        raise RuntimeError, "cuda_make_ctx call failed"
     return res
 
 import numpy
@@ -172,7 +172,7 @@ def register_dtype(np.dtype dtype, cname):
 
     t = <compyte_type *>malloc(sizeof(compyte_type))
     if t == NULL:
-        raise MemoryError("Can't allocate new type")
+        raise MemoryError, "Can't allocate new type"
     tmp = <char *>malloc(len(cname)+1)
     if tmp == NULL:
         free(t)
@@ -185,7 +185,7 @@ def register_dtype(np.dtype dtype, cname):
     if typecode == -1:
         free(tmp)
         free(t)
-        raise RuntimeError("Could not register type")
+        raise RuntimeError, "Could not register type"
     NP_TO_TYPE[dtype] = typecode
     TYPE_TO_NP[typecode] = dtype
 
@@ -194,7 +194,7 @@ cdef np.dtype typecode_to_dtype(int typecode):
     if res is not None:
         return res
     else:
-        raise NotImplementedError("TODO")
+        raise NotImplementedError, "TODO"
 
 # This is a stupid wrapper to avoid the extra argument introduced by having
 # dtype_to_typecode declared 'cpdef'.
@@ -219,7 +219,7 @@ cpdef int dtype_to_typecode(dtype) except -1:
         res = NP_TO_TYPE.get(dtype, None)
         if res is not None:
             return res
-    raise ValueError("don't know how to convert to dtype: %s"%(dtype,))
+    raise ValueError, "don't know how to convert to dtype: %s"%(dtype,)
 
 def dtype_to_ctype(dtype):
     """
@@ -234,7 +234,7 @@ def dtype_to_ctype(dtype):
     cdef int typecode = dtype_to_typecode(dtype)
     cdef const compyte_type *t = compyte_get_type(typecode)
     if t.cluda_name == NULL:
-        raise ValueError("No mapping for %s"%(dtype,))
+        raise ValueError, "No mapping for %s"%(dtype,)
     return t.cluda_name
 
 cdef ga_order to_ga_order(ord) except <ga_order>-2:
@@ -245,7 +245,7 @@ cdef ga_order to_ga_order(ord) except <ga_order>-2:
     elif ord == "F" or ord == "f":
         return GA_F_ORDER
     else:
-        raise ValueError("Valid orders are: 'A' (any), 'C' (C), 'F' (Fortran)")
+        raise ValueError, "Valid orders are: 'A' (any), 'C' (C), 'F' (Fortran)"
 
 class GpuArrayException(Exception):
     """
@@ -415,7 +415,7 @@ cdef const compyte_buffer_ops *get_ops(kind) except NULL:
     cdef const compyte_buffer_ops *res
     res = compyte_get_ops(kind)
     if res == NULL:
-        raise RuntimeError("Unsupported kind: %s"%(kind,))
+        raise RuntimeError, "Unsupported kind: %s" % (kind,)
     return res
 
 cdef ops_kind(const compyte_buffer_ops *ops):
@@ -423,7 +423,7 @@ cdef ops_kind(const compyte_buffer_ops *ops):
         return "opencl"
     if ops == compyte_get_ops("cuda"):
         return "cuda"
-    raise RuntimeError("Unknown ops vector")
+    raise RuntimeError, "Unknown ops vector"
 
 def set_default_context(GpuContext ctx):
     """
@@ -557,7 +557,7 @@ def empty(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
 
     cdims = <size_t *>calloc(len(shape), sizeof(size_t))
     if cdims == NULL:
-        raise MemoryError("could not allocate cdims")
+        raise MemoryError, "could not allocate cdims"
     try:
         for i, d in enumerate(shape):
             cdims[i] = d
@@ -689,7 +689,7 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
 
     nd = <unsigned int>len(shape)
     if strides is not None and len(strides) != nd:
-        raise ValueError("strides must be the same length as shape")
+        raise ValueError, "strides must be the same length as shape"
 
     typecode = dtype_to_typecode(dtype)
 
@@ -760,7 +760,7 @@ def array(proto, dtype=None, copy=True, order=None, int ndmin=0,
         arg = proto
 
         if context is not None and  context.ctx != array_context(arg):
-            raise ValueError("cannot copy an array to a different context")
+            raise ValueError, "cannot copy an array to a different context"
 
         if (not copy
             and (dtype is None or dtype_to_typecode(dtype) == arg.typecode)
@@ -916,7 +916,7 @@ cdef class flags(object):
             key = idx
             n = len(idx)
         else:
-            raise KeyError("Unknown flag")
+            raise KeyError, "Unknown flag"
         if n == 1:
             c = key[0]
             if c == 'C':
@@ -972,7 +972,7 @@ cdef class flags(object):
             if strncmp(key, "F_CONTIGUOUS", n) == 0:
                 return self.f_contiguous
 
-        raise KeyError("Unknown flag")
+        raise KeyError, "Unknown flag"
 
     def __repr__(self):
         return '\n'.join(" %s : %s" % (name.upper(), getattr(self, name))
@@ -991,7 +991,7 @@ cdef class flags(object):
             return a.fl == b.fl
         elif op == Py_NE:
             return a.fl != b.fl
-        raise TypeError("undefined comparison for flag object")
+        raise TypeError, "undefined comparison for flag object"
 
     property c_contiguous:
         def __get__(self):
@@ -1059,7 +1059,7 @@ cdef class flags(object):
 cdef GpuArray new_GpuArray(type cls, GpuContext ctx, object base):
     cdef GpuArray res
     if ctx is None:
-        raise RuntimeError("ctx is None in new_GpuArray")
+        raise RuntimeError, "ctx is None in new_GpuArray"
     if cls is None or cls is GpuArray:
         res = GpuArray.__new__(GpuArray)
     else:
@@ -1095,7 +1095,7 @@ cdef class GpuArray:
 
     def __init__(self):
         if type(self) is GpuArray:
-            raise RuntimeError("Called raw GpuArray.__init__")
+            raise RuntimeError, "Called raw GpuArray.__init__"
 
     cdef __index_helper(self, key, unsigned int i, ssize_t *start,
                         ssize_t *stop, ssize_t *step):
@@ -1106,7 +1106,7 @@ cdef class GpuArray:
             if k < 0:
                 k += self.ga.dimensions[i]
             if k < 0 or k >= self.ga.dimensions[i]:
-                raise IndexError("index %d out of bounds"%(i,))
+                raise IndexError, "index %d out of bounds" % (i,)
             start[0] = k
             step[0] = 0
             return
@@ -1125,7 +1125,7 @@ cdef class GpuArray:
             stop[0] = self.ga.dimensions[i]
             step[0] = 1
         else:
-            raise IndexError("cannot index with: %s"%(key,))
+            raise IndexError, "cannot index with: %s" % (key,)
 
     def __array__(self):
         """
@@ -1300,7 +1300,7 @@ cdef class GpuArray:
             array_transpose(res, self, NULL)
         else:
             if len(params) != self.ga.nd:
-                raise ValueError("axes don't match")
+                raise ValueError, "axes don't match"
             new_axes = <unsigned int *>calloc(self.ga.nd, sizeof(unsigned int))
             try:
                 for i in range(self.ga.nd):
@@ -1314,7 +1314,7 @@ cdef class GpuArray:
         if self.ga.nd > 0:
             return self.ga.dimensions[0]
         else:
-            raise TypeError("len() of unsized object")
+            raise TypeError, "len() of unsized object"
 
     def __getitem__(self, key):
         cdef GpuArray res
@@ -1328,7 +1328,7 @@ cdef class GpuArray:
         if key is Ellipsis:
             return self
         elif self.ga.nd == 0:
-            raise IndexError("0-d arrays can't be indexed")
+            raise IndexError, "0-d arrays can't be indexed"
 
         starts = <ssize_t *>calloc(self.ga.nd, sizeof(ssize_t))
         stops = <ssize_t *>calloc(self.ga.nd, sizeof(ssize_t))
@@ -1352,7 +1352,7 @@ cdef class GpuArray:
                         (Ellipsis,)*(self.ga.nd - (len(key) - 1)) + \
                         key[el+1:]
                 if len(key) > self.ga.nd:
-                    raise IndexError("too many indices")
+                    raise IndexError, "too many indices"
                 for i in range(0, len(key)):
                     self.__index_helper(key[i], i, &starts[i], &stops[i],
                                         &steps[i])
@@ -1388,7 +1388,7 @@ cdef class GpuArray:
         array_setarray(tmp, gv)
 
     def __hash__(self):
-        raise TypeError("unhashable type '%s'"%self.__class__)
+        raise TypeError, "unhashable type '%s'" % (self.__class__,)
 
     def __nonzero__(self):
         cdef int sz = self.size
@@ -1397,7 +1397,7 @@ cdef class GpuArray:
         if sz == 1:
             return bool(numpy.asarray(self))
         else:
-            raise ValueError("Thruth value of array with more than one element is ambiguous")
+            raise ValueError, "Thruth value of array with more than one element is ambiguous"
 
     property shape:
         "shape of this ndarray (tuple)"
@@ -1416,7 +1416,7 @@ cdef class GpuArray:
             nd = len(newshape)
             newdims = <size_t *>calloc(nd, sizeof(size_t))
             if newdims == NULL:
-                raise MemoryError("calloc")
+                raise MemoryError, "calloc"
             try:
                 for i in range(nd):
                     newdims[i] = newshape[i]
@@ -1563,9 +1563,9 @@ cdef class GpuKernel:
         cdef int flags = 0
 
         if not isinstance(source, (str, unicode)):
-            raise TypeError("Expected a string for the kernel source")
+            raise TypeError, "Expected a string for the kernel source"
         if not isinstance(name, (str, unicode)):
-            raise TypeError("Expected a string for the kernel name")
+            raise TypeError, "Expected a string for the kernel name"
 
         self.context = ensure_context(context)
 
@@ -1587,7 +1587,7 @@ cdef class GpuKernel:
 
     def __call__(self, *args, n=0, ls=0, gs=0):
         if n == 0 and (ls == 0 or gs == 0):
-            raise ValueError("Must specify size (n) or both gs and ls")
+            raise ValueError, "Must specify size (n) or both gs and ls"
         self.setargs(args)
         self.call(n, ls, gs)
 
@@ -1632,7 +1632,7 @@ cdef class GpuKernel:
             try:
                 self._setarg(index, o.dtype, o)
             except AttributeError:
-                raise TypeError("Wrap your scalar arguments in numpy objects")
+                raise TypeError, "Wrap your scalar arguments in numpy objects"
 
     cdef _setarg(self, unsigned int index, np.dtype t, object o):
         cdef float f
@@ -1678,7 +1678,7 @@ cdef class GpuKernel:
             ul = o
             kernel_setarg(self, index, typecode, &ul)
         else:
-            raise TypeError("Can't set argument of this type", t)
+            raise TypeError, ("Can't set argument of this type", t)
 
     cpdef call(self, size_t n, size_t ls, size_t gs):
         """
