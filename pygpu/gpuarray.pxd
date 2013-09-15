@@ -202,7 +202,7 @@ cdef kernel_setbufarg(GpuKernel k, unsigned int index, GpuArray a)
 cdef kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs)
 cdef kernel_property(GpuKernel k, int prop_id, void *res)
 
-cdef api GpuContext GpuArray_default_context()
+cdef api GpuContext pygpu_default_context()
 
 cdef ctx_property(GpuContext c, int prop_id, void *res)
 cdef const compyte_buffer_ops *get_ops(kind) except NULL

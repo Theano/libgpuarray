@@ -400,7 +400,7 @@ cdef kernel_property(GpuKernel k, int prop_id, void *res):
     if err != GA_NO_ERROR:
         raise GpuArrayException(kernel_error(k, err), err)
 
-cdef GpuContext GpuArray_default_context():
+cdef GpuContext pygpu_default_context():
     return default_context
 
 cdef GpuContext default_context = None
