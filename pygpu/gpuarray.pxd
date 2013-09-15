@@ -202,12 +202,20 @@ cdef kernel_setbufarg(GpuKernel k, unsigned int index, GpuArray a)
 cdef kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs)
 cdef kernel_property(GpuKernel k, int prop_id, void *res)
 
-cdef api GpuContext pygpu_default_context()
-
 cdef ctx_property(GpuContext c, int prop_id, void *res)
 cdef const compyte_buffer_ops *get_ops(kind) except NULL
 cdef ops_kind(const compyte_buffer_ops *ops)
 cdef GpuContext ensure_context(GpuContext c)
+
+cdef api GpuContext pygpu_default_context()
+
+cdef api GpuContext pygpu_init(object dev)
+
+cdef api GpuArray pygpu_zeros(unsigned int nd, size_t *dims, int typecode,
+                              ga_order order, GpuContext context, type cls)
+cdef api GpuArray pygpu_empty(unsigned int nd, size_t *dims, int typecode,
+                              ga_order order, GpuContext context, type cls)
+cdef api GpuArray pygpu_copy(GpuArray a, ga_order ord)
 
 cdef api class GpuContext [type GpuContextType, object GpuContextObject]:
     cdef const compyte_buffer_ops *ops
@@ -223,8 +231,6 @@ cdef api class GpuArray [type GpuArrayType, object GpuArrayObject]:
 
     cdef __index_helper(self, key, unsigned int i, ssize_t *start,
                         ssize_t *stop, ssize_t *step)
-
-    cpdef copy(self, order=*)
 
 cdef api class GpuKernel [type GpuKernelType, object GpuKernelObject]:
     cdef _GpuKernel k

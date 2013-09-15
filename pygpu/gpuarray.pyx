@@ -458,11 +458,27 @@ def get_default_context():
     return default_context
 
 cdef GpuContext ensure_context(GpuContext c):
+    global default_context
     if c is None:
         if default_context is None:
             raise TypeError, "No context specified."
         return default_context
     return c
+
+cdef GpuContext pygpu_init(dev):
+    if dev.startswith('cuda'):
+        kind = "cuda"
+        if dev[4:] == '':
+            devnum = -1
+        else:
+            devnum = int(dev[4:])
+    elif dev.startswith('opencl'):
+        kind = "opencl"
+        devspec = dev[6:].split(':')
+        devnum = int(devspec[0]) << 16 | int(devspec[1])
+    else:
+        raise ValueError, "Unknown device format:" + dev
+    return GpuContext(kind, devnum)
 
 def init(dev):
     """
@@ -491,19 +507,7 @@ def init(dev):
     the values, unavaiable ones will just raise an error, and there
     are no gaps in the valid numbers.
     """
-    if dev.startswith('cuda'):
-        kind = "cuda"
-        if dev[4:] == '':
-            devnum = -1
-        else:
-            devnum = int(dev[4:])
-    elif dev.startswith('opencl'):
-        kind = "opencl"
-        devspec = dev[6:].split(':')
-        devnum = int(devspec[0]) << 16 | int(devspec[1])
-    else:
-        raise ValueError("Unknown device format:", dev)
-    return GpuContext(kind, devnum)
+    return pygpu_init(dev)
 
 def zeros(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
           cls=None):
@@ -529,6 +533,29 @@ def zeros(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
     array_memset(res, 0)
     return res
 
+cdef GpuArray pygpu_zeros(unsigned int nd, size_t *dims, int typecode,
+                          ga_order order, GpuContext context, type cls):
+    cdef GpuArray res
+    res = pygpu_empty(nd, dims, typecode, order, context, cls)
+    array_memset(res, 0)
+    return res
+
+cdef GpuArray pygpu_empty(unsigned int nd, size_t *dims, int typecode,
+                          ga_order order, GpuContext context, type cls):
+    cdef GpuArray res
+
+    context = ensure_context(context)
+
+    res = new_GpuArray(cls, context, None)
+    array_empty(res, context.ops, context.ctx, typecode, nd, dims, order)
+    return res
+
+cdef GpuArray pygpu_copy(GpuArray a, ga_order ord):
+    cdef GpuArray res
+    res = new_GpuArray(type(a), a.context, None)
+    array_copy(res, a, ord)
+    return res
+
 def empty(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
           cls=None):
     """
@@ -550,9 +577,6 @@ def empty(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
     :rtype: array
     """
     cdef size_t *cdims
-    cdef GpuArray res
-
-    context = ensure_context(context)
 
     cdims = <size_t *>calloc(len(shape), sizeof(size_t))
     if cdims == NULL:
@@ -560,12 +584,11 @@ def empty(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
     try:
         for i, d in enumerate(shape):
             cdims[i] = d
-        res = new_GpuArray(cls, context, None)
-        array_empty(res, context.ops, context.ctx, dtype_to_typecode(dtype),
-                    <unsigned int>len(shape), cdims, to_ga_order(order))
+        return pygpu_empty(<unsigned int>len(shape), cdims,
+                           dtype_to_typecode(dtype), to_ga_order(order),
+                           context, cls)
     finally:
         free(cdims)
-    return res
 
 def asarray(a, dtype=None, order='A', GpuContext context=None):
     """
@@ -1179,7 +1202,7 @@ cdef class GpuArray:
                     self.ga.nd, self.ga.dimensions, ord)
         return res
 
-    cpdef copy(self, order='C'):
+    def copy(self, order='C'):
         """
         copy(order='C')
 
@@ -1188,19 +1211,16 @@ cdef class GpuArray:
         :param order: memory layout of the copy
         :type order: string
         """
-        cdef GpuArray res
-        res = new_GpuArray(self.__class__, self.context, None)
-        array_copy(res, self, to_ga_order(order))
-        return res
+        return pygpu_copy(self, to_ga_order(order))
 
     def __copy__(self):
-        return self.copy()
+        return pygpu_copy(self, GA_C_ORDER)
 
     def __deepcopy__(self, memo):
         if id(self) in memo:
             return memo[id(self)]
         else:
-            return self.copy()
+            return pygpu_copy(self, GA_C_ORDER)
 
     def sync(self):
         """
