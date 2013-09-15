@@ -77,13 +77,76 @@ typedef struct _compyte_buffer_ops {
    *
    * \param ctx a context pointer
    * \param sz the requested size
+   * \param flags see \ref alloc_flags "Allocation flags"
+   * \param data optional pointer to host buffer
    * \param ret error return pointer
    *
    * \returns A non-NULL pointer to a gpudata structure.  This
    * structure is intentionally opaque as its content may change
    * according to the backend used.
    */
-  gpudata *(*buffer_alloc)(void *ctx, size_t sz, int *ret);
+  gpudata *(*buffer_alloc)(void *ctx, size_t sz, int flags, void *data,
+                           int *ret);
+
+/**
+ * \defgroup alloc_flags Allocation flags
+ * @{
+ */
+
+/**
+ * The buffer is available for reading and writing from kernels.
+ *
+ * This is the default (0) value.
+ */
+#define GA_BUFFER_READ_WRITE 0x00
+
+/**
+ * Allocate the buffer in device-only memory.
+ *
+ * This is the default (0) value.
+ */
+#define GA_BUFFER_DEV        0x00
+
+/**
+ * Signal that the memory in this buffer will only be read by kernels.
+ *
+ * You can use buffer_write() to set the contents.
+ *
+ * You may not call buffer_extcopy() or buffer_memset() with the
+ * resulting buffer as the destination.
+ */
+#define GA_BUFFER_READ_ONLY  0x01
+
+/**
+ * Signal that the memory in this buffer will only be written by
+ * kernels (i.e. it is an output buffer).
+ *
+ * You can read the contents with buffer_read().
+ *
+ * You may not call buffer_extcopy() with the resuting buffer as
+ * source.
+ */
+
+#define GA_BUFFER_WRITE_ONLY 0x02
+
+/**
+ * Initialize the contents of the buffer with the user-supplied host
+ * buffer (`data`).  This buffer must be at least `sz` large.
+ */
+#define GA_BUFFER_INIT       0x04
+
+/**
+ * Allocate the buffer in host-reachable memory enabling you to
+ * retrieve a pointer to the contents as the
+ * `GA_BUFFER_PROP_HOSTPOINTER` property.
+ */
+#define GA_BUFFER_HOST       0x08
+
+/*#define GA_BUFFER_USE_DATA   0x10*/
+
+/**
+ * @}
+ */
 
   /**
    * Increase the reference count to the passed buffer by 1.

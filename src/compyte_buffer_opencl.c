@@ -376,11 +376,43 @@ static void cl_deinit(void *c) {
   cl_free_ctx((cl_ctx *)c);
 }
 
-static gpudata *cl_alloc(void *c, size_t size, int *ret) {
+#define GA_BUFFER_READ_WRITE 0x00 /* default */
+#define GA_BUFFER_DEV        0x00 /* also default */
+
+#define GA_BUFFER_READ_ONLY  0x01
+#define GA_BUFFER_WRITE_ONLY 0x02
+#define GA_BUFFER_INIT       0x04
+#define GA_BUFFER_HOST       0x08
+/*#define GA_BUFFER_USE_DATA   0x10*/
+
+static gpudata *cl_alloc(void *c, size_t size, void *data, int flags,
+                         int *ret) {
   cl_ctx *ctx = (cl_ctx *)c;
   gpudata *res;
+  void *hostp = NULL;
+  cl_mem_flags clflags = CL_MEM_READ_WRITE;
 
   ASSERT_CTX(ctx);
+
+  if (flags & GA_BUFFER_INIT) {
+    if (data == NULL) FAIL(NULL, GA_VALUE_ERROR);
+    hostp = data;
+    clflags |= CL_MEM_COPY_HOST_PTR;
+  }
+
+  if (flags & GA_BUFFER_HOST) {
+    clflags |= CL_MEM_ALLOC_HOST_PTR;
+  }
+
+  if (flags & GA_BUFFER_READ_ONLY) {
+    if (flags & GA_BUFFER_WRITE_ONLY) FAIL(NULL, GA_VALUE_ERROR);
+    clflags |= CL_MEM_READ_ONLY;
+  }
+
+  if (flags & GA_BUFFER_WRITE_ONLY) {
+    if (flags & GA_BUFFER_READ_ONLY) FAIL(NULL, GA_VALUE_ERROR);
+    clflags |= CL_MEM_WRITE_ONLY;
+  }
 
   res = malloc(sizeof(*res));
   if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
@@ -391,8 +423,7 @@ static gpudata *cl_alloc(void *c, size_t size, int *ret) {
     size = 1;
   }
 
-  res->buf = clCreateBuffer(ctx->ctx, CL_MEM_READ_WRITE, size, NULL,
-                            &ctx->err);
+  res->buf = clCreateBuffer(ctx->ctx, clflags, size, hostp, &ctx->err);
   res->ev = NULL;
   if (ctx->err != CL_SUCCESS) {
     free(res);
@@ -542,11 +573,12 @@ static int cl_write(gpudata *dst, size_t dstoff, const void *src, size_t sz) {
 }
 
 static int cl_memset(gpudata *dst, size_t offset, int data) {
-  cl_ctx *ctx = dst->ctx;
   char local_kern[256];
+  cl_ctx *ctx = dst->ctx;
   const char *rlk[1];
   size_t sz, bytes, n, ls, gs;
   gpukernel *m;
+  cl_mem_flags fl;
   int r, res = GA_IMPL_ERROR;
 
   unsigned char val = (unsigned)data;
@@ -555,6 +587,11 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
 
   ASSERT_BUF(dst);
   ASSERT_CTX(ctx);
+
+  ctx->err = clGetMemObjectInfo(dst->buf, CL_MEM_FLAGS, sizeof(fl), &fl, NULL);
+  if (ctx->err != CL_SUCCESS) return GA_IMPL_ERROR;
+
+  if (fl & CL_MEM_READ_ONLY) return GA_READONLY_ERROR;
 
   ctx->err = clGetMemObjectInfo(dst->buf, CL_MEM_SIZE, sizeof(bytes), &bytes,
 				NULL);
@@ -935,6 +972,7 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
   char *strs[64];
   size_t nEls, ls, gs;
   gpukernel *k;
+  cl_mem_flags fl;
   unsigned int count = 0;
   int res = GA_SYS_ERROR;
   unsigned int i;
@@ -945,6 +983,17 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
   ASSERT_CTX(ctx);
 
   if (input->ctx != output->ctx) return GA_VALUE_ERROR;
+
+  ctx->err = clGetMemObjectInfo(input->buf, CL_MEM_FLAGS, sizeof(fl), &fl,
+                                NULL);
+  if (ctx->err != CL_SUCCESS) return GA_IMPL_ERROR;
+  if (fl & CL_MEM_WRITE_ONLY) return GA_WRITEONLY_ERROR;
+
+  ctx->err = clGetMemObjectInfo(output->buf, CL_MEM_FLAGS, sizeof(fl), &fl,
+                                NULL);
+  if (ctx->err != CL_SUCCESS) return GA_IMPL_ERROR;
+  if (fl & CL_MEM_READ_ONLY) return GA_READONLY_ERROR;
+
 
   nEls = 1;
   for (i = 0; i < a_nd; i++) {
