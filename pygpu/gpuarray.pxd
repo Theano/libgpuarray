@@ -129,6 +129,10 @@ cdef extern from "compyte/array.h":
                           gpudata *data, size_t offset, int typecode,
                           unsigned int nd, size_t *dims, ssize_t *strides,
                           int writable)
+    int GpuArray_copy_from_host(_GpuArray *a, const compyte_buffer_ops *ops,
+                            void *ctx, void *buf, size_t sz, int typecode,
+                            unsigned int nd, const size_t *dims,
+                            const ssize_t *strides)
     int GpuArray_view(_GpuArray *v, _GpuArray *a)
     int GpuArray_sync(_GpuArray *a)
     int GpuArray_index(_GpuArray *r, _GpuArray *a, ssize_t *starts,
@@ -174,6 +178,9 @@ cdef array_empty(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
 cdef array_fromdata(GpuArray a, const compyte_buffer_ops *ops, gpudata *data,
                     size_t offset, int typecode, unsigned int nd, size_t *dims,
                     ssize_t *strides, int writeable)
+cdef array_copy_from_host(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
+                    void *buf, size_t sz, int typecode, unsigned int nd,
+                    const size_t *dims, const ssize_t *strides)
 cdef array_view(GpuArray v, GpuArray a)
 cdef array_sync(GpuArray a)
 cdef array_index(GpuArray r, GpuArray a, ssize_t *starts, ssize_t *stops,
