@@ -846,16 +846,11 @@ def array(proto, dtype=None, copy=True, order=None, int ndmin=0,
     if not np.PyArray_ISONESEGMENT(a):
         a = np.PyArray_GETCONTIGUOUS(a)
 
-    if np.PyArray_ISFORTRAN(a) and not np.PyArray_ISCONTIGUOUS(a):
-        ord = GA_F_ORDER
-    else:
-        ord = GA_C_ORDER
-
-    res = new_GpuArray(cls, context, None)
-    array_empty(res, context.ops, context.ctx, dtype_to_typecode(a.dtype),
-                np.PyArray_NDIM(a), <size_t *>np.PyArray_DIMS(a), ord)
-    array_write(res, np.PyArray_DATA(a), np.PyArray_NBYTES(a))
-    return res
+    return pygpu_fromhostdata(np.PyArray_DATA(a), np.PyArray_NBYTES(a),
+                              dtype_to_typecode(a.dtype), np.PyArray_NDIM(a),
+                              <size_t *>np.PyArray_DIMS(a),
+                              <ssize_t *>np.PyArray_STRIDES(a),
+                              context, cls)
 
 cdef class GpuContext:
     """
