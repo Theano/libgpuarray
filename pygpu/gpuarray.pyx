@@ -283,11 +283,11 @@ cdef array_fromdata(GpuArray a, const compyte_buffer_ops *ops, gpudata *data,
         raise GpuArrayException(Gpu_error(ops, ctx, err), err)
 
 cdef array_copy_from_host(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
-                    void *buf, size_t sz, int typecode, unsigned int nd,
-                    const size_t *dims, const ssize_t *strides):
+                          void *buf, int typecode, unsigned int nd,
+                          const size_t *dims, const ssize_t *strides):
     cdef int err
-    err = GpuArray_copy_from_host(&a.ga, ops, ctx, buf, sz, typecode, nd,
-                                  dims, strides);
+    err = GpuArray_copy_from_host(&a.ga, ops, ctx, buf, typecode, nd, dims,
+                                  strides);
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(ops, ctx, err), err)
 
@@ -559,15 +559,14 @@ cdef GpuArray pygpu_empty(unsigned int nd, size_t *dims, int typecode,
     array_empty(res, context.ops, context.ctx, typecode, nd, dims, order)
     return res
 
-cdef GpuArray pygpu_fromhostdata(void *buf, size_t sz, int typecode,
-                                 unsigned int nd, const size_t *dims,
-                                 const ssize_t *strides, GpuContext context,
-                                 type cls):
+cdef GpuArray pygpu_fromhostdata(void *buf, int typecode, unsigned int nd,
+                                 const size_t *dims, const ssize_t *strides,
+                                 GpuContext context, type cls):
     cdef GpuArray res
     context = ensure_context(context)
 
     res = new_GpuArray(cls, context, None)
-    array_copy_from_host(res, context.ops, context.ctx, buf, sz, typecode, nd,
+    array_copy_from_host(res, context.ops, context.ctx, buf, typecode, nd,
                          dims, strides)
     return res
 
@@ -843,14 +842,9 @@ def array(proto, dtype=None, copy=True, order=None, int ndmin=0,
 
     a = numpy.array(proto, dtype=dtype, order=order, ndmin=ndmin, copy=False)
 
-    if not np.PyArray_ISONESEGMENT(a):
-        a = np.PyArray_GETCONTIGUOUS(a)
-
-    return pygpu_fromhostdata(np.PyArray_DATA(a), np.PyArray_NBYTES(a),
-                              dtype_to_typecode(a.dtype), np.PyArray_NDIM(a),
-                              <size_t *>np.PyArray_DIMS(a),
-                              <ssize_t *>np.PyArray_STRIDES(a),
-                              context, cls)
+    return pygpu_fromhostdata(np.PyArray_DATA(a), dtype_to_typecode(a.dtype),
+                              np.PyArray_NDIM(a), <size_t *>np.PyArray_DIMS(a),
+                              <ssize_t *>np.PyArray_STRIDES(a), context, cls)
 
 cdef class GpuContext:
     """

@@ -142,16 +142,35 @@ int GpuArray_fromdata(GpuArray *a, const compyte_buffer_ops *ops,
 }
 
 int GpuArray_copy_from_host(GpuArray *a, const compyte_buffer_ops *ops,
-                            void *ctx, void *buf, size_t sz, int typecode,
+                            void *ctx, void *buf, int typecode,
                             unsigned int nd, const size_t *dims,
                             const ssize_t *strides) {
+  char *base = (char *)buf;
+  size_t offset = 0;
+  size_t size = compyte_get_elsize(typecode);
   gpudata *b;
   int err;
+  unsigned int i;
 
-  b = ops->buffer_alloc(ctx, sz, buf, GA_BUFFER_INIT, &err);
+  for (i = 0; i < nd; i++) {
+    if (dims[i] == 0) {
+      size = 0;
+      base = (char *)buf;
+      break;
+    }
+
+    if (strides[i] < 0)
+      base += (dims[i]-1) * strides[i];
+    else
+      size += (dims[i]-1) * strides[i];
+  }
+  offset = (char *)buf - base;
+  size += offset;
+
+  b = ops->buffer_alloc(ctx, size, base, GA_BUFFER_INIT, &err);
   if (b == NULL) return err;
 
-  err = GpuArray_fromdata(a, ops, b, 0, typecode, nd, dims, strides, 1);
+  err = GpuArray_fromdata(a, ops, b, offset, typecode, nd, dims, strides, 1);
   ops->buffer_release(b);
   return err;
 }
