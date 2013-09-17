@@ -821,7 +821,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     return res;
 }
 
-static voud cuda_retainkernel(gpukernel *k) {
+static void cuda_retainkernel(gpukernel *k) {
   k->refcnt++;
 }
 
