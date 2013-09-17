@@ -885,7 +885,6 @@ static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
 
 static int cuda_callkernel(gpukernel *k, size_t bs, size_t gs) {
     cuda_context *ctx = k->ctx;
-    int res;
     unsigned int i;
 #if CUDA_VERSION < 4000
     size_t total = 0;
@@ -959,7 +958,7 @@ static int cuda_sync(gpudata *b) {
   cuda_context *ctx = (cuda_context *)b->ctx;
 
   cuda_enter(ctx);
-  if (ctx->err != GA_NO_ERROR)
+  if (ctx->err != CUDA_SUCCESS)
     return GA_IMPL_ERROR;
   ctx->err = cuEventSynchronize(b->ev);
   cuda_exit(ctx);
