@@ -49,7 +49,7 @@
 typedef struct {char c; CUdeviceptr x; } st_devptr;
 #define DEVPTR_ALIGN (sizeof(st_devptr) - sizeof(CUdeviceptr))
 
-#define DONTFREE 0x1
+#define DONTFREE 0x1000
 
 static CUresult err;
 
@@ -61,6 +61,8 @@ typedef struct _cuda_context {
   unsigned int refcnt;
   int flags;
 } cuda_context;
+
+static void cuda_free(gpudata *);
 
 COMPYTE_LOCAL void *cuda_make_ctx(CUcontext ctx, int flags) {
   cuda_context *res;
@@ -321,16 +323,24 @@ static void cuda_deinit(void *c) {
   cuda_free_ctx((cuda_context *)c);
 }
 
-static gpudata *cuda_alloc(void *c, size_t size, int *ret) {
+static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
+			   int *ret) {
     gpudata *res;
     cuda_context *ctx = (cuda_context *)c;
+
+    if ((flags & GA_BUFFER_INIT) && data == NULL) FAIL(NULL, GA_VALUE_ERROR);
+    if ((flags & (GA_BUFFER_READ_ONLY|GA_BUFFER_WRITE_ONLY)) ==
+	(GA_BUFFER_READ_ONLY|GA_BUFFER_WRITE_ONLY)) FAIL(NULL, GA_VALUE_ERROR);
+
+    /* TODO: figure out how to make this work */
+    if (flags & GA_BUFFER_HOST) FAIL(NULL, GA_DEVSUP_ERROR);
 
     res = malloc(sizeof(*res));
     if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
     res->refcnt = 1;
 
     res->sz = size;
-    res->flags = 0;
+    res->flags = flags & (GA_BUFFER_READ_ONLY|GA_BUFFER_WRITE_ONLY);
 
     cuda_enter(ctx);
     if (ctx->err != CUDA_SUCCESS) {
@@ -357,6 +367,15 @@ static gpudata *cuda_alloc(void *c, size_t size, int *ret) {
     }
     res->ctx = ctx;
     ctx->refcnt++;
+
+    if (flags & GA_BUFFER_INIT) {
+      ctx->err = cuMemcpyHtoD(res->ptr, data, size);
+      if (ctx->err != CUDA_SUCCESS) {
+	cuda_free(res);
+	FAIL(NULL, GA_IMPL_ERROR)
+      }
+    }
+
     cuEventRecord(res->ev, ctx->s);
     cuda_exit(ctx);
     return res;

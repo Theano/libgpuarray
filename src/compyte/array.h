@@ -129,15 +129,7 @@ static inline int GpuArray_CHKFLAGS(const GpuArray *a, int flags) {
   return (a->flags & flags) == flags;
 }
 /* Add tests here when you need them */
-/**
- * Checks if the array owns its data (is responsible for freeing it
- * when freed itself).
- *
- * \param a array
- *
- * \returns true if `a` owns its data
- */
-#define GpuArray_OWNSDATA(a) GpuArray_CHKFLAGS(a, GA_OWNDATA)
+
 /**
  * Checks if the array data is writable.
  *
@@ -251,6 +243,12 @@ COMPYTE_PUBLIC int GpuArray_fromdata(GpuArray *a,
                                      int typecode, unsigned int nd,
                                      const size_t *dims,
                                      const ssize_t *strides, int writeable);
+
+COMPYTE_PUBLIC int GpuArray_copy_from_host(GpuArray *a,
+                                           const compyte_buffer_ops *ops,
+                                           void *ctx, void *buf, int typecode,
+                                           unsigned int nd, const size_t *dims,
+                                           const ssize_t *strides);
 
 /**
  * Initialize an array structure to provide a view of another.

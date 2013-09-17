@@ -20,6 +20,22 @@
 /* Value below which a size_t multiplication will never overflow. */
 #define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
 
+static int get_size_from_dims(unsigned int nd, const size_t *dims,
+                              size_t *size) {
+  size_t res = *size;
+  unsigned int i;
+  for (i = 0; i < nd; i++) {
+    size_t d = dims[i];
+    /* Check for overflow */
+    if ((d >= MUL_NO_OVERFLOW || res >= MUL_NO_OVERFLOW) &&
+	d > 0 && SIZE_MAX / d < res)
+      return GA_VALUE_ERROR;
+    res *= d;
+  }
+  *size = res;
+  return GA_NO_ERROR;
+}
+
 int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
 		   int typecode, unsigned int nd, const size_t *dims,
                    ga_order ord) {
@@ -36,18 +52,12 @@ int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
   if (ord != GA_C_ORDER && ord != GA_F_ORDER)
     return GA_VALUE_ERROR;
 
-  for (i = 0; (unsigned)i < nd; i++) {
-    size_t d = dims[i];
-    /* Check for overflow */
-    if ((d >= MUL_NO_OVERFLOW || size >= MUL_NO_OVERFLOW) &&
-	d > 0 && SIZE_MAX / d < size)
-      return GA_VALUE_ERROR;
-    size *= d;
-  }
+  res = get_size_from_dims(nd, dims, &size);
+  if (res != GA_NO_ERROR) return res;
 
   a->ops = ops;
-  a->data = a->ops->buffer_alloc(ctx, size, &res);
-  if (res != GA_NO_ERROR) return res;
+  a->data = a->ops->buffer_alloc(ctx, size, NULL, 0, &res);
+  if (a->data == NULL) return res;
   a->nd = nd;
   a->offset = 0;
   a->typecode = typecode;
@@ -129,6 +139,40 @@ int GpuArray_fromdata(GpuArray *a, const compyte_buffer_ops *ops,
   if (GpuArray_is_f_contiguous(a)) a->flags |= GA_F_CONTIGUOUS;
 
   return GA_NO_ERROR;
+}
+
+int GpuArray_copy_from_host(GpuArray *a, const compyte_buffer_ops *ops,
+                            void *ctx, void *buf, int typecode,
+                            unsigned int nd, const size_t *dims,
+                            const ssize_t *strides) {
+  char *base = (char *)buf;
+  size_t offset = 0;
+  size_t size = compyte_get_elsize(typecode);
+  gpudata *b;
+  int err;
+  unsigned int i;
+
+  for (i = 0; i < nd; i++) {
+    if (dims[i] == 0) {
+      size = 0;
+      base = (char *)buf;
+      break;
+    }
+
+    if (strides[i] < 0)
+      base += (dims[i]-1) * strides[i];
+    else
+      size += (dims[i]-1) * strides[i];
+  }
+  offset = (char *)buf - base;
+  size += offset;
+
+  b = ops->buffer_alloc(ctx, size, base, GA_BUFFER_INIT, &err);
+  if (b == NULL) return err;
+
+  err = GpuArray_fromdata(a, ops, b, offset, typecode, nd, dims, strides, 1);
+  ops->buffer_release(b);
+  return err;
 }
 
 int GpuArray_view(GpuArray *v, const GpuArray *a) {

@@ -73,10 +73,6 @@ def cast(shp, dtype1, dtype2):
 
 
 def test_transfer_not_contiguous():
-    """
-    Test transfer when the input on the CPU is not contiguous
-    TODO: test when the input on the gpu is not contiguous
-    """
     for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             yield transfer_not_contiguous, shp, dtype
@@ -91,8 +87,8 @@ def transfer_not_contiguous(shp, dtype):
 
     assert numpy.allclose(c, a)
     assert a.shape == b.shape == c.shape
-    # We copy a to a c contiguous array before the transfer
-    assert (-a.strides[0],) + a.strides[1:] == b.strides == c.strides
+    # the result array (c) is C contiguous
+    assert a.strides == b.strides == (-c.strides[0],) + c.strides[1:]
     assert a.dtype == b.dtype == c.dtype
     assert c.flags.c_contiguous
 

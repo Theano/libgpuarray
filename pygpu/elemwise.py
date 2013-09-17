@@ -520,7 +520,6 @@ def elemwise2(a, op, b, ary, odtype=None, oper=None,
     else:
         res = ary._empty_like_me(dtype=odtype)
 
-    print res.shape
     if oper is None:
         oper = op_tmpl % {'a': a_arg.expr(), 'op': op, 'b': b_arg.expr(),
                           'out_t': dtype_to_ctype(odtype)}

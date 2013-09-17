@@ -15,6 +15,8 @@ const char *compyte_error_str(int err) {
   case GA_SYS_ERROR:         return strerror(errno);
   case GA_RUN_ERROR:         return "Could not execute helper program";
   case GA_DEVSUP_ERROR:      return "Device does not support operation";
+  case GA_READONLY_ERROR:    return "Buffer is read-only";
+  case GA_WRITEONLY_ERROR:   return "Buffer is write-only";
   default: return "Unknown GA error";
   }
 }
