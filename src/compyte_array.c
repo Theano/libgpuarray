@@ -57,7 +57,7 @@ int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
 
   a->ops = ops;
   a->data = a->ops->buffer_alloc(ctx, size, NULL, 0, &res);
-  if (res != GA_NO_ERROR) return res;
+  if (a->data == NULL) return res;
   a->nd = nd;
   a->offset = 0;
   a->typecode = typecode;
@@ -149,7 +149,7 @@ int GpuArray_copy_from_host(GpuArray *a, const compyte_buffer_ops *ops,
   int err;
 
   b = ops->buffer_alloc(ctx, sz, buf, GA_BUFFER_INIT, &err);
-  if (err != GA_NO_ERROR) return err;
+  if (b == NULL) return err;
 
   err = GpuArray_fromdata(a, ops, b, 0, typecode, nd, dims, strides, 1);
   ops->buffer_release(b);
