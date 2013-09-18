@@ -2,7 +2,7 @@ import math
 
 from mako.template import Template
 
-from tools import ArrayArg, check_args, prod
+from tools import ArrayArg, check_args, prod, lfu_cache
 from elemwise import parse_c_args, massage_op
 
 import numpy
@@ -195,6 +195,7 @@ class ReductionKernel(object):
                                cluda=True, **self.flags)
         return k
 
+    @lfu_cache()
     def _get_basic_kernel(self, maxls, nd):
         return self._find_kernel_ls(self._gen_basic, maxls, nd)
 
