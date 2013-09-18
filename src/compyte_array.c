@@ -20,22 +20,6 @@
 /* Value below which a size_t multiplication will never overflow. */
 #define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
 
-static int get_size_from_dims(unsigned int nd, const size_t *dims,
-                              size_t *size) {
-  size_t res = *size;
-  unsigned int i;
-  for (i = 0; i < nd; i++) {
-    size_t d = dims[i];
-    /* Check for overflow */
-    if ((d >= MUL_NO_OVERFLOW || res >= MUL_NO_OVERFLOW) &&
-	d > 0 && SIZE_MAX / d < res)
-      return GA_VALUE_ERROR;
-    res *= d;
-  }
-  *size = res;
-  return GA_NO_ERROR;
-}
-
 int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
 		   int typecode, unsigned int nd, const size_t *dims,
                    ga_order ord) {
@@ -52,8 +36,14 @@ int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
   if (ord != GA_C_ORDER && ord != GA_F_ORDER)
     return GA_VALUE_ERROR;
 
-  res = get_size_from_dims(nd, dims, &size);
-  if (res != GA_NO_ERROR) return res;
+  for (i = 0; i < nd; i++) {
+    size_t d = dims[i];
+    /* Check for overflow */
+    if ((d >= MUL_NO_OVERFLOW || size >= MUL_NO_OVERFLOW) &&
+	d > 0 && SIZE_MAX / d < size)
+      return GA_VALUE_ERROR;
+    size *= d;
+  }
 
   a->ops = ops;
   a->data = a->ops->buffer_alloc(ctx, size, NULL, 0, &res);
