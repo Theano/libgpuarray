@@ -1,6 +1,8 @@
 #ifndef _PRIVATE
 #define _PRIVATE
 
+/** \cond INTERNAL_DOCS */
+
 /* 
  * This file contains function definition that are shared in multiple
  * files but not exposed in the interface.
@@ -17,8 +19,6 @@ extern "C" {
 }
 #endif
 
-
-/** \cond INTERNAL_DOCS */
 
 #cmakedefine HAVE_STRL
 #cmakedefine HAVE_ASPRINTF
@@ -79,10 +79,10 @@ COMPYTE_LOCAL int compyte_elem_perdim(char *strs[], unsigned int *count,
 
 #define nelems(a) (sizeof(a)/sizeof(a[0]))
 
-/** \endcond */
-
 #ifdef __cplusplus
 }
 #endif
+
+/** \endcond */
 
 #endif

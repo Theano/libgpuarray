@@ -91,6 +91,7 @@ typedef struct _GpuArray {
    */
   /* Numpy flags that will not be supported at this level (and why):
 
+     NPY_OWNDATA: data is refcounted
      NPY_NOTSWAPPED: data is alway native endian
      NPY_FORCECAST: no casts
      NPY_ENSUREARRAY: no inherited classes
