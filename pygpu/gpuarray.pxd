@@ -222,6 +222,11 @@ cdef api GpuArray pygpu_zeros(unsigned int nd, size_t *dims, int typecode,
                               ga_order order, GpuContext context, type cls)
 cdef api GpuArray pygpu_empty(unsigned int nd, size_t *dims, int typecode,
                               ga_order order, GpuContext context, type cls)
+cdef api GpuArray pygpu_fromhostdata(void *buf, int typecode, unsigned int nd,
+                                     const size_t *dims,
+                                     const ssize_t *strides,
+                                     GpuContext context, type cls)
+
 cdef api GpuArray pygpu_copy(GpuArray a, ga_order ord)
 
 cdef api class GpuContext [type GpuContextType, object GpuContextObject]:
