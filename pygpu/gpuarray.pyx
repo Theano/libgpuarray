@@ -1503,7 +1503,13 @@ cdef class GpuArray:
             return compyte_get_elsize(self.ga.typecode)
 
     property flags:
-        "Return the flags as a dictionary"
+        """Return a flags object describing the properties of this array.
+
+        This is mostly numpy-compatible with some exceptions:
+          * Flags are always constant (numpy allows modification of certain flags in certain cicumstances).
+          * OWNDATA is always True, since the data is refcounted in libcompyte.
+          * UPDATEIFCOPY is not supported, therefore always False.
+        """
         def __get__(self):
             return flags(self.ga.flags)
 
