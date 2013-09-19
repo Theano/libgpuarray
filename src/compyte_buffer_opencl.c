@@ -1,19 +1,10 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include "private.h"
+#include "private_opencl.h"
 #include "compyte/buffer.h"
 #include "compyte/util.h"
 #include "compyte/error.h"
-
-#ifdef __APPLE__
-
-#include <OpenCL/opencl.h>
-
-#else
-
-#include <CL/opencl.h>
-
-#endif
 
 #include <assert.h>
 #include <stdlib.h>
@@ -73,15 +64,7 @@ static cl_device_id get_dev(cl_context ctx, int *ret) {
   return res;
 }
 
-typedef struct _cl_ctx {
-  cl_context ctx;
-  cl_command_queue q;
-  char *exts;
-  cl_int err;
-  unsigned int refcnt;
-} cl_ctx;
-
-COMPYTE_LOCAL cl_ctx *cl_make_ctx(cl_context ctx) {
+cl_ctx *cl_make_ctx(cl_context ctx) {
   cl_ctx *res;
   cl_device_id id;
   cl_command_queue_properties qprop;
@@ -111,11 +94,11 @@ COMPYTE_LOCAL cl_ctx *cl_make_ctx(cl_context ctx) {
   return res;
 }
 
-COMPYTE_LOCAL cl_context cl_get_ctx(void *ctx) {
+cl_context cl_get_ctx(void *ctx) {
   return ((cl_ctx *)ctx)->ctx;
 }
 
-COMPYTE_LOCAL cl_command_queue cl_get_stream(void *ctx) {
+cl_command_queue cl_get_stream(void *ctx) {
   return ((cl_ctx *)ctx)->q;
 }
 
@@ -131,14 +114,7 @@ static void cl_free_ctx(cl_ctx *ctx) {
   }
 }
 
-struct _gpudata {
-  cl_mem buf;
-  cl_event ev;
-  cl_ctx *ctx;
-  cl_uint refcnt;
-};
-
-COMPYTE_LOCAL gpudata *cl_make_buf(void *c, cl_mem buf) {
+gpudata *cl_make_buf(void *c, cl_mem buf) {
   cl_ctx *ctx = (cl_ctx *)c;
   gpudata *res;
   cl_context buf_ctx;
@@ -165,15 +141,7 @@ COMPYTE_LOCAL gpudata *cl_make_buf(void *c, cl_mem buf) {
   return res;
 }
 
-COMPYTE_LOCAL cl_mem cl_get_buf(gpudata *g) { return g->buf; }
-
-struct _gpukernel {
-  cl_kernel k;
-  cl_event ev;
-  gpudata **bs;
-  cl_ctx *ctx;
-  unsigned int refcnt;
-};
+cl_mem cl_get_buf(gpudata *g) { return g->buf; }
 
 #define PRAGMA "#pragma OPENCL EXTENSION "
 #define ENABLE " : enable\n"
