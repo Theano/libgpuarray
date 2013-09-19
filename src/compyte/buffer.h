@@ -446,6 +446,15 @@ typedef struct _compyte_buffer_ops {
  */
 #define GA_CTX_PROP_MAXGSIZE  5
 
+/**
+ * Get the vector of blas ops for the context.
+ *
+ * This may differ from one context to the other in the same backend
+ * depending of the availability and performance of various BLAS
+ * libraries.
+ *
+ * Type: `const compyte_blas_ops *`
+ */
 #define GA_CTX_PROP_BLAS_OPS  6
 
 /* Start at 512 for GA_BUFFER_PROP_ */
