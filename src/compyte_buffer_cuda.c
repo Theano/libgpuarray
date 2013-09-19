@@ -1356,6 +1356,9 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((size_t *)res) = i;
     cuda_exit(ctx);
     return GA_NO_ERROR;
+  case GA_CTX_PROP_BLAS_OPS:
+    *((void **)res) = NULL;
+    return GA_DEVSUP_ERROR;
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;
     return GA_NO_ERROR;

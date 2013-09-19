@@ -5,6 +5,7 @@
 #include "compyte/buffer.h"
 #include "compyte/util.h"
 #include "compyte/error.h"
+#include "compyte/blas.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -1147,6 +1148,15 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     }
     *((size_t *)res) = sz;
     return GA_NO_ERROR;
+  case GA_CTX_PROP_BLAS_OPS:
+#ifdef WITH_OPENCL_CLBLAS
+    extern compyte_blas_ops clblas_ops;
+    *((compyte_blas_ops **)res) = &clblas_ops;
+    return GA_NO_ERROR;
+#else
+    *((void **)res) = NULL;
+    return GA_DEVSUPP_ERROR;
+#endif
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;
     return GA_NO_ERROR;

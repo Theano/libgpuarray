@@ -446,6 +446,8 @@ typedef struct _compyte_buffer_ops {
  */
 #define GA_CTX_PROP_MAXGSIZE  5
 
+#define GA_CTX_PROP_BLAS_OPS  6
+
 /* Start at 512 for GA_BUFFER_PROP_ */
 /**
  * Get the context in which this buffer was allocated.

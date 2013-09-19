@@ -17,6 +17,7 @@ const char *compyte_error_str(int err) {
   case GA_DEVSUP_ERROR:      return "Device does not support operation";
   case GA_READONLY_ERROR:    return "Buffer is read-only";
   case GA_WRITEONLY_ERROR:   return "Buffer is write-only";
+  case GA_BLAS_ERROR:        return "Error in BLAS call";
   default: return "Unknown GA error";
   }
 }

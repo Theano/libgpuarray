@@ -28,6 +28,7 @@ enum ga_error {
   GA_DEVSUP_ERROR,
   GA_READONLY_ERROR,
   GA_WRITEONLY_ERROR,
+  GA_BLAS_ERROR,
   /* Add more error types if needed, but at the end */
   /* Don't forget to sync with Gpu_error() */
 };
