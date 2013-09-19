@@ -1032,6 +1032,10 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
   return res;
 }
 
+#ifdef WITH_OPENCL_CLBLAS
+extern compyte_blas_ops clblas_ops;
+#endif
+
 static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
                        void *res) {
   cl_ctx *ctx = NULL;
@@ -1150,7 +1154,6 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     return GA_NO_ERROR;
   case GA_CTX_PROP_BLAS_OPS:
 #ifdef WITH_OPENCL_CLBLAS
-    extern compyte_blas_ops clblas_ops;
     *((compyte_blas_ops **)res) = &clblas_ops;
     return GA_NO_ERROR;
 #else
