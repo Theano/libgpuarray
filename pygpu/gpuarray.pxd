@@ -229,13 +229,13 @@ cdef api GpuArray pygpu_fromhostdata(void *buf, int typecode, unsigned int nd,
 
 cdef api GpuArray pygpu_copy(GpuArray a, ga_order ord)
 
-cdef api class GpuContext [type GpuContextType, object GpuContextObject]:
+cdef api class GpuContext [type PyGpuContextType, object PyGpuContextObject]:
     cdef const compyte_buffer_ops *ops
     cdef void* ctx
 
 cdef api GpuArray new_GpuArray(type cls, GpuContext ctx, object base)
 
-cdef api class GpuArray [type GpuArrayType, object GpuArrayObject]:
+cdef api class GpuArray [type PyGpuArrayType, object PyGpuArrayObject]:
     cdef _GpuArray ga
     cdef readonly GpuContext context
     cdef readonly object base
@@ -244,7 +244,7 @@ cdef api class GpuArray [type GpuArrayType, object GpuArrayObject]:
     cdef __index_helper(self, key, unsigned int i, ssize_t *start,
                         ssize_t *stop, ssize_t *step)
 
-cdef api class GpuKernel [type GpuKernelType, object GpuKernelObject]:
+cdef api class GpuKernel [type PyGpuKernelType, object PyGpuKernelObject]:
     cdef _GpuKernel k
     cdef readonly GpuContext context
     cdef object __weakref__
