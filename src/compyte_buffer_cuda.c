@@ -1,5 +1,6 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "private.h"
+#include "private_cuda.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -35,12 +36,6 @@
 #include <unistd.h>
 #endif
 
-#ifdef __APPLE__
-#include <CUDA/cuda.h>
-#else
-#include <cuda.h>
-#endif
-
 #include "compyte/buffer.h"
 #include "compyte/util.h"
 #include "compyte/error.h"
@@ -49,22 +44,11 @@
 typedef struct {char c; CUdeviceptr x; } st_devptr;
 #define DEVPTR_ALIGN (sizeof(st_devptr) - sizeof(CUdeviceptr))
 
-#define DONTFREE 0x1000
-
 static CUresult err;
-
-typedef struct _cuda_context {
-  CUcontext ctx;
-  CUcontext old;
-  CUresult err;
-  CUstream s;
-  unsigned int refcnt;
-  int flags;
-} cuda_context;
 
 static void cuda_free(gpudata *);
 
-COMPYTE_LOCAL void *cuda_make_ctx(CUcontext ctx, int flags) {
+void *cuda_make_ctx(CUcontext ctx, int flags) {
   cuda_context *res;
   res = malloc(sizeof(*res));
   if (res == NULL)
@@ -91,15 +75,15 @@ static void cuda_free_ctx(cuda_context *ctx) {
   }
 }
 
-COMPYTE_LOCAL CUcontext cuda_get_ctx(void *ctx) {
+CUcontext cuda_get_ctx(void *ctx) {
   return ((cuda_context *)ctx)->ctx;
 }
 
-COMPYTE_LOCAL CUstream cuda_get_stream(void *ctx) {
+CUstream cuda_get_stream(void *ctx) {
   return ((cuda_context *)ctx)->s;
 }
 
-static void cuda_enter(cuda_context *ctx) {
+void cuda_enter(cuda_context *ctx) {
   cuCtxGetCurrent(&ctx->old);
   if (ctx->old != ctx->ctx)
     ctx->err = cuCtxSetCurrent(ctx->ctx);
@@ -108,21 +92,12 @@ static void cuda_enter(cuda_context *ctx) {
   if (ctx->old == NULL) ctx->old = ctx->ctx;
 }
 
-static void cuda_exit(cuda_context *ctx) {
+void cuda_exit(cuda_context *ctx) {
   if (ctx->old != ctx->ctx)
     cuCtxSetCurrent(ctx->old);
 }
 
-struct _gpudata {
-  CUdeviceptr ptr;
-  CUevent ev;
-  size_t sz;
-  cuda_context *ctx;
-  int flags;
-  unsigned int refcnt;
-};
-
-COMPYTE_LOCAL gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
+gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
     cuda_context *ctx = (cuda_context *)c;
     gpudata *res;
 
@@ -154,25 +129,8 @@ COMPYTE_LOCAL gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
     return res;
 }
 
-COMPYTE_LOCAL CUdeviceptr cuda_get_ptr(gpudata *g) { return g->ptr; }
-COMPYTE_LOCAL size_t cuda_get_sz(gpudata *g) { return g->sz; }
-
-/* The total size of the arguments is limited to 256 bytes */
-#define NUM_ARGS (256/sizeof(void*))
-
-struct _gpukernel {
-    CUmodule m;
-    CUfunction k;
-    CUevent ev;
-    void *args[NUM_ARGS];
-#if CUDA_VERSION < 4000
-    size_t types[NUM_ARGS];
-#endif
-    unsigned int argcount;
-    gpudata *bs[NUM_ARGS];
-    cuda_context *ctx;
-    unsigned int refcnt;
-};
+CUdeviceptr cuda_get_ptr(gpudata *g) { return g->ptr; }
+size_t cuda_get_sz(gpudata *g) { return g->sz; }
 
 #define FAIL(v, e) { if (ret) *ret = e; return v; }
 #define CHKFAIL(v) if (err != CUDA_SUCCESS) FAIL(v, GA_IMPL_ERROR)
