@@ -1158,7 +1158,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     return GA_NO_ERROR;
 #else
     *((void **)res) = NULL;
-    return GA_DEVSUPP_ERROR;
+    return GA_DEVSUP_ERROR;
 #endif
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;
