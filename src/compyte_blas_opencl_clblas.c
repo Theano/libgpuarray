@@ -36,16 +36,23 @@ static inline clblasTranspose convT(cb_transpose trans) {
   }
 }
 
-static int setup(void) {
+static unsigned int init_num = 0;
+
+static int setup(void *c) {
   clblasStatus err;
-  err = clblasSetup();
-  if (err != clblasSuccess)
-    return GA_BLAS_ERROR;
+  if (init_num == 0) {
+    err = clblasSetup();
+    if (err != clblasSuccess)
+      return GA_BLAS_ERROR;
+  }
+  init_num++;
   return GA_NO_ERROR;
 }
 
-static void teardown(void) {
-  clblasTeardown();
+static void teardown(void *c) {
+  init_num--;
+  if (init_num == 0)
+    clblasTeardown();
 }
 
 static int sgemv(const cb_order order,

@@ -26,8 +26,8 @@ typedef enum _cb_uplo {
 } cb_uplo;
 
 typedef struct _compyte_blas_ops {
-  int (*setup)(void);
-  void (*teardown)(void);
+  int (*setup)(void *ctx);
+  void (*teardown)(void *ctx);
   int (*sgemv)(const cb_order order,
                const cb_transpose transA,
                const size_t M,
