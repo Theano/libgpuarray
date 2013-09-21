@@ -771,9 +771,8 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
       cuda_exit(ctx);
       FAIL(NULL, GA_SYS_ERROR);
     }
-    res->refcnt = 1;
-
     memset(res, 0, sizeof(*res));
+    res->refcnt = 1;
 
     ctx->err = cuModuleLoadData(&res->m, p);
     free(p);
