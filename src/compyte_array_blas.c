@@ -50,6 +50,10 @@ int GpuArray_sgemv(cb_transpose t, float alpha, GpuArray *A, GpuArray *X,
   if (err != GA_NO_ERROR)
     return err;
 
+  err = blas->setup(ctx);
+  if (err != GA_NO_ERROR)
+    return err;
+
   return blas->sgemv(o, t, m, n, alpha, A->data, A->offset / elsize,
 		     A->dimensions[0], X->data, X->offset / elsize,
 		     X->strides[0] / elsize, beta, Y->data, Y->offset / elsize,
