@@ -76,18 +76,18 @@ static int sgemv(const cb_order order,
                  const size_t offY,
                  const int incY) {
   cuda_context *ctx = A->ctx;
-  size_t tmp;
   cublasStatus_t err;
+  cb_transpose trans_a = transA;
+  size_t n = N, m = M, _lda = lda;
 
   if (order == cb_c) {
-    tmp = M;
-    M = N;
-    N = tmp;
-    lda = N;
+    m = N;
+    n = M;
+    _lda = n;
     if (transA == cb_no_trans) {
-      transA = cb_trans;
+      trans_a = cb_trans;
     } else if (transA == cb_trans) {
-      transA = cb_no_trans;
+      trans_a = cb_no_trans;
     } else {
       return GA_DEVSUP_ERROR;
     }
@@ -113,8 +113,8 @@ static int sgemv(const cb_order order,
     return GA_IMPL_ERROR;
   }
 
-  err = cublasSgemv(ctx->blas_handle, convO(transA), M, N, &alpha,
-		    ((float *)A->ptr) + offA, lda, 
+  err = cublasSgemv(ctx->blas_handle, convO(trans_a), m, n, &alpha,
+		    ((float *)A->ptr) + offA, _lda,
 		    ((float *)X->ptr) + offX, incX, &beta,
 		    ((float *)Y->ptr) + offY, incY);
   if (err == CUBLAS_STATUS_ARCH_MISMATCH)
