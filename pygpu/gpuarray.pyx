@@ -124,7 +124,7 @@ def cuda_wrap_ctx(size_t ptr, bint own):
     res = GpuContext.__new__(GpuContext)
     res.ops = get_ops('cuda')
     flags = 0
-    if own:
+    if not own:
         flags |= COMPYTE_CUDA_CTX_NOFREE
     res.ctx = cuda_make_ctx(<void *>ptr, flags)
     if res.ctx == NULL:
