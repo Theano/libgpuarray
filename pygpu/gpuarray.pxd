@@ -160,6 +160,16 @@ cdef extern from "compyte/array.h":
     bint GpuArray_is_c_contiguous(_GpuArray *a)
     bint GpuArray_is_f_contiguous(_GpuArray *a)
 
+cdef extern from "compyte/buffer_blas.h":
+    ctypedef enum cb_transpose:
+        cb_no_trans,
+        cb_trans,
+        cb_conj_trans
+
+cdef extern from "compyte/blas.h":
+    int GpuArray_sgemv(cb_transpose trans, float alpha, _GpuArray *A,
+                       _GpuArray *X, float beta, _GpuArray *Y)
+
 cdef extern from "compyte/extension.h":
     void *compyte_get_extension(const char *) nogil
     cdef int COMPYTE_CUDA_CTX_NOFREE
@@ -228,6 +238,9 @@ cdef api GpuArray pygpu_fromhostdata(void *buf, int typecode, unsigned int nd,
                                      GpuContext context, type cls)
 
 cdef api GpuArray pygpu_copy(GpuArray a, ga_order ord)
+
+cdef api GpuArray pygpu_blas_sgemv(cb_transpose trans, float alpha, GpuArray A,
+                                   GpuArray X, float beta, GpuArray Y)
 
 cdef api class GpuContext [type PyGpuContextType, object PyGpuContextObject]:
     cdef const compyte_buffer_ops *ops
