@@ -1,6 +1,9 @@
 #ifndef COMPYTE_BUFFER_BLAS_H
 #define COMPYTE_BUFFER_BLAS_H
 
+#include <compyte/buffer.h>
+#include <compyte/config.h>
+
 typedef enum _cb_order {
   cb_row,
   cb_column
