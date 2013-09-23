@@ -1,12 +1,6 @@
 #include "private.h"
 #include "private_opencl.h"
 
-#ifdef __APPLE__
-#include <OpenCL/cl.h>
-#else
-#include <CL/cl.h>
-#endif
-
 #include <clBLAS.h>
 
 #include "compyte/blas.h"
