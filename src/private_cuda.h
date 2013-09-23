@@ -18,6 +18,7 @@ typedef struct _cuda_context {
   CUcontext old;
   CUresult err;
   CUstream s;
+  void *blas_handle;
   unsigned int refcnt;
   int flags;
 } cuda_context;

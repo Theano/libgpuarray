@@ -40,6 +40,7 @@
 #include "compyte/util.h"
 #include "compyte/error.h"
 #include "compyte/extension.h"
+#include "compyte/blas.h"
 
 typedef struct {char c; CUdeviceptr x; } st_devptr;
 #define DEVPTR_ALIGN (sizeof(st_devptr) - sizeof(CUdeviceptr))
@@ -47,6 +48,7 @@ typedef struct {char c; CUdeviceptr x; } st_devptr;
 static CUresult err;
 
 static void cuda_free(gpudata *);
+static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
 
 void *cuda_make_ctx(CUcontext ctx, int flags) {
   cuda_context *res;
@@ -55,6 +57,7 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
     return NULL;
   res->ctx = ctx;
   res->err = CUDA_SUCCESS;
+  res->blas_handle = NULL;
   res->refcnt = 1;
   res->flags = flags;
   err = cuStreamCreate(&res->s, 0);
@@ -66,8 +69,14 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
 }
 
 static void cuda_free_ctx(cuda_context *ctx) {
+  compyte_blas_ops *blas_ops;
+
   ctx->refcnt--;
   if (ctx->refcnt == 0) {
+    if (ctx->blas_handle != NULL) {
+      err = cuda_property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas_ops);
+      blas_ops->teardown(ctx);
+    }
     cuStreamDestroy(ctx->s);
     if (!(ctx->flags & DONTFREE))
       cuCtxDestroy(ctx->ctx);
@@ -181,8 +190,6 @@ static const char CUDA_PREAMBLE[] =
     "#define ga_half uint16_t\n";
 /* XXX: add complex, quads, longlong */
 /* XXX: add vector types */
-
-static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
 
 static const char *get_error_string(CUresult err) {
     switch (err) {
@@ -1198,6 +1205,10 @@ fail:
     return res;
 }
 
+#ifdef WITH_CUDA_CUBLAS
+extern compyte_blas_ops cublas_ops;
+#endif
+
 static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
                          void *res) {
   cuda_context *ctx = NULL;
@@ -1314,8 +1325,13 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     cuda_exit(ctx);
     return GA_NO_ERROR;
   case GA_CTX_PROP_BLAS_OPS:
+#ifdef WITH_CUDA_CUBLAS
+    *((compyte_blas_ops **)res) = &cublas_ops;
+    return GA_NO_ERROR;
+#else
     *((void **)res) = NULL;
     return GA_DEVSUP_ERROR;
+#endif
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;
     return GA_NO_ERROR;

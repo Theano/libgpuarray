@@ -50,6 +50,8 @@ if(CUDA_FOUND)
   set(COMPYTE_SRC ${COMPYTE_SRC} compyte_buffer_cuda.c)
   add_definitions(-DNVCC_BIN="${CUDA_NVCC_EXECUTABLE}" -DWITH_CUDA)
   include_directories("${CUDADRV_INCLUDE}")
+  set(COMPYTE_SRC ${COMPYTE_SRC} compyte_blas_cuda_cublas.c)
+  add_definitions(-DWITH_CUDA_CUBLAS)
 endif()
 
 if(OPENCL_FOUND)
@@ -75,8 +77,8 @@ set_target_properties(compyte PROPERTIES COMPILE_FLAGS "-DCOMPYTE_BUILDING_DLL -
 add_library(compyte-static STATIC ${COMPYTE_SRC})
 
 if(CUDA_FOUND)
-  target_link_libraries(compyte ${CUDADRV_LIBRARY})
-  target_link_libraries(compyte-static ${CUDADRV_LIBRARY})
+  target_link_libraries(compyte ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
+  target_link_libraries(compyte-static ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARY})
 endif()
 
 if(OPENCL_FOUND)
