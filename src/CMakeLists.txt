@@ -13,6 +13,7 @@ compyte_error.c
 compyte_util.c
 compyte_buffer.c
 compyte_array.c
+compyte_array_blas.c
 compyte_kernel.c
 compyte_extension.c
 )
