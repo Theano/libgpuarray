@@ -2,10 +2,12 @@
 #include "compyte/buffer_blas.h"
 #include "compyte/types.h"
 #include "compyte/util.h"
+#include "compyte/error.h"
 
 int GpuArray_sgemv(cb_transpose t, float alpha, GpuArray *A, GpuArray *X,
 		   float beta, GpuArray *Y) {
   compyte_blas_ops *blas;
+  void *ctx;
   size_t elsize;
   size_t n, m;
   cb_order o;
@@ -40,7 +42,11 @@ int GpuArray_sgemv(cb_transpose t, float alpha, GpuArray *A, GpuArray *X,
       Y->strides[0] % elsize != 0)
     return GA_VALUE_ERROR;
 
-  err = A->ops->property(A->ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas);
+
+  err = A->ops->property(NULL, A->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
+  if (err != GA_NO_ERROR)
+    return err;
+  err = A->ops->property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas);
   if (err != GA_NO_ERROR)
     return err;
 
