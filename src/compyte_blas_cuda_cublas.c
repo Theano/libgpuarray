@@ -1,7 +1,7 @@
 #include "private.h"
 #include "private_cuda.h"
 
-#include "compyte/blas.h"
+#include "compyte/buffer_blas.h"
 #include "compyte/error.h"
 
 #include "cublas_v2.h"

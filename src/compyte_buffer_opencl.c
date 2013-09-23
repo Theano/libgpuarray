@@ -5,7 +5,7 @@
 #include "compyte/buffer.h"
 #include "compyte/util.h"
 #include "compyte/error.h"
-#include "compyte/blas.h"
+#include "compyte/buffer_blas.h"
 
 #include <assert.h>
 #include <stdlib.h>

@@ -3,7 +3,7 @@
 
 #include <clBLAS.h>
 
-#include "compyte/blas.h"
+#include "compyte/buffer_blas.h"
 #include "compyte/error.h"
 
 static inline clblasOrder convO(cb_order order) {

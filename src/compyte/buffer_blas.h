@@ -1,5 +1,5 @@
-#ifndef COMPYTE_BLAS_H
-#define COMPYTE_BLAS_H
+#ifndef COMPYTE_BUFFER_BLAS_H
+#define COMPYTE_BUFFER_BLAS_H
 
 typedef enum _cb_order {
   cb_row,

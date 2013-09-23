@@ -40,7 +40,7 @@
 #include "compyte/util.h"
 #include "compyte/error.h"
 #include "compyte/extension.h"
-#include "compyte/blas.h"
+#include "compyte/buffer_blas.h"
 
 typedef struct {char c; CUdeviceptr x; } st_devptr;
 #define DEVPTR_ALIGN (sizeof(st_devptr) - sizeof(CUdeviceptr))
