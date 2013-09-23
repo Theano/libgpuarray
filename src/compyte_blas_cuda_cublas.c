@@ -75,8 +75,24 @@ static int sgemv(const cb_order order,
                  gpudata *Y,
                  const size_t offY,
                  const int incY) {
-  cublasStatus_t err;
   cuda_context *ctx = A->ctx;
+  size_t tmp;
+  cublasStatus_t err;
+
+  if (order == cb_c) {
+    tmp = M;
+    M = N;
+    N = tmp;
+    lda = N;
+    if (transA == cb_no_trans) {
+      transA = cb_trans;
+    } else if (transA == cb_trans) {
+      transA = cb_no_trans;
+    } else {
+      return GA_DEVSUP_ERROR;
+    }
+  }
+
   cuda_enter(ctx);
   if (ctx->err != CUDA_SUCCESS)
     return GA_IMPL_ERROR;
