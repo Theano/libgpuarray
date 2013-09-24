@@ -9,7 +9,7 @@ int GpuArray_sgemv(cb_transpose t, float alpha, GpuArray *A, GpuArray *X,
   compyte_blas_ops *blas;
   void *ctx;
   size_t elsize;
-  size_t n, m;
+  size_t n, m, lda;
   cb_order o;
   int err;
 
@@ -28,11 +28,19 @@ int GpuArray_sgemv(cb_transpose t, float alpha, GpuArray *A, GpuArray *X,
   if (t == cb_no_trans) {
     if (A->dimensions[1] != X->dimensions[0])
       return GA_VALUE_ERROR;
-    n = X->dimensions[0];
+    m = A->dimensions[0];
+    n = A->dimensions[1];
   } else {
     if (A->dimensions[1] != Y->dimensions[0])
       return GA_VALUE_ERROR;
-    m = Y->dimensions[0];
+    m = A->dimensions[1];
+    n = A->dimensions[0];
+  }
+
+  if (o == cb_c) {
+    lda = A->dimensions[1];
+  } else {
+    lda = A->dimensions[0];
   }
 
   elsize = compyte_get_elsize(GA_FLOAT);
@@ -55,7 +63,7 @@ int GpuArray_sgemv(cb_transpose t, float alpha, GpuArray *A, GpuArray *X,
     return err;
 
   return blas->sgemv(o, t, m, n, alpha, A->data, A->offset / elsize,
-		     A->dimensions[0], X->data, X->offset / elsize,
+		     lda, X->data, X->offset / elsize,
 		     X->strides[0] / elsize, beta, Y->data, Y->offset / elsize,
 		     Y->strides[0] / elsize);
 }
