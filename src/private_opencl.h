@@ -13,6 +13,7 @@ typedef struct _cl_ctx {
   cl_context ctx;
   cl_command_queue q;
   char *exts;
+  void *blas_handle;
   cl_int err;
   unsigned int refcnt;
 } cl_ctx;

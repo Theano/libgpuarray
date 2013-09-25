@@ -46,6 +46,8 @@ static cl_int err;
 #define CLEAR(p)
 #endif
 
+static int cl_property(void *c, gpudata *b, gpukernel *k, int p, void *r);
+
 static cl_device_id get_dev(cl_context ctx, int *ret) {
   size_t sz;
   cl_device_id res;
@@ -83,6 +85,7 @@ cl_ctx *cl_make_ctx(cl_context ctx) {
   res->err = CL_SUCCESS;
   res->refcnt = 1;
   res->exts = NULL;
+  res->blas_handle = NULL;
   res->q = clCreateCommandQueue(ctx, id,
 				qprop&CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE,
 				&err);
@@ -104,9 +107,15 @@ cl_command_queue cl_get_stream(void *ctx) {
 }
 
 static void cl_free_ctx(cl_ctx *ctx) {
+  compyte_blas_ops *blas_ops;
+
   assert(ctx->refcnt != 0);
   ctx->refcnt--;
   if (ctx->refcnt == 0) {
+    if (ctx->blas_handle != NULL) {
+      ctx->err = cl_property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas_ops);
+      blas_ops->teardown(ctx);
+    }
     clReleaseCommandQueue(ctx->q);
     CLEAR(ctx->q);
     clReleaseContext(ctx->ctx);
@@ -157,7 +166,6 @@ static void cl_releasekernel(gpukernel *k);
 static int cl_setkernelarg(gpukernel *k, unsigned int index,
 			   int typecode, const void *val);
 static int cl_callkernel(gpukernel *k, size_t bs, size_t gs);
-static int cl_property(void *c, gpudata *b, gpukernel *k, int p, void *r);
 
 static const char CL_PREAMBLE[] =
   "#define local_barrier() barrier(CLK_LOCAL_MEM_FENCE)\n"

@@ -30,22 +30,31 @@ static inline clblasTranspose convT(cb_transpose trans) {
   }
 }
 
-static unsigned int init_num = 0;
+static unsigned int refcnt = 0;
 
 static int setup(void *c) {
+  cl_ctx *ctx = (cl_ctx *)c;
   clblasStatus err;
-  if (init_num == 0) {
+
+  if (refcnt == 0) {
     err = clblasSetup();
     if (err != clblasSuccess)
       return GA_BLAS_ERROR;
   }
-  init_num++;
+
+  if (ctx->blas_handle == NULL)
+    ctx->blas_handle = &refcnt;
+  refcnt++;
   return GA_NO_ERROR;
 }
 
 static void teardown(void *c) {
-  init_num--;
-  if (init_num == 0)
+  cl_ctx *ctx = (cl_ctx *)c;
+  if (ctx->blas_handle != NULL) {
+    ctx->blas_handle == NULL;
+    refcnt--;
+  }
+  if (refcnt == 0)
     clblasTeardown();
 }
 
