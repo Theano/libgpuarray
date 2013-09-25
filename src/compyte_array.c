@@ -577,7 +577,12 @@ int GpuArray_copy(GpuArray *res, const GpuArray *a, ga_order order) {
 
 const char *GpuArray_error(const GpuArray *a, int err) {
   void *ctx;
-  a->ops->property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
+  int err2 = a->ops->property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
+  if (err2 != GA_NO_ERROR) {
+    /* If CUDA refuses to work after any kind of error in kernels
+       there is not much we can do about it. */
+    return compyte_error_str(err);
+  }
   return Gpu_error(a->ops, ctx, err);
 }
 
