@@ -50,7 +50,6 @@ int GpuArray_sgemv(cb_transpose t, float alpha, GpuArray *A, GpuArray *X,
       Y->strides[0] % elsize != 0)
     return GA_VALUE_ERROR;
 
-
   err = A->ops->property(NULL, A->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
   if (err != GA_NO_ERROR)
     return err;

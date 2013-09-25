@@ -25,7 +25,12 @@ cdef api GpuArray pygpu_blas_sgemv(cb_transpose trans, float alpha, GpuArray A,
     return Y
 
 def sgemv(float alpha, GpuArray A, GpuArray X, float beta, GpuArray Y,
-          overwrite_y=False):
+          trans=False, overwrite_y=False):
+    cdef cb_transpose t
     if not overwrite_y:
         Y = pygpu_copy(Y, GA_ANY_ORDER)
-    return pygpu_blas_sgemv(cb_no_trans, alpha, A, X, beta, Y)
+    if trans:
+        t = cb_trans
+    else:
+        t = cb_no_trans
+    return pygpu_blas_sgemv(t, alpha, A, X, beta, Y)
