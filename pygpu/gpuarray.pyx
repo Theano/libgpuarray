@@ -420,13 +420,6 @@ cdef ctx_property(GpuContext c, int prop_id, void *res):
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(c.ops, c.ctx, err), err)
 
-cdef blas_sgemv(cb_transpose trans, float alpha, GpuArray A, GpuArray X,
-                float beta, GpuArray Y):
-    cdef int err
-    err = GpuArray_sgemv(trans, alpha, &A.ga, &X.ga, beta, &Y.ga);
-    if err != GA_NO_ERROR:
-        raise GpuArrayException(GpuArray_error(&A.ga, err), err)
-
 cdef const compyte_buffer_ops *get_ops(kind) except NULL:
     cdef const compyte_buffer_ops *res
     res = compyte_get_ops(kind)
@@ -582,11 +575,6 @@ cdef GpuArray pygpu_copy(GpuArray a, ga_order ord):
     res = new_GpuArray(type(a), a.context, None)
     array_copy(res, a, ord)
     return res
-
-cdef GpuArray pygpu_blas_sgemv(cb_transpose trans, float alpha, GpuArray A,
-                               GpuArray X, float beta, GpuArray Y):
-    blas_sgemv(trans, alpha, A, X, beta, Y)
-    return Y
 
 def empty(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
           cls=None):

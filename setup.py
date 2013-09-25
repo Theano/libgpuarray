@@ -36,11 +36,19 @@ del to_del
 
 if have_cython:
     srcs = ['pygpu/gpuarray.pyx']
+    blas_src = ['pygpu/blas.pyx']
 else:
     srcs = ['pygpu/gpuarray.c']
+    blas_src = ['pygpu/blas.c']
 
 exts = [Extension('pygpu.gpuarray',
                   sources = srcs,
+                  include_dirs = [np.get_include()],
+                  libraries = ['compyte'],
+                  define_macros = [('COMPYTE_SHARED', None)],
+                  ),
+        Extension('pygpu.blas',
+                  sources = blas_src,
                   include_dirs = [np.get_include()],
                   libraries = ['compyte'],
                   define_macros = [('COMPYTE_SHARED', None)],
