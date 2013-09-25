@@ -25,16 +25,13 @@ static cl_int err;
 
 #ifdef DEBUG
 #define ASSERT_BUF(b) do {                              \
-    fprintf(stderr, #b " = %p\n", b);                   \
     assert(b != NULL);                                  \
     assert(b->refcnt != 0);                             \
-    fprintf(stderr, #b "->ctx = %p\n", b->ctx);         \
     assert(b->ctx != NULL);                             \
     assert(b->buf != NULL);                             \
     assert(b->ctx->refcnt != 0);                        \
   } while(0)
 #define ASSERT_CTX(c) do {                      \
-    fprintf(stderr, "ctx = %p\n", c);           \
     assert(c != NULL);                          \
     assert(c->refcnt != 0);                     \
     assert(c->ctx != NULL);                     \
