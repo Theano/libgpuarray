@@ -83,7 +83,7 @@ static int sgemv(const cb_order order,
   if (order == cb_c) {
     m = N;
     n = M;
-    _lda = n;
+    _lda = m;
     if (transA == cb_no_trans) {
       trans_a = cb_trans;
     } else if (transA == cb_trans) {
