@@ -74,7 +74,7 @@ static void cuda_free_ctx(cuda_context *ctx) {
   ctx->refcnt--;
   if (ctx->refcnt == 0) {
     if (ctx->blas_handle != NULL) {
-      err = cuda_property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas_ops);
+      ctx->err = cuda_property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas_ops);
       blas_ops->teardown(ctx);
     }
     cuStreamDestroy(ctx->s);
