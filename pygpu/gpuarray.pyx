@@ -251,7 +251,7 @@ class GpuArrayException(Exception):
     """
     Exception used for all errors related to libcompyte.
     """
-    def __init__(self, msg, errcode):
+    def __init__(self, msg, errcode=None):
         """
         __init__(self, msg, errcode)
         """
