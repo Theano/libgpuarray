@@ -22,7 +22,7 @@ struct _gpudata {
   cl_mem buf;
   cl_event ev;
   cl_ctx *ctx;
-  cl_uint refcnt;
+  unsigned int refcnt;
 };
 
 struct _gpukernel {
