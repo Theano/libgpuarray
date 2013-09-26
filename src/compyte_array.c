@@ -242,15 +242,18 @@ int GpuArray_index(GpuArray *r, const GpuArray *a, const ssize_t *starts,
 
 int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
   GpuArray tmp;
-  int i;
+  unsigned int i;
+  unsigned int off;
   int err = GA_NO_ERROR;
   void *t;
 
   if (a->nd < v->nd)
     return GA_VALUE_ERROR;
 
+  off = a->nd - v->nd;
+
   for (i = 0; i < v->nd; i++) {
-    if (v->dimensions[i] != 1 && v->dimensions[i] != a->dimensions[i])
+    if (v->dimensions[i] != 1 && v->dimensions[i] != a->dimensions[i+off])
       return GA_VALUE_ERROR;
   }
 
@@ -258,35 +261,39 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
   if (err != GA_NO_ERROR)
     return err;
 
-  for (i = 0; i < tmp.nd; i++) {
-    if (tmp.dimensions[i] == 1 && a->dimensions[i] != 1) {
-      tmp.strides[i] = 0;
-      tmp.dimensions[i] = a->dimensions[i];
-      // Mark non-contiguous if we make broadcast dimensions
-      tmp.flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
-    }
-  }
-
-  if (a->nd > tmp.nd) {
+  if (off != 0) {
     t = realloc(tmp.dimensions, a->nd*sizeof(size_t));
     if (t == NULL) {
       err = GA_NO_ERROR;
       goto exit;
     }
     tmp.dimensions = (size_t *)t;
-    t = realloc(tmp.strides, a->nd*sizeof(size_t));
+    t = realloc(tmp.strides, a->nd*sizeof(ssize_t));
     if (t == NULL) {
       err = GA_NO_ERROR;
       goto exit;
     }
     tmp.strides = (ssize_t *)t;
-    for (i = tmp.nd; i < a->nd; i++) {
-      tmp.dimensions[i] = a->dimensions[i];
-      tmp.strides[i] = 0;
-    }
+
     tmp.nd = a->nd;
-      // Mark non-contiguous if we make broadcast dimensions
+    // Mark non-contiguous if we make broadcast dimensions
     tmp.flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
+  }
+
+  for (i = 0; i < tmp.nd; i++) {
+    tmp.dimensions[i] = a->dimensions[i];
+    if (i < off) {
+      tmp.strides[i] = 0;
+      // This was already marked non-contiguous by the realloc above
+    } else {
+      if (v->dimensions[i-off] != a->dimensions[i]) {
+	tmp.strides[i] = 0;
+	// Mark non-contiguous if we make broadcast dimensions
+	tmp.flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
+      } else {
+	tmp.strides[i] = v->strides[i-off];
+      }
+    }
   }
 
   err = GpuArray_move(a, &tmp);
