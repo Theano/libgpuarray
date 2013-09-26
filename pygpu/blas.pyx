@@ -1,6 +1,7 @@
 from pygpu.gpuarray import GpuArrayException
 from pygpu.gpuarray cimport (_GpuArray, GpuArray, GA_NO_ERROR, GpuArray_error,
-                             pygpu_copy, GA_ANY_ORDER)
+                             pygpu_copy, GA_ANY_ORDER, GA_F_ORDER,
+                             GpuArray_ISONESEGMENT)
 
 cdef extern from "compyte/buffer_blas.h":
     ctypedef enum cb_transpose:
@@ -27,6 +28,8 @@ cdef api GpuArray pygpu_blas_sgemv(cb_transpose trans, float alpha, GpuArray A,
 def sgemv(float alpha, GpuArray A, GpuArray X, float beta, GpuArray Y,
           trans=False, overwrite_y=False):
     cdef cb_transpose t
+    if not GpuArray_ISONESEGMENT(&A.ga):
+        A = pygpu_copy(A, GA_F_ORDER)
     if not overwrite_y:
         Y = pygpu_copy(Y, GA_ANY_ORDER)
     if trans:
