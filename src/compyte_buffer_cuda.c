@@ -532,7 +532,8 @@ static const char *detect_arch(int *ret) {
     }
 }
 
-static const char *TMP_VAR_NAMES[] = {"COMPYTE_TMPDIR", "TMPDIR", "TEMP", "TMP"};
+static const char *TMP_VAR_NAMES[] = {"COMPYTE_TMPDIR", "TMPDIR", "TMP",
+				      "TEMP", "USERPROFILE"};
 
 static void *call_compiler_impl(const char *src, size_t len, int *ret) {
     char namebuf[PATH_MAX];
