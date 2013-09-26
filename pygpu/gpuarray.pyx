@@ -1357,7 +1357,10 @@ cdef class GpuArray:
         if key is Ellipsis:
             return self
         elif self.ga.nd == 0:
-            raise IndexError, "0-d arrays can't be indexed"
+            if isinstance(key, tuple) and len(key) == 0:
+                return self
+            else:
+                raise IndexError, "0-d arrays can't be indexed"
 
         starts = <ssize_t *>calloc(self.ga.nd, sizeof(ssize_t))
         stops = <ssize_t *>calloc(self.ga.nd, sizeof(ssize_t))
