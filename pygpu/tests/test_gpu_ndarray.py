@@ -497,6 +497,7 @@ def mapping_getitem_w_int(dtype, offseted):
     _cmp(_a[1:], a[1:])
     _cmp(_a[1:2], a[1:2])
     _cmp(_a[-1:1], a[-1:1])
+    _cmp(_a[6:7:], a[6:7:])
 
     #test with tuple (mix slice, integer, numpy.int64)
     _cmpNs(_a[0, 0, ::numpy.int64(-1), ::-1], a[0, 0, ::-1, ::-1])
