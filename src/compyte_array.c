@@ -215,8 +215,8 @@ int GpuArray_index(GpuArray *r, const GpuArray *a, const ssize_t *starts,
 
   r_i = 0;
   for (i = 0; i < a->nd; i++) {
-    if (starts[i] != -1 && starts[i] > 0 &&
-	(size_t)starts[i] > a->dimensions[i]) {
+    if (starts[i] < -1 || (starts[i] > 0 &&
+			   (size_t)starts[i] > a->dimensions[i])) {
       GpuArray_clear(r);
       return GA_VALUE_ERROR;
     }
@@ -227,8 +227,8 @@ int GpuArray_index(GpuArray *r, const GpuArray *a, const ssize_t *starts,
     }
     r->offset += starts[i] * a->strides[i];
     if (steps[i] != 0) {
-      if ((stops[i] != -1 && stops[i] > 0 &&
-	   (size_t)stops[i] > a->dimensions[i]) ||
+      if ((stops[i] < -1 || (stops[i] > 0 &&
+			      (size_t)stops[i] > a->dimensions[i])) ||
 	  (stops[i]-starts[i])/steps[i] < 0) {
 	GpuArray_clear(r);
 	return GA_VALUE_ERROR;
