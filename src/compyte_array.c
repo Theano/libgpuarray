@@ -107,6 +107,8 @@ int GpuArray_fromdata(GpuArray *a, const compyte_buffer_ops *ops,
                       gpudata *data, size_t offset, int typecode,
                       unsigned int nd, const size_t *dims,
                       const ssize_t *strides, int writeable) {
+  if (compyte_get_type(typecode)->typecode != typecode)
+    return GA_VALUE_ERROR;
   a->ops = ops;
   assert(data != NULL);
   a->data = data;
@@ -116,8 +118,7 @@ int GpuArray_fromdata(GpuArray *a, const compyte_buffer_ops *ops,
   a->typecode = typecode;
   a->dimensions = calloc(nd, sizeof(size_t));
   a->strides = calloc(nd, sizeof(ssize_t));
-  /* XXX: We assume that the buffer is aligned */
-  a->flags = (writeable ? GA_WRITEABLE : 0)|GA_ALIGNED;
+  a->flags = (writeable ? GA_WRITEABLE : 0);
   if (a->dimensions == NULL || a->strides == NULL) {
     GpuArray_clear(a);
     return GA_MEMORY_ERROR;
@@ -127,6 +128,7 @@ int GpuArray_fromdata(GpuArray *a, const compyte_buffer_ops *ops,
 
   if (GpuArray_is_c_contiguous(a)) a->flags |= GA_C_CONTIGUOUS;
   if (GpuArray_is_f_contiguous(a)) a->flags |= GA_F_CONTIGUOUS;
+  if (GpuArra_is_aligned(a)) a->flags |= GA_ALIGNED;
 
   return GA_NO_ERROR;
 }
@@ -248,6 +250,10 @@ int GpuArray_index(GpuArray *r, const GpuArray *a, const ssize_t *starts,
     r->flags |= GA_F_CONTIGUOUS;
   else
     r->flags &= ~GA_F_CONTIGUOUS;
+  if (GpuArray_is_aligned(r))
+    r->flags |= GA_ALIGNED;
+  else
+    r->flags &= ~GA_ALIGNED;
 
   return GA_NO_ERROR;
 }

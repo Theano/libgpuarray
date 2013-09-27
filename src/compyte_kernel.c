@@ -33,6 +33,8 @@ int GpuKernel_setarg(GpuKernel *k, unsigned int index, int typecode,
 }
 
 int GpuKernel_setbufarg(GpuKernel *k, unsigned int index, GpuArray *a) {
+  if (!(a->flags | GA_ALIGNED))
+    return GA_UNALIGNED_ERROR;
   return k->ops->kernel_setarg(k->k, index, GA_BUFFER, a->data);
 }
 

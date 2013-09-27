@@ -164,7 +164,10 @@ class ReductionKernel(object):
     def _find_kernel_ls(self, tmpl, max_ls, *tmpl_args):
         local_size = min(self.init_local_size, max_ls)
         # nearest power of 2 (going up)
-        count_lim = int(math.ceil(math.log(local_size, 2)))
+        if local_size != 0:
+            count_lim = int(math.ceil(math.log(local_size, 2)))
+        else:
+            count_lim = 0
         local_size = 2**count_lim
         loop_count = 0
         while loop_count <= count_lim:
@@ -209,6 +212,8 @@ class ReductionKernel(object):
         n = prod(dims)
         out_shape = tuple(d for i, d in enumerate(dims) if not self.redux[i])
         gs = prod(out_shape)
+        if gs == 0:
+            gs = 1
         n /= gs
         if gs > self.context.maxgsize:
             raise ValueError("Array to big to be reduced along the "

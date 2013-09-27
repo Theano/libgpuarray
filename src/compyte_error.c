@@ -18,6 +18,7 @@ const char *compyte_error_str(int err) {
   case GA_READONLY_ERROR:    return "Buffer is read-only";
   case GA_WRITEONLY_ERROR:   return "Buffer is write-only";
   case GA_BLAS_ERROR:        return "Error in BLAS call";
+  case GA_UNALIGNED_ERROR:   return "Unaligned array";
   default: return "Unknown GA error";
   }
 }
