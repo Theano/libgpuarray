@@ -128,7 +128,7 @@ int GpuArray_fromdata(GpuArray *a, const compyte_buffer_ops *ops,
 
   if (GpuArray_is_c_contiguous(a)) a->flags |= GA_C_CONTIGUOUS;
   if (GpuArray_is_f_contiguous(a)) a->flags |= GA_F_CONTIGUOUS;
-  if (GpuArra_is_aligned(a)) a->flags |= GA_ALIGNED;
+  if (GpuArray_is_aligned(a)) a->flags |= GA_ALIGNED;
 
   return GA_NO_ERROR;
 }
@@ -314,6 +314,11 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
     }
   }
 
+  if (!GpuArray_is_aligned(&tmp)) {
+    err = GA_UNALIGNED_ERROR;
+    goto exit;
+  }
+
   err = GpuArray_move(a, &tmp);
   exit:
   GpuArray_clear(&tmp);
@@ -475,6 +480,10 @@ int GpuArray_reshape(GpuArray *res, const GpuArray *a, unsigned int nd,
     res->flags |= GA_F_CONTIGUOUS;
   else
     res->flags &= ~GA_F_CONTIGUOUS;
+  if (GpuArray_is_aligned(res))
+    res->flags |= GA_ALIGNED;
+  else
+    res->flags &= ~GA_ALIGNED;
   return GA_NO_ERROR;
 }
 
@@ -554,6 +563,8 @@ int GpuArray_move(GpuArray *dst, const GpuArray *src) {
     return GA_INVALID_ERROR;
   if (!GpuArray_ISWRITEABLE(dst))
     return GA_VALUE_ERROR;
+  if (!GpuArray_ISALIGNED(src) || !GpuArray_ISALIGNED(dst))
+    return GA_UNALIGNED_ERROR;
   if (!GpuArray_ISONESEGMENT(dst) || !GpuArray_ISONESEGMENT(src) ||
       GpuArray_ISFORTRAN(dst) != GpuArray_ISFORTRAN(src) ||
       dst->typecode != src->typecode ||
@@ -662,6 +673,19 @@ int GpuArray_is_f_contiguous(const GpuArray *a) {
     if (a->strides[i] != size) return 0;
     // We suppose that overflow will not happen since data has to fit in memory
     size *= a->dimensions[i];
+  }
+  return 1;
+}
+
+int GpuArray_is_aligned(const GpuArray *a) {
+  size_t align = compyte_get_type(a->typecode)->align;
+  unsigned int i;
+
+  if (a->offset % align != 0)
+    return 0;
+
+  for (i = 0; i < a->nd; i++) {
+    if (a->strides[i] % align != 0) return 0;
   }
   return 1;
 }
