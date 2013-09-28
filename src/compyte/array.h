@@ -65,12 +65,15 @@ typedef struct _GpuArray {
    */
 #define GA_F_CONTIGUOUS   0x0002
   /**
-   * Buffer data is properly aligned for the type (currently this is
-   * always assumed to be true).
+   * Buffer data is properly aligned for the type.  This should always
+   * be true for arrays allocated through this library.
+   *
+   * If this isn't true you can't use kernels on the data, since they
+   * require aligned access.
    */
 #define GA_ALIGNED        0x0100
   /**
-   * Can write to the data buffer.  (This is always true for array
+   * Can write to the data buffer.  (This is always true for arrays
    * allocated through this library).
    */
 #define GA_WRITEABLE      0x0400

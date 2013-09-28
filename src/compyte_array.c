@@ -544,14 +544,14 @@ void GpuArray_clear(GpuArray *a) {
 }
 
 int GpuArray_share(const GpuArray *a, const GpuArray *b) {
-  if (a->ops != b->ops) return 0;
+  if (a->ops != b->ops || a->data != b->data) return 0;
   /* XXX: redefine buffer_share to mean: is it possible to share?
           and use offset to make sure */
   return a->ops->buffer_share(a->data, b->data, NULL);
 }
 
 void *GpuArray_context(const GpuArray *a) {
-  void *res;
+  void *res = NULL;
   (void)a->ops->property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &res);
   return res;
 }
