@@ -51,7 +51,7 @@ static int setup(void *c) {
 static void teardown(void *c) {
   cl_ctx *ctx = (cl_ctx *)c;
   if (ctx->blas_handle != NULL) {
-    ctx->blas_handle == NULL;
+    ctx->blas_handle = NULL;
     refcnt--;
   }
   if (refcnt == 0)
