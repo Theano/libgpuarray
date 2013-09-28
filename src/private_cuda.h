@@ -48,7 +48,6 @@ COMPYTE_LOCAL size_t cuda_get_sz(gpudata *g);
 struct _gpukernel {
   CUmodule m;
   CUfunction k;
-  CUevent ev;
   void *args[NUM_ARGS];
 #if CUDA_VERSION < 4000
   size_t types[NUM_ARGS];

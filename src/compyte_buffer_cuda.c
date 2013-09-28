@@ -427,20 +427,17 @@ static int cuda_read(void *dst, gpudata *src, size_t srcoff, size_t sz) {
     if (ctx->err != CUDA_SUCCESS)
       return GA_IMPL_ERROR;
 
-    ctx->err = cuStreamWaitEvent(ctx->s, src->ev, 0);
+    ctx->err = cuEventSynchronize(src->ev);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
 
-    ctx->err = cuMemcpyDtoHAsync(dst, src->ptr + srcoff, sz, ctx->s);
+    ctx->err = cuMemcpyDtoH(dst, src->ptr + srcoff, sz);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
-    cuEventRecord(src->ev, ctx->s);
-    /* We want the copy to be finished when the function returns */
-    cuEventSynchronize(src->ev);
     cuda_exit(ctx);
     return GA_NO_ERROR;
 }
@@ -458,19 +455,17 @@ static int cuda_write(gpudata *dst, size_t dstoff, const void *src,
     if (ctx->err != CUDA_SUCCESS)
       return GA_IMPL_ERROR;
 
-    ctx->err = cuStreamWaitEvent(ctx->s, dst->ev, 0);
+    ctx->err = cuEventSynchronize(dst->ev);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
 
-    ctx->err = cuMemcpyHtoDAsync(dst->ptr + dstoff, src, sz, ctx->s);
+    ctx->err = cuMemcpyHtoD(dst->ptr + dstoff, src, sz);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
-    cuEventRecord(dst->ev, ctx->s);
-    cuEventSynchronize(dst->ev);
     cuda_exit(ctx);
     return GA_NO_ERROR;
 }
@@ -933,7 +928,6 @@ static int cuda_callkernel(gpukernel *k, size_t bs, size_t gs) {
       if (k->bs[i] != NULL)
         cuEventRecord(k->bs[i]->ev, ctx->s);
     }
-    cuEventRecord(k->ev, ctx->s);
     cuda_exit(ctx);
     return GA_NO_ERROR;
 }
