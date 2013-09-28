@@ -68,8 +68,8 @@ if(OPENCL_FOUND)
 endif()
 
 configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/private.h.in
-  ${CMAKE_CURRENT_SOURCE_DIR}/private.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/private_config.h.in
+  ${CMAKE_CURRENT_SOURCE_DIR}/private_config.h
   )
 
 add_library(compyte SHARED ${COMPYTE_SRC})

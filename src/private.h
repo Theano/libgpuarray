@@ -19,10 +19,7 @@ extern "C" {
 }
 #endif
 
-
-#cmakedefine HAVE_STRL
-#cmakedefine HAVE_ASPRINTF
-#cmakedefine HAVE_MKSTEMP
+#include "private_config.h"
 
 #ifdef _MSC_VER
 struct iovec {
@@ -56,6 +53,7 @@ struct iovec {
 
 COMPYTE_LOCAL int GpuArray_is_c_contiguous(const GpuArray *a);
 COMPYTE_LOCAL int GpuArray_is_f_contiguous(const GpuArray *a);
+COMPYTE_LOCAL int GpuArray_is_aligned(const GpuArray *a);
 
 #ifndef HAVE_ASPRINTF
 COMPYTE_LOCAL int asprintf(char **ret, const char *fmt, ...);
