@@ -570,6 +570,18 @@ cdef GpuArray pygpu_fromhostdata(void *buf, int typecode, unsigned int nd,
                          dims, strides)
     return res
 
+cdef GpuArray pygpu_fromgpudata(gpudata *buf, size_t offset, int typecode,
+                                unsigned int nd, const size_t *dims,
+                                const ssize_t *strides, GpuContext context,
+                                int writable, object base, type cls):
+    cdef GpuArray res
+
+    res = new_GpuArray(cls, context, base)
+    array_fromdata(res, context.ops, buf, offset, typecode, nd, dims,
+                   strides, writable)
+    return res
+
+
 cdef GpuArray pygpu_copy(GpuArray a, ga_order ord):
     cdef GpuArray res
     res = new_GpuArray(type(a), a.context, None)
@@ -720,9 +732,8 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
         used with the value of the `gpudata` attribute of an existing
         GpuArray.
     """
-    cdef GpuArray res
-    cdef size_t *cdims
-    cdef ssize_t *cstrides
+    cdef size_t *cdims = NULL
+    cdef ssize_t *cstrides = NULL
     cdef unsigned int nd
     cdef size_t size
     cdef int typecode
@@ -751,13 +762,12 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
                 strides[i] = size
                 size *= cdims[i]
 
-        res = new_GpuArray(cls, context, base)
-        array_fromdata(res, context.ops, <gpudata *>data, offset, typecode,
-                       nd, cdims, cstrides, <int>(1 if writable else 0))
+        return pygpu_fromgpudata(<gpudata *>data, offset, typecode, nd, cdims,
+                                 cstrides, context, (1 if writable else 0),
+                                 base, cls)
     finally:
         free(cdims)
         free(cstrides)
-    return res
 
 def array(proto, dtype=None, copy=True, order=None, int ndmin=0,
           GpuContext context=None, cls=None):
