@@ -272,8 +272,8 @@ cdef array_empty(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
         raise GpuArrayException(Gpu_error(ops, ctx, err), err)
 
 cdef array_fromdata(GpuArray a, const compyte_buffer_ops *ops, gpudata *data,
-                    size_t offset, int typecode, unsigned int nd, size_t *dims,
-                    ssize_t *strides, int writeable):
+                    size_t offset, int typecode, unsigned int nd,
+                    const size_t *dims, const ssize_t *strides, int writeable):
     cdef int err
     cdef void *ctx
     err = GpuArray_fromdata(&a.ga, ops, data, offset, typecode, nd, dims,
@@ -573,7 +573,7 @@ cdef GpuArray pygpu_fromhostdata(void *buf, int typecode, unsigned int nd,
 cdef GpuArray pygpu_fromgpudata(gpudata *buf, size_t offset, int typecode,
                                 unsigned int nd, const size_t *dims,
                                 const ssize_t *strides, GpuContext context,
-                                int writable, object base, type cls):
+                                bint writable, object base, type cls):
     cdef GpuArray res
 
     res = new_GpuArray(cls, context, base)
@@ -763,8 +763,7 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
                 size *= cdims[i]
 
         return pygpu_fromgpudata(<gpudata *>data, offset, typecode, nd, cdims,
-                                 cstrides, context, (1 if writable else 0),
-                                 base, cls)
+                                 cstrides, context, writable, base, cls)
     finally:
         free(cdims)
         free(cstrides)
@@ -1313,7 +1312,7 @@ cdef class GpuArray:
         cdef unsigned int nd
         cdef unsigned int i
         cdef GpuArray res
-        nd = len(shape)
+        nd = <unsigned int>len(shape)
         newdims = <size_t *>calloc(nd, sizeof(size_t))
         try:
             for i in range(nd):
@@ -1444,7 +1443,7 @@ cdef class GpuArray:
             cdef unsigned int nd
             cdef unsigned int i
             cdef GpuArray res
-            nd = len(newshape)
+            nd = <unsigned int>len(newshape)
             newdims = <size_t *>calloc(nd, sizeof(size_t))
             if newdims == NULL:
                 raise MemoryError, "calloc"
@@ -1637,10 +1636,10 @@ cdef class GpuKernel:
         :param args: kernel arguments
         :type args: tuple or list
         """
-        cdef unsigned int i
+        cdef size_t i
         # Work backwards to avoid a lot of reallocations in the argument code.
         for i in range(len(args), 0, -1):
-            self.setarg(i-1, args[i-1])
+            self.setarg(<unsigned int>i-1, args[i-1])
 
     cpdef setarg(self, unsigned int index, o):
         """

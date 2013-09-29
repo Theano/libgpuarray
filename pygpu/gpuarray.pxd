@@ -127,8 +127,8 @@ cdef extern from "compyte/array.h":
                        int typecode, int nd, size_t *dims, ga_order ord)
     int GpuArray_fromdata(_GpuArray *a, const compyte_buffer_ops *ops,
                           gpudata *data, size_t offset, int typecode,
-                          unsigned int nd, size_t *dims, ssize_t *strides,
-                          int writable)
+                          unsigned int nd, const size_t *dims,
+                          const ssize_t *strides, int writable)
     int GpuArray_copy_from_host(_GpuArray *a, const compyte_buffer_ops *ops,
                             void *ctx, void *buf, int typecode,
                             unsigned int nd, const size_t *dims,
@@ -176,8 +176,8 @@ cdef bint py_ISONESEGMENT(GpuArray a)
 cdef array_empty(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
                  int typecode, unsigned int nd, size_t *dims, ga_order ord)
 cdef array_fromdata(GpuArray a, const compyte_buffer_ops *ops, gpudata *data,
-                    size_t offset, int typecode, unsigned int nd, size_t *dims,
-                    ssize_t *strides, int writeable)
+                    size_t offset, int typecode, unsigned int nd,
+                    const size_t *dims, const ssize_t *strides, int writeable)
 cdef array_copy_from_host(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
                           void *buf, int typecode, unsigned int nd,
                           const size_t *dims, const ssize_t *strides)
