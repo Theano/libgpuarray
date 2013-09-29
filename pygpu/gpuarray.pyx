@@ -1266,10 +1266,6 @@ cdef class GpuArray:
         """
         cdef GpuArray res = new_GpuArray(cls, self.context, self.base)
         array_view(res, self)
-        if self.base is not None:
-            res.base = self.base
-        else:
-            res.base = self
         return res
 
     def astype(self, dtype, order='A', copy=True):
@@ -1408,13 +1404,8 @@ cdef class GpuArray:
                 stops[i] = self.ga.dimensions[i]
                 steps[i] = 1
 
-            if self.base is not None:
-                base = self.base
-            else:
-                base = self
             res = new_GpuArray(self.__class__, self.context, self.base)
             array_index(res, self, starts, stops, steps)
-            res.base = base
         finally:
             free(starts)
             free(stops)
