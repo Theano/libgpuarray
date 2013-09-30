@@ -264,16 +264,18 @@ cdef bint py_CHKFLAGS(GpuArray a, int flags):
 cdef bint py_ISONESEGMENT(GpuArray a):
     return GpuArray_ISONESEGMENT(&a.ga)
 
-cdef array_empty(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
-                 int typecode, unsigned int nd, size_t *dims, ga_order ord):
+cdef int array_empty(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
+                     int typecode, unsigned int nd, size_t *dims,
+                     ga_order ord) except -1:
     cdef int err
     err = GpuArray_empty(&a.ga, ops, ctx, typecode, nd, dims, ord)
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(ops, ctx, err), err)
 
-cdef array_fromdata(GpuArray a, const compyte_buffer_ops *ops, gpudata *data,
-                    size_t offset, int typecode, unsigned int nd,
-                    const size_t *dims, const ssize_t *strides, int writeable):
+cdef int array_fromdata(GpuArray a, const compyte_buffer_ops *ops,
+                        gpudata *data, size_t offset, int typecode,
+                        unsigned int nd, const size_t *dims,
+                        const ssize_t *strides, int writeable) except -1:
     cdef int err
     cdef void *ctx
     err = GpuArray_fromdata(&a.ga, ops, data, offset, typecode, nd, dims,
@@ -282,128 +284,141 @@ cdef array_fromdata(GpuArray a, const compyte_buffer_ops *ops, gpudata *data,
         ops.property(NULL, data, NULL, GA_BUFFER_PROP_CTX, &ctx)
         raise GpuArrayException(Gpu_error(ops, ctx, err), err)
 
-cdef array_copy_from_host(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
-                          void *buf, int typecode, unsigned int nd,
-                          const size_t *dims, const ssize_t *strides):
+cdef int array_copy_from_host(GpuArray a, const compyte_buffer_ops *ops,
+                              void *ctx, void *buf, int typecode,
+                              unsigned int nd, const size_t *dims,
+                              const ssize_t *strides) except -1:
     cdef int err
     err = GpuArray_copy_from_host(&a.ga, ops, ctx, buf, typecode, nd, dims,
                                   strides);
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(ops, ctx, err), err)
 
-cdef array_view(GpuArray v, GpuArray a):
+cdef int array_view(GpuArray v, GpuArray a) except -1:
     cdef int err
     err = GpuArray_view(&v.ga, &a.ga)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
-cdef array_sync(GpuArray a):
+cdef int array_sync(GpuArray a) except -1:
     cdef int err
     err = GpuArray_sync(&a.ga)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
-cdef array_index(GpuArray r, GpuArray a, ssize_t *starts, ssize_t *stops,
-                 ssize_t *steps):
+cdef int array_index(GpuArray r, GpuArray a, ssize_t *starts, ssize_t *stops,
+                     ssize_t *steps) except -1:
     cdef int err
     err = GpuArray_index(&r.ga, &a.ga, starts, stops, steps)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
-cdef array_setarray(GpuArray v, GpuArray a):
+cdef int array_setarray(GpuArray v, GpuArray a) except -1:
     cdef int err
     err = GpuArray_setarray(&v.ga, &a.ga)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&v.ga, err), err)
 
-cdef array_reshape(GpuArray res, GpuArray a, unsigned int nd, size_t *newdims,
-                   ga_order ord, int nocopy):
+cdef int array_reshape(GpuArray res, GpuArray a, unsigned int nd,
+                       const size_t *newdims, ga_order ord,
+                       bint nocopy) except -1:
     cdef int err
     err = GpuArray_reshape(&res.ga, &a.ga, nd, newdims, ord, nocopy)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
-cdef array_transpose(GpuArray res, GpuArray a, unsigned int *new_axes):
+cdef int array_transpose(GpuArray res, GpuArray a,
+                         unsigned int *new_axes) except -1:
     cdef int err
     err = GpuArray_transpose(&res.ga, &a.ga, new_axes)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
-cdef array_clear(GpuArray a):
+cdef int array_clear(GpuArray a) except -1:
     GpuArray_clear(&a.ga)
 
 cdef bint array_share(GpuArray a, GpuArray b):
     return GpuArray_share(&a.ga, &b.ga)
 
-cdef void *array_context(GpuArray a):
-    return GpuArray_context(&a.ga)
+cdef void *array_context(GpuArray a) except NULL:
+    cdef void *res
+    res = GpuArray_context(&a.ga)
+    if res is NULL:
+        raise GpuArrayException("Invalid array or destroyed context", None)
+    return res
 
-cdef array_move(GpuArray a, GpuArray src):
+cdef int array_move(GpuArray a, GpuArray src) except -1:
     cdef int err
     err = GpuArray_move(&a.ga, &src.ga)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
-cdef array_write(GpuArray a, void *src, size_t sz):
+cdef int array_write(GpuArray a, void *src, size_t sz) except -1:
     cdef int err
     err = GpuArray_write(&a.ga, src, sz)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
-cdef array_read(void *dst, size_t sz, GpuArray src):
+cdef int array_read(void *dst, size_t sz, GpuArray src) except -1:
     cdef int err
     err = GpuArray_read(dst, sz, &src.ga)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&src.ga, err), err)
 
-cdef array_memset(GpuArray a, int data):
+cdef int array_memset(GpuArray a, int data) except -1:
     cdef int err
     err = GpuArray_memset(&a.ga, data)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
-cdef array_copy(GpuArray res, GpuArray a, ga_order order):
+cdef int array_copy(GpuArray res, GpuArray a, ga_order order) except -1:
     cdef int err
     err = GpuArray_copy(&res.ga, &a.ga, order)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
-cdef const char *kernel_error(GpuKernel k, int err):
+cdef const char *kernel_error(GpuKernel k, int err) except NULL:
     return Gpu_error(k.k.ops, kernel_context(k), err)
 
-cdef kernel_init(GpuKernel k, const compyte_buffer_ops *ops, void *ctx,
-                 unsigned int count, const char **strs, size_t *len,
-                 char *name, int flags):
+cdef int kernel_init(GpuKernel k, const compyte_buffer_ops *ops, void *ctx,
+                     unsigned int count, const char **strs, size_t *len,
+                     char *name, int flags) except -1:
     cdef int err
     err = GpuKernel_init(&k.k, ops, ctx, count, strs, len, name, flags)
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(ops, ctx, err), err)
 
-cdef kernel_clear(GpuKernel k):
+cdef int kernel_clear(GpuKernel k) except -1:
     GpuKernel_clear(&k.k)
 
-cdef void *kernel_context(GpuKernel k):
-    return GpuKernel_context(&k.k)
+cdef void *kernel_context(GpuKernel k) except NULL:
+    cdef void *res
+    res = GpuKernel_context(&k.k)
+    if res is NULL:
+        raise GpuArrayException("Invalid kernel or destroyed context", None)
+    return res
 
-cdef kernel_setarg(GpuKernel k, unsigned int index, int typecode, void *arg):
+cdef int kernel_setarg(GpuKernel k, unsigned int index, int typecode,
+                       void *arg) except -1:
     cdef int err
     err = GpuKernel_setarg(&k.k, index, typecode, arg)
     if err != GA_NO_ERROR:
         raise GpuArrayException(kernel_error(k, err), err)
 
-cdef kernel_setbufarg(GpuKernel k, unsigned int index, GpuArray a):
+cdef int kernel_setbufarg(GpuKernel k, unsigned int index,
+                          GpuArray a) except -1:
     cdef int err
     err = GpuKernel_setbufarg(&k.k, index, &a.ga)
     if err != GA_NO_ERROR:
         raise GpuArrayException(kernel_error(k, err), err)
 
-cdef kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs):
+cdef int kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs) except -1:
     cdef int err
     err = GpuKernel_call(&k.k, n, ls, gs)
     if err != GA_NO_ERROR:
         raise GpuArrayException(kernel_error(k, err), err)
 
-cdef kernel_property(GpuKernel k, int prop_id, void *res):
+cdef int kernel_property(GpuKernel k, int prop_id, void *res) except -1:
     cdef int err
     err = k.k.ops.property(NULL, NULL, k.k.k, prop_id, res)
     if err != GA_NO_ERROR:
@@ -414,7 +429,7 @@ cdef GpuContext pygpu_default_context():
 
 cdef GpuContext default_context = None
 
-cdef ctx_property(GpuContext c, int prop_id, void *res):
+cdef int ctx_property(GpuContext c, int prop_id, void *res) except -1:
     cdef int err
     err = c.ops.property(c.ctx, NULL, NULL, prop_id, res)
     if err != GA_NO_ERROR:

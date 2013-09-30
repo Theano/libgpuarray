@@ -173,43 +173,50 @@ cdef ga_order to_ga_order(ord) except <ga_order>-2
 cdef bint py_CHKFLAGS(GpuArray a, int flags)
 cdef bint py_ISONESEGMENT(GpuArray a)
 
-cdef array_empty(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
-                 int typecode, unsigned int nd, size_t *dims, ga_order ord)
-cdef array_fromdata(GpuArray a, const compyte_buffer_ops *ops, gpudata *data,
-                    size_t offset, int typecode, unsigned int nd,
-                    const size_t *dims, const ssize_t *strides, int writeable)
-cdef array_copy_from_host(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
-                          void *buf, int typecode, unsigned int nd,
-                          const size_t *dims, const ssize_t *strides)
-cdef array_view(GpuArray v, GpuArray a)
-cdef array_sync(GpuArray a)
-cdef array_index(GpuArray r, GpuArray a, ssize_t *starts, ssize_t *stops,
-                 ssize_t *steps)
-cdef array_setarray(GpuArray v, GpuArray a)
-cdef array_reshape(GpuArray res, GpuArray a, unsigned int nd, size_t *newdims,
-                   ga_order ord, int nocopy)
-cdef array_transpose(GpuArray res, GpuArray a, unsigned int *new_axes)
-cdef array_clear(GpuArray a)
+cdef int array_empty(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
+                     int typecode, unsigned int nd, size_t *dims,
+                     ga_order ord) except -1
+cdef int array_fromdata(GpuArray a, const compyte_buffer_ops *ops,
+                        gpudata *data, size_t offset, int typecode,
+                        unsigned int nd, const size_t *dims,
+                        const ssize_t *strides, int writeable) except -1
+cdef int array_copy_from_host(GpuArray a, const compyte_buffer_ops *ops,
+                              void *ctx, void *buf, int typecode,
+                              unsigned int nd, const size_t *dims,
+                              const ssize_t *strides) except -1
+cdef int array_view(GpuArray v, GpuArray a) except -1
+cdef int array_sync(GpuArray a) except -1
+cdef int array_index(GpuArray r, GpuArray a, ssize_t *starts, ssize_t *stops,
+                     ssize_t *steps) except -1
+cdef int array_setarray(GpuArray v, GpuArray a) except -1
+cdef int array_reshape(GpuArray res, GpuArray a, unsigned int nd,
+                       const size_t *newdims, ga_order ord,
+                       bint nocopy) except -1
+cdef int array_transpose(GpuArray res, GpuArray a,
+                         unsigned int *new_axes) except -1
+cdef int array_clear(GpuArray a) except -1
 cdef bint array_share(GpuArray a, GpuArray b)
-cdef void *array_context(GpuArray a)
-cdef array_move(GpuArray a, GpuArray src)
-cdef array_write(GpuArray a, void *src, size_t sz)
-cdef array_read(void *dst, size_t sz, GpuArray src)
-cdef array_memset(GpuArray a, int data)
-cdef array_copy(GpuArray res, GpuArray a, ga_order order)
+cdef void *array_context(GpuArray a) except NULL
+cdef int array_move(GpuArray a, GpuArray src) except -1
+cdef int array_write(GpuArray a, void *src, size_t sz) except -1
+cdef int array_read(void *dst, size_t sz, GpuArray src) except -1
+cdef int array_memset(GpuArray a, int data) except -1
+cdef int array_copy(GpuArray res, GpuArray a, ga_order order) except -1
 
-cdef const char *kernel_error(GpuKernel k, int err)
-cdef kernel_init(GpuKernel k, const compyte_buffer_ops *ops, void *ctx,
-                 unsigned int count, const char **strs, size_t *len,
-                 char *name, int flags)
-cdef kernel_clear(GpuKernel k)
-cdef void *kernel_context(GpuKernel k)
-cdef kernel_setarg(GpuKernel k, unsigned int index, int typecode, void *arg)
-cdef kernel_setbufarg(GpuKernel k, unsigned int index, GpuArray a)
-cdef kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs)
-cdef kernel_property(GpuKernel k, int prop_id, void *res)
+cdef const char *kernel_error(GpuKernel k, int err) except NULL
+cdef int kernel_init(GpuKernel k, const compyte_buffer_ops *ops, void *ctx,
+                     unsigned int count, const char **strs, size_t *len,
+                     char *name, int flags) except -1
+cdef int kernel_clear(GpuKernel k) except -1
+cdef void *kernel_context(GpuKernel k) except NULL
+cdef int kernel_setarg(GpuKernel k, unsigned int index, int typecode,
+                       void *arg) except -1
+cdef int kernel_setbufarg(GpuKernel k, unsigned int index,
+                          GpuArray a) except -1
+cdef int kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs) except -1
+cdef int kernel_property(GpuKernel k, int prop_id, void *res) except -1
 
-cdef ctx_property(GpuContext c, int prop_id, void *res)
+cdef int ctx_property(GpuContext c, int prop_id, void *res) except -1
 cdef const compyte_buffer_ops *get_ops(kind) except NULL
 cdef ops_kind(const compyte_buffer_ops *ops)
 cdef GpuContext ensure_context(GpuContext c)
