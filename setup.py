@@ -16,9 +16,21 @@ except Exception:
         return arg
 
 try:
-    from setuptools import setup, Extension
+    from setuptools import setup, Extension as _Extension
+
+    # setuptools is stupid and rewrites "sources" to change '.pyx' to '.c'
+    # if it can't find Pyrex (and in recent versions, Cython).
+    #
+    # This is a really stupid thing to do behind the users's back (since
+    # it breaks development builds) especially with no way of disabling it
+    # short of the hack below.
+    class Extension(_Extension):
+        def __init__(self, *args, **kwargs):
+            save_sources = kwargs.get('sources', None)
+            _Extension.__init__(self, *args, **kwargs)
+            self.sources = save_sources
 except ImportError:
-    from distutils import setup, Extension
+    from distutils.core import setup, Extension
 
 import numpy as np
 
@@ -58,7 +70,8 @@ setup(name='pygpu',
       version='0.2.1',
       description='numpy-like wrapper on libcompyte for GPU computations',
       packages = ['pygpu'],
-      data_files = [('pygpu', ['pygpu/gpuarray.h', 'pygpu/gpuarray_api.h'])],
+      data_files = [('pygpu', ['pygpu/gpuarray.h', 'pygpu/gpuarray_api.h',
+                               'pygpu/blas_api.h'])],
       ext_modules=cythonize(exts),
       install_requires=['mako>=0.7'],
       )
