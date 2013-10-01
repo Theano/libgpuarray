@@ -190,10 +190,13 @@ int GpuArray_sync(GpuArray *a) {
   return a->ops->buffer_sync(a->data);
 }
 
-int GpuArray_index(GpuArray *r, const GpuArray *a, const ssize_t *starts,
-                   const ssize_t *stops, const ssize_t *steps) {
-  unsigned int i, r_i;
+int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
+                           const ssize_t *stops, const ssize_t *steps) {
+  unsigned int i, new_i;
   unsigned int new_nd = a->nd;
+  size_t *newdims;
+  ssize_t *newstrs;
+  size_t new_offset = a->offset;
 
   if ((starts == NULL) || (stops == NULL) || (steps == NULL))
     return GA_VALUE_ERROR;
@@ -201,61 +204,73 @@ int GpuArray_index(GpuArray *r, const GpuArray *a, const ssize_t *starts,
   for (i = 0; i < a->nd; i++) {
     if (steps[i] == 0) new_nd -= 1;
   }
-  r->ops = a->ops;
-  r->data = a->data;
-  r->ops->buffer_retain(r->data);
-  r->typecode = a->typecode;
-  r->flags = a->flags;
-  r->nd = new_nd;
-  r->offset = a->offset;
-  r->dimensions = calloc(r->nd, sizeof(size_t));
-  r->strides = calloc(r->nd, sizeof(ssize_t));
-  if (r->dimensions == NULL || r->strides == NULL) {
-    GpuArray_clear(r);
+  newdims = calloc(new_nd, sizeof(size_t));
+  newstrs = calloc(new_nd, sizeof(ssize_t));
+  if (newdims == NULL || newstrs == NULL) {
+    free(newdims);
+    free(newstrs);
     return GA_MEMORY_ERROR;
   }
 
-  r_i = 0;
+  new_i = 0;
   for (i = 0; i < a->nd; i++) {
     if (starts[i] < -1 || (starts[i] > 0 &&
 			   (size_t)starts[i] > a->dimensions[i])) {
-      GpuArray_clear(r);
+      free(newdims);
+      free(newstrs);
       return GA_VALUE_ERROR;
     }
     if (steps[i] == 0 &&
 	(starts[i] == -1 || starts[i] >= a->dimensions[i])) {
-      GpuArray_clear(r);
+      free(newdims);
+      free(newstrs);
       return GA_VALUE_ERROR;
     }
-    r->offset += starts[i] * a->strides[i];
+    new_offset += starts[i] * a->strides[i];
     if (steps[i] != 0) {
       if ((stops[i] < -1 || (stops[i] > 0 &&
 			      (size_t)stops[i] > a->dimensions[i])) ||
 	  (stops[i]-starts[i])/steps[i] < 0) {
-	GpuArray_clear(r);
+        free(newdims);
+        free(newstrs);
 	return GA_VALUE_ERROR;
       }
-      r->strides[r_i] = steps[i] * a->strides[i];
-      r->dimensions[r_i] = (stops[i]-starts[i]+steps[i]-
-			    (steps[i] < 0? -1 : 1))/steps[i];
-      r_i++;
+      newstrs[new_i] = steps[i] * a->strides[i];
+      newdims[new_i] = (stops[i]-starts[i]+steps[i]-
+                        (steps[i] < 0? -1 : 1))/steps[i];
+      new_i++;
     }
-    assert(r_i <= r->nd);
   }
-  if (GpuArray_is_c_contiguous(r))
-    r->flags |= GA_C_CONTIGUOUS;
+  a->nd = new_nd;
+  a->offset = new_offset;
+  free(a->dimensions);
+  a->dimensions = newdims;
+  free(a->strides);
+  a->strides = newstrs;
+  if (GpuArray_is_c_contiguous(a))
+    a->flags |= GA_C_CONTIGUOUS;
   else
-    r->flags &= ~GA_C_CONTIGUOUS;
-  if (GpuArray_is_f_contiguous(r))
-    r->flags |= GA_F_CONTIGUOUS;
+    a->flags &= ~GA_C_CONTIGUOUS;
+  if (GpuArray_is_f_contiguous(a))
+    a->flags |= GA_F_CONTIGUOUS;
   else
-    r->flags &= ~GA_F_CONTIGUOUS;
-  if (GpuArray_is_aligned(r))
-    r->flags |= GA_ALIGNED;
+    a->flags &= ~GA_F_CONTIGUOUS;
+  if (GpuArray_is_aligned(a))
+    a->flags |= GA_ALIGNED;
   else
-    r->flags &= ~GA_ALIGNED;
+    a->flags &= ~GA_ALIGNED;
 
   return GA_NO_ERROR;
+}
+
+int GpuArray_index(GpuArray *r, const GpuArray *a, const ssize_t *starts,
+                   const ssize_t *stops, const ssize_t *steps) {
+  int err;
+  err = GpuArray_view(r, a);
+  if (err != GA_NO_ERROR) return err;
+  err = GpuArray_index_inplace(r, starts, stops, steps);
+  if (err != GA_NO_ERROR) GpuArray_clear(r);
+  return err;
 }
 
 int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
@@ -327,7 +342,25 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
 
 int GpuArray_reshape(GpuArray *res, const GpuArray *a, unsigned int nd,
                      const size_t *newdims, ga_order ord, int nocopy) {
+  int err;
+  err = GpuArray_view(res, a);
+  if (err != GA_NO_ERROR) return err;
+  err = GpuArray_reshape_inplace(res, nd, newdims, ord);
+  /* If we recieve a GA_VALUE_ERROR it means that we need a copy in
+     the target order. */
+  if (err == GA_VALUE_ERROR && !nocopy) {
+    GpuArray_clear(res);
+    GpuArray_copy(res, a, ord);
+    err = GpuArray_reshape_inplace(res, nd, newdims, ord);
+  }
+  if (err != GA_NO_ERROR) GpuArray_clear(res);
+  return err;
+}
+
+int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
+                             const size_t *newdims, ga_order ord) {
   ssize_t *newstrides;
+  size_t *tmpdims;
   size_t np;
   size_t op;
   size_t newsize = 1;
@@ -339,7 +372,6 @@ int GpuArray_reshape(GpuArray *res, const GpuArray *a, unsigned int nd,
   unsigned int nk;
   unsigned int ok;
   unsigned int i;
-  int err;
 
   if (ord == GA_ANY_ORDER && GpuArray_ISFORTRAN(a) && a->nd > 1)
     ord = GA_F_ORDER;
@@ -358,13 +390,6 @@ int GpuArray_reshape(GpuArray *res, const GpuArray *a, unsigned int nd,
   }
 
   if (newsize != oldsize) return GA_INVALID_ERROR;
-
-  res->ops = a->ops;
-  res->data = a->data;
-  res->ops->buffer_retain(res->data);
-  res->offset = a->offset;
-  res->typecode = a->typecode;
-  res->flags = a->flags;
 
   /* If the source and desired layouts are the same, then just copy
      strides and dimensions */
@@ -421,116 +446,125 @@ int GpuArray_reshape(GpuArray *res, const GpuArray *a, unsigned int nd,
     }
   } else {
     for (i = nj-1; i < nd; i++) {
-      newstrides[i] = compyte_get_elsize(res->typecode);
+      newstrides[i] = compyte_get_elsize(a->typecode);
     }
   }
 
-  res->nd = nd;
-  /* We reuse newstrides since it was allocated in this function.
+  /* We can reuse newstrides since it was allocated in this function.
      Can't do the same with newdims (which is a parameter). */
-  res->strides = newstrides;
-  res->dimensions = calloc(nd, sizeof(size_t));
-  if (res->dimensions == NULL) {
-    GpuArray_clear(res);
+  tmpdims = calloc(nd, sizeof(size_t));
+  if (tmpdims == NULL) {
     return GA_MEMORY_ERROR;
   }
-  memcpy(res->dimensions, newdims, res->nd*sizeof(size_t));
+  memcpy(tmpdims, newdims, nd*sizeof(size_t));
+  a->nd = nd;
+  free(a->dimensions);
+  free(a->strides);
+  a->dimensions = tmpdims;
+  a->strides = newstrides;
 
   goto fix_flags;
  need_copy:
   free(newstrides);
-  GpuArray_clear(res);
-  if (nocopy)
     return GA_VALUE_ERROR; /* Might want a better error code */
 
-  err = GpuArray_copy(res, a, ord);
-  if (err != GA_NO_ERROR) return err;
-  free(res->dimensions);
-  free(res->strides);
-
  do_final_copy:
-  res->nd = nd;
-  res->dimensions = calloc(res->nd, sizeof(size_t));
-  res->strides = calloc(res->nd, sizeof(ssize_t));
-  if (res->dimensions == NULL || res->strides == NULL) {
-    GpuArray_clear(res);
+  tmpdims = calloc(nd, sizeof(size_t));
+  newstrides = calloc(nd, sizeof(ssize_t));
+  if (tmpdims == NULL || newstrides == NULL) {
+    free(tmpdims);
+    free(newstrides);
     return GA_MEMORY_ERROR;
   }
-  memcpy(res->dimensions, newdims, res->nd*sizeof(size_t));
-  if (res->nd > 0) {
+  memcpy(tmpdims, newdims, nd*sizeof(size_t));
+  if (nd > 0) {
     if (ord == GA_F_ORDER) {
-      res->strides[0] = compyte_get_elsize(res->typecode);
-      for (i = 1; i < res->nd; i++) {
-        res->strides[i] = res->strides[i-1] * res->dimensions[i-1];
+      newstrides[0] = compyte_get_elsize(a->typecode);
+      for (i = 1; i < nd; i++) {
+        newstrides[i] = newstrides[i-1] * tmpdims[i-1];
       }
     } else {
-      res->strides[res->nd-1] = compyte_get_elsize(res->typecode);
-      for (i = res->nd-1; i > 0; i--) {
-        res->strides[i-1] = res->strides[i] * res->dimensions[i];
+      newstrides[nd-1] = compyte_get_elsize(a->typecode);
+      for (i = nd-1; i > 0; i--) {
+        newstrides[i-1] = newstrides[i] * tmpdims[i];
       }
     }
   }
+  free(a->dimensions);
+  free(a->strides);
+  a->nd = nd;
+  a->dimensions = tmpdims;
+  a->strides = newstrides;
 
  fix_flags:
-  if (GpuArray_is_c_contiguous(res))
-    res->flags |= GA_C_CONTIGUOUS;
+  if (GpuArray_is_c_contiguous(a))
+    a->flags |= GA_C_CONTIGUOUS;
   else
-    res->flags &= ~GA_C_CONTIGUOUS;
-  if (GpuArray_is_f_contiguous(res))
-    res->flags |= GA_F_CONTIGUOUS;
+    a->flags &= ~GA_C_CONTIGUOUS;
+  if (GpuArray_is_f_contiguous(a))
+    a->flags |= GA_F_CONTIGUOUS;
   else
-    res->flags &= ~GA_F_CONTIGUOUS;
-  if (GpuArray_is_aligned(res))
-    res->flags |= GA_ALIGNED;
+    a->flags &= ~GA_F_CONTIGUOUS;
+  if (GpuArray_is_aligned(a))
+    a->flags |= GA_ALIGNED;
   else
-    res->flags &= ~GA_ALIGNED;
+    a->flags &= ~GA_ALIGNED;
   return GA_NO_ERROR;
 }
 
+
 int GpuArray_transpose(GpuArray *res, const GpuArray *a,
                        const unsigned int *new_axes) {
+  int err;
+  err = GpuArray_view(res, a);
+  if (err != GA_NO_ERROR) return err;
+  err = GpuArray_transpose_inplace(res, new_axes);
+  if (err != GA_NO_ERROR) GpuArray_clear(res);
+  return err;
+}
+
+int GpuArray_transpose_inplace(GpuArray *a, const unsigned int *new_axes) {
+  size_t *newdims;
+  ssize_t *newstrs;
   unsigned int i;
   unsigned int j;
   unsigned int k;
 
-  res->ops = a->ops;
-  res->data = a->data;
-  res->ops->buffer_retain(a->data);
-  res->offset = a->offset;
-  res->nd = a->nd;
-  res->flags = a->flags & ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
-  res->typecode = a->typecode;
-  res->dimensions = calloc(res->nd, sizeof(size_t));
-  res->strides = calloc(res->nd, sizeof(ssize_t));
-  if (res->dimensions == NULL || res->strides == NULL) {
-    GpuArray_clear(res);
+  newdims = calloc(a->nd, sizeof(size_t));
+  newstrs = calloc(a->nd, sizeof(ssize_t));
+  if (newdims == NULL || newstrs == NULL) {
+    free(newdims);
+    free(newstrs);
     return GA_MEMORY_ERROR;
   }
 
-  for (i = 0; i < res->nd; i++) {
+  for (i = 0; i < a->nd; i++) {
     if (new_axes == NULL) {
-      j = res->nd - i - 1;
+      j = a->nd - i - 1;
     } else {
       j = new_axes[i];
       // Repeated axes will lead to a broken output
       for (k = 0; k < i; k++)
         if (j == new_axes[k]) {
-          GpuArray_clear(res);
+          free(newdims);
+          free(newstrs);
           return GA_VALUE_ERROR;
         }
     }
-    res->dimensions[i] = a->dimensions[j];
-    res->strides[i] = a->strides[j];
+    newdims[i] = a->dimensions[j];
+    newstrs[i] = a->strides[j];
   }
-  if (new_axes == NULL) {
-    if (a->flags & GA_C_CONTIGUOUS) res->flags |= GA_F_CONTIGUOUS;
-    if (a->flags & GA_F_CONTIGUOUS) res->flags |= GA_C_CONTIGUOUS;
-  } else {
-  if (GpuArray_is_c_contiguous(res))
-    res->flags |= GA_C_CONTIGUOUS;
-  if (GpuArray_is_f_contiguous(res))
-    res->flags |= GA_F_CONTIGUOUS;
-  }
+
+  free(a->dimensions);
+  free(a->strides);
+  a->dimensions = newdims;
+  a->strides = newstrs;
+
+  a->flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
+  if (GpuArray_is_c_contiguous(a))
+    a->flags |= GA_C_CONTIGUOUS;
+  if (GpuArray_is_f_contiguous(a))
+    a->flags |= GA_F_CONTIGUOUS;
 
   return GA_NO_ERROR;
 }

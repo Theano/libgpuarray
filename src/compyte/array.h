@@ -308,6 +308,10 @@ COMPYTE_PUBLIC int GpuArray_index(GpuArray *r, const GpuArray *a,
                                   const ssize_t *starts, const ssize_t *stops,
                                   const ssize_t *steps);
 
+COMPYTE_PUBLIC int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
+                                          const ssize_t *stops,
+                                          const ssize_t *steps);
+
 /**
  * Sets the content of an array to the content of another array.
  *
@@ -348,6 +352,10 @@ COMPYTE_PUBLIC int GpuArray_reshape(GpuArray *res, const GpuArray *a,
                                     unsigned int nd, const size_t *newdims,
                                     ga_order ord, int nocopy);
 
+COMPYTE_PUBLIC int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
+                                            const size_t *newdims,
+                                            ga_order ord);
+
 /**
  * Rearrange the axes of an array.
  *
@@ -365,6 +373,9 @@ COMPYTE_PUBLIC int GpuArray_reshape(GpuArray *res, const GpuArray *a,
  */
 COMPYTE_PUBLIC int GpuArray_transpose(GpuArray *res, const GpuArray *a,
                                       const unsigned int *new_axes);
+
+COMPYTE_PUBLIC int GpuArray_transpose_inplace(GpuArray *a,
+                                              const unsigned int *new_axes);
 
 /**
  * Relase all device and host memory associated with `a`.
