@@ -252,6 +252,11 @@ cdef api np.ndarray pygpu_as_ndarray(GpuArray a)
 cdef api GpuArray pygpu_index(GpuArray a, const ssize_t *starts,
                               const ssize_t *stops, const ssize_t *steps)
 
+cdef api GpuArray pygpu_reshape(GpuArray a, unsigned int nd,
+                                const size_t *newdims, ga_order ord,
+                                bint nocopy)
+cdef api GpuArray pygpu_transpose(GpuArray a, const unsigned int *newaxes)
+
 cdef api class GpuContext [type PyGpuContextType, object PyGpuContextObject]:
     cdef const compyte_buffer_ops *ops
     cdef void* ctx

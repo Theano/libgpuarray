@@ -1171,6 +1171,19 @@ cdef GpuArray pygpu_index(GpuArray a, const ssize_t *starts,
     array_index(res, a, starts, stops, steps)
     return res
 
+cdef GpuArray pygpu_reshape(GpuArray a, unsigned int nd, const size_t *newdims,
+                            ga_order ord, bint nocopy):
+    cdef GpuArray res
+    res = new_GpuArray(type(a), a.context, a.base)
+    array_reshape(res, a, nd, newdims, ord, nocopy)
+    return res
+
+cdef GpuArray pygpu_transpose(GpuArray a, const unsigned int *newaxes):
+    cdef GpuArray res
+    res = new_GpuArray(type(a), a.context, a.base)
+    array_transpose(res, a, newaxes)
+    return res
+
 cdef class GpuArray:
     """
     Device array
@@ -1345,27 +1358,22 @@ cdef class GpuArray:
         cdef size_t *newdims
         cdef unsigned int nd
         cdef unsigned int i
-        cdef GpuArray res
         nd = <unsigned int>len(shape)
         newdims = <size_t *>calloc(nd, sizeof(size_t))
         try:
             for i in range(nd):
                 newdims[i] = shape[i]
-            res = new_GpuArray(self.__class__, self.context, self.base)
-            array_reshape(res, self, nd, newdims, to_ga_order(order), 0)
+            return pygpu_reshape(self, nd, newdims, to_ga_order(order), 0)
         finally:
             free(newdims)
-        return res
 
     def transpose(self, *params):
-        cdef GpuArray res
         cdef unsigned int *new_axes
         cdef unsigned int i
         if len(params) is 1 and isinstance(params[0], (tuple, list)):
             params = params[0]
-        res = new_GpuArray(self.__class__, self.context, self.base)
         if params is ():
-            array_transpose(res, self, NULL)
+            return pygpu_transpose(self, NULL)
         else:
             if len(params) != self.ga.nd:
                 raise ValueError, "axes don't match"
@@ -1373,10 +1381,9 @@ cdef class GpuArray:
             try:
                 for i in range(self.ga.nd):
                     new_axes[i] = params[i]
-                array_transpose(res, self, new_axes)
+                return pygpu_transpose(self, new_axes)
             finally:
                 free(new_axes)
-        return res
 
     def __len__(self):
         if self.ga.nd > 0:
