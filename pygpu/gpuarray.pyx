@@ -1168,7 +1168,12 @@ cdef GpuArray pygpu_index(GpuArray a, const ssize_t *starts,
                           const ssize_t *stops, const ssize_t *steps):
     cdef GpuArray res
     res = new_GpuArray(type(a), a.context, a.base)
-    array_index(res, a, starts, stops, steps)
+    try:
+        array_index(res, a, starts, stops, steps)
+    except GpuArrayException, e:
+        if e.errcode == GA_VALUE_ERROR:
+            raise IndexError, "index out of bounds"
+        raise
     return res
 
 cdef GpuArray pygpu_reshape(GpuArray a, unsigned int nd, const size_t *newdims,
