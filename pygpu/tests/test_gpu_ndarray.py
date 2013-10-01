@@ -310,18 +310,6 @@ def check_memory_region(a, a_op, b, b_op):
     assert numpy.may_share_memory(a, a_op) == \
         gpu_ndarray.may_share_memory(b, b_op)
 
-    if a_op.base is None:
-        assert b_op.base is None
-    else:
-        assert a_op.base is a
-        if b.base is not None:
-            # We avoid having a series of object connected by base.
-            # This is to don't bloc the garbage collection.
-            assert b_op.base is b.base
-        else:
-            assert b_op.base is b
-
-
 @guard_devsup
 def copy_view(shp, dtype, offseted, order1, order2):
     #TODO test copy unbroadcast!
