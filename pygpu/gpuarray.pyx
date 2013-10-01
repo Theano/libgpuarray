@@ -1444,7 +1444,8 @@ cdef class GpuArray:
 
     def __setitem__(self, idx, v):
         cdef GpuArray tmp = self.__getitem__(idx)
-        cdef GpuArray gv = v
+        cdef GpuArray gv = asarray(v, dtype=self.dtype,
+                                   context=self.context)
 
         array_setarray(tmp, gv)
 
