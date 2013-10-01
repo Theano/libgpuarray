@@ -234,13 +234,29 @@ cdef api GpuArray pygpu_fromhostdata(void *buf, int typecode, unsigned int nd,
                                      const ssize_t *strides,
                                      GpuContext context, type cls)
 
+cdef api GpuArray pygpu_fromgpudata(gpudata *buf, size_t offset, int typecode,
+                                    unsigned int nd, const size_t *dims,
+                                    const ssize_t *strides, GpuContext context,
+                                    bint writable, object base, type cls)
+
 cdef api GpuArray pygpu_copy(GpuArray a, ga_order ord)
+
+cdef api GpuArray pygpu_view(GpuArray a, type cls)
+
+cdef api int pygpu_sync(GpuArray a) except -1
+
+cdef api GpuArray pygpu_empty_like(GpuArray a, ga_order ord, int typecode)
+
+cdef api np.ndarray pygpu_as_ndarray(GpuArray a)
+
+cdef api GpuArray pygpu_index(GpuArray a, const ssize_t *starts,
+                              const ssize_t *stops, const ssize_t *steps)
 
 cdef api class GpuContext [type PyGpuContextType, object PyGpuContextObject]:
     cdef const compyte_buffer_ops *ops
     cdef void* ctx
 
-cdef api GpuArray new_GpuArray(type cls, GpuContext ctx, object base)
+cdef GpuArray new_GpuArray(type cls, GpuContext ctx, object base)
 
 cdef api class GpuArray [type PyGpuArrayType, object PyGpuArrayObject]:
     cdef _GpuArray ga

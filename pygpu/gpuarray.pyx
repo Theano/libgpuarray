@@ -1124,6 +1124,53 @@ cdef GpuArray new_GpuArray(type cls, GpuContext ctx, object base):
     res.context = ctx
     return res
 
+cdef GpuArray pygpu_view(GpuArray a, type cls):
+    cdef GpuArray res = new_GpuArray(cls, a.context, a.base)
+    array_view(res, a)
+    return res
+
+cdef int pygpu_sync(GpuArray a) except -1:
+    array_sync(a)
+
+cdef GpuArray pygpu_empty_like(GpuArray a, ga_order ord, int typecode):
+    cdef GpuArray res
+
+    if ord == GA_ANY_ORDER:
+        if py_CHKFLAGS(a, GA_F_CONTIGUOUS) and \
+                not py_CHKFLAGS(a, GA_C_CONTIGUOUS):
+            ord = GA_F_ORDER
+        else:
+            ord = GA_C_ORDER
+
+    if typecode == -1:
+        typecode = a.ga.typecode
+
+    res = new_GpuArray(type(a), a.context, None)
+    array_empty(res, a.ga.ops, a.context.ctx, typecode,
+                a.ga.nd, a.ga.dimensions, ord)
+    return res
+
+cdef np.ndarray pygpu_as_ndarray(GpuArray a):
+    cdef np.ndarray res
+
+    if not py_ISONESEGMENT(a):
+        a = pygpu_copy(a, GA_ANY_ORDER)
+
+    res = PyArray_Empty(a.ga.nd, <np.npy_intp *>a.ga.dimensions,
+                        a.dtype, (py_CHKFLAGS(a, GA_F_CONTIGUOUS) and
+                                  not py_CHKFLAGS(a, GA_C_CONTIGUOUS)))
+
+    array_read(np.PyArray_DATA(res), np.PyArray_NBYTES(res), a)
+
+    return res
+
+cdef GpuArray pygpu_index(GpuArray a, const ssize_t *starts,
+                          const ssize_t *stops, const ssize_t *steps):
+    cdef GpuArray res
+    res = new_GpuArray(type(a), a.context, a.base)
+    array_index(res, a, starts, stops, steps)
+    return res
+
 cdef class GpuArray:
     """
     Device array
@@ -1191,20 +1238,7 @@ cdef class GpuArray:
 
         Automatically used by :meth:`numpy.asarray`.
         """
-        cdef np.ndarray res
-
-        if not py_ISONESEGMENT(self):
-            self = self.copy()
-
-        res = PyArray_Empty(self.ga.nd, <np.npy_intp *>self.ga.dimensions,
-                            self.dtype, py_CHKFLAGS(self, GA_F_CONTIGUOUS) \
-                                and not py_CHKFLAGS(self, GA_C_CONTIGUOUS))
-
-        array_read(np.PyArray_DATA(res),
-                   np.PyArray_NBYTES(res),
-                   self)
-
-        return res
+        return pygpu_as_ndarray(self)
 
     def _empty_like_me(self, dtype=None, order='C'):
         """
@@ -1215,26 +1249,13 @@ cdef class GpuArray:
         """
         cdef int typecode
         cdef GpuArray res
-        cdef ga_order ord = to_ga_order(order)
-
-        # XXX: support numpy order='K'
-        # (which means: as close as possible to the layout of the source)
-        if ord == GA_ANY_ORDER:
-            if py_CHKFLAGS(self, GA_F_CONTIGUOUS) and \
-                    not py_CHKFLAGS(self, GA_C_CONTIGUOUS):
-                ord = GA_F_ORDER
-            else:
-                ord = GA_C_ORDER
 
         if dtype is None:
-            typecode = self.ga.typecode
+            typecode = -1
         else:
             typecode = dtype_to_typecode(dtype)
 
-        res = new_GpuArray(self.__class__, self.context, self.base)
-        array_empty(res, self.ga.ops, array_context(self), typecode,
-                    self.ga.nd, self.ga.dimensions, ord)
-        return res
+        return pygpu_empty_like(self, to_ga_order(order), typecode)
 
     def copy(self, order='C'):
         """
@@ -1265,9 +1286,9 @@ cdef class GpuArray:
         This is done automatically when reading or writing from it,
         but can be useful as a separate operation for timings.
         """
-        array_sync(self)
+        pygpu_sync(self)
 
-    def view(self, cls=GpuArray):
+    def view(self, type cls=GpuArray):
         """
         view(cls=GpuArray)
 
@@ -1278,9 +1299,7 @@ cdef class GpuArray:
         The returned array shares device data with this one and both
         will reflect changes made to the other.
         """
-        cdef GpuArray res = new_GpuArray(cls, self.context, self.base)
-        array_view(res, self)
-        return res
+        return pygpu_view(self, cls)
 
     def astype(self, dtype, order='A', copy=True):
         """
@@ -1366,7 +1385,6 @@ cdef class GpuArray:
             raise TypeError, "len() of unsized object"
 
     def __getitem__(self, key):
-        cdef GpuArray res
         cdef ssize_t *starts
         cdef ssize_t *stops
         cdef ssize_t *steps
@@ -1418,13 +1436,11 @@ cdef class GpuArray:
                 stops[i] = self.ga.dimensions[i]
                 steps[i] = 1
 
-            res = new_GpuArray(self.__class__, self.context, self.base)
-            array_index(res, self, starts, stops, steps)
+            return pygpu_index(self, starts, stops, steps)
         finally:
             free(starts)
             free(stops)
             free(steps)
-        return res
 
     def __setitem__(self, idx, v):
         cdef GpuArray tmp = self.__getitem__(idx)
