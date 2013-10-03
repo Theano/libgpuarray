@@ -356,12 +356,12 @@ static void cuda_free(gpudata *d) {
   d->refcnt--;
   if (d->refcnt == 0) {
     cuda_enter(d->ctx);
-    err = cuEventQuery(d->ev);
-    if (err != CUDA_SUCCESS) {
-      fprintf(stderr, "ERROR: in cuda_release: buffer refcount reached 0 "
-              "but events are still pending.");
-      cuEventSynchronize(d->ev);
-    }
+    /*
+     * From testing, I have discovered that cuMemFree() will just
+     * block until nothing uses the region on the GPU.  Since this is
+     * not documented behavior, we will emulate that here.
+     */
+    cuEventSynchronize(d->ev);
     if (!(d->flags & DONTFREE))
       cuMemFree(d->ptr);
     cuEventDestroy(d->ev);
