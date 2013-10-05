@@ -346,9 +346,7 @@ int GpuArray_reshape(GpuArray *res, const GpuArray *a, unsigned int nd,
   err = GpuArray_view(res, a);
   if (err != GA_NO_ERROR) return err;
   err = GpuArray_reshape_inplace(res, nd, newdims, ord);
-  /* If we recieve a GA_VALUE_ERROR it means that we need a copy in
-     the target order. */
-  if (err == GA_VALUE_ERROR && !nocopy) {
+  if (err == GA_COPY_ERROR && !nocopy) {
     GpuArray_clear(res);
     GpuArray_copy(res, a, ord);
     err = GpuArray_reshape_inplace(res, nd, newdims, ord);
@@ -466,7 +464,7 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
   goto fix_flags;
  need_copy:
   free(newstrides);
-    return GA_VALUE_ERROR; /* Might want a better error code */
+  return GA_COPY_ERROR;
 
  do_final_copy:
   tmpdims = calloc(nd, sizeof(size_t));
