@@ -1,3 +1,4 @@
+/* This file is generated from private_config.h.in.  Do not edit. */
 #cmakedefine HAVE_STRL
 #cmakedefine HAVE_ASPRINTF
 #cmakedefine HAVE_MKSTEMP

@@ -18,3 +18,4 @@ distribute*tar.gz
 *.log
 pygpu/*.c
 pygpu/*.h
+src/private_config.h
