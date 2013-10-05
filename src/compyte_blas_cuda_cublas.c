@@ -28,6 +28,8 @@ static int setup(void *c) {
     return GA_NO_ERROR;
 
   cuda_enter(ctx);
+  if (ctx->err != CUDA_SUCCESS)
+    return GA_IMPL_ERROR;
   err = cublasCreate(&handle);
   cuda_exit(ctx);
 
@@ -60,76 +62,54 @@ static void teardown(void *c) {
   cuda_exit(ctx);
 }
 
-static int sgemv(const cb_order order,
-                 const cb_transpose transA,
-                 const size_t M,
-                 const size_t N,
-                 const float alpha,
-                 gpudata *A,
-                 const size_t offA,
-                 const size_t lda,
-                 gpudata *X,
-                 const size_t offX,
-                 const int incX,
-                 const float beta,
-                 gpudata *Y,
-                 const size_t offY,
-                 const int incY) {
-  cuda_context *ctx = A->ctx;
-  cublasStatus_t err;
-  cb_transpose trans_a = transA;
-  size_t n = N, m = M, _lda = lda;
+#define NAME cublas
 
-  if (order == cb_c) {
-    m = N;
-    n = M;
-    _lda = m;
-    if (transA == cb_no_trans) {
-      trans_a = cb_trans;
-    } else if (transA == cb_trans) {
-      trans_a = cb_no_trans;
-    } else {
-      return GA_DEVSUP_ERROR;
-    }
+#define FETCH_CONTEXT(A) cuda_context *ctx = (A)->ctx
+#define FUNC_DECLS cublasStatus_t err
+#define PREP_ORDER1(transA, M, N, A, lda) \
+  cb_transpose r ## transA = transA; \
+  size_t r ## N = N, r ## M = M, r ## lda = lda
+
+#define HANDLE_ORDER1(order, transA, M, N, A, lda) \
+  if (order == cb_c) {				   \
+    r ## M = N;					   \
+    r ## N = M;					   \
+    r ## lda = r ## M;				   \
+    if (transA == cb_no_trans) {		   \
+      r ## transA = cb_trans;			   \
+    } else if (transA == cb_trans) {		   \
+      r ## transA = cb_no_trans;		   \
+    } else {					   \
+      return GA_DEVSUP_ERROR;			   \
+    }						   \
   }
 
-  cuda_enter(ctx);
-  if (ctx->err != CUDA_SUCCESS)
-    return GA_IMPL_ERROR;
+#define FUNC_INIT	       \
+  cuda_enter(ctx);	       \
+  if (ctx->err != GA_NO_ERROR) \
+    return GA_IMPL_ERROR
 
-  ctx->err = cuStreamWaitEvent(ctx->s, A->ev, 0);
-  if (ctx->err != CUDA_SUCCESS) {
-    cuda_exit(ctx);
-    return GA_IMPL_ERROR;
+#define ARRAY_INIT(A)				  \
+  ctx->err = cuStreamWaitEvent(ctx->s, A->ev, 0); \
+  if (ctx->err != CUDA_SUCCESS) {		  \
+    cuda_exit(ctx);				  \
+    return GA_IMPL_ERROR;			  \
   }
-  ctx->err = cuStreamWaitEvent(ctx->s, X->ev, 0);
-  if (ctx->err != CUDA_SUCCESS) {
-    cuda_exit(ctx);
-    return GA_IMPL_ERROR;
-  }
-  ctx->err = cuStreamWaitEvent(ctx->s, Y->ev, 0);
-  if (ctx->err != CUDA_SUCCESS) {
-    cuda_exit(ctx);
-    return GA_IMPL_ERROR;
-  }
+#define ARRAY_FINI(A) cuEventRecord(A->ev, ctx->s)
 
-  err = cublasSgemv(ctx->blas_handle, convO(trans_a), m, n, &alpha,
-		    ((float *)A->ptr) + offA, _lda,
-		    ((float *)X->ptr) + offX, incX, &beta,
-		    ((float *)Y->ptr) + offY, incY);
-  if (err == CUBLAS_STATUS_ARCH_MISMATCH)
-    return GA_DEVSUP_ERROR;
-  if (err != CUBLAS_STATUS_SUCCESS)
-    return GA_BLAS_ERROR;
+#define PRE_CALL err =
+#define PREFIX(typec, TYPEC) cublas ## TYPEC
+#define INIT_ARGS ctx->blas_handle,
+#define TRANS(tr) convO(tr)
+#define SZ(s) r ## s
+#define SCAL(s) &s
+#define ARRAY(A, dtype) ((dtype *)A->ptr) + off ## A
 
-  cuEventRecord(A->ev, ctx->s);
-  cuEventRecord(X->ev, ctx->s);
-  cuEventRecord(Y->ev, ctx->s);
-  return GA_NO_ERROR;
-}
+#define POST_CALL			  \
+  if (err == CUBLAS_STATUS_ARCH_MISMATCH) \
+    return GA_DEVSUP_ERROR;		  \
+  if (err != CUBLAS_STATUS_SUCCESS)	  \
+    return GA_BLAS_ERROR
 
-COMPYTE_LOCAL compyte_blas_ops cublas_ops = {
-  setup,
-  teardown,
-  sgemv
-};
+#include "generic_blas.inc.c"
+
