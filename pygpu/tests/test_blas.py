@@ -19,18 +19,43 @@ type_to_prefix = {
 }
 
 def test_sgemv():
-    for shape in [(128, 128), (400, 784)]:
-        for order in ['f', 'c']:
-            for trans in [False, True]:
-                for offseted in [True, False]:
-                    yield sgemv, shape, order, trans, offseted
+    for shape in [(100, 128)]:
+        for dtype in ['float32', 'float64']:
+            for order in ['f', 'c']:
+                for trans in [False, True]:
+                    for offseted_o in [True, False]:
+                        for offseted_i in [True, False]:
+                            for sliced in [1, 2, -1, -2]:
+                                for overwrite in [True, False]:
+                                    for init_y in [True, False]:
+                                        yield sgemv, shape, dtype, order, \
+                                            trans, offseted_i, offseted_o, \
+                                            sliced, overwrite, init_y
 
-def sgemv(shp, order, trans, offseted_o):
-    cA, gA = gen_gpuarray(shp, 'float32', order=order, ctx=context)
-    cX, gX = gen_gpuarray((shp[1],), 'float32', offseted_o, ctx=context)
-    cY, gY = gen_gpuarray((shp[0],), 'float32', offseted_o, ctx=context)
+#@guard_devsup
+def sgemv(shp, dtype, order, trans, offseted_i, offseted_o, sliced,
+          overwrite, init_y):
+    cA, gA = gen_gpuarray(shp, dtype, order=order, offseted_outer=offseted_o,
+                          offseted_inner=offseted_i, sliced=sliced,
+                          ctx=context)
+    if trans:
+        shpX = (shp[0],)
+        shpY = (shp[1],)
+    else:
+        shpX = (shp[1],)
+        shpY = (shp[0],)
+    cX, gX = gen_gpuarray(shpX, dtype, offseted_outer=offseted_o,
+                          offseted_inner=offseted_i, sliced=sliced,
+                          ctx=context)
+    if init_y:
+        cY, gY = gen_gpuarray(shpY, dtype, ctx=context)
+    else:
+        cY, gY = None, None
 
-    fblas.sgemv(1, cA, cX, 0, cY, trans=False, overwrite_y=True)
-    gblas.sgemv(1, gA, gX, 0, gY, trans=False, overwrite_y=True)
+    if dtype == 'float32':
+        cr = fblas.sgemv(1, cA, cX, 0, cY, trans=trans, overwrite_y=overwrite)
+    else:
+        cr = fblas.dgemv(1, cA, cX, 0, cY, trans=trans, overwrite_y=overwrite)
+    gr = gblas.gemv(1, gA, gX, 0, gY, trans=trans, overwrite_y=overwrite)
 
-    assert numpy.allclose(cY, numpy.asarray(gY))
+    assert numpy.allclose(cr, numpy.asarray(gr))
