@@ -74,7 +74,6 @@ static void teardown(void *c) {
   if (order == cb_c) {				   \
     r ## M = N;					   \
     r ## N = M;					   \
-    r ## lda = r ## M;				   \
     if (transA == cb_no_trans) {		   \
       r ## transA = cb_trans;			   \
     } else if (transA == cb_trans) {		   \
@@ -84,9 +83,9 @@ static void teardown(void *c) {
     }						   \
   }
 
-#define FUNC_INIT	       \
-  cuda_enter(ctx);	       \
-  if (ctx->err != GA_NO_ERROR) \
+#define FUNC_INIT		\
+  cuda_enter(ctx);		\
+  if (ctx->err != CUDA_SUCCESS) \
     return GA_IMPL_ERROR
 
 #define ARRAY_INIT(A)				  \
@@ -100,7 +99,7 @@ static void teardown(void *c) {
 #define PRE_CALL err =
 #define PREFIX(typec, TYPEC) cublas ## TYPEC
 #define INIT_ARGS ctx->blas_handle,
-#define TRANS(tr) convO(tr)
+#define TRANS(tr) convO(r ## tr)
 #define SZ(s) r ## s
 #define SCAL(s) &s
 #define ARRAY(A, dtype) ((dtype *)A->ptr) + off ## A
