@@ -1,4 +1,5 @@
 include(CheckFunctionExists)
+include(${CMAKE_SOURCE_DIR}/gen_blas.cmake)
 
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
 
@@ -76,6 +77,8 @@ add_library(compyte SHARED ${COMPYTE_SRC})
 set_target_properties(compyte PROPERTIES COMPILE_FLAGS "-DCOMPYTE_BUILDING_DLL -DCOMPYTE_SHARED")
 
 add_library(compyte-static STATIC ${COMPYTE_SRC})
+add_dependencies(compyte gen_blas)
+add_dependencies(compyte-static gen_blas)
 
 if(CUDA_FOUND)
   target_link_libraries(compyte ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
@@ -91,7 +94,18 @@ if(OPENCL_FOUND)
   endif()
 endif()
 
-FILE(GLOB headers compyte/*.h)
+SET(headers
+  compyte/array.h
+  compyte/blas.h
+  compyte/buffer.h
+  compyte/buffer_blas.h
+  compyte/config.h
+  compyte/error.h
+  compyte/extension.h
+  compyte/kernel.h
+  compyte/types.h
+  compyte/util.h
+)
 
 INSTALL(FILES ${headers} DESTINATION include/compyte)
 

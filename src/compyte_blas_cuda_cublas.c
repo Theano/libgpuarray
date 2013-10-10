@@ -66,21 +66,35 @@ static void teardown(void *c) {
 
 #define FETCH_CONTEXT(A) cuda_context *ctx = (A)->ctx
 #define FUNC_DECLS cublasStatus_t err
-#define PREP_ORDER1(transA, M, N, A, lda) \
-  cb_transpose r ## transA = transA; \
-  size_t r ## N = N, r ## M = M, r ## lda = lda
+#define PREP_ORDER_GEMV				\
+  cb_transpose rtransA = transA;		\
+  size_t rN = N, rM = M, rlda = lda
 
-#define HANDLE_ORDER1(order, transA, M, N, A, lda) \
-  if (order == cb_c) {				   \
-    r ## M = N;					   \
-    r ## N = M;					   \
-    if (transA == cb_no_trans) {		   \
-      r ## transA = cb_trans;			   \
-    } else if (transA == cb_trans) {		   \
-      r ## transA = cb_no_trans;		   \
-    } else {					   \
-      return GA_DEVSUP_ERROR;			   \
-    }						   \
+#define HANDLE_ORDER_GEMV			       \
+  if (order == cb_c) {				       \
+    rM = N;					       \
+    rN = M;					       \
+    if (transA == cb_no_trans) {		       \
+      rtransA = cb_trans;			       \
+    } else {					       \
+      rtransA = cb_no_trans;			       \
+    }						       \
+  }
+
+#define PREP_ORDER_GEMM						\
+  cb_transpose rtransA = transA, rtransB = transB;		\
+  size_t rM = M, rN = N, rK = K, rlda = lda, rldb = ldb;	\
+  gpudata *tmp;
+
+#define HANDLE_ORDER_GEMM \
+  if (order == cb_c) {	  \
+    tmp = A;		  \
+    A = B;		  \
+    B = tmp;		  \
+    rN = M;		  \
+    rM = N;		  \
+    rlda = ldb;		  \
+    rldb = lda;		  \
   }
 
 #define FUNC_INIT		\
