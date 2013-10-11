@@ -1,3 +1,6 @@
+import sys
+
+from mako import exceptions
 from mako.template import Template
 
 TYPEMAP = {}
@@ -216,10 +219,15 @@ const compyte_type vector_types[] = {
 };
 """)
 
-header = open("compyte/types.h", "w")
-header.write(head_tmpl.render(TYPEMAP=TYPEMAP, VECTORMAP=VECTORMAP, ntypes=ntypes))
-header.close()
+try:
+    header = head_tmpl.render(TYPEMAP=TYPEMAP, VECTORMAP=VECTORMAP, ntypes=ntypes)
+    impl = impl_tmpl.render(TYPEMAP=TYPEMAP, VECTORMAP=VECTORMAP, ntypes=ntypes, decls=decls)
+except Exception:
+    print exceptions.text_error_template().render()
+    sys.exit(1)
 
-impl = open("compyte_types.c", "w")
-impl.write(impl_tmpl.render(TYPEMAP=TYPEMAP, VECTORMAP=VECTORMAP, ntypes=ntypes, decls=decls))
-impl.close()
+with open("compyte/types.h", "w") as f:
+    f.write(header)
+
+with open("compyte_types.c", "w") as f:
+    f.write(impl)

@@ -8,6 +8,13 @@ find_package(OpenCL)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/compyte_types.c
+         ${CMAKE_CURRENT_SOURCE_DIR}/compyte/types.h
+  COMMAND python gen_types.py
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen_types.py)
+
 SET(COMPYTE_SRC
 compyte_types.c
 compyte_error.c
