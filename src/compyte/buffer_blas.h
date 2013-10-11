@@ -33,8 +33,8 @@ typedef enum _cb_uplo {
 typedef struct _compyte_blas_ops {
   int (*setup)(void *ctx);
   void (*teardown)(void *ctx);
-  int (*sgemv)(const cb_order order, const cb_transpose transA, const size_t N, const size_t M, const float alpha, gpudata *A, const size_t offA, const size_t lda, gpudata *X, const size_t offX, const int incX, const float beta, gpudata *Y, const size_t offY, const int incY);
-  int (*dgemv)(const cb_order order, const cb_transpose transA, const size_t N, const size_t M, const double alpha, gpudata *A, const size_t offA, const size_t lda, gpudata *X, const size_t offX, const int incX, const double beta, gpudata *Y, const size_t offY, const int incY);
+  int (*sgemv)(const cb_order order, const cb_transpose transA, const size_t M, const size_t N, const float alpha, gpudata *A, const size_t offA, const size_t lda, gpudata *X, const size_t offX, const int incX, const float beta, gpudata *Y, const size_t offY, const int incY);
+  int (*dgemv)(const cb_order order, const cb_transpose transA, const size_t M, const size_t N, const double alpha, gpudata *A, const size_t offA, const size_t lda, gpudata *X, const size_t offX, const int incX, const double beta, gpudata *Y, const size_t offY, const int incY);
 } compyte_blas_ops;
 
 #endif

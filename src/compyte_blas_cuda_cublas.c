@@ -6,8 +6,8 @@
 
 #include "cublas_v2.h"
 
-static inline cublasOperation_t convO(cb_transpose order) {
-  switch (order) {
+static inline cublasOperation_t convT(cb_transpose trans) {
+  switch (trans) {
   case cb_no_trans:
     return CUBLAS_OP_N;
   case cb_trans:
@@ -113,7 +113,7 @@ static void teardown(void *c) {
 #define PRE_CALL err =
 #define PREFIX(typec, TYPEC) cublas ## TYPEC
 #define INIT_ARGS ctx->blas_handle,
-#define TRANS(tr) convO(r ## tr)
+#define TRANS(tr) convT(r ## tr)
 #define SZ(s) r ## s
 #define SCAL(s) &s
 #define ARRAY(A, dtype) ((dtype *)A->ptr) + off ## A

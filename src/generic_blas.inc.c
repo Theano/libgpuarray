@@ -46,7 +46,29 @@
 #define __GLUE(part1, part2) __GLUE_INT(part1, part2)
 #define __GLUE_INT(part1, part2) part1 ## part2
 
-#define GEMV(dtype, typec, TYPEC)				  static int typec ## gemv(const cb_order order, const cb_transpose transA, const size_t N, const size_t M, const dtype alpha, gpudata *A, const size_t offA, const size_t lda, gpudata *X, const size_t offX, const int incX, const dtype beta, gpudata *Y, const size_t offY, const int incY) {	    FETCH_CONTEXT(A);				    FUNC_DECLS;								    PREP_ORDER_GEMV;		                        									    HANDLE_ORDER_GEMV;	                                    FUNC_INIT;																	    ARRAY_INIT(A);						    ARRAY_INIT(X);						    ARRAY_INIT(Y);															    PRE_CALL __GLUE(PREFIX(typec, TYPEC), gemv)(INIT_ARGS ORDER TRANS(transA), SZ(N), SZ(M), SCAL(alpha), ARRAY(A, dtype), SZ(lda), ARRAY(X, dtype), (incX), SCAL(beta), ARRAY(Y, dtype), (incY) TRAIL_ARGS);     POST_CALL;																	    ARRAY_FINI(A);						    ARRAY_FINI(X);						    ARRAY_FINI(Y);						    FUNC_FINI;																	    return GA_NO_ERROR;							  }
+#define GEMV(dtype, typec, TYPEC)			    \
+  static int typec ## gemv(const cb_order order, const cb_transpose transA, const size_t M, const size_t N, const dtype alpha, gpudata *A, const size_t offA, const size_t lda, gpudata *X, const size_t offX, const int incX, const dtype beta, gpudata *Y, const size_t offY, const int incY) { \
+    FETCH_CONTEXT(A);			    \
+    FUNC_DECLS;							    \
+    PREP_ORDER_GEMV;		                    \
+								    \
+    HANDLE_ORDER_GEMV;	                            \
+    FUNC_INIT;							    \
+								    \
+    ARRAY_INIT(A);					    \
+    ARRAY_INIT(X);					    \
+    ARRAY_INIT(Y);					    \
+								    \
+    PRE_CALL __GLUE(PREFIX(typec, TYPEC), gemv)(INIT_ARGS ORDER TRANS(transA), SZ(M), SZ(N), SCAL(alpha), ARRAY(A, dtype), SZ(lda), ARRAY(X, dtype), (incX), SCAL(beta), ARRAY(Y, dtype), (incY) TRAIL_ARGS); \
+    POST_CALL;							    \
+								    \
+    ARRAY_FINI(A);					    \
+    ARRAY_FINI(X);					    \
+    ARRAY_FINI(Y);					    \
+    FUNC_FINI;							    \
+								    \
+    return GA_NO_ERROR;						    \
+  }
 
 GEMV(float, s, S)
 GEMV(double, d, D)

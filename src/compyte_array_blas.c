@@ -45,6 +45,9 @@ int GpuArray_rgemv(const cb_transpose transA, const double alpha, GpuArray *A, G
   if (Y->dimensions[0] != m || X->dimensions[0] != n)
     return GA_VALUE_ERROR;
 
+  m = A->dimensions[0];
+  n = A->dimensions[1];
+
 
   elsize = compyte_get_elsize(A->typecode);
 
@@ -97,9 +100,9 @@ int GpuArray_rgemv(const cb_transpose transA, const double alpha, GpuArray *A, G
     goto cleanup;
 
   if (Ap->typecode == GA_FLOAT)
-    err = blas->sgemv(o, transA, n, m, (float)alpha, Ap->data, Ap->offset / elsize, lda, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, (float)beta, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize);
+    err = blas->sgemv(o, transA, m, n, (float)alpha, Ap->data, Ap->offset / elsize, lda, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, (float)beta, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize);
   else
-    err = blas->dgemv(o, transA, n, m, (double)alpha, Ap->data, Ap->offset / elsize, lda, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, (double)beta, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize);
+    err = blas->dgemv(o, transA, m, n, (double)alpha, Ap->data, Ap->offset / elsize, lda, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, (double)beta, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize);
 
  cleanup:
   if (Ap == &copyA)

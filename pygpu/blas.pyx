@@ -12,7 +12,7 @@ cdef extern from "compyte/buffer_blas.h":
         cb_conj_trans
 
 cdef extern from "compyte/blas.h":
-    int GpuArray_r%{op.name}(const cb_transpose transA, const double alpha, _GpuArray *A, _GpuArray *X, const double beta, _GpuArray *Y,
+    int GpuArray_rgemv(const cb_transpose transA, const double alpha, _GpuArray *A, _GpuArray *X, const double beta, _GpuArray *Y,
                              int nocopy)
 
 cdef blas_rgemv(const cb_transpose transA, const double alpha, GpuArray A, GpuArray X, const double beta, GpuArray Y,

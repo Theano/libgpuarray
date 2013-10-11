@@ -56,6 +56,6 @@ def sgemv(shp, dtype, order, trans, offseted_i, offseted_o, sliced,
         cr = fblas.sgemv(1, cA, cX, 0, cY, trans=trans, overwrite_y=overwrite)
     else:
         cr = fblas.dgemv(1, cA, cX, 0, cY, trans=trans, overwrite_y=overwrite)
-    gr = gblas.gemv(1, gA, gX, 0, gY, trans=trans, overwrite_y=overwrite)
+    gr = gblas.gemv(1, gA, gX, 0, gY, trans_a=trans, overwrite_y=overwrite)
 
     assert numpy.allclose(cr, numpy.asarray(gr))
