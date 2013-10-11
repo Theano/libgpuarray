@@ -351,7 +351,6 @@ static void cuda_retain(gpudata *d) {
 }
 
 static void cuda_free(gpudata *d) {
-  CUresult err;
   /* We ignore errors on free */
   d->refcnt--;
   if (d->refcnt == 0) {
