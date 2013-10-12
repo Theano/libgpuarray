@@ -15,33 +15,32 @@ import pygpu.blas as gblas
 
 def test_gemv():
     for shape in [(100, 128), (128, 100)]:
-        for dtype in ['float32', 'float64']:
-            for order in ['f', 'c']:
-                for trans in [False, True]:
-                    for offseted_o in [True, False]:
-                        for offseted_i in [True, False]:
-                            for sliced in [1, 2, -1, -2]:
-                                for overwrite in [True, False]:
-                                    for init_y in [True, False]:
-                                        yield gemv, shape, dtype, order, \
-                                            trans, offseted_i, offseted_o, \
-                                            sliced, overwrite, init_y
+        for order in ['f', 'c']:
+            for trans in [False, True]:
+                for offseted_i in [True, False]:
+                    for sliced in [1, 2, -1, -2]:
+                        yield gemv, shape, 'float32', order, trans, \
+                            offseted_i, sliced, True, False
+    for overwrite in [True, False]:
+        for init_y in [True, False]:
+            yield gemv, (4, 3), 'float32', 'f', False, False, 1, \
+                overwrite, init_y
+    yield gemv, (32, 32), 'float64', 'f', False, False, 1, True, False
+
 
 @guard_devsup
-def gemv(shp, dtype, order, trans, offseted_i, offseted_o, sliced,
+def gemv(shp, dtype, order, trans, offseted_i, sliced,
           overwrite, init_y):
-    cA, gA = gen_gpuarray(shp, dtype, order=order, offseted_outer=offseted_o,
-                          offseted_inner=offseted_i, sliced=sliced,
-                          ctx=context)
+    cA, gA = gen_gpuarray(shp, dtype, order=order, offseted_inner=offseted_i,
+                          sliced=sliced, ctx=context)
     if trans:
         shpX = (shp[0],)
         shpY = (shp[1],)
     else:
         shpX = (shp[1],)
         shpY = (shp[0],)
-    cX, gX = gen_gpuarray(shpX, dtype, offseted_outer=offseted_o,
-                          offseted_inner=offseted_i, sliced=sliced,
-                          ctx=context)
+    cX, gX = gen_gpuarray(shpX, dtype, offseted_inner=offseted_i,
+                          sliced=sliced, ctx=context)
     if init_y:
         cY, gY = gen_gpuarray(shpY, dtype, ctx=context)
     else:
@@ -55,27 +54,30 @@ def gemv(shp, dtype, order, trans, offseted_i, offseted_o, sliced,
 
     numpy.testing.assert_allclose(cr, numpy.asarray(gr), rtol=1e-6)
 
+
 def test_gemm():
-    for m, n, k in [(48, 15, 32)]:#, (48, 32, 15), (15, 48, 32), (15, 32, 48),
-#                    (32, 48, 15), (32, 15, 48)]:
-        for dtype in ['float32']:#, 'float64']:
-            for order in [('f', 'f', 'f'), ('c', 'c', 'c'), ('f', 'f', 'c'),
-                          ('f', 'c', 'f'), ('f', 'c', 'c'), ('c', 'f', 'f')]:
-#                          ('c', 'f', 'c'), ('c', 'c', 'f')]:
-                for trans in [(False, False)]:#, (False, True), (True, False),
-#                              (True, True)]:
-                    for offseted_o in [False]:#, True]:
-                        for offseted_i in [False]:#, True]:
-                            for sliced in [1]:#, 2, -1, -2]:
-                                for overwrite in [True]:#, False]:
-                                    for init_res in [True]:#, False]:
-                                        yield gemm, m, n, k, dtype, order, \
-                                            trans, offseted_i, offseted_o, \
-                                            sliced, overwrite, init_res
+    for m, n, k in [(48, 15, 32), (15, 32, 48)]:
+        for order in [('f', 'f', 'f'), ('c', 'c', 'c'),
+                      ('f', 'f', 'c'), ('f', 'c', 'f'),
+                      ('f', 'c', 'c'), ('c', 'f', 'f'),
+                      ('c', 'f', 'c'), ('c', 'c', 'f')]:
+            for trans in [(False, False), (True, True),
+                          (False, True), (True, False)]:
+                for offseted_o in [False, True]:
+                    yield gemm, m, n, k, 'float32', order, trans, \
+                        offseted_o, 1, False, False
+    for sliced in [1, 2, -1, -2]:
+        for overwrite in [True, False]:
+            for init_res in [True, False]:
+                yield gemm, 4, 3, 2, 'float32', ('f', 'f', 'f'), \
+                    (False, False), False, sliced, overwrite, init_res
+    yield gemm, 32, 32, 32, 'float64', ('f', 'f', 'f'), (False, False), \
+        False, 1, False, False
+
 
 @guard_devsup
-def gemm(m, n, k, dtype, order, trans, offseted_i, offseted_o,
-         sliced, overwrite, init_res):
+def gemm(m, n, k, dtype, order, trans, offseted_o, sliced, overwrite,
+         init_res):
     if trans[0]:
         shpA = (k,m)
     else:
@@ -85,12 +87,12 @@ def gemm(m, n, k, dtype, order, trans, offseted_i, offseted_o,
     else:
         shpB = (k,n)
 
-    cA, gA = gen_gpuarray(shpA, dtype, order=order[0], offseted_outer=offseted_o,
-                          offseted_inner=offseted_i, sliced=sliced,
-                          ctx=context)
-    cB, gB = gen_gpuarray(shpB, dtype, order=order[1], offseted_outer=offseted_o,
-                          offseted_inner=offseted_i, sliced=sliced,
-                          ctx=context)
+    cA, gA = gen_gpuarray(shpA, dtype, order=order[0],
+                          offseted_outer=offseted_o,
+                          sliced=sliced, ctx=context)
+    cB, gB = gen_gpuarray(shpB, dtype, order=order[1],
+                          offseted_outer=offseted_o,
+                          sliced=sliced, ctx=context)
     if init_res:
         cC, gC = gen_gpuarray((m,n), dtype, order=order[2], ctx=context)
     else:
