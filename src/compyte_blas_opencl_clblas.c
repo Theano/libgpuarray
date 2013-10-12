@@ -58,52 +58,35 @@ static void teardown(void *c) {
     clblasTeardown();
 }
 
-static int sgemv(const cb_order order,
-                 const cb_transpose transA,
-                 const size_t M,
-                 const size_t N,
-                 const float alpha,
-                 gpudata *A,
-                 const size_t offA,
-                 const size_t lda,
-                 gpudata *X,
-                 const size_t offX,
-                 const int incX,
-                 const float beta,
-                 gpudata *Y,
-                 const size_t offY,
-                 const int incY) {
-  clblasStatus err;
-  cl_uint num_ev = 0;
-  cl_event evl[3];
-  cl_event ev;
-  if (A->ev != NULL)
-    evl[num_ev++] = A->ev;
-  if (X->ev != NULL)
-    evl[num_ev++] = X->ev;
-  if (Y->ev != NULL)
-    evl[num_ev++] = Y->ev;
-  err = clblasSgemv(convO(order), convT(transA), M, N, alpha, A->buf, offA,
-                    lda, X->buf, offX, incX, beta, Y->buf, offY, incY,
-                    1, &A->ctx->q, num_ev, num_ev == 0 ? NULL : evl, &ev);
-  if (err != clblasSuccess)
-    return GA_BLAS_ERROR;
-  if (A->ev != NULL)
-    clReleaseEvent(A->ev);
-  A->ev = ev;
-  clRetainEvent(ev);
-  if (X->ev != NULL)
-    clReleaseEvent(X->ev);
-  X->ev = ev;
-  clRetainEvent(ev);
-  if (Y->ev != NULL)
-    clReleaseEvent(Y->ev);
-  Y->ev = ev;
-  return GA_NO_ERROR;
-}
+#define NAME clblas
 
-COMPYTE_LOCAL const compyte_blas_ops clblas_ops = {
-  setup,
-  teardown,
-  sgemv,
-};
+#define FETCH_CONTEXT(A) cl_ctx *ctx = (A)->ctx
+#define FUNC_DECLS    \
+  clblasStatus err;   \
+  cl_uint num_ev = 0; \
+  cl_event evl[3];    \
+  cl_event ev
+
+#define ARRAY_INIT(A)                           \
+  if (A->ev != NULL)                            \
+    evl[num_ev++] = A->ev
+
+#define ARRAY_FINI(A)                           \
+  if (A->ev != NULL)                            \
+    clReleaseEvent(A->ev);                      \
+  A->ev = ev;                                   \
+  clRetainEvent(A->ev)
+
+#define PRE_CALL err =
+#define PREFIX(typec, TYPEC) clblas ## TYPEC
+#define TRANS(tr) convT(tr)
+#define ARRAY(A, dtype) A->buf, off ## A
+#define TRAIL_ARGS , 1, &ctx->q, num_ev, num_ev == 0 ? NULL : evl, &ev
+
+#define POST_CALL                               \
+  if (err != clblasSuccess)                     \
+    return GA_BLAS_ERROR
+
+#define ORDER convO(order),
+
+#include "generic_blas.inc.c"
