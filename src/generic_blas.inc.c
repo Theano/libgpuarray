@@ -11,6 +11,12 @@
 #ifndef HANDLE_ORDER_GEMV
 #define HANDLE_ORDER_GEMV
 #endif
+#ifndef PREP_ORDER_GEMM
+#define PREP_ORDER_GEMM
+#endif
+#ifndef HANDLE_ORDER_GEMM
+#define HANDLE_ORDER_GEMM
+#endif
 #else
 #define ORDER
 #endif
@@ -47,7 +53,7 @@
 #define __GLUE_INT(part1, part2) part1 ## part2
 
 #define GEMV(dtype, typec, TYPEC)			    \
-  static int typec ## gemv(const cb_order order, const cb_transpose transA, const size_t M, const size_t N, const dtype alpha, gpudata *A, const size_t offA, const size_t lda, gpudata *X, const size_t offX, const int incX, const dtype beta, gpudata *Y, const size_t offY, const int incY) { \
+  static int typec ## gemv(cb_order order, cb_transpose transA, size_t M, size_t N, dtype alpha, gpudata *A, size_t offA, size_t lda, gpudata *X, size_t offX, int incX, dtype beta, gpudata *Y, size_t offY, int incY) { \
     FETCH_CONTEXT(A);			    \
     FUNC_DECLS;							    \
     PREP_ORDER_GEMV;		                    \
@@ -72,10 +78,38 @@
 
 GEMV(float, s, S)
 GEMV(double, d, D)
+#define GEMM(dtype, typec, TYPEC)			    \
+  static int typec ## gemm(cb_order order, cb_transpose transA, cb_transpose transB, size_t M, size_t N, size_t K, dtype alpha, gpudata *A, size_t offA, size_t lda, gpudata *B, size_t offB, size_t ldb, dtype beta, gpudata *C, size_t offC, size_t ldc) { \
+    FETCH_CONTEXT(A);			    \
+    FUNC_DECLS;							    \
+    PREP_ORDER_GEMM;		                    \
+								    \
+    HANDLE_ORDER_GEMM;	                            \
+    FUNC_INIT;							    \
+								    \
+    ARRAY_INIT(A);					    \
+    ARRAY_INIT(B);					    \
+    ARRAY_INIT(C);					    \
+								    \
+    PRE_CALL __GLUE(PREFIX(typec, TYPEC), gemm)(INIT_ARGS ORDER TRANS(transA), TRANS(transB), SZ(M), SZ(N), SZ(K), SCAL(alpha), ARRAY(A, dtype), SZ(lda), ARRAY(B, dtype), SZ(ldb), SCAL(beta), ARRAY(C, dtype), SZ(ldc) TRAIL_ARGS); \
+    POST_CALL;							    \
+								    \
+    ARRAY_FINI(A);					    \
+    ARRAY_FINI(B);					    \
+    ARRAY_FINI(C);					    \
+    FUNC_FINI;							    \
+								    \
+    return GA_NO_ERROR;						    \
+  }
+
+GEMM(float, s, S)
+GEMM(double, d, D)
 
 COMPYTE_LOCAL compyte_blas_ops __GLUE(NAME, _ops) = {
   setup,
   teardown,
   sgemv,
   dgemv,
+  sgemm,
+  dgemm,
 };

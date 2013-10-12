@@ -12,20 +12,33 @@ cdef extern from "compyte/buffer_blas.h":
         cb_conj_trans
 
 cdef extern from "compyte/blas.h":
-    int GpuArray_rgemv(const cb_transpose transA, const double alpha, _GpuArray *A, _GpuArray *X, const double beta, _GpuArray *Y,
+    int GpuArray_rgemv(cb_transpose transA, double alpha, _GpuArray *A, _GpuArray *X, double beta, _GpuArray *Y,
+                             int nocopy)
+    int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha, _GpuArray *A, _GpuArray *B, double beta, _GpuArray *C,
                              int nocopy)
 
-cdef blas_rgemv(const cb_transpose transA, const double alpha, GpuArray A, GpuArray X, const double beta, GpuArray Y,
+cdef blas_rgemv(cb_transpose transA, double alpha, GpuArray A, GpuArray X, double beta, GpuArray Y,
                       bint nocopy):
     cdef int err
     err = GpuArray_rgemv(transA, alpha, &A.ga, &X.ga, beta, &Y.ga, nocopy);
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&A.ga, err), err)
 
-cdef api GpuArray pygpu_blas_rgemv(const cb_transpose transA, const double alpha, GpuArray A, GpuArray X, const double beta, GpuArray Y):
+cdef api GpuArray pygpu_blas_rgemv(cb_transpose transA, double alpha, GpuArray A, GpuArray X, double beta, GpuArray Y):
     blas_rgemv(transA, alpha, A, X, beta, Y, 0)
 
     return Y
+cdef blas_rgemm(cb_transpose transA, cb_transpose transB, double alpha, GpuArray A, GpuArray B, double beta, GpuArray C,
+                      bint nocopy):
+    cdef int err
+    err = GpuArray_rgemm(transA, transB, alpha, &A.ga, &B.ga, beta, &C.ga, nocopy);
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(GpuArray_error(&A.ga, err), err)
+
+cdef api GpuArray pygpu_blas_rgemm(cb_transpose transA, cb_transpose transB, double alpha, GpuArray A, GpuArray B, double beta, GpuArray C):
+    blas_rgemm(transA, transB, alpha, A, B, beta, C, 0)
+
+    return C
 
 def gemv(double alpha, GpuArray A, GpuArray X, double beta=0.0, GpuArray Y=None, trans_a=False, overwrite_y=False):
     cdef cb_transpose transA
@@ -53,3 +66,40 @@ def gemv(double alpha, GpuArray A, GpuArray X, double beta=0.0, GpuArray Y=None,
     if not overwrite_y:
         Y = pygpu_copy(Y, GA_ANY_ORDER)
     return pygpu_blas_rgemv(transA, alpha, A, X, beta, Y)
+def gemm(double alpha, GpuArray A, GpuArray B, double beta, GpuArray C=None, trans_a=False, trans_b=False, overwrite_c=False):
+    cdef cb_transpose transA
+    cdef cb_transpose transB
+    cdef size_t[2] Cshp
+
+    if trans_a:
+        transA = cb_trans
+    else:
+        transA = cb_no_trans
+    if trans_b:
+        transB = cb_trans
+    else:
+        transB = cb_no_trans
+
+    
+    if A.ga.nd != 2:
+        raise TypeError, "A is not a matrix"
+    if B.ga.nd != 2:
+        raise TypeError, "B is not a matrix"
+    if transA == cb_no_trans:
+        Cshp[0] = A.ga.dimensions[0]
+    else:
+        Cshp[0] = A.ga.dimensions[1]
+    if transB == cb_no_trans:
+        Cshp[1] = B.ga.dimensions[1]
+    else:
+        Cshp[1] = B.ga.dimensions[0]
+    if C is None:
+        if beta != 0.0:
+            raise ValueError, "C not provided and beta != 0"
+        C = pygpu_empty(2, Cshp, A.ga.typecode, GA_ANY_ORDER, A.context, None)
+        overwrite_c = True
+
+
+    if not overwrite_c:
+        C = pygpu_copy(C, GA_ANY_ORDER)
+    return pygpu_blas_rgemm(transA, transB, alpha, A, B, beta, C)

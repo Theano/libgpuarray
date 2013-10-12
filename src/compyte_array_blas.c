@@ -6,7 +6,7 @@
 #include "compyte/util.h"
 #include "compyte/error.h"
 
-int GpuArray_rgemv(const cb_transpose transA, const double alpha, GpuArray *A, GpuArray *X, const double beta, GpuArray *Y,
+int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A, GpuArray *X, double beta, GpuArray *Y,
                          int nocopy) {
   GpuArray *Ap = A;
   GpuArray copyA;
@@ -16,8 +16,7 @@ int GpuArray_rgemv(const cb_transpose transA, const double alpha, GpuArray *A, G
   compyte_blas_ops *blas;
   void *ctx;
   size_t elsize;
-  size_t m, n, k;
-  size_t lda;
+  size_t m, n, lda;
   cb_order o;
   int err;
 
@@ -76,6 +75,7 @@ int GpuArray_rgemv(const cb_transpose transA, const double alpha, GpuArray *A, G
     goto cleanup;
   }
 
+  
   if (Ap->flags & GA_F_CONTIGUOUS) {
     o = cb_fortran;
     lda = Ap->dimensions[0];
@@ -87,6 +87,7 @@ int GpuArray_rgemv(const cb_transpose transA, const double alpha, GpuArray *A, G
     err = GA_VALUE_ERROR;
     goto cleanup;
   }
+
 
   err = Ap->ops->property(NULL, Ap->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
   if (err != GA_NO_ERROR)
@@ -109,5 +110,157 @@ int GpuArray_rgemv(const cb_transpose transA, const double alpha, GpuArray *A, G
     GpuArray_clear(&copyA);
   if (Xp == &copyX)
     GpuArray_clear(&copyX);
+  return err;
+}
+int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha, GpuArray *A, GpuArray *B, double beta, GpuArray *C,
+                         int nocopy) {
+  GpuArray *Ap = A;
+  GpuArray copyA;
+  GpuArray *Bp = B;
+  GpuArray copyB;
+  GpuArray *Cp = C;
+  compyte_blas_ops *blas;
+  void *ctx;
+  size_t elsize;
+  size_t m, n, k, lda, ldb, ldc;
+  cb_order o;
+  int err;
+
+
+  if (A->typecode != GA_FLOAT && A->typecode != GA_DOUBLE)
+    return GA_INVALID_ERROR;
+
+
+  if (A->nd != 2||B->nd != 2||C->nd != 2 ||
+      A->typecode != A->typecode||B->typecode != A->typecode||C->typecode != A->typecode)
+    return GA_VALUE_ERROR;
+
+  if (!(A->flags & GA_ALIGNED)||!(B->flags & GA_ALIGNED)||!(C->flags & GA_ALIGNED))
+    return GA_UNALIGNED_ERROR;
+
+  
+  if (transA == cb_no_trans) {
+    m = A->dimensions[0];
+    k = A->dimensions[1];
+  } else {
+    m = A->dimensions[1];
+    k = A->dimensions[0];
+  }
+
+  if (transB == cb_no_trans) {
+    n = B->dimensions[1];
+    if (B->dimensions[0] != k)
+      return GA_VALUE_ERROR;
+  } else {
+    n = B->dimensions[0];
+    if (B->dimensions[1] != k)
+      return GA_VALUE_ERROR;
+  }
+
+  if (C->dimensions[0] != m || C->dimensions[1] != n)
+    return GA_VALUE_ERROR;
+
+
+  elsize = compyte_get_elsize(A->typecode);
+
+  if (!GpuArray_ISONESEGMENT(A)) {
+    if (nocopy)
+      return GA_COPY_ERROR;
+    else {
+      err = GpuArray_copy(&copyA, A, GA_F_ORDER);
+      if (err != GA_NO_ERROR)
+	goto cleanup;
+      Ap = &copyA;
+    }
+  }
+  if (!GpuArray_ISONESEGMENT(B)) {
+    if (nocopy)
+      return GA_COPY_ERROR;
+    else {
+      err = GpuArray_copy(&copyB, B, GA_F_ORDER);
+      if (err != GA_NO_ERROR)
+	goto cleanup;
+      Bp = &copyB;
+    }
+  }
+  if (!GpuArray_ISONESEGMENT(C)) {
+    err = GA_VALUE_ERROR;
+    goto cleanup;
+  }
+
+  
+  if (Cp->flags & GA_F_CONTIGUOUS) {
+    o = cb_fortran;
+    ldc = Cp->dimensions[0];
+  } else if (Cp->flags & GA_C_CONTIGUOUS) {
+    o = cb_c;
+    ldc = Cp->dimensions[1];
+  } else {
+    err = GA_VALUE_ERROR;
+    goto cleanup;
+  }
+  if (Ap->flags & GA_F_CONTIGUOUS) {
+    lda = Ap->dimensions[0];
+    if (o == cb_c) {
+      if (transA == cb_no_trans)
+        transA = cb_trans;
+      else
+        transA = cb_no_trans;
+    }
+  } else if (Ap->flags & GA_C_CONTIGUOUS) {
+    lda = Ap->dimensions[1];
+    if (o == cb_fortran) {
+      if (transA == cb_no_trans)
+        transA = cb_trans;
+      else
+        transA = cb_no_trans;
+    }
+  } else {
+    err = GA_VALUE_ERROR;
+    goto cleanup;
+  }
+  if (Bp->flags & GA_F_CONTIGUOUS) {
+    ldb = Bp->dimensions[0];
+    if (o == cb_c) {
+      if (transB == cb_no_trans)
+        transB = cb_trans;
+      else
+        transB = cb_no_trans;
+    }
+  } else if (Bp->flags & GA_C_CONTIGUOUS) {
+    ldb = Bp->dimensions[1];
+    if (o == cb_fortran) {
+      if (transB == cb_no_trans)
+        transB = cb_trans;
+      else
+        transB = cb_no_trans;
+    }
+  } else {
+    err = GA_VALUE_ERROR;
+    goto cleanup;
+  }
+
+
+  err = Ap->ops->property(NULL, Ap->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
+  if (err != GA_NO_ERROR)
+    goto cleanup;
+  err = Ap->ops->property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas);
+  if (err != GA_NO_ERROR)
+    goto cleanup;
+
+  err = blas->setup(ctx);
+  if (err != GA_NO_ERROR)
+    goto cleanup;
+
+  if (Ap->typecode == GA_FLOAT)
+    err = blas->sgemm(o, transA, transB, m, n, k, (float)alpha, Ap->data, Ap->offset / elsize, lda, Bp->data, Bp->offset / elsize, ldb, (float)beta, Cp->data, Cp->offset / elsize, ldc);
+  else
+    err = blas->dgemm(o, transA, transB, m, n, k, (double)alpha, Ap->data, Ap->offset / elsize, lda, Bp->data, Bp->offset / elsize, ldb, (double)beta, Cp->data, Cp->offset / elsize, ldc);
+
+ cleanup:
+  if (Ap == &copyA)
+    GpuArray_clear(&copyA);
+  if (Bp == &copyB)
+    GpuArray_clear(&copyB);
   return err;
 }

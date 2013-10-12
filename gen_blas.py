@@ -3,10 +3,26 @@ import sys
 from mako import exceptions
 from mako.template import Template
 
-TYPE_TO_CHARS = dict(float='s', double='d')
+def make_ops():
+    return [
+        BlasOp('gemv', (float, double),
+               [trans('transA'), size('M'), size('N'), scalar('alpha'),
+                matrix('A'), size('lda'), vector('X'), inc('incX'),
+                scalar('beta', pydef='0.0'), vector('Y', output=True),
+                inc('incY')],
+               check_dims=check_dims_gemv, setup_order=setup_order_gemv,
+               py_decls=py_decls_gemv, py_ensure_output=py_ensure_output_gemv),
+        BlasOp('gemm', (float, double),
+               [trans('transA'), trans('transB'), size('M'), size('N'),
+                size('K'), scalar('alpha'), matrix('A'), size('lda'),
+                matrix('B'), size('ldb'), scalar('beta'),
+                matrix('C', output=True), size('ldc')],
+               check_dims=check_dims_gemm, setup_order=setup_order_gemm,
+               py_decls=py_decls_gemm, py_ensure_output=py_ensure_output_gemm)
+        ]
 
 class Argument(object):
-    def __init__(self, name, const=True, pydef=None):
+    def __init__(self, name, const=False, pydef=None):
         self.name = name
         self.const = const
         self.pydef = pydef
@@ -93,7 +109,7 @@ class ArrayArg(Argument):
         return arraypat % (self.name,)
 
     def format_as_arg(self, ctype):
-        return 'gpudata *' + self.name + ', const size_t off' + self.name
+        return 'gpudata *' + self.name + ', size_t off' + self.name
 
     def format_as_call(self):
         return 'ARRAY(' + self.name + ', dtype)'
@@ -115,12 +131,13 @@ class vector(ArrayArg):
     pass
 
 class BlasOp(object):
-    def __init__(self, name, types, arguments, check_dims, py_decls,
-                 py_ensure_output):
+    def __init__(self, name, types, arguments, check_dims, setup_order,
+                 py_decls, py_ensure_output):
         self.name = name
         self.types = types
         self.arguments = arguments
         self.check_dims = check_dims
+        self.setup_order = setup_order
         self.py_decls = py_decls
         self.py_ensure_output = py_ensure_output
         self.has_order = any(arg.ismatrix() for arg in self.arguments)
@@ -130,6 +147,9 @@ class BlasOp(object):
 
     def array_args(self):
         return [arg for arg in self.arguments if arg.isarray()]
+
+    def size_args(self):
+        return self.args_per_class(size)
 
     def simple_args(self):
         return [arg for arg in self.arguments if (arg.isarray() or type(arg) is scalar or type(arg) is trans)]
@@ -143,7 +163,7 @@ class BlasOp(object):
     def format_arguments(self, ctype):
         order = ''
         if self.has_order:
-            order = 'const cb_order order, '
+            order = 'cb_order order, '
         return order + ', '.join(arg.format_as_arg(ctype) for arg in self.arguments)
     def format_blas_args(self, ctype):
         return ', '.join(arg.format_as_callarg(ctype) for arg in self.arguments)
@@ -189,6 +209,20 @@ check_dims_gemv = """
   n = A->dimensions[1];
 """
 
+setup_order_gemv = """
+  if (Ap->flags & GA_F_CONTIGUOUS) {
+    o = cb_fortran;
+    lda = Ap->dimensions[0];
+  } else if (Ap->flags & GA_C_CONTIGUOUS) {
+    o = cb_c;
+    lda = Ap->dimensions[1];
+  } else {
+    /* Might be worth looking at making degenerate matrices (1xn) work here. */
+    err = GA_VALUE_ERROR;
+    goto cleanup;
+  }
+"""
+
 py_decls_gemv = "cdef size_t Yshp"
 
 py_ensure_output_gemv = """
@@ -228,6 +262,59 @@ check_dims_gemm = """
     return GA_VALUE_ERROR;
 """
 
+setup_order_gemm = """
+  if (Cp->flags & GA_F_CONTIGUOUS) {
+    o = cb_fortran;
+    ldc = Cp->dimensions[0];
+  } else if (Cp->flags & GA_C_CONTIGUOUS) {
+    o = cb_c;
+    ldc = Cp->dimensions[1];
+  } else {
+    err = GA_VALUE_ERROR;
+    goto cleanup;
+  }
+  if (Ap->flags & GA_F_CONTIGUOUS) {
+    lda = Ap->dimensions[0];
+    if (o == cb_c) {
+      if (transA == cb_no_trans)
+        transA = cb_trans;
+      else
+        transA = cb_no_trans;
+    }
+  } else if (Ap->flags & GA_C_CONTIGUOUS) {
+    lda = Ap->dimensions[1];
+    if (o == cb_fortran) {
+      if (transA == cb_no_trans)
+        transA = cb_trans;
+      else
+        transA = cb_no_trans;
+    }
+  } else {
+    err = GA_VALUE_ERROR;
+    goto cleanup;
+  }
+  if (Bp->flags & GA_F_CONTIGUOUS) {
+    ldb = Bp->dimensions[0];
+    if (o == cb_c) {
+      if (transB == cb_no_trans)
+        transB = cb_trans;
+      else
+        transB = cb_no_trans;
+    }
+  } else if (Bp->flags & GA_C_CONTIGUOUS) {
+    ldb = Bp->dimensions[1];
+    if (o == cb_fortran) {
+      if (transB == cb_no_trans)
+        transB = cb_trans;
+      else
+        transB = cb_no_trans;
+    }
+  } else {
+    err = GA_VALUE_ERROR;
+    goto cleanup;
+  }
+"""
+
 py_decls_gemm = "cdef size_t[2] Cshp"
 
 py_ensure_output_gemm = """
@@ -242,23 +329,13 @@ py_ensure_output_gemm = """
     if transB == cb_no_trans:
         Cshp[1] = B.ga.dimensions[1]
     else:
-        Cshp[0] = B.ga.dimensions[0]
+        Cshp[1] = B.ga.dimensions[0]
     if C is None:
         if beta != 0.0:
             raise ValueError, "C not provided and beta != 0"
         C = pygpu_empty(2, Cshp, A.ga.typecode, GA_ANY_ORDER, A.context, None)
         overwrite_c = True
 """
-
-OPS = [
-    BlasOp('gemv', (float, double),
-           [trans('transA'), size('M'), size('N'), scalar('alpha'),
-            matrix('A'), size('lda'), vector('X'), inc('incX'),
-            scalar('beta', pydef='0.0'), vector('Y', output=True),
-            inc('incY')],
-           check_dims=check_dims_gemv, py_decls=py_decls_gemv,
-           py_ensure_output=py_ensure_output_gemv)
-]
 
 # having two (or three) layers of backslash-interpreting can be pretty
 # confusing if you want to output a backslash.  Add to that mako's
@@ -441,10 +518,7 @@ int GpuArray_r${op.name}(${op.format_simple_args('double', 'GpuArray *')},
   compyte_blas_ops *blas;
   void *ctx;
   size_t elsize;
-  size_t m, n, k;
- % for m in op.matrix_args():
-  size_t ld${m.name.lower()};
- % endfor
+  size_t ${', '.join(a.name.lower() for a in op.size_args())};
   cb_order o;
   int err;
 <% firsta = op.array_args()[0].name %>
@@ -512,19 +586,7 @@ def aligncond(a):
  % endif
 % endfor
 
-% for m in op.matrix_args():
-  if (${m.name}p->flags & GA_F_CONTIGUOUS) {
-    o = cb_fortran;
-    ld${m.name.lower()} = ${m.name}p->dimensions[0];
-  } else if (${m.name}p->flags & GA_C_CONTIGUOUS) {
-    o = cb_c;
-    ld${m.name.lower()} = ${m.name}p->dimensions[1];
-  } else {
-    /* Might be worth looking at making degenerate matrices (1xn) work here. */
-    err = GA_VALUE_ERROR;
-    goto cleanup;
-  }
-% endfor
+  ${op.setup_order}
 
   err = ${firsta}p->ops->property(NULL, ${firsta}p->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
   if (err != GA_NO_ERROR)
@@ -614,11 +676,17 @@ def ${op.name}(${op.format_pyargs()}):
 
     ${op.py_ensure_output}
 
-    if not overwrite_y:
-        Y = pygpu_copy(Y, GA_ANY_ORDER)
+ % for a in op.array_args():
+  % if a.isoutput:
+    if not overwrite_${a.name.lower()}:
+        ${a.name} = pygpu_copy(${a.name}, GA_ANY_ORDER)
+  % endif
+ % endfor
     return pygpu_blas_r${op.name}(${op.format_simple_call('%s')})
 % endfor
 """)
+
+OPS=make_ops()
 
 try:
     generic = GENERIC_TMPL.render(ops=OPS, bs=BS)

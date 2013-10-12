@@ -66,35 +66,42 @@ static void teardown(void *c) {
 
 #define FETCH_CONTEXT(A) cuda_context *ctx = (A)->ctx
 #define FUNC_DECLS cublasStatus_t err
-#define PREP_ORDER_GEMV				\
-  cb_transpose rtransA = transA;		\
-  size_t rN = N, rM = M, rlda = lda
+#define PREP_ORDER_GEMV size_t t
 
 #define HANDLE_ORDER_GEMV			       \
   if (order == cb_c) {				       \
-    rM = N;					       \
-    rN = M;					       \
+    t = N;					       \
+    N = M;					       \
+    M = t;					       \
     if (transA == cb_no_trans) {		       \
-      rtransA = cb_trans;			       \
+      transA = cb_trans;			       \
     } else {					       \
-      rtransA = cb_no_trans;			       \
+      transA = cb_no_trans;			       \
     }						       \
   }
 
-#define PREP_ORDER_GEMM						\
-  cb_transpose rtransA = transA, rtransB = transB;		\
-  size_t rM = M, rN = N, rK = K, rlda = lda, rldb = ldb;	\
-  gpudata *tmp;
+#define PREP_ORDER_GEMM							\
+  size_t t;								\
+  gpudata *T;								\
+  cb_transpose transT
 
-#define HANDLE_ORDER_GEMM \
-  if (order == cb_c) {	  \
-    tmp = A;		  \
-    A = B;		  \
-    B = tmp;		  \
-    rN = M;		  \
-    rM = N;		  \
-    rlda = ldb;		  \
-    rldb = lda;		  \
+#define HANDLE_ORDER_GEMM			       \
+  if (order == cb_c) {				       \
+    t = N;					       \
+    N = M;					       \
+    M = t;					       \
+    T = A;					       \
+    A = B;					       \
+    B = T;					       \
+    t = lda;					       \
+    lda = ldb;					       \
+    ldb = t;					       \
+    transT = transA;				       \
+    transA = transB;				       \
+    transB = transT;				       \
+    t = offA;					       \
+    offA = offB;				       \
+    offB = t;					       \
   }
 
 #define FUNC_INIT		\
@@ -108,13 +115,14 @@ static void teardown(void *c) {
     cuda_exit(ctx);				  \
     return GA_IMPL_ERROR;			  \
   }
+
 #define ARRAY_FINI(A) cuEventRecord(A->ev, ctx->s)
 
 #define PRE_CALL err =
 #define PREFIX(typec, TYPEC) cublas ## TYPEC
 #define INIT_ARGS ctx->blas_handle,
-#define TRANS(tr) convT(r ## tr)
-#define SZ(s) r ## s
+#define TRANS(tr) convT(tr)
+#define SZ(s) s
 #define SCAL(s) &s
 #define ARRAY(A, dtype) ((dtype *)A->ptr) + off ## A
 
