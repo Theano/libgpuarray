@@ -555,7 +555,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
   cl_mem_flags fl;
   int r, res = GA_IMPL_ERROR;
 
-  unsigned char val = (unsigned)data;
+  unsigned char val = (unsigned char)data;
   cl_uint pattern = (cl_uint)val & (cl_uint)val >> 8 & \
     (cl_uint)val >> 16 & (cl_uint)val >> 24;
 

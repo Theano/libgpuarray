@@ -7,6 +7,10 @@
 
 #include <compyte/buffer.h>
 
+#ifdef _MSC_VER
+#define inline
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
