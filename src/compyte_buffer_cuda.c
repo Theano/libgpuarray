@@ -579,21 +579,21 @@ static void *call_compiler_impl(const char *src, size_t len, int *ret) {
 
     /* This block executes nvcc on the written-out file */
 #ifdef DEBUG
-#define NVCC_ARGS "nvcc", "-g", "-G", "-arch", arch_arg, "-x", "cu", \
+#define NVCC_ARGS NVCC_BIN, "-g", "-G", "-arch", arch_arg, "-x", "cu", \
       "--cubin", namebuf, "-o", outbuf
 #else
-#define NVCC_ARGS "nvcc", "-arch", arch_arg, "-x", "cu", \
+#define NVCC_ARGS NVCC_BIN, "-arch", arch_arg, "-x", "cu", \
       "--cubin", namebuf, "-o", outbuf
 #endif
 #ifdef _WIN32
-    sys_err = _spawnlp(_P_WAIT, NVCC_BIN, NVCC_ARGS, NULL);
+    sys_err = _spawnl(_P_WAIT, NVCC_BIN, NVCC_ARGS, NULL);
     unlink(namebuf);
     if (sys_err == -1) FAIL(NULL, GA_SYS_ERROR);
     if (sys_err != 0) FAIL(NULL, GA_RUN_ERROR);
 #else
     p = fork();
     if (p == 0) {
-        execlp(NVCC_BIN, NVCC_ARGS, NULL);
+        execl(NVCC_BIN, NVCC_ARGS, NULL);
         exit(1);
     }
     if (p == -1) {
