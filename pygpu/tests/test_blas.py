@@ -14,7 +14,7 @@ except ImportError, e:
 import pygpu.blas as gblas
 
 def test_gemv():
-    for shape in [(100, 128), (128, 100)]:
+    for shape in [(100, 128), (128, 50)]:
         for order in ['f', 'c']:
             for trans in [False, True]:
                 for offseted_i in [True, False]:
