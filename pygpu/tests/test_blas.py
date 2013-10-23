@@ -26,11 +26,16 @@ def test_gemv():
             yield gemv, (4, 3), 'float32', 'f', False, False, 1, \
                 overwrite, init_y
     yield gemv, (32, 32), 'float64', 'f', False, False, 1, True, False
+    for alpha in [0, 1, -1, 0.6]:
+        for beta in [0, 1, -1, 0.6]:
+            for overwite in [True, False]:
+                yield gemv, (32, 32), 'float32', 'f', False, False, 1, \
+                    overwrite, True, alpha, beta
 
 
 @guard_devsup
 def gemv(shp, dtype, order, trans, offseted_i, sliced,
-          overwrite, init_y):
+          overwrite, init_y, alpha=1.0, beta=0.0):
     cA, gA = gen_gpuarray(shp, dtype, order=order, offseted_inner=offseted_i,
                           sliced=sliced, ctx=context)
     if trans:
@@ -47,10 +52,13 @@ def gemv(shp, dtype, order, trans, offseted_i, sliced,
         cY, gY = None, None
 
     if dtype == 'float32':
-        cr = fblas.sgemv(1, cA, cX, 0, cY, trans=trans, overwrite_y=overwrite)
+        cr = fblas.sgemv(alpha, cA, cX, beta, cY, trans=trans,
+                         overwrite_y=overwrite)
     else:
-        cr = fblas.dgemv(1, cA, cX, 0, cY, trans=trans, overwrite_y=overwrite)
-    gr = gblas.gemv(1, gA, gX, 0, gY, trans_a=trans, overwrite_y=overwrite)
+        cr = fblas.dgemv(alpha, cA, cX, beta, cY, trans=trans,
+                         overwrite_y=overwrite)
+    gr = gblas.gemv(alpha, gA, gX, beta, gY, trans_a=trans,
+                    overwrite_y=overwrite)
 
     numpy.testing.assert_allclose(cr, numpy.asarray(gr), rtol=1e-6)
 
@@ -73,11 +81,15 @@ def test_gemm():
                     (False, False), False, sliced, overwrite, init_res
     yield gemm, 32, 32, 32, 'float64', ('f', 'f', 'f'), (False, False), \
         False, 1, False, False
-
+    for alpha in [0, 1, -1, 0.6]:
+        for beta in [0, 1, -1, 0.6]:
+            for overwrite in [True, False]:
+                yield gemm, 32, 23, 32, 'float32', ('f', 'f', 'f'), \
+                    (False, False), False, 1, overwrite, True, alpha, beta
 
 @guard_devsup
 def gemm(m, n, k, dtype, order, trans, offseted_o, sliced, overwrite,
-         init_res):
+         init_res, alpha=1.0, beta=0.0):
     if trans[0]:
         shpA = (k,m)
     else:
@@ -99,12 +111,12 @@ def gemm(m, n, k, dtype, order, trans, offseted_o, sliced, overwrite,
         cC, gC = None, None
 
     if dtype == 'float32':
-        cr = fblas.sgemm(1, cA, cB, 0, cC, trans_a=trans[0], trans_b=trans[1],
-                         overwrite_c=overwrite)
+        cr = fblas.sgemm(alpha, cA, cB, beta, cC, trans_a=trans[0],
+                         trans_b=trans[1], overwrite_c=overwrite)
     else:
-        cr = fblas.dgemm(1, cA, cB, 0, cC, trans_a=trans[0], trans_b=trans[1],
-                         overwrite_c=overwrite)
-    gr = gblas.gemm(1, gA, gB, 0, gC, trans_a=trans[0], trans_b=trans[1],
-                    overwrite_c=overwrite)
+        cr = fblas.dgemm(alpha, cA, cB, beta, cC, trans_a=trans[0],
+                         trans_b=trans[1], overwrite_c=overwrite)
+    gr = gblas.gemm(alpha, gA, gB, beta, gC, trans_a=trans[0],
+                    trans_b=trans[1], overwrite_c=overwrite)
 
     numpy.testing.assert_allclose(cr, numpy.asarray(gr), rtol=1e-6)
