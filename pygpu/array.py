@@ -193,6 +193,8 @@ class gpuarray(array.GpuArray):
             return self.copy()
         if self.dtype.kind == 'f':
             oper = "res[i] = fabs(a[i])"
+        elif self.dtype.itemsize < 4:
+            oper = "res[i] = abs((int)a[i])"
         else:
             oper = "res[i] = abs(a[i])"
         return elemwise1(self, None, oper=oper)
