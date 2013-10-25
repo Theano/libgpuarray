@@ -194,6 +194,7 @@ class gpuarray(array.GpuArray):
         if self.dtype.kind == 'f':
             oper = "res[i] = fabs(a[i])"
         elif self.dtype.itemsize < 4:
+            # cuda 5.5 finds the c++ stdlib definition if we don't cast here.
             oper = "res[i] = abs((int)a[i])"
         else:
             oper = "res[i] = abs(a[i])"
