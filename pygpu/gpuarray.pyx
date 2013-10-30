@@ -306,8 +306,8 @@ cdef int array_sync(GpuArray a) except -1:
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
-cdef int array_index(GpuArray r, GpuArray a, ssize_t *starts, ssize_t *stops,
-                     ssize_t *steps) except -1:
+cdef int array_index(GpuArray r, GpuArray a, const ssize_t *starts, const ssize_t *stops,
+                     const ssize_t *steps) except -1:
     cdef int err
     err = GpuArray_index(&r.ga, &a.ga, starts, stops, steps)
     if err != GA_NO_ERROR:
@@ -328,7 +328,7 @@ cdef int array_reshape(GpuArray res, GpuArray a, unsigned int nd,
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
 cdef int array_transpose(GpuArray res, GpuArray a,
-                         unsigned int *new_axes) except -1:
+                         const unsigned int *new_axes) except -1:
     cdef int err
     err = GpuArray_transpose(&res.ga, &a.ga, new_axes)
     if err != GA_NO_ERROR:
