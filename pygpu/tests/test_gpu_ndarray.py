@@ -346,10 +346,17 @@ def copy_view(shp, dtype, offseted, order1, order2):
 
 def test_shape():
     for shps in [((), (1,)), ((5,), (1, 5)), ((5,), (5, 1)), ((2, 3), (6,)),
-                 ((6,), (2, 3)), ((1,), ())]:
+                 ((6,), (2, 3)), ((1,), ()),
+                 ((4,), (-1,)), ((4, 3), (-1,)),
+                 ((4, 3), (-1, 3)), ((4, 3), (4, -1)), ((4, 3), (3, -1)),
+                 ((4, 3), (12, -1)), ((4, 3), (-1, 12)),
+                 ((5, 4, 3, 2), (2, -1, 12)),
+                 # ((4, 3), (13, -1)),
+    ]:
         for offseted in [True, False]:
             for order1 in ['c', 'f']:
-                yield shape_, shps, offseted, order1
+                if not -1 in shps[1]:
+                    yield shape_, shps, offseted, order1
                 for order2 in ['a', 'c', 'f']:
                     yield reshape, shps, offseted, order1, order2
 
@@ -362,7 +369,9 @@ def shape_(shps, offseted, order):
         # If numpy says it can't be done, we don't try to test it
         return
     ag.shape = shps[1]
-    assert ac.strides == ag.strides
+    assert ac.strides == ag.strides, (ac.strides, ag.strides)
+    # np.allclose don't test shapes
+    assert ac.shape == ag.shape, (ac.shape, ag.shape)
     assert numpy.allclose(ac, numpy.asarray(ag))
 
 

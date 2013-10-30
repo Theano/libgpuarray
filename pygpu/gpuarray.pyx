@@ -306,8 +306,8 @@ cdef int array_sync(GpuArray a) except -1:
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
-cdef int array_index(GpuArray r, GpuArray a, ssize_t *starts, ssize_t *stops,
-                     ssize_t *steps) except -1:
+cdef int array_index(GpuArray r, GpuArray a, const ssize_t *starts, const ssize_t *stops,
+                     const ssize_t *steps) except -1:
     cdef int err
     err = GpuArray_index(&r.ga, &a.ga, starts, stops, steps)
     if err != GA_NO_ERROR:
@@ -328,7 +328,7 @@ cdef int array_reshape(GpuArray res, GpuArray a, unsigned int nd,
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
 cdef int array_transpose(GpuArray res, GpuArray a,
-                         unsigned int *new_axes) except -1:
+                         const unsigned int *new_axes) except -1:
     cdef int err
     err = GpuArray_transpose(&res.ga, &a.ga, new_axes)
     if err != GA_NO_ERROR:
@@ -1177,11 +1177,37 @@ cdef GpuArray pygpu_index(GpuArray a, const ssize_t *starts,
     return res
 
 cdef GpuArray pygpu_reshape(GpuArray a, unsigned int nd, const size_t *newdims,
-                            ga_order ord, bint nocopy):
+                            ga_order ord, bint nocopy, int compute_axis):
     cdef GpuArray res
     res = new_GpuArray(type(a), a.context, a.base)
-    array_reshape(res, a, nd, newdims, ord, nocopy)
+    if compute_axis < 0:
+        array_reshape(res, a, nd, newdims, ord, nocopy)
+        return res
+    if compute_axis >= nd:
+        raise ValueError("You wanted us to compute the shape of a dimensions that don't exist")
+
+    cdef size_t *cdims
+    cdef size_t tot = 1
+    for i in range(nd):
+        d = newdims[i]
+        if d != compute_axis:
+            tot *= d
+    cdims = <size_t *>calloc(nd, sizeof(size_t))
+    if cdims == NULL:
+        raise MemoryError, "could not allocate cdims"
+
+    for i in range(nd):
+        d = newdims[i]
+        if i == compute_axis:
+            d = a.size // tot
+
+            if d * tot != a.size:
+                raise GpuArrayException("...")
+        cdims[i] = d
+
+    array_reshape(res, a, nd, cdims, ord, nocopy)
     return res
+
 
 cdef GpuArray pygpu_transpose(GpuArray a, const unsigned int *newaxes):
     cdef GpuArray res
@@ -1365,10 +1391,18 @@ cdef class GpuArray:
         cdef unsigned int i
         nd = <unsigned int>len(shape)
         newdims = <size_t *>calloc(nd, sizeof(size_t))
+        if newdims == NULL:
+            raise MemoryError, "calloc"
+        compute_axis = -1
         try:
             for i in range(nd):
-                newdims[i] = shape[i]
-            return pygpu_reshape(self, nd, newdims, to_ga_order(order), 0)
+                if shape[i] == -1:
+                    assert compute_axis == -1
+                    compute_axis = i
+                    newdims[i] = 1
+                else:
+                    newdims[i] = shape[i]
+            return pygpu_reshape(self, nd, newdims, to_ga_order(order), 0, compute_axis)
         finally:
             free(newdims)
 
@@ -1483,6 +1517,7 @@ cdef class GpuArray:
             return tuple(res)
 
         def __set__(self, newshape):
+            # We support -1 only in a call to reshape
             cdef size_t *newdims
             cdef unsigned int nd
             cdef unsigned int i
