@@ -228,7 +228,11 @@ class ReductionKernel(object):
                 raise TypeError("Out array is not of expected type "
                                 "(expected %s %s, got %s %s)" % (
                         out_shape, self.dtype_out, out.shape, out.dtype))
-        k, ls = self._get_basic_kernel(n, nd)
+        #Don't compile and cache for nothing for big size
+        if self.init_local_size < n:
+            k, ls = self._get_basic_kernel(self.init_local_size, nd)
+        else:
+            k, ls = self._get_basic_kernel(n, nd)
 
         kargs = [numpy.asarray(n, dtype='uint32'), out]
         kargs.extend(numpy.asarray(d, dtype='uint32') for d in dims)
