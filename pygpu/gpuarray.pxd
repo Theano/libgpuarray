@@ -254,7 +254,7 @@ cdef api GpuArray pygpu_index(GpuArray a, const ssize_t *starts,
 
 cdef api GpuArray pygpu_reshape(GpuArray a, unsigned int nd,
                                 const size_t *newdims, ga_order ord,
-                                bint nocopy)
+                                bint nocopy, int compute_axis)
 cdef api GpuArray pygpu_transpose(GpuArray a, const unsigned int *newaxes)
 
 cdef api class GpuContext [type PyGpuContextType, object PyGpuContextObject]:
