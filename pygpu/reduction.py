@@ -109,7 +109,12 @@ KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} out
 
 class ReductionKernel(object):
     def __init__(self, context, dtype_out, neutral, reduce_expr, redux,
-                 map_expr=None, arguments=None, preamble=""):
+                 map_expr=None, arguments=None, preamble="", init_nd=None):
+        """
+        :param init_nd: used to pre compile the reduction code for
+            this value of nd and the self.init_local_size value.
+
+        """
         self.context = context
         self.neutral = neutral
         self.redux = tuple(redux)
@@ -141,7 +146,7 @@ class ReductionKernel(object):
             raise ValueError("ReductionKernel can only be used with "
                              "functions that have at least one vector "
                              "argument.")
-        
+
         have_small = False
         have_double = False
         have_complex = False
@@ -160,6 +165,8 @@ class ReductionKernel(object):
         self.init_local_size = min(context.lmemsize //
                                    self.out_arg.dtype.itemsize,
                                    context.maxlsize)
+        if init_nd is not None:
+            k, ls = self._get_basic_kernel(self.init_local_size, init_nd)
 
     def _find_kernel_ls(self, tmpl, max_ls, *tmpl_args):
         local_size = min(self.init_local_size, max_ls)
