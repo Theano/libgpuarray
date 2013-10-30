@@ -164,6 +164,9 @@ cdef extern from "compyte/extension.h":
     void *compyte_get_extension(const char *) nogil
     cdef int COMPYTE_CUDA_CTX_NOFREE
 
+# If you change the api interface, you MUST increment either the minor
+# (if you add a function) or the major version (if you change
+# arguments or remove a function) in the gpuarray.pyx file.
 cdef api np.dtype typecode_to_dtype(int typecode)
 cdef api int get_typecode(dtype) except -1
 cpdef int dtype_to_typecode(dtype) except -1

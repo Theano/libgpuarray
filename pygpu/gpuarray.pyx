@@ -7,6 +7,10 @@ cimport numpy as np
 from cpython cimport Py_INCREF, PyNumber_Index
 from cpython.object cimport Py_EQ, Py_NE
 
+def api_version():
+    # major, minor
+    return (0, 0)
+
 np.import_array()
 
 # Numpy API steals dtype references and this breaks cython
