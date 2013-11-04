@@ -472,6 +472,16 @@ typedef struct _compyte_buffer_ops {
  */
 #define GA_BUFFER_PROP_REFCNT 513
 
+/**
+ * Size of the buffer on the device.
+ *
+ * This may be larger than the requested allocation size due to a
+ * number of factors.
+ *
+ * Type: `size_t`
+ */
+#define GA_BUFFER_PROP_SIZE  514
+
 /* Start at 1024 for GA_KERNEL_PROP_ */
 /**
  * Get the context for which this kernel was compiled.

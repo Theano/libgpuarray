@@ -1163,6 +1163,15 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;
     return GA_NO_ERROR;
+
+  case GA_BUFFER_PROP_SIZE:
+    ctx->err = clGetMemObjectInfo(buf->buf, CL_MEM_SIZE, sizeof(sz), &sz,
+                                  NULL);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+    *((size_t *)res) = sz;
+    return GA_NO_ERROR;
+
   /* GA_BUFFER_PROP_CTX is not ordered to simplify code */
   case GA_BUFFER_PROP_CTX:
   case GA_KERNEL_PROP_CTX:

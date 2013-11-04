@@ -1371,6 +1371,10 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((unsigned int *)res) = buf->refcnt;
     return GA_NO_ERROR;
 
+  case GA_BUFFER_PROP_SIZE:
+    *((size_t *)res) = buf->sz;
+    return GA_NO_ERROR;
+
   case GA_BUFFER_PROP_CTX:
   case GA_KERNEL_PROP_CTX:
     *((void **)res) = (void *)ctx;
