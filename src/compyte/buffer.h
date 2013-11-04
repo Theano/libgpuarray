@@ -364,7 +364,30 @@ typedef struct _compyte_buffer_ops {
                         const ssize_t *b_str);
 
   /**
-   * Returns a property.
+   * Efficiently transfer the contents of a buffer to a new context.
+   *
+   * Both the buffer and the new context must come from the same
+   * backend.
+   *
+   * If there is no way to do an efficient transfer within the
+   * provided constraints, then this function may return NULL
+   * indicating to the caller that it should fallback to some other
+   * means of performing the transfer.
+   *
+   * \param src buffer to transfer from
+   * \param offset start of the region transfer
+   * \param sz size of the region to transfer
+   * \param dst_ctx context for the result buffer
+   * \param may_share indicate if the buffers may share data backing
+   *
+   * \returns the new buffer in dst_ctx or NULL if no efficient way to
+   *          transfer could be found.
+   */
+  gpudata *(*buffer_transfer)(gpudata *src, size_t offset, size_t sz,
+                              void *dst_ctx, int may_share);
+
+  /**
+   * Fetch a property.
    *
    * Can be used to get a property of a context, a buffer or a kernel.
    * The element corresponding to the property category must be given
@@ -573,6 +596,20 @@ COMPYTE_PUBLIC const char *Gpu_error(const compyte_buffer_ops *o, void *ctx,
  * \returns the operation vector or NULL if the backend name is unrecognized.
  */
 COMPYTE_PUBLIC const compyte_buffer_ops *compyte_get_ops(const char *name);
+
+/**
+ * Transfer a buffer from one context to another.
+ *
+ * This function will try to use an efficient method if one is
+ * available and fallback to going through host memory if nothing else
+ * can be done.
+ */
+COMPYTE_PUBLIC gpudata *compyte_buffer_transfer(gpudata *buf, size_t offset,
+                                             size_t sz, void *src_ctx,
+                                             const compyte_buffer_ops *src_ops,
+                                             void *dst_ctx,
+                                             const compyte_buffer_ops *dst_ops,
+                                             int may_share, int *ret);
 
 #ifdef __cplusplus
 }

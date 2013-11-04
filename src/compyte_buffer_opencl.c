@@ -907,6 +907,21 @@ static int cl_sync(gpudata *b) {
   return GA_NO_ERROR;
 }
 
+static gpudata *cl_transfer(gpudata *buf, size_t offset, size_t sz,
+                            void *dst_ctx, int may_share) {
+  cl_ctx *ctx = buf->ctx;
+
+  ASSERT_BUF(buf);
+  ASSERT_CTX(ctx);
+  ASSERT_CTX((cl_ctx *)dst_ctx);
+
+  if (ctx == dst_ctx && may_share && offset == 0) {
+    cl_retain(buf);
+    return buf;
+  }
+  return NULL;
+}
+
 static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
   "#define DTYPEB %s\n"
   "__kernel void elemk(__global const DTYPEA *a_data,"
@@ -1251,5 +1266,6 @@ const compyte_buffer_ops opencl_ops = {cl_init,
                                        cl_callkernel,
                                        cl_sync,
                                        cl_extcopy,
+                                       cl_transfer,
                                        cl_property,
                                        cl_error};

@@ -1231,6 +1231,20 @@ fail:
     return res;
 }
 
+static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
+                              void *dst_ctx, int may_share) {
+  cuda_context *ctx = src->ctx;
+
+  ASSERT_BUF(src);
+  ASSERT_CTX((cuda_context *)dst_ctx);
+
+  if (ctx == dst_ctx && may_share && offset == 0) {
+    cuda_retain(src);
+    return src;
+  }
+  return NULL;
+}
+
 #ifdef WITH_CUDA_CUBLAS
 extern compyte_blas_ops cublas_ops;
 #endif
@@ -1437,5 +1451,6 @@ const compyte_buffer_ops cuda_ops = {cuda_init,
                                      cuda_callkernel,
                                      cuda_sync,
                                      cuda_extcopy,
+                                     cuda_transfer,
                                      cuda_property,
                                      cuda_error};
