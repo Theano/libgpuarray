@@ -65,12 +65,14 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
     free(res);
     return NULL;
   }
+  TAG_CTX(res);
   return res;
 }
 
 static void cuda_free_ctx(cuda_context *ctx) {
   compyte_blas_ops *blas_ops;
 
+  ASSERT_CTX(ctx);
   ctx->refcnt--;
   if (ctx->refcnt == 0) {
     if (ctx->blas_handle != NULL) {
@@ -80,19 +82,23 @@ static void cuda_free_ctx(cuda_context *ctx) {
     cuStreamDestroy(ctx->s);
     if (!(ctx->flags & DONTFREE))
       cuCtxDestroy(ctx->ctx);
+    CLEAR(ctx);
     free(ctx);
   }
 }
 
 CUcontext cuda_get_ctx(void *ctx) {
+  ASSERT_CTX((cuda_context *)ctx);
   return ((cuda_context *)ctx)->ctx;
 }
 
 CUstream cuda_get_stream(void *ctx) {
+  ASSERT_CTX((cuda_context *)ctx);
   return ((cuda_context *)ctx)->s;
 }
 
 void cuda_enter(cuda_context *ctx) {
+  ASSERT_CTX(ctx);
   cuCtxGetCurrent(&ctx->old);
   if (ctx->old != ctx->ctx)
     ctx->err = cuCtxSetCurrent(ctx->ctx);
@@ -135,11 +141,12 @@ gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
 
     cuEventRecord(res->ev, ctx->s);
     cuda_exit(ctx);
+    TAG_BUF(res);
     return res;
 }
 
-CUdeviceptr cuda_get_ptr(gpudata *g) { return g->ptr; }
-size_t cuda_get_sz(gpudata *g) { return g->sz; }
+CUdeviceptr cuda_get_ptr(gpudata *g) { ASSERT_BUF(g); return g->ptr; }
+size_t cuda_get_sz(gpudata *g) { ASSERT_BUF(g); return g->sz; }
 
 #define FAIL(v, e) { if (ret) *ret = e; return v; }
 #define CHKFAIL(v) if (err != CUDA_SUCCESS) FAIL(v, GA_IMPL_ERROR)
@@ -347,11 +354,13 @@ static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
 }
 
 static void cuda_retain(gpudata *d) {
+  ASSERT_BUF(d);
   d->refcnt++;
 }
 
 static void cuda_free(gpudata *d) {
   /* We ignore errors on free */
+  ASSERT_BUF(d);
   d->refcnt--;
   if (d->refcnt == 0) {
     cuda_enter(d->ctx);
@@ -366,11 +375,14 @@ static void cuda_free(gpudata *d) {
     cuEventDestroy(d->ev);
     cuda_exit(d->ctx);
     cuda_free_ctx(d->ctx);
+    CLEAR(d);
     free(d);
   }
 }
 
 static int cuda_share(gpudata *a, gpudata *b, int *ret) {
+  ASSERT_BUF(a);
+  ASSERT_BUF(b);
   return (a->ctx == b->ctx && a->sz != 0 && b->sz != 0 &&
           ((a->ptr <= b->ptr && a->ptr + a->sz > b->ptr) ||
            (b->ptr <= a->ptr && b->ptr + b->sz > a->ptr)));
@@ -380,6 +392,8 @@ static int cuda_move(gpudata *dst, size_t dstoff, gpudata *src,
                      size_t srcoff, size_t sz) {
     cuda_context *ctx = dst->ctx;
     int res = GA_NO_ERROR;
+    ASSERT_BUF(dst);
+    ASSERT_BUF(src);
     if (src->ctx != dst->ctx) return GA_VALUE_ERROR;
 
     if (sz == 0) return GA_NO_ERROR;
@@ -417,6 +431,8 @@ static int cuda_move(gpudata *dst, size_t dstoff, gpudata *src,
 static int cuda_read(void *dst, gpudata *src, size_t srcoff, size_t sz) {
     cuda_context *ctx = src->ctx;
 
+    ASSERT_BUF(src);
+
     if (sz == 0) return GA_NO_ERROR;
 
     if ((src->sz - srcoff) < sz)
@@ -445,6 +461,8 @@ static int cuda_write(gpudata *dst, size_t dstoff, const void *src,
                       size_t sz) {
     cuda_context *ctx = dst->ctx;
 
+    ASSERT_BUF(dst);
+
     if (sz == 0) return GA_NO_ERROR;
 
     if ((dst->sz - dstoff) < sz)
@@ -471,6 +489,9 @@ static int cuda_write(gpudata *dst, size_t dstoff, const void *src,
 
 static int cuda_memset(gpudata *dst, size_t dstoff, int data) {
     cuda_context *ctx = dst->ctx;
+
+    ASSERT_BUF(dst);
+
     if ((dst->sz - dstoff) == 0) return GA_NO_ERROR;
 
     cuda_enter(ctx);
@@ -796,10 +817,12 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     res->ctx = ctx;
     ctx->refcnt++;
     cuda_exit(ctx);
+    TAG_KER(res);
     return res;
 }
 
 static void cuda_retainkernel(gpukernel *k) {
+  ASSERT_KER(k);
   k->refcnt++;
 }
 
@@ -807,6 +830,7 @@ static void cuda_freekernel(gpukernel *k) {
   /* We don't check for errors on free */
   unsigned int i;
 
+  ASSERT_KER(k);
   k->refcnt--;
   if (k->refcnt == 0) {
     cuda_enter(k->ctx);
@@ -818,6 +842,7 @@ static void cuda_freekernel(gpukernel *k) {
     cuModuleUnload(k->m);
     cuda_exit(k->ctx);
     cuda_free_ctx(k->ctx);
+    CLEAR(k);
     free(k);
   }
 }
@@ -827,6 +852,8 @@ static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
     void *tmp;
     gpudata *b;
     size_t sz;
+
+    ASSERT_KER(k);
     if (index >= NUM_ARGS) return GA_VALUE_ERROR;
 
     if (index >= k->argcount)
@@ -834,6 +861,7 @@ static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
 
     if (typecode == GA_BUFFER) {
         b = (gpudata *)val;
+        ASSERT_BUF(b);
         if (k->ctx != b->ctx)
             return GA_VALUE_ERROR;
         if (k->bs[index] != NULL)
@@ -869,6 +897,7 @@ static int cuda_callkernel(gpukernel *k, size_t bs, size_t gs) {
     size_t align, sz;
 #endif
 
+    ASSERT_KER(k);
     cuda_enter(ctx);
     if (ctx->err != CUDA_SUCCESS)
       return GA_IMPL_ERROR;
@@ -934,6 +963,7 @@ static int cuda_callkernel(gpukernel *k, size_t bs, size_t gs) {
 static int cuda_sync(gpudata *b) {
   cuda_context *ctx = (cuda_context *)b->ctx;
 
+  ASSERT_BUF(b);
   cuda_enter(ctx);
   if (ctx->err != CUDA_SUCCESS)
     return GA_IMPL_ERROR;
@@ -1104,6 +1134,8 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
     const char *rmod;
     const char *arch;
 
+    ASSERT_BUF(input);
+    ASSERT_BUF(output);
     if (input->ctx != output->ctx)
       return GA_INVALID_ERROR;
 
@@ -1224,9 +1256,11 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
   } else if (prop_id < 1024) {
     if (buf == NULL)
       return GA_VALUE_ERROR;
+    ASSERT_BUF(buf);
   } else {
     if (k == NULL)
       return GA_VALUE_ERROR;
+    ASSERT_KER(k);
   }
 
   cuda_enter(ctx);
@@ -1237,6 +1271,7 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     char *s;
     CUdevice id;
     int i;
+
   case GA_CTX_PROP_DEVNAME:
     ctx->err = cuCtxGetDevice(&id);
     if (ctx->err != CUDA_SUCCESS) {
@@ -1257,6 +1292,7 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((char **)res) = s;
     cuda_exit(ctx);
     return GA_NO_ERROR;
+
   case GA_CTX_PROP_MAXLSIZE:
     ctx->err = cuCtxGetDevice(&id);
     if (ctx->err != CUDA_SUCCESS) {
@@ -1272,6 +1308,7 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((size_t *)res) = i;
     cuda_exit(ctx);
     return GA_NO_ERROR;
+
   case GA_CTX_PROP_LMEMSIZE:
     ctx->err = cuCtxGetDevice(&id);
     if (ctx->err != CUDA_SUCCESS) {
@@ -1287,6 +1324,7 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((size_t *)res) = i;
     cuda_exit(ctx);
     return GA_NO_ERROR;
+
   case GA_CTX_PROP_NUMPROCS:
     ctx->err = cuCtxGetDevice(&id);
     if (ctx->err != CUDA_SUCCESS) {
@@ -1303,6 +1341,7 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((unsigned int *)res) = i;
     cuda_exit(ctx);
     return GA_NO_ERROR;
+
   case GA_CTX_PROP_MAXGSIZE:
     ctx->err = cuCtxGetDevice(&id);
     if (ctx->err != CUDA_SUCCESS) {
@@ -1318,6 +1357,7 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((size_t *)res) = i;
     cuda_exit(ctx);
     return GA_NO_ERROR;
+
   case GA_CTX_PROP_BLAS_OPS:
 #ifdef WITH_CUDA_CUBLAS
     *((compyte_blas_ops **)res) = &cublas_ops;
@@ -1326,13 +1366,16 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((void **)res) = NULL;
     return GA_DEVSUP_ERROR;
 #endif
+
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;
     return GA_NO_ERROR;
+
   case GA_BUFFER_PROP_CTX:
   case GA_KERNEL_PROP_CTX:
     *((void **)res) = (void *)ctx;
     return GA_NO_ERROR;
+
   case GA_KERNEL_PROP_MAXLSIZE:
     ctx->err = cuFuncGetAttribute(&i,
                                   CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK,
@@ -1342,6 +1385,7 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
       return GA_IMPL_ERROR;
     *((size_t *)res) = i;
     return GA_NO_ERROR;
+
   case GA_KERNEL_PROP_PREFLSIZE:
     ctx->err = cuCtxGetDevice(&id);
     if (ctx->err != CUDA_SUCCESS) {
@@ -1356,6 +1400,7 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((size_t *)res) = i;
     cuda_exit(ctx);
     return GA_NO_ERROR;
+
   default:
     cuda_exit(ctx);
     return GA_INVALID_ERROR;

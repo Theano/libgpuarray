@@ -23,26 +23,6 @@ static cl_int err;
 #define FAIL(v, e) { if (ret) *ret = e; return v; }
 #define CHKFAIL(v) if (err != CL_SUCCESS) FAIL(v, GA_IMPL_ERROR)
 
-#ifdef DEBUG
-#define ASSERT_BUF(b) do {                              \
-    assert(b != NULL);                                  \
-    assert(b->refcnt != 0);                             \
-    assert(b->ctx != NULL);                             \
-    assert(b->buf != NULL);                             \
-    assert(b->ctx->refcnt != 0);                        \
-  } while(0)
-#define ASSERT_CTX(c) do {                      \
-    assert(c != NULL);                          \
-    assert(c->refcnt != 0);                     \
-    assert(c->ctx != NULL);                     \
-  } while(0)
-#define CLEAR(p) p = NULL
-#else
-#define ASSERT_BUF(b)
-#define ASSERT_CTX(c)
-#define CLEAR(p)
-#endif
-
 static int cl_property(void *c, gpudata *b, gpukernel *k, int p, void *r);
 
 static cl_device_id get_dev(cl_context ctx, int *ret) {
@@ -60,7 +40,7 @@ static cl_device_id get_dev(cl_context ctx, int *ret) {
   err = clGetContextInfo(ctx, CL_CONTEXT_DEVICES, sz, ids, NULL);
   res = ids[0];
   free(ids);
-  if (err != CL_SUCCESS) FAIL(NULL, GA_IMPL_ERROR);
+  CHKFAIL(NULL);
   return res;
 }
 
@@ -92,31 +72,34 @@ cl_ctx *cl_make_ctx(cl_context ctx) {
   }
 
   clRetainContext(res->ctx);
+  TAG_CTX(res);
   return res;
 }
 
 cl_context cl_get_ctx(void *ctx) {
+  ASSERT_CTX((cl_ctx *)ctx);
   return ((cl_ctx *)ctx)->ctx;
 }
 
 cl_command_queue cl_get_stream(void *ctx) {
+  ASSERT_CTX((cl_ctx *)ctx);
   return ((cl_ctx *)ctx)->q;
 }
 
 static void cl_free_ctx(cl_ctx *ctx) {
   compyte_blas_ops *blas_ops;
 
+  ASSERT_CTX(ctx);
   assert(ctx->refcnt != 0);
   ctx->refcnt--;
   if (ctx->refcnt == 0) {
+    CLEAR(ctx);
     if (ctx->blas_handle != NULL) {
       ctx->err = cl_property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas_ops);
       blas_ops->teardown(ctx);
     }
     clReleaseCommandQueue(ctx->q);
-    CLEAR(ctx->q);
     clReleaseContext(ctx->ctx);
-    CLEAR(ctx->ctx);
     free(ctx);
   }
 }
@@ -126,6 +109,7 @@ gpudata *cl_make_buf(void *c, cl_mem buf) {
   gpudata *res;
   cl_context buf_ctx;
 
+  ASSERT_CTX(ctx);
   ctx->err = clGetMemObjectInfo(buf, CL_MEM_CONTEXT, sizeof(buf_ctx),
                                 &buf_ctx, NULL);
   if (ctx->err != CL_SUCCESS) return NULL;
@@ -145,10 +129,11 @@ gpudata *cl_make_buf(void *c, cl_mem buf) {
   res->ctx = ctx;
   res->ctx->refcnt++;
 
+  TAG_BUF(res);
   return res;
 }
 
-cl_mem cl_get_buf(gpudata *g) { return g->buf; }
+cl_mem cl_get_buf(gpudata *g) { ASSERT_BUF(g); return g->buf; }
 
 #define PRAGMA "#pragma OPENCL EXTENSION "
 #define ENABLE " : enable\n"
@@ -347,17 +332,9 @@ static void *cl_init(int devno, int *ret) {
 }
 
 static void cl_deinit(void *c) {
+  ASSERT_CTX((cl_ctx *)c);
   cl_free_ctx((cl_ctx *)c);
 }
-
-#define GA_BUFFER_READ_WRITE 0x00 /* default */
-#define GA_BUFFER_DEV        0x00 /* also default */
-
-#define GA_BUFFER_READ_ONLY  0x01
-#define GA_BUFFER_WRITE_ONLY 0x02
-#define GA_BUFFER_INIT       0x04
-#define GA_BUFFER_HOST       0x08
-/*#define GA_BUFFER_USE_DATA   0x10*/
 
 static gpudata *cl_alloc(void *c, size_t size, void *data, int flags,
                          int *ret) {
@@ -406,6 +383,8 @@ static gpudata *cl_alloc(void *c, size_t size, void *data, int flags,
 
   res->ctx = ctx;
   ctx->refcnt++;
+
+  TAG_BUF(res);
   return res;
 }
 
@@ -418,12 +397,11 @@ static void cl_release(gpudata *b) {
   ASSERT_BUF(b);
   b->refcnt--;
   if (b->refcnt == 0) {
+    CLEAR(b);
     clReleaseMemObject(b->buf);
-    CLEAR(b->buf);
     if (b->ev != NULL)
       clReleaseEvent(b->ev);
     cl_free_ctx(b->ctx);
-    CLEAR(b->ctx);
     free(b);
   }
 }
@@ -433,6 +411,8 @@ static int cl_share(gpudata *a, gpudata *b, int *ret) {
   cl_ctx *ctx;
   cl_mem aa, bb;
 #endif
+  ASSERT_BUF(a);
+  ASSERT_BUF(b);
   if (a->buf == b->buf) return 1;
 #ifdef CL_VERSION_1_1
   if (a->ctx != b->ctx) return 0;
@@ -761,10 +741,12 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
     FAIL(NULL, GA_MEMORY_ERROR);
   }
 
+  TAG_KER(res);
   return res;
 }
 
 static void cl_retainkernel(gpukernel *k) {
+  ASSERT_KER(k);
   k->refcnt++;
 }
 
@@ -773,8 +755,11 @@ static void cl_releasekernel(gpukernel *k) {
   cl_uint num_args;
   cl_uint i;
 
+  ASSERT_KER(k);
+
   k->refcnt--;
   if (k->refcnt == 0) {
+    CLEAR(k);
     if (k->ev != NULL) {
       clWaitForEvents(1, &k->ev);
       clReleaseEvent(k->ev);
@@ -795,7 +780,6 @@ static void cl_releasekernel(gpukernel *k) {
     }
     if (k->k) clReleaseKernel(k->k);
     cl_free_ctx(k->ctx);
-    CLEAR(k->ctx);
     free(k);
   }
 }
@@ -804,6 +788,9 @@ static int cl_setkernelarg(gpukernel *k, unsigned int index, int typecode,
 			   const void *val) {
   size_t sz;
   gpudata *b;
+
+  ASSERT_KER(k);
+
   if (typecode == GA_BUFFER) {
     b = (gpudata *)val;
     ASSERT_BUF(b);
@@ -840,6 +827,7 @@ static int cl_callkernel(gpukernel *k, size_t ls, size_t gs) {
   cl_uint i;
   int res;
 
+  ASSERT_KER(k);
   ASSERT_CTX(ctx);
 
   dev = get_dev(ctx->ctx, &res);
@@ -968,7 +956,6 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
   if (ctx->err != CL_SUCCESS) return GA_IMPL_ERROR;
   if (fl & CL_MEM_READ_ONLY) return GA_READONLY_ERROR;
 
-
   nEls = 1;
   for (i = 0; i < a_nd; i++) {
     nEls *= a_dims[i];
@@ -1067,6 +1054,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
   } else {
     if (k == NULL)
       return GA_VALUE_ERROR;
+    ASSERT_KER(k);
   }
 
   switch (prop_id) {
@@ -1075,6 +1063,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     size_t *psz;
     cl_device_id id;
     cl_uint ui;
+
   case GA_CTX_PROP_DEVNAME:
     ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
                                 &id, NULL);
@@ -1093,6 +1082,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     }
     *((char **)res) = s;
     return GA_NO_ERROR;
+
   case GA_CTX_PROP_MAXLSIZE:
     ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
                                 &id, NULL);
@@ -1113,6 +1103,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((size_t *)res) = psz[0];
     free(psz);
     return GA_NO_ERROR;
+
   case GA_CTX_PROP_LMEMSIZE:
     ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
                                 &id, NULL);
@@ -1124,6 +1115,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
       return GA_IMPL_ERROR;
     *((size_t *)res) = sz;
     return GA_NO_ERROR;
+
   case GA_CTX_PROP_NUMPROCS:
     ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
                                 &id, NULL);
@@ -1135,6 +1127,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
       return GA_IMPL_ERROR;
     *((unsigned int *)res) = ui;
     return GA_NO_ERROR;
+
   case GA_CTX_PROP_MAXGSIZE:
     ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id), &id,
                                 NULL);
@@ -1157,6 +1150,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     }
     *((size_t *)res) = sz;
     return GA_NO_ERROR;
+
   case GA_CTX_PROP_BLAS_OPS:
 #ifdef WITH_OPENCL_CLBLAS
     *((compyte_blas_ops **)res) = &clblas_ops;
@@ -1165,6 +1159,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((void **)res) = NULL;
     return GA_DEVSUP_ERROR;
 #endif
+
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;
     return GA_NO_ERROR;
@@ -1173,6 +1168,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
   case GA_KERNEL_PROP_CTX:
     *((void **)res) = (void *)ctx;
     return GA_NO_ERROR;
+
   case GA_KERNEL_PROP_MAXLSIZE:
     ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
                                 &id, NULL);
@@ -1184,6 +1180,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
       return GA_IMPL_ERROR;
     *((size_t *)res) = sz;
     return GA_NO_ERROR;
+
   case GA_KERNEL_PROP_PREFLSIZE:
     ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
                                 &id, NULL);
@@ -1212,6 +1209,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 #endif
     *((size_t *)res) = sz;
     return GA_NO_ERROR;
+
   default:
     return GA_INVALID_ERROR;
   }
@@ -1219,10 +1217,10 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
 static const char *cl_error(void *c) {
   cl_ctx *ctx = (cl_ctx *)c;
-  ASSERT_CTX(ctx);
   if (ctx == NULL)
     return get_error_string(err);
   else
+    ASSERT_CTX(ctx);
     return get_error_string(ctx->err);
 }
 

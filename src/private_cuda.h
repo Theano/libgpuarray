@@ -11,9 +11,38 @@
 
 #include "compyte/buffer.h"
 
+#ifdef DEBUG
+#include <assert.h>
+
+#define CTX_TAG "cudactx "
+#define BUF_TAG "cudabuf "
+#define KER_TAG "cudakern"
+
+#define TAG_CTX(c) memcpy((c)->tag, CTX_TAG, 8)
+#define TAG_BUF(b) memcpy((b)->tag, BUF_TAG, 8)
+#define TAG_KER(k) memcpy((k)->tag, KER_TAG, 8)
+#define ASSERT_CTX(c) assert(memcmp((c)->tag, CTX_TAG, 8))
+#define ASSERT_BUF(b) assert(memcmp((b)->tag, BUF_TAG, 8))
+#define ASSERT_KER(k) assert(memcmp((k)->tag, KER_TAG, 8))
+#define CLEAR(o) memset((o)->tag, 0, 8);
+
+#else
+#define TAG_CTX(c)
+#define TAG_BUF(b)
+#define TAG_KER(k)
+#define ASSERT_CTX(c)
+#define ASSERT_BUF(b)
+#define ASSERT_KER(k)
+#define CLEAR(o)
+#endif
+
+
 #define DONTFREE 0x1000
 
 typedef struct _cuda_context {
+#ifdef DEBUG
+  char tag[8];
+#endif
   CUcontext ctx;
   CUcontext old;
   CUresult err;
@@ -30,6 +59,9 @@ COMPYTE_LOCAL void cuda_enter(cuda_context *ctx);
 COMPYTE_LOCAL void cuda_exit(cuda_context *ctx);
 
 struct _gpudata {
+#ifdef DEBUG
+  char tag[8];
+#endif
   CUdeviceptr ptr;
   CUevent ev;
   size_t sz;
@@ -46,6 +78,9 @@ COMPYTE_LOCAL size_t cuda_get_sz(gpudata *g);
 #define NUM_ARGS (256/sizeof(void*))
 
 struct _gpukernel {
+#ifdef DEBUG
+  char tag[8];
+#endif
   CUmodule m;
   CUfunction k;
   void *args[NUM_ARGS];
