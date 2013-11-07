@@ -479,6 +479,29 @@ COMPYTE_PUBLIC int GpuArray_copy(GpuArray *res, const GpuArray *a,
                                  ga_order order);
 
 /**
+ * Transfer an array to a different context.
+ *
+ * The device data is copied to the new device and an new GpuArray is
+ * allocated to refer to this new data.  If the `may_share` parameter
+ * is 1 the data on the new device may be a view of the old (but this
+ * might not be possible so you should not count on it).
+ *
+ * \param res result array
+ * \param a array to transfer
+ * \param new_ctx destination context
+ * \param new_ops ops vector for the destination context
+ * \param may_share indicate that the result array may share data with
+ *                  the source
+ *
+ * \return GA_NO_ERROR if the operation was succesful.
+ * \return an error code otherwise
+ */
+COMPYTE_PUBLIC int GpuArray_transfer(GpuArray *res, const GpuArray *a,
+                                     void *new_ctx,
+                                     compyte_buffer_ops *new_ops,
+                                     int may_share);
+
+/**
  * Get a description of the last error in the context of `a`.
  *
  * The description may reflect operations with other arrays in the

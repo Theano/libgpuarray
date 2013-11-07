@@ -17,6 +17,25 @@
 #include "compyte/error.h"
 #include "compyte/util.h"
 
+static void ga_boundaries(size_t *start, size_t *end, size_t offset,
+                          unsigned int nd, size_t *dims, ssize_t *strs) {
+  unsigned int i;
+  *start = offset;
+  *end = offset;
+
+  for (i = 0; i < nd; i++) {
+    if (dims[i] == 0) {
+      *start = *end = offset;
+      break;
+    }
+
+    if (strs[i] < 0)
+      *start += (dims[i] - 1) * strs[i];
+    else
+      *end += (dims[i] - 1) * strs[i];
+  }
+}
+
 /* Value below which a size_t multiplication will never overflow. */
 #define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
 
@@ -641,6 +660,25 @@ int GpuArray_copy(GpuArray *res, const GpuArray *a, ga_order order) {
   if (err != GA_NO_ERROR)
     GpuArray_clear(res);
   return err;
+}
+
+int GpuArray_transfer(GpuArray *res, const GpuArray *a, void *new_ctx,
+                      compyte_buffer_ops *new_ops, int may_share) {
+  size_t start, end;
+  gpudata *tmp;
+  int err;
+
+  ga_boundaries(&start, &end, a->offset, a->nd, a->dimensions, a->strides);
+  end += GpuArray_ITEMSIZE(a);
+
+  tmp = compyte_buffer_transfer(a->data, start, end - start,
+                                GpuArray_context(a), a->ops,
+                                new_ctx, new_ops, may_share, &err);
+  if (tmp == NULL)
+    return err;
+
+  return GpuArray_fromdata(res, new_ops, tmp, a->offset - start, a->typecode,
+                           a->nd, a->dimensions, a->strides, 1);
 }
 
 const char *GpuArray_error(const GpuArray *a, int err) {

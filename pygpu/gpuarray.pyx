@@ -9,7 +9,7 @@ from cpython.object cimport Py_EQ, Py_NE
 
 def api_version():
     # major, minor
-    return (0, 0)
+    return (0, 1)
 
 np.import_array()
 
@@ -378,6 +378,13 @@ cdef int array_memset(GpuArray a, int data) except -1:
 cdef int array_copy(GpuArray res, GpuArray a, ga_order order) except -1:
     cdef int err
     err = GpuArray_copy(&res.ga, &a.ga, order)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(GpuArray_error(&a.ga, err), err)
+
+cdef int array_transfer(GpuArray res, GpuArray a, void *new_ctx,
+                        compyte_buffer_ops *new_ops, bint may_share) except -1:
+    cdef int err
+    err = GpuArray_transfer(&res.ga, &a.ga, new_ctx, new_ops, may_share)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
@@ -1219,6 +1226,12 @@ cdef GpuArray pygpu_transpose(GpuArray a, const unsigned int *newaxes):
     array_transpose(res, a, newaxes)
     return res
 
+cdef GpuArray pygpu_transfer(GpuArray a, GpuContext new_ctx, bint may_share):
+    cdef GpuArray res
+    res = new_GpuArray(type(a), new_ctx, None)
+    array_transfer(res, a, new_ctx.ctx, new_ctx.ops, may_share)
+    return res
+
 cdef class GpuArray:
     """
     Device array
@@ -1315,6 +1328,9 @@ cdef class GpuArray:
         :type order: string
         """
         return pygpu_copy(self, to_ga_order(order))
+
+    def transfer(self, GpuContext new_ctx, share=False):
+        return pygpu_transfer(self, new_ctx, share)
 
     def __copy__(self):
         return pygpu_copy(self, GA_C_ORDER)

@@ -154,6 +154,9 @@ cdef extern from "compyte/array.h":
     int GpuArray_memset(_GpuArray *a, int data)
     int GpuArray_copy(_GpuArray *res, _GpuArray *a, ga_order order)
 
+    int GpuArray_transfer(_GpuArray *res, const _Gpuarray *a, void *new_ctx,
+                          compyte_buffer_ops *new_ops, int may_share)
+
     char *GpuArray_error(_GpuArray *a, int err)
 
     void GpuArray_fprintf(libc.stdio.FILE *fd, _GpuArray *a)
@@ -189,8 +192,8 @@ cdef int array_copy_from_host(GpuArray a, const compyte_buffer_ops *ops,
                               const ssize_t *strides) except -1
 cdef int array_view(GpuArray v, GpuArray a) except -1
 cdef int array_sync(GpuArray a) except -1
-cdef int array_index(GpuArray r, GpuArray a, const ssize_t *starts, const ssize_t *stops,
-                     const ssize_t *steps) except -1
+cdef int array_index(GpuArray r, GpuArray a, const ssize_t *starts,
+                     const ssize_t *stops, const ssize_t *steps) except -1
 cdef int array_setarray(GpuArray v, GpuArray a) except -1
 cdef int array_reshape(GpuArray res, GpuArray a, unsigned int nd,
                        const size_t *newdims, ga_order ord,
@@ -205,6 +208,8 @@ cdef int array_write(GpuArray a, void *src, size_t sz) except -1
 cdef int array_read(void *dst, size_t sz, GpuArray src) except -1
 cdef int array_memset(GpuArray a, int data) except -1
 cdef int array_copy(GpuArray res, GpuArray a, ga_order order) except -1
+cdef int array_transfer(GpuArray res, GpuArray a, void *new_ctx,
+                        compyte_buffer_ops *ops, bint may_share) except -1
 
 cdef const char *kernel_error(GpuKernel k, int err) except NULL
 cdef int kernel_init(GpuKernel k, const compyte_buffer_ops *ops, void *ctx,
@@ -259,6 +264,9 @@ cdef api GpuArray pygpu_reshape(GpuArray a, unsigned int nd,
                                 const size_t *newdims, ga_order ord,
                                 bint nocopy, int compute_axis)
 cdef api GpuArray pygpu_transpose(GpuArray a, const unsigned int *newaxes)
+
+cdef api GpuArray pygpu_transfer(GpuArray a, GpuContext new_ctx,
+                                 bint may_share)
 
 cdef api class GpuContext [type PyGpuContextType, object PyGpuContextObject]:
     cdef const compyte_buffer_ops *ops
