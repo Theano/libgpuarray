@@ -350,6 +350,7 @@ static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
 
     cuEventRecord(res->ev, ctx->s);
     cuda_exit(ctx);
+    TAG_BUF(res);
     return res;
 }
 
