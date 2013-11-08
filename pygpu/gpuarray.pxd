@@ -154,7 +154,7 @@ cdef extern from "compyte/array.h":
     int GpuArray_memset(_GpuArray *a, int data)
     int GpuArray_copy(_GpuArray *res, _GpuArray *a, ga_order order)
 
-    int GpuArray_transfer(_GpuArray *res, const _Gpuarray *a, void *new_ctx,
+    int GpuArray_transfer(_GpuArray *res, const _GpuArray *a, void *new_ctx,
                           compyte_buffer_ops *new_ops, int may_share)
 
     char *GpuArray_error(_GpuArray *a, int err)
