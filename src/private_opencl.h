@@ -19,9 +19,9 @@
 #define TAG_CTX(c) memcpy((c)->tag, CTX_TAG, 8)
 #define TAG_BUF(b) memcpy((b)->tag, BUF_TAG, 8)
 #define TAG_KER(k) memcpy((k)->tag, KER_TAG, 8)
-#define ASSERT_CTX(c) assert(memcmp((c)->tag, CTX_TAG, 8))
-#define ASSERT_BUF(b) assert(memcmp((b)->tag, BUF_TAG, 8))
-#define ASSERT_KER(k) assert(memcmp((k)->tag, KER_TAG, 8))
+#define ASSERT_CTX(c) assert(memcmp((c)->tag, CTX_TAG, 8) == 0)
+#define ASSERT_BUF(b) assert(memcmp((b)->tag, BUF_TAG, 8) == 0)
+#define ASSERT_KER(k) assert(memcmp((k)->tag, KER_TAG, 8) == 0)
 #define CLEAR(o) memset((o)->tag, 0, 8);
 
 #else
