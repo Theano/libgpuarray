@@ -378,7 +378,7 @@ typedef struct _compyte_buffer_ops {
    * \param offset start of the region transfer
    * \param sz size of the region to transfer
    * \param dst_ctx context for the result buffer
-   * \param may_share indicate if the buffers may share data backing
+   * \param may_share set to 1 to allow the returned buffer to be a view
    *
    * \returns the new buffer in dst_ctx or NULL if no efficient way to
    *          transfer could be found.

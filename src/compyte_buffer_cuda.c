@@ -1269,7 +1269,13 @@ static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
   dst = cuda_alloc(dst_ctx, sz, NULL, src->flags & (GA_BUFFER_READ_ONLY|
                                                     GA_BUFFER_WRITE_ONLY),
                    NULL);
+  if (dst == NULL)
+    return NULL;
   cuda_enter(ctx);
+  if (ctx->err != CUDA_SUCCESS) {
+    cuda_free(dst);
+    return NULL;
+  }
   cuStreamWaitEvent(ctx->s, src->ev, 0);
   ctx->err = cuMemcpyPeerAsync(dst->ptr, dst->ctx->ctx, src->ptr+offset,
 			       src->ctx->ctx, sz, ctx->s);

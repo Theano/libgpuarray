@@ -17,6 +17,19 @@
 #include "compyte/error.h"
 #include "compyte/util.h"
 
+/*
+ * Returns the boundaries of an array.
+ *
+ * This function works on virtual addresses where 0 is the start of
+ * the gpu buffer and `offset` is the address of the first (0, ..., 0)
+ * element of the array.  If you do not pass offset correctly, this
+ * function will most likely overflow and return garbage results.
+ *
+ * On exit `start` holds the lowest (virtual) address ever touched by
+ * the array and `end` holds the highest (virtual) address touched.
+ * If you want the size of the memory region (to copy the data) you
+ * need to add the size of one element to `end - start`.
+ */
 static void ga_boundaries(size_t *start, size_t *end, size_t offset,
                           unsigned int nd, size_t *dims, ssize_t *strs) {
   unsigned int i;
