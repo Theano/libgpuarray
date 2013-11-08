@@ -1235,13 +1235,56 @@ fail:
 static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
                               void *dst_ctx, int may_share) {
   cuda_context *ctx = src->ctx;
+  gpudata *dst;
 
   ASSERT_BUF(src);
   ASSERT_CTX((cuda_context *)dst_ctx);
 
-  if (ctx == dst_ctx && may_share && offset == 0) {
-    cuda_retain(src);
-    return src;
+  if (ctx == dst_ctx) {
+    if (may_share && offset == 0) {
+        cuda_retain(src);
+        return src;
+    }
+    dst = cuda_alloc(ctx, sz, NULL, src->flags & (GA_BUFFER_READ_ONLY|
+                                                  GA_BUFFER_WRITE_ONLY), NULL);
+    if (dst == NULL) return NULL;
+    cuda_enter(ctx);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_free(dst);
+      return NULL;
+    }
+    cuStreamWaitEvent(ctx->s, src->ev, 0);
+    ctx->err = cuMemcpyDtoDAsync(dst->ptr, src->ptr+offset, sz, ctx->s);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      cuda_free(dst);
+      return NULL;
+    }
+    cuEventRecord(src->ev, ctx->s);
+    cuEventRecord(dst->ev, ctx->s);
+    cuda_exit(ctx);
+    return dst;
+  }
+
+  dst = cuda_alloc(dst_ctx, sz, NULL, src->flags & (GA_BUFFER_READ_ONLY|
+                                                    GA_BUFFER_WRITE_ONLY),
+                   NULL);
+  cuda_enter(ctx);
+  cuStreamWaitEvent(ctx->s, src->ev, 0);
+  ctx->err = cuMemcpyPeerAsync(dst->ptr, dst->ctx->ctx, src->ptr+offset,
+			       src->ctx->ctx, sz, ctx->s);
+  if (ctx->err != CUDA_SUCCESS) {
+    cuda_free(dst);
+    cuda_exit(ctx);
+    return NULL;
+  }
+  cuEventRecord(src->ev, ctx->s);
+  cuStreamWaitEvent(dst->ctx->s, src->ev, 0);
+  cuEventRecord(dst->ev, dst->ctx->s);
+  cuda_exit(ctx);
+  if (ctx->err != CUDA_SUCCESS) {
+    cuda_free(dst);
+    return NULL;
   }
   return NULL;
 }
