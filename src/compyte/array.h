@@ -22,6 +22,9 @@ extern "C" {
  * Main array structure.
  */
 typedef struct _GpuArray {
+#ifdef DEBUG
+  char tag[8];
+#endif
   /**
    * Device data buffer.
    */
