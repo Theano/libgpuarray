@@ -17,23 +17,6 @@
 #include "compyte/error.h"
 #include "compyte/util.h"
 
-#ifdef DEBUG
-#include <assert.h>
-#define ARRAY_TAG "gpuarray"
-
-#define TAG_ARRAY(a) memcpy((a)->tag, ARRAY_TAG, 8)
-#define ASSERT_ARRAY(a) assert(memcmp((a)->tag, ARRAY_TAG, 8) == 0)
-#define ASSERT_NOTARRAY(a) assert(memcmp((a)->tag, ARRAY_TAG, 8) != 0)
-#define CLEAR(a) memset((a)->tag, 0, 8);
-
-#else
-#define TAG_ARRAY(a)
-#define ASSERT_ARRAY(a)
-#define ASSERT_NOTARRAY(a)
-#define CLEAR(a)
-
-#endif
-
 /*
  * Returns the boundaries of an array.
  *
@@ -76,8 +59,6 @@ int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
   unsigned int i;
   int res = GA_NO_ERROR;
 
-  ASSERT_NOTARRAY(a);
-
   if (ops == NULL)
     return GA_INVALID_ERROR;
 
@@ -106,7 +87,6 @@ int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
   a->strides = calloc(nd, sizeof(ssize_t));
   /* F/C distinction comes later */
   a->flags = GA_BEHAVED;
-  TAG_ARRAY(a);
   if (a->dimensions == NULL || a->strides == NULL) {
     GpuArray_clear(a);
     return GA_MEMORY_ERROR;
@@ -159,7 +139,6 @@ int GpuArray_fromdata(GpuArray *a, const compyte_buffer_ops *ops,
                       gpudata *data, size_t offset, int typecode,
                       unsigned int nd, const size_t *dims,
                       const ssize_t *strides, int writeable) {
-  ASSERT_NOTARRAY(a);
   if (compyte_get_type(typecode)->typecode != typecode)
     return GA_VALUE_ERROR;
   a->ops = ops;
@@ -172,7 +151,6 @@ int GpuArray_fromdata(GpuArray *a, const compyte_buffer_ops *ops,
   a->dimensions = calloc(nd, sizeof(size_t));
   a->strides = calloc(nd, sizeof(ssize_t));
   a->flags = (writeable ? GA_WRITEABLE : 0);
-  TAG_ARRAY(a);
   if (a->dimensions == NULL || a->strides == NULL) {
     GpuArray_clear(a);
     return GA_MEMORY_ERROR;
@@ -222,8 +200,6 @@ int GpuArray_copy_from_host(GpuArray *a, const compyte_buffer_ops *ops,
 }
 
 int GpuArray_view(GpuArray *v, const GpuArray *a) {
-  ASSERT_NOTARRAY(v);
-  ASSERT_ARRAY(a);
   v->ops = a->ops;
   v->data = a->data;
   v->ops->buffer_retain(a->data);
@@ -233,7 +209,6 @@ int GpuArray_view(GpuArray *v, const GpuArray *a) {
   v->flags = a->flags;
   v->dimensions = calloc(v->nd, sizeof(size_t));
   v->strides = calloc(v->nd, sizeof(ssize_t));
-  TAG_ARRAY(v);
   if (v->dimensions == NULL || v->strides == NULL) {
     GpuArray_clear(v);
     return GA_MEMORY_ERROR;
@@ -244,7 +219,6 @@ int GpuArray_view(GpuArray *v, const GpuArray *a) {
 }
 
 int GpuArray_sync(GpuArray *a) {
-  ASSERT_ARRAY(a);
   return a->ops->buffer_sync(a->data);
 }
 
@@ -255,8 +229,6 @@ int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
   size_t *newdims;
   ssize_t *newstrs;
   size_t new_offset = a->offset;
-
-  ASSERT_ARRAY(a);
 
   if ((starts == NULL) || (stops == NULL) || (steps == NULL))
     return GA_VALUE_ERROR;
@@ -339,9 +311,6 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
   unsigned int off;
   int err = GA_NO_ERROR;
   void *t;
-
-  ASSERT_ARRAY(a);
-  ASSERT_ARRAY(v);
 
   if (a->nd < v->nd)
     return GA_VALUE_ERROR;
@@ -433,8 +402,6 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
   unsigned int nk;
   unsigned int ok;
   unsigned int i;
-
-  ASSERT_ARRAY(a);
 
   if (ord == GA_ANY_ORDER && GpuArray_ISFORTRAN(a) && a->nd > 1)
     ord = GA_F_ORDER;
@@ -593,8 +560,6 @@ int GpuArray_transpose_inplace(GpuArray *a, const unsigned int *new_axes) {
   unsigned int j;
   unsigned int k;
 
-  ASSERT_ARRAY(a);
-
   newdims = calloc(a->nd, sizeof(size_t));
   newstrs = calloc(a->nd, sizeof(ssize_t));
   if (newdims == NULL || newstrs == NULL) {
@@ -635,18 +600,14 @@ int GpuArray_transpose_inplace(GpuArray *a, const unsigned int *new_axes) {
 }
 
 void GpuArray_clear(GpuArray *a) {
-  ASSERT_ARRAY(a);
   if (a->data)
     a->ops->buffer_release(a->data);
   free(a->dimensions);
   free(a->strides);
-  CLEAR(a); // This is redundent, but we might do away with the memset below
   memset(a, 0, sizeof(*a));
 }
 
 int GpuArray_share(const GpuArray *a, const GpuArray *b) {
-  ASSERT_ARRAY(a);
-  ASSERT_ARRAY(b);
   if (a->ops != b->ops || a->data != b->data) return 0;
   /* XXX: redefine buffer_share to mean: is it possible to share?
           and use offset to make sure */
@@ -655,7 +616,6 @@ int GpuArray_share(const GpuArray *a, const GpuArray *b) {
 
 void *GpuArray_context(const GpuArray *a) {
   void *res = NULL;
-  ASSERT_ARRAY(a);
   (void)a->ops->property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &res);
   return res;
 }
@@ -663,10 +623,6 @@ void *GpuArray_context(const GpuArray *a) {
 int GpuArray_move(GpuArray *dst, const GpuArray *src) {
   size_t sz;
   unsigned int i;
-
-  ASSERT_ARRAY(src);
-  ASSERT_ARRAY(dst);
-
   if (dst->ops != src->ops)
     return GA_INVALID_ERROR;
   if (!GpuArray_ISWRITEABLE(dst))
@@ -689,7 +645,6 @@ int GpuArray_move(GpuArray *dst, const GpuArray *src) {
 }
 
 int GpuArray_write(GpuArray *dst, const void *src, size_t src_sz) {
-  ASSERT_ARRAY(dst);
   if (!GpuArray_ISWRITEABLE(dst))
     return GA_VALUE_ERROR;
   if (!GpuArray_ISONESEGMENT(dst))
@@ -698,14 +653,12 @@ int GpuArray_write(GpuArray *dst, const void *src, size_t src_sz) {
 }
 
 int GpuArray_read(void *dst, size_t dst_sz, const GpuArray *src) {
-  ASSERT_ARRAY(src);
   if (!GpuArray_ISONESEGMENT(src))
     return GA_UNSUPPORTED_ERROR;
   return src->ops->buffer_read(dst, src->data, src->offset, dst_sz);
 }
 
 int GpuArray_memset(GpuArray *a, int data) {
-  ASSERT_ARRAY(a);
   if (!GpuArray_ISONESEGMENT(a))
     return GA_UNSUPPORTED_ERROR;
   return a->ops->buffer_memset(a->data, a->offset, data);
@@ -728,8 +681,6 @@ int GpuArray_transfer(GpuArray *res, const GpuArray *a, void *new_ctx,
   gpudata *tmp;
   int err;
 
-  ASSERT_ARRAY(a);
-
   ga_boundaries(&start, &end, a->offset, a->nd, a->dimensions, a->strides);
   end += GpuArray_ITEMSIZE(a);
 
@@ -746,9 +697,6 @@ int GpuArray_transfer(GpuArray *res, const GpuArray *a, void *new_ctx,
 const char *GpuArray_error(const GpuArray *a, int err) {
   void *ctx;
   int err2 = a->ops->property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
-
-  ASSERT_ARRAY(a);
-
   if (err2 != GA_NO_ERROR) {
     /* If CUDA refuses to work after any kind of error in kernels
        there is not much we can do about it. */
@@ -760,8 +708,6 @@ const char *GpuArray_error(const GpuArray *a, int err) {
 void GpuArray_fprintf(FILE *fd, const GpuArray *a) {
   unsigned int i;
   int comma = 0;
-
-  ASSERT_ARRAY(a);
 
   fprintf(fd, "GpuNdArray <%p, %p, %p> nd=%d\n", a, a->data, a->ops, a->nd);
   fprintf(fd, "\tdims: %p, str: %p\n", a->dimensions, a->strides);
@@ -793,8 +739,6 @@ void GpuArray_fprintf(FILE *fd, const GpuArray *a) {
 int GpuArray_is_c_contiguous(const GpuArray *a) {
   size_t size = GpuArray_ITEMSIZE(a);
   int i;
-
-  ASSERT_ARRAY(a);
   
   for (i = a->nd - 1; i >= 0; i--) {
     if (a->strides[i] != size) return 0;
@@ -808,8 +752,6 @@ int GpuArray_is_f_contiguous(const GpuArray *a) {
   size_t size = GpuArray_ITEMSIZE(a);
   unsigned int i;
 
-  ASSERT_ARRAY(a);
-
   for (i = 0; i < a->nd; i++) {
     if (a->strides[i] != size) return 0;
     // We suppose that overflow will not happen since data has to fit in memory
@@ -821,8 +763,6 @@ int GpuArray_is_f_contiguous(const GpuArray *a) {
 int GpuArray_is_aligned(const GpuArray *a) {
   size_t align = compyte_get_type(a->typecode)->align;
   unsigned int i;
-
-  ASSERT_ARRAY(a);
 
   if (a->offset % align != 0)
     return 0;
