@@ -6,17 +6,12 @@
 #include "extension.h"
 #ifndef COMPYTE_BUFFER_CUDA_H
 #define COMPYTE_BUFFER_CUDA_H
-CUdeviceptr (*cuda_get_ptr)(gpudata *g) = (CUdeviceptr (*)(gpudata *g))compyte_get_extension("cuda_get_ptr");
 
 int PyGpuArray_NDIM(PyGpuArrayObject *arr) {
   return arr->ga.nd;
 }
 size_t *PyGpuArray_DIMS(PyGpuArrayObject *arr) {
   return arr->ga.dimensions;
-}
-//void *PyGpuArray_DATA(PyGpuArrayObject *arr)
-char *PyGpuArray_BYTES(PyGpuArrayObject *arr){
-  return ((char*) cuda_get_ptr(arr->ga.data)) + arr->ga.offset;
 }
 
 ssize_t *PyGpuArray_STRIDES(PyGpuArrayObject* arr) {
