@@ -112,6 +112,7 @@ SET(headers
   compyte/kernel.h
   compyte/types.h
   compyte/util.h
+  compyte/pygpua_cuda.h
 )
 
 INSTALL(FILES ${headers} DESTINATION include/compyte)
