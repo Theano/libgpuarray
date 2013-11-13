@@ -271,10 +271,10 @@ class ElemwiseKernel(object):
         self.preamble = preamble
 
         self.contig_src = contiguous_kernel.render(preamble=self.preamble,
-                                                   name="elemk",
+                                                   name="elem_contig",
                                                    arguments=self.arguments,
                                                    expression=self.operation)
-        self.contig_k = gpuarray.GpuKernel(self.contig_src, "elemk",
+        self.contig_k = gpuarray.GpuKernel(self.contig_src, "elem_contig",
                                            context=self.context,
                                            cluda=True, **self.flags)
         self._speckey = None
@@ -308,15 +308,16 @@ class ElemwiseKernel(object):
         kernel_args.insert(0, numpy.asarray(n, dtype='uint32'))
         return kernel_args
 
-    def render_basic(self, nd):
-        return basic_kernel.render(preamble=self.preamble, name="elemk",
+    def render_basic(self, nd, name="elemk"):
+        return basic_kernel.render(preamble=self.preamble, name=name,
                                    nd=nd, arguments=self.arguments,
                                    expression=self.expression)
 
     @lfu_cache()
     def _make_basic(self, nd):
-        src = self.render_basic(nd)
-        return gpuarray.GpuKernel(src, "elemk", context=self.context,
+        name = "elem_" + str(nd)
+        src = self.render_basic(nd, name=name)
+        return gpuarray.GpuKernel(src, name, context=self.context,
                                   cluda=True, **self.flags)
 
     def prepare_args_basic(self, args, n, dims, strs, offsets):
