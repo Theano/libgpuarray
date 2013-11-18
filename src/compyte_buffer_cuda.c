@@ -899,7 +899,7 @@ static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
 
 #define ALIGN_UP(offset, align) ((offset) + (align) - 1) & ~((align) - 1)
 
-static int cuda_callkernel(gpukernel *k, size_t bs, size_t gs) {
+static int cuda_callkernel(gpukernel *k, size_t bs[2], size_t gs[2]) {
     cuda_context *ctx = k->ctx;
     unsigned int i;
 #if CUDA_VERSION < 4000
@@ -923,8 +923,8 @@ static int cuda_callkernel(gpukernel *k, size_t bs, size_t gs) {
     }
 
 #if CUDA_VERSION >= 4000
-    ctx->err = cuLaunchKernel(k->k, gs, 1, 1, bs, 1, 1, 0, ctx->s, k->args,
-                              NULL);
+    ctx->err = cuLaunchKernel(k->k, gs[0], gs[1], 1, bs[0], bs[1], 1, 0,
+                              ctx->s, k->args, NULL);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
@@ -951,12 +951,12 @@ static int cuda_callkernel(gpukernel *k, size_t bs, size_t gs) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
-    ctx->err = cuFuncSetBlockShape(k->k, bs, 1, 1);
+    ctx->err = cuFuncSetBlockShape(k->k, bs[0], bs[1], 1);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
-    ctx->err = cuLaunchGridAsync(k->k, gs, 1, ctx->s);
+    ctx->err = cuLaunchGridAsync(k->k, gs[0], gs[1], ctx->s);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
@@ -1133,7 +1133,7 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
     unsigned int count = 0;
     int res = GA_SYS_ERROR;
     
-    size_t nEls = 1, ls, gs;
+    size_t nEls = 1, ls[2], gs[2];
     gpukernel *k;
     unsigned int i;
     int flags = GA_USE_PTX;
@@ -1226,10 +1226,11 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
     if (res != GA_NO_ERROR) goto failk;
 
     /* Cheap kernel scheduling */
-    res = cuda_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, &ls);
+    res = cuda_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, ls);
     if (res != GA_NO_ERROR) goto failk;
 
-    gs = ((nEls-1) / ls) + 1;
+    gs[0] = ((nEls-1) / ls[0]) + 1;
+    gs[1] = ls[1] = 1;
     res = cuda_callkernel(k, ls, gs);
 
 failk:

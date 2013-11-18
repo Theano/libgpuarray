@@ -147,7 +147,7 @@ static gpukernel *cl_newkernel(void *ctx, unsigned int count,
 static void cl_releasekernel(gpukernel *k);
 static int cl_setkernelarg(gpukernel *k, unsigned int index,
 			   int typecode, const void *val);
-static int cl_callkernel(gpukernel *k, size_t bs, size_t gs);
+static int cl_callkernel(gpukernel *k, size_t bs[3], size_t gs[2]);
 
 static const char CL_PREAMBLE[] =
   "#define local_barrier() barrier(CLK_LOCAL_MEM_FENCE)\n"
@@ -531,7 +531,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
   char local_kern[256];
   cl_ctx *ctx = dst->ctx;
   const char *rlk[1];
-  size_t sz, bytes, n, ls, gs;
+  size_t sz, bytes, n, ls[2], gs[2];
   gpukernel *m;
   cl_mem_flags fl;
   int r, res = GA_IMPL_ERROR;
@@ -606,9 +606,10 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
   if (res != GA_NO_ERROR) goto fail;
 
   /* Cheap kernel scheduling */
-  res = cl_property(NULL, NULL, m, GA_KERNEL_PROP_MAXLSIZE, &ls);
+  res = cl_property(NULL, NULL, m, GA_KERNEL_PROP_MAXLSIZE, &ls[0]);
   if (res != GA_NO_ERROR) goto fail;
-  gs = ((n-1) / ls) + 1;
+  gs[0] = ((n-1) / ls[0]) + 1;
+  gs[1] = ls[1] = 1;
   res = cl_callkernel(m, ls, gs);
 
  fail:
@@ -821,8 +822,9 @@ static int cl_setkernelarg(gpukernel *k, unsigned int index, int typecode,
   return GA_NO_ERROR;
 }
 
-static int cl_callkernel(gpukernel *k, size_t ls, size_t gs) {
+static int cl_callkernel(gpukernel *k, size_t ls[2], size_t gs[2]) {
   cl_ctx *ctx = k->ctx;
+  size_t _gs[2];
   cl_event ev, ev2;
   cl_event *evw;
 #ifdef OPENCL_1_2
@@ -862,8 +864,9 @@ static int cl_callkernel(gpukernel *k, size_t ls, size_t gs) {
     evw = NULL;
   }
 
-  gs *= ls;
-  ctx->err = clEnqueueNDRangeKernel(ctx->q, k->k, 1, NULL, &gs, &ls,
+  _gs[0] = gs[0] * ls[0];
+  _gs[1] = gs[1] * ls[1];
+  ctx->err = clEnqueueNDRangeKernel(ctx->q, k->k, 2, NULL, _gs, ls,
 				    num_ev, evw, &ev);
   free(evw);
   if (ctx->err != CL_SUCCESS) return GA_IMPL_ERROR;
@@ -954,7 +957,7 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
                       const ssize_t *b_str) {
   cl_ctx *ctx = input->ctx;
   char *strs[64];
-  size_t nEls, ls, gs;
+  size_t nEls, ls[2], gs[2];
   gpukernel *k;
   cl_mem_flags fl;
   unsigned int count = 0;
@@ -1034,7 +1037,8 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
   res = cl_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, &ls);
   if (res != GA_NO_ERROR) goto kfail;
 
-  gs = ((nEls-1) / ls) + 1;
+  gs[0] = ((nEls-1) / ls[0]) + 1;
+  gs[1] = ls[1] = 1;
   res = cl_callkernel(k, ls, gs);
 
  kfail:

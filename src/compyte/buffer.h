@@ -314,7 +314,7 @@ typedef struct _compyte_buffer_ops {
    *
    * \returns GA_NO_ERROR or an error code if an error occurred.
    */
-  int (*kernel_call)(gpukernel *k, size_t bs, size_t gs);
+  int (*kernel_call)(gpukernel *k, size_t bs[2], size_t gs[2]);
 
   /**
    * Synchronize a buffer.

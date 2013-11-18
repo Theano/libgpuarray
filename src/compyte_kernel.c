@@ -73,11 +73,40 @@ static int do_sched(GpuKernel *k, size_t n, size_t *ls, size_t *gs) {
 }
 
 int GpuKernel_call(GpuKernel *k, size_t n, size_t bs, size_t gs) {
+  size_t _n[2], _bs[2], _gs[2];
+  _n[1] = _bs[1] = _gs[1] = 1;
+  _n[0] = n;
+  _bs[0] = bs;
+  _gs[0] = gs;
+  return GpuKernel_call2(k, _n, _bs, _gs);
+}
+
+int GpuKernel_call2(GpuKernel *k, size_t n[2], size_t bs[2], size_t gs[2]) {
+  size_t _bs[2] = {0, 0}, _gs[2] = {0, 0};
   int err;
-  if (bs == 0 || gs == 0) {
-    err = do_sched(k, n, &bs, &gs);
-    if (err != GA_NO_ERROR)
-      return err;
+  if (n == NULL) {
+    if (bs == NULL || gs == NULL)
+      return GA_INVALID_ERROR;
+  } else {
+    if (bs == NULL) bs = _bs;
+    if (gs == NULL) gs = _gs;
+
+    if (bs[0] == 0 || gs[0] == 0) {
+      err = do_sched(k, n[0], &bs[0], &gs[0]);
+      if (err != GA_NO_ERROR)
+        return err;
+    }
+
+    if (bs[1] == 0 || gs[1] == 0) {
+      if (n[1] == 1) {
+        bs[1] = 1;
+        gs[1] = 1;
+      } else {
+        err = do_sched(k, n[1], &bs[1], &gs[1]);
+        if (err != GA_NO_ERROR)
+          return err;
+      }
+    }
   }
   return k->ops->kernel_call(k->k, bs, gs);
 }
