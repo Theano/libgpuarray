@@ -32,6 +32,7 @@ add_type("cquad", "ga_cquad", 32)
 assert i <= 23
 i=23 # to sync with numpy.
 add_type("half", "half_t", 2);
+add_type("size", "size_t", 8);
 
 decls = """
 #ifdef _MSC_VER

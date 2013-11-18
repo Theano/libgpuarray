@@ -194,7 +194,8 @@ static const char CUDA_PREAMBLE[] =
     "#define ga_ulong uint64_t\n"
     "#define ga_float float\n"
     "#define ga_double double\n"
-    "#define ga_half uint16_t\n";
+    "#define ga_half uint16_t\n"
+    "#define ga_size size_t\n";
 /* XXX: add complex, quads, longlong */
 /* XXX: add vector types */
 
@@ -872,15 +873,23 @@ static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
         sz = sizeof(CUdeviceptr);
         val = &b->ptr;
     } else {
+      if (typecode == GA_SIZE) {
+        sz = sizeof(size_t);
+      } else {
         sz = compyte_get_elsize(typecode);
-        if (k->bs[index] != NULL)
-          cuda_free(k->bs[index]);
-        k->bs[index] = NULL;
+      }
+      if (k->bs[index] != NULL)
+        cuda_free(k->bs[index]);
+      k->bs[index] = NULL;
     }
 
     tmp = malloc(sz);
     if (tmp == NULL) return GA_MEMORY_ERROR;
-    memcpy(tmp, val, sz);
+    if (typecode == GA_SIZE) {
+      *((size_t *)tmp) = *((size_t *)val);
+    } else {
+      memcpy(tmp, val, sz);
+    }
     k->args[index] = tmp;
 #if CUDA_VERSION < 4000
     k->types[index] = typecode;

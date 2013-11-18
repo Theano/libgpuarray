@@ -99,6 +99,8 @@ typedef struct {char c; ga_cquad x; } st_cquad;
 #define CQUAD_ALIGN (sizeof(st_cquad) - sizeof(ga_cquad))
 typedef struct {char c; half_t x; } st_half;
 #define HALF_ALIGN (sizeof(st_half) - sizeof(half_t))
+typedef struct {char c; size_t x; } st_size;
+#define SIZE_ALIGN (sizeof(st_size) - sizeof(size_t))
 
 const compyte_type scalar_types[] = {
   {"ga_bool", 1, BOOL_ALIGN, GA_BOOL},
@@ -125,6 +127,7 @@ const compyte_type scalar_types[] = {
   {NULL, 0, 0, -1},
   {NULL, 0, 0, -1},
   {"ga_half", 2, HALF_ALIGN, GA_HALF},
+  {"ga_size", 8, SIZE_ALIGN, GA_SIZE},
 };
 
 const compyte_type vector_types[] = {

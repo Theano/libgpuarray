@@ -62,8 +62,9 @@ enum COMPYTE_TYPES {
   GA_CDOUBLE = 15,
   GA_CQUAD = 16,
   GA_HALF = 23,
+  GA_SIZE = 24,
 /** \cond INTERNAL_DOCS */
-  GA_NBASE = 24,
+  GA_NBASE = 25,
 
   GA_DELIM = 255, /* To be forward-compatible with numpy */
 /** \endcond */

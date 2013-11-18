@@ -180,7 +180,8 @@ static const char CL_PREAMBLE[] =
   "#define ga_ulong ulong\n"
   "#define ga_float float\n"
   "#define ga_double double\n"
-  "#define ga_half half\n";
+  "#define ga_half half\n"
+  "#define ga_size ulong\n";
 /* XXX: add complex types, quad types, and longlong */
 /* XXX: add vector types */
 
@@ -787,6 +788,7 @@ static void cl_releasekernel(gpukernel *k) {
 static int cl_setkernelarg(gpukernel *k, unsigned int index, int typecode,
 			   const void *val) {
   size_t sz;
+  uint64_t t;
   gpudata *b;
 
   ASSERT_KER(k);
@@ -806,6 +808,11 @@ static int cl_setkernelarg(gpukernel *k, unsigned int index, int typecode,
     if (k->bs[index] != NULL)
       cl_release(k->bs[index]);
     k->bs[index] = NULL;
+  }
+  if (typecode == GA_SIZE) {
+    /* OpenCL doesn't support variable size types in arguments */
+    t = *((size_t *)val);
+    val = &t;
   }
   k->ctx->err = clSetKernelArg(k->k, index, sz, val);
   if (k->ctx->err != CL_SUCCESS) {
