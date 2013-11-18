@@ -81,10 +81,10 @@ configure_file(
   )
 
 add_library(compyte SHARED ${COMPYTE_SRC})
+add_dependencies(compyte gen_blas)
 set_target_properties(compyte PROPERTIES COMPILE_FLAGS "-DCOMPYTE_BUILDING_DLL -DCOMPYTE_SHARED")
 
 add_library(compyte-static STATIC ${COMPYTE_SRC})
-add_dependencies(compyte gen_blas)
 add_dependencies(compyte-static gen_blas)
 
 if(CUDA_FOUND)
