@@ -1431,11 +1431,11 @@ cdef class GpuArray:
         cdef unsigned int i
         if len(params) is 1 and isinstance(params[0], (tuple, list)):
             params = params[0]
-        if params is ():
+        if params is () or params == (None,):
             return pygpu_transpose(self, NULL)
         else:
             if len(params) != self.ga.nd:
-                raise ValueError, "axes don't match"
+                raise ValueError("axes don't match: " + str(params))
             new_axes = <unsigned int *>calloc(self.ga.nd, sizeof(unsigned int))
             try:
                 for i in range(self.ga.nd):

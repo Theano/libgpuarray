@@ -404,6 +404,12 @@ def transpose(shp, offseted, sliced, order):
     # also check that we are exactly equal since this only a copy op
     assert numpy.all(rc == numpy.asarray(rg))
 
+    # Test NumPy interface
+    rg = numpy.transpose(ag)
+    check_all(rg, rc)
+    # also check that we are exactly equal since this only a copy op
+    assert numpy.all(rc == numpy.asarray(rg))
+
 
 def transpose_perm(shp, perm, offseted, sliced, order):
     ac, ag = gen_gpuarray(shp, 'float32', offseted, sliced=sliced,
@@ -411,6 +417,12 @@ def transpose_perm(shp, perm, offseted, sliced, order):
     rc = ac.transpose(perm)
     rg = ag.transpose(perm)
 
+    check_all(rg, rc)
+    # also check that we are exactly equal since this only a copy op
+    assert numpy.all(rc == numpy.asarray(rg))
+
+    # Test NumPy interface
+    rg = numpy.transpose(ag, perm)
     check_all(rg, rc)
     # also check that we are exactly equal since this only a copy op
     assert numpy.all(rc == numpy.asarray(rg))
