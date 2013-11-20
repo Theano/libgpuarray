@@ -234,7 +234,6 @@ static const char *get_error_string(CUresult err) {
     case CUDA_ERROR_LAUNCH_OUT_OF_RESOURCES: return "Not enough resource to launch kernel (or passed wrong arguments)";
     case CUDA_ERROR_LAUNCH_TIMEOUT:    return "Kernel took too long to execute";
     case CUDA_ERROR_LAUNCH_INCOMPATIBLE_TEXTURING: return "Kernel launch uses incompatible texture mode";
-#if CUDA_VERSION >= 4000
     case CUDA_ERROR_PROFILER_DISABLED: return "Profiler is disabled";
     case CUDA_ERROR_PROFILER_NOT_INITIALIZED: return "Profiler is not initialized";
     case CUDA_ERROR_PROFILER_ALREADY_STARTED: return "Profiler has already started";
@@ -244,7 +243,6 @@ static const char *get_error_string(CUresult err) {
     case CUDA_ERROR_PEER_ACCESS_NOT_ENABLED: return "Peer access not enabled";
     case CUDA_ERROR_PRIMARY_CONTEXT_ACTIVE: return "Primary context already initialized";
     case CUDA_ERROR_CONTEXT_IS_DESTROYED: return "Context has been destroyed (or not yet initialized)";
-#endif
 #if CUDA_VERSION >= 4020
     case CUDA_ERROR_ASSERT:            return "Kernel trigged an assert and destroyed the context";
     case CUDA_ERROR_TOO_MANY_PEERS:    return "Not enough ressoures to enable peer access";
@@ -891,21 +889,12 @@ static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
       memcpy(tmp, val, sz);
     }
     k->args[index] = tmp;
-#if CUDA_VERSION < 4000
-    k->types[index] = typecode;
-#endif
     return GA_NO_ERROR;
 }
-
-#define ALIGN_UP(offset, align) ((offset) + (align) - 1) & ~((align) - 1)
 
 static int cuda_callkernel(gpukernel *k, size_t bs[2], size_t gs[2]) {
     cuda_context *ctx = k->ctx;
     unsigned int i;
-#if CUDA_VERSION < 4000
-    size_t total = 0;
-    size_t align, sz;
-#endif
 
     ASSERT_KER(k);
     cuda_enter(ctx);
@@ -922,46 +911,13 @@ static int cuda_callkernel(gpukernel *k, size_t bs[2], size_t gs[2]) {
         }
     }
 
-#if CUDA_VERSION >= 4000
     ctx->err = cuLaunchKernel(k->k, gs[0], gs[1], 1, bs[0], bs[1], 1, 0,
                               ctx->s, k->args, NULL);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
-#else
-    for (i = 0; i < k->argcount; i++) {
-        if (k->types[i] == GA_DELIM) {
-            align = DEVPTR_ALIGN;
-            sz = sizeof(CUdeviceptr);
-        } else {
-            align = compyte_get_type(k->types[i])->align;
-            sz = compyte_get_elsize(k->types[i]);
-        }
-        total = ALIGN_UP(total, align);
-        ctx->err = cuParamSetv(k->k, (int)total, k->args[i], (unsigned int)sz);
-        if (ctx->err != CUDA_SUCCESS) {
-          cuda_exit(ctx);
-          return GA_IMPL_ERROR;
-        }
-        total += sz;
-    }
-    ctx->err = cuParamSetSize(k->k, total);
-    if (ctx->err != CUDA_SUCCESS) {
-      cuda_exit(ctx);
-      return GA_IMPL_ERROR;
-    }
-    ctx->err = cuFuncSetBlockShape(k->k, bs[0], bs[1], 1);
-    if (ctx->err != CUDA_SUCCESS) {
-      cuda_exit(ctx);
-      return GA_IMPL_ERROR;
-    }
-    ctx->err = cuLaunchGridAsync(k->k, gs[0], gs[1], ctx->s);
-    if (ctx->err != CUDA_SUCCESS) {
-      cuda_exit(ctx);
-      return GA_IMPL_ERROR;
-    }
-#endif
+
     for (i = 0; i < k->argcount; i++) {
       if (k->bs[i] != NULL)
         cuEventRecord(k->bs[i]->ev, ctx->s);

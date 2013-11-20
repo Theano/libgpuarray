@@ -84,9 +84,6 @@ struct _gpukernel {
   CUmodule m;
   CUfunction k;
   void *args[NUM_ARGS];
-#if CUDA_VERSION < 4000
-  size_t types[NUM_ARGS];
-#endif
   unsigned int argcount;
   gpudata *bs[NUM_ARGS];
   cuda_context *ctx;
