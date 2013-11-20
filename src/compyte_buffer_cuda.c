@@ -1314,27 +1314,25 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
   cuda_context *ctx = NULL;
   if (c != NULL) {
     ctx = (cuda_context *)c;
+    ASSERT_CTX(ctx);
   } else if (buf != NULL) {
+    ASSERT_BUF(buf);
     ctx = buf->ctx;
   } else if (k != NULL) {
+    ASSERT_KER(k);
     ctx = k->ctx;
-  }
-  if (ctx == NULL) {
-    return GA_VALUE_ERROR;
   }
   /* I know that 512 and 1024 are magic numbers.
      There is an indication in buffer.h, though. */
   if (prop_id < 512) {
-    if (c == NULL)
+    if (ctx == NULL)
       return GA_VALUE_ERROR;
   } else if (prop_id < 1024) {
     if (buf == NULL)
       return GA_VALUE_ERROR;
-    ASSERT_BUF(buf);
   } else {
     if (k == NULL)
       return GA_VALUE_ERROR;
-    ASSERT_KER(k);
   }
 
   cuda_enter(ctx);
