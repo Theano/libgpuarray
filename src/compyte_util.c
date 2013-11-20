@@ -7,6 +7,10 @@
 static compyte_type **custom_types = NULL;
 static int n_types = 0;
 static compyte_type no_type = {NULL, 0, 0, -1};
+typedef struct _buf_st { char c; GpuArray *a; } buf_st;
+#define BUF_ALIGN (sizeof(buf_st) - sizeof(GpuArray *))
+static compyte_type buffer_type = {NULL, sizeof(GpuArray *),
+                                   BUF_ALIGN, GA_BUFFER};
 
 int compyte_register_type(compyte_type *t, int *ret) {
   compyte_type **tmp;
@@ -23,6 +27,8 @@ int compyte_register_type(compyte_type *t, int *ret) {
 
 const compyte_type *compyte_get_type(int typecode) {
   if (typecode <= GA_DELIM) {
+    if (typecode == GA_BUFFER)
+      return &buffer_type;
     if (typecode < GA_NBASE)
       return &scalar_types[typecode];
     else
