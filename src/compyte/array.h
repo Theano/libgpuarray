@@ -498,7 +498,7 @@ COMPYTE_PUBLIC int GpuArray_copy(GpuArray *res, const GpuArray *a,
  */
 COMPYTE_PUBLIC int GpuArray_transfer(GpuArray *res, const GpuArray *a,
                                      void *new_ctx,
-                                     compyte_buffer_ops *new_ops,
+                                     const compyte_buffer_ops *new_ops,
                                      int may_share);
 
 /**

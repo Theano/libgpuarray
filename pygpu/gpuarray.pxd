@@ -155,7 +155,7 @@ cdef extern from "compyte/array.h":
     int GpuArray_copy(_GpuArray *res, _GpuArray *a, ga_order order)
 
     int GpuArray_transfer(_GpuArray *res, const _GpuArray *a, void *new_ctx,
-                          compyte_buffer_ops *new_ops, int may_share)
+                          const compyte_buffer_ops *new_ops, int may_share)
 
     char *GpuArray_error(_GpuArray *a, int err)
 
@@ -209,7 +209,8 @@ cdef int array_read(void *dst, size_t sz, GpuArray src) except -1
 cdef int array_memset(GpuArray a, int data) except -1
 cdef int array_copy(GpuArray res, GpuArray a, ga_order order) except -1
 cdef int array_transfer(GpuArray res, GpuArray a, void *new_ctx,
-                        compyte_buffer_ops *ops, bint may_share) except -1
+                        const compyte_buffer_ops *ops,
+                        bint may_share) except -1
 
 cdef const char *kernel_error(GpuKernel k, int err) except NULL
 cdef int kernel_init(GpuKernel k, const compyte_buffer_ops *ops, void *ctx,

@@ -382,7 +382,8 @@ cdef int array_copy(GpuArray res, GpuArray a, ga_order order) except -1:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
 cdef int array_transfer(GpuArray res, GpuArray a, void *new_ctx,
-                        compyte_buffer_ops *new_ops, bint may_share) except -1:
+                        const compyte_buffer_ops *new_ops,
+                        bint may_share) except -1:
     cdef int err
     err = GpuArray_transfer(&res.ga, &a.ga, new_ctx, new_ops, may_share)
     if err != GA_NO_ERROR:

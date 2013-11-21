@@ -676,7 +676,7 @@ int GpuArray_copy(GpuArray *res, const GpuArray *a, ga_order order) {
 }
 
 int GpuArray_transfer(GpuArray *res, const GpuArray *a, void *new_ctx,
-                      compyte_buffer_ops *new_ops, int may_share) {
+                      const compyte_buffer_ops *new_ops, int may_share) {
   size_t start, end;
   gpudata *tmp;
   int err;
