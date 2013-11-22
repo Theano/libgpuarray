@@ -682,7 +682,8 @@ COMPYTE_LOCAL void cuda_set_compiler(void *(*compiler_f)(const char *, size_t,
 
 static gpukernel *cuda_newkernel(void *c, unsigned int count,
                                  const char **strings, const size_t *lengths,
-                                 const char *fname, int flags, int *ret) {
+                                 const char *fname, unsigned int argcount,
+                                 int *types, int flags, int *ret) {
     cuda_context *ctx = (cuda_context *)c;
     struct iovec *descr;
     char *buf;
@@ -796,11 +797,26 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     }
     memset(res, 0, sizeof(*res));
     res->refcnt = 1;
+    res->argcount = argcount;
+    res->types = calloc(argcount, sizeof(int));
+    if (res->types == NULL) {
+      free(res);
+      FAIL(NULL, GA_MEMORY_ERROR);
+    }
+    memcpy(res->types, types, argcount*sizeof(int));
+    res->args = calloc(argcount, sizeof(void *));
+    if (res->args == NULL) {
+      free(res->types);
+      free(res);
+      FAIL(NULL, GA_MEMORY_ERROR);
+    }
 
     ctx->err = cuModuleLoadData(&res->m, p);
     free(p);
 
     if (ctx->err != CUDA_SUCCESS) {
+      free(res->types);
+      free(res->args);
       free(res);
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
@@ -809,6 +825,8 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     ctx->err = cuModuleGetFunction(&res->k, res->m, fname);
     if (ctx->err != CUDA_SUCCESS) {
         cuModuleUnload(res->m);
+        free(res->types);
+        free(res->args);
         free(res);
         cuda_exit(ctx);
         FAIL(NULL, GA_IMPL_ERROR);
@@ -827,72 +845,22 @@ static void cuda_retainkernel(gpukernel *k) {
 }
 
 static void cuda_freekernel(gpukernel *k) {
-  /* We don't check for errors on free */
-  unsigned int i;
-
   ASSERT_KER(k);
   k->refcnt--;
   if (k->refcnt == 0) {
     cuda_enter(k->ctx);
-    for (i = 0; i < k->argcount; i++) {
-      free(k->args[i]);
-      if (k->bs[i] != NULL)
-        cuda_free(k->bs[i]);
-    }
     cuModuleUnload(k->m);
     cuda_exit(k->ctx);
     cuda_free_ctx(k->ctx);
     CLEAR(k);
+    free(k->types);
+    free(k->args);
     free(k);
   }
 }
 
-static int cuda_setkernelarg(gpukernel *k, unsigned int index, int typecode,
-                             const void *val) {
-    void *tmp;
-    gpudata *b;
-    size_t sz;
-
-    ASSERT_KER(k);
-    if (index >= NUM_ARGS) return GA_VALUE_ERROR;
-
-    if (index >= k->argcount)
-        k->argcount = index+1;
-
-    if (typecode == GA_BUFFER) {
-        b = (gpudata *)val;
-        ASSERT_BUF(b);
-        if (k->ctx != b->ctx)
-            return GA_VALUE_ERROR;
-        if (k->bs[index] != NULL)
-          cuda_free(k->bs[index]);
-        k->bs[index] = b;
-        cuda_retain(k->bs[index]);
-        sz = sizeof(CUdeviceptr);
-        val = &b->ptr;
-    } else {
-      if (typecode == GA_SIZE) {
-        sz = sizeof(size_t);
-      } else {
-        sz = compyte_get_elsize(typecode);
-      }
-      if (k->bs[index] != NULL)
-        cuda_free(k->bs[index]);
-      k->bs[index] = NULL;
-    }
-
-    tmp = malloc(sz);
-    if (tmp == NULL) return GA_MEMORY_ERROR;
-    if (typecode == GA_SIZE) {
-      *((size_t *)tmp) = *((size_t *)val);
-    } else {
-      memcpy(tmp, val, sz);
-    }
-    k->args[index] = tmp;
-    return GA_NO_ERROR;
-}
-
-static int cuda_callkernel(gpukernel *k, size_t bs[2], size_t gs[2]) {
+static int cuda_callkernel(gpukernel *k, size_t bs[2], size_t gs[2],
+                           void **args) {
     cuda_context *ctx = k->ctx;
     unsigned int i;
 
@@ -902,25 +870,29 @@ static int cuda_callkernel(gpukernel *k, size_t bs[2], size_t gs[2]) {
       return GA_IMPL_ERROR;
 
     for (i = 0; i < k->argcount; i++) {
-        if (k->bs[i] != NULL) {
-            ctx->err = cuStreamWaitEvent(ctx->s, k->bs[i]->ev, 0);
-            if (ctx->err != CUDA_SUCCESS) {
-              cuda_exit(ctx);
-              return GA_IMPL_ERROR;
-            }
+      if (k->types[i] == GA_BUFFER) {
+        ASSERT_BUF((gpudata *)args[i]);
+        ctx->err = cuStreamWaitEvent(ctx->s, ((gpudata *)args[i])->ev, 0);
+        if (ctx->err != CUDA_SUCCESS) {
+          cuda_exit(ctx);
+          return GA_IMPL_ERROR;
         }
+        k->args[i] = &((gpudata *)args[i])->ptr;
+      } else {
+        k->args[i] = args[i];
+      }
     }
 
     ctx->err = cuLaunchKernel(k->k, gs[0], gs[1], 1, bs[0], bs[1], 1, 0,
-                              ctx->s, k->args, NULL);
+			      ctx->s, k->args, NULL);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
 
     for (i = 0; i < k->argcount; i++) {
-      if (k->bs[i] != NULL)
-        cuEventRecord(k->bs[i]->ev, ctx->s);
+      if (k->types[i] == GA_BUFFER)
+        cuEventRecord(((gpudata *)args[i])->ev, ctx->s);
     }
     cuda_exit(ctx);
     return GA_NO_ERROR;
@@ -1086,7 +1058,9 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
                         unsigned int b_nd, const size_t *b_dims,
                         const ssize_t *b_str) {
     char *strs[64];
+    void *args[2];
     unsigned int count = 0;
+    int types[2];
     int res = GA_SYS_ERROR;
     
     size_t nEls = 1, ls[2], gs[2];
@@ -1173,13 +1147,10 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
         flags |= GA_USE_COMPLEX;
     }
 
+    types[0] = types[1] = GA_BUFFER;
     k = cuda_newkernel(input->ctx, count, (const char **)strs, NULL, "extcpy",
-                       flags, &res);
+                       2, types, flags, &res);
     if (k == NULL) goto fail;
-    res = cuda_setkernelarg(k, 0, GA_BUFFER, input);
-    if (res != GA_NO_ERROR) goto failk;
-    res = cuda_setkernelarg(k, 1, GA_BUFFER, output);
-    if (res != GA_NO_ERROR) goto failk;
 
     /* Cheap kernel scheduling */
     res = cuda_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, ls);
@@ -1187,7 +1158,9 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
 
     gs[0] = ((nEls-1) / ls[0]) + 1;
     gs[1] = ls[1] = 1;
-    res = cuda_callkernel(k, ls, gs);
+    args[0] = input;
+    args[1] = output;
+    res = cuda_callkernel(k, ls, gs, args);
 
 failk:
     cuda_freekernel(k);
@@ -1446,8 +1419,16 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
-    *((size_t *)res) = i;
     cuda_exit(ctx);
+    *((size_t *)res) = i;
+    return GA_NO_ERROR;
+
+  case GA_KERNEL_PROP_NUMARGS:
+    *((unsigned int *)res) = k->argcount;
+    return GA_NO_ERROR;
+
+  case GA_KERNEL_PROP_TYPES:
+    *((const int **)res) = k->types;
     return GA_NO_ERROR;
 
   default:
@@ -1477,7 +1458,6 @@ const compyte_buffer_ops cuda_ops = {cuda_init,
                                      cuda_newkernel,
                                      cuda_retainkernel,
                                      cuda_freekernel,
-                                     cuda_setkernelarg,
                                      cuda_callkernel,
                                      cuda_sync,
                                      cuda_extcopy,

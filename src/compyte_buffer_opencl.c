@@ -143,11 +143,10 @@ cl_mem cl_get_buf(gpudata *g) { ASSERT_BUF(g); return g->buf; }
 
 static gpukernel *cl_newkernel(void *ctx, unsigned int count,
 			       const char **strings, const size_t *lengths,
-			       const char *fname, int flags, int *ret);
+			       const char *fname, unsigned int argcount,
+                               int *types, int flags, int *ret);
 static void cl_releasekernel(gpukernel *k);
-static int cl_setkernelarg(gpukernel *k, unsigned int index,
-			   int typecode, const void *val);
-static int cl_callkernel(gpukernel *k, size_t bs[3], size_t gs[2]);
+static int cl_callkernel(gpukernel *k, size_t bs[2], size_t gs[2], void **args);
 
 static const char CL_PREAMBLE[] =
   "#define local_barrier() barrier(CLK_LOCAL_MEM_FENCE)\n"
@@ -531,9 +530,11 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
   char local_kern[256];
   cl_ctx *ctx = dst->ctx;
   const char *rlk[1];
+  void *args[1];
   size_t sz, bytes, n, ls[2], gs[2];
   gpukernel *m;
   cl_mem_flags fl;
+  int type;
   int r, res = GA_IMPL_ERROR;
 
   unsigned char val = (unsigned char)data;
@@ -599,10 +600,10 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
 
   sz = strlen(local_kern);
   rlk[0] = local_kern;
+  type = GA_BUFFER;
 
-  m = cl_newkernel(ctx, 1, rlk, &sz, "kmemset", 0, &res);
+  m = cl_newkernel(ctx, 1, rlk, &sz, "kmemset", 1, &type, 0, &res);
   if (m == NULL) return res;
-  res = cl_setkernelarg(m, 0, GA_BUFFER, dst);
   if (res != GA_NO_ERROR) goto fail;
 
   /* Cheap kernel scheduling */
@@ -610,7 +611,8 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
   if (res != GA_NO_ERROR) goto fail;
   gs[0] = ((n-1) / ls[0]) + 1;
   gs[1] = ls[1] = 1;
-  res = cl_callkernel(m, ls, gs);
+  args[0] = dst;
+  res = cl_callkernel(m, ls, gs, args);
 
  fail:
   cl_releasekernel(m);
@@ -649,7 +651,8 @@ static int cl_check_extensions(const char **preamble, unsigned int *count,
 
 static gpukernel *cl_newkernel(void *c, unsigned int count,
 			       const char **strings, const size_t *lengths,
-			       const char *fname, int flags, int *ret) {
+			       const char *fname, unsigned int argcount,
+                               int *types, int flags, int *ret) {
   cl_ctx *ctx = (cl_ctx *)c;
   gpukernel *res;
   cl_device_id dev;
@@ -660,7 +663,6 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
   size_t *newl;
   const char **news;
   unsigned int n = 0;
-  cl_uint num_args;
   int error;
 
   ASSERT_CTX(ctx);
@@ -673,16 +675,9 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
   error = cl_check_extensions(preamble, &n, flags, ctx);
   if (error != GA_NO_ERROR) FAIL(NULL, error);
 
-  res = malloc(sizeof(*res));
-  if (res == NULL) FAIL(NULL, GA_MEMORY_ERROR);
-  res->refcnt = 1;
-  res->k = NULL;
-  res->ev = NULL;
-
   if (n != 0) {
     news = calloc(count+n, sizeof(const char *));
     if (news == NULL) {
-      free(res);
       FAIL(NULL, GA_SYS_ERROR);
     }
     memcpy(news, preamble, n*sizeof(const char *));
@@ -693,7 +688,6 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
       newl = calloc(count+n, sizeof(size_t));
       if (newl == NULL) {
         free(news);
-        free(res);
         FAIL(NULL, GA_MEMORY_ERROR);
       }
       memcpy(newl+n, lengths, count*sizeof(size_t));
@@ -709,18 +703,20 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
     free(newl);
   }
   if (ctx->err != CL_SUCCESS) {
-    free(res);
     FAIL(NULL, GA_IMPL_ERROR);
   }
 
   ctx->err = clBuildProgram(p, 1, &dev, "-w", NULL, NULL);
   if (ctx->err != CL_SUCCESS) {
-    free(res);
     clReleaseProgram(p);
     FAIL(NULL, GA_IMPL_ERROR);
   }  
 
-  res->bs = NULL;
+  res = malloc(sizeof(*res));
+  if (res == NULL) FAIL(NULL, GA_MEMORY_ERROR);
+  res->refcnt = 1;
+  res->ev = NULL;
+  res->argcount = argcount;
   res->k = clCreateKernel(p, fname, &ctx->err);
   res->ctx = ctx;
   ctx->refcnt++;
@@ -729,19 +725,12 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
     cl_releasekernel(res);
     FAIL(NULL, GA_IMPL_ERROR);
   }
-
-  ctx->err = clGetKernelInfo(res->k, CL_KERNEL_NUM_ARGS, sizeof(num_args),
-                             &num_args, NULL);
-  if (ctx->err != CL_SUCCESS) {
+  res->types = calloc(argcount, sizeof(int));
+  if (res->types == NULL) {
     cl_releasekernel(res);
     FAIL(NULL, GA_IMPL_ERROR);
   }
-
-  res->bs = calloc(sizeof(gpudata *), num_args);
-  if (res->bs == NULL) {
-    cl_releasekernel(res);
-    FAIL(NULL, GA_MEMORY_ERROR);
-  }
+  memcpy(res->types, types, argcount * sizeof(int));
 
   TAG_KER(res);
   return res;
@@ -753,86 +742,28 @@ static void cl_retainkernel(gpukernel *k) {
 }
 
 static void cl_releasekernel(gpukernel *k) {
-  cl_ctx *ctx = k->ctx;
-  cl_uint num_args;
-  cl_uint i;
-
   ASSERT_KER(k);
 
   k->refcnt--;
   if (k->refcnt == 0) {
     CLEAR(k);
-    if (k->ev != NULL) {
-      clWaitForEvents(1, &k->ev);
-      clReleaseEvent(k->ev);
-    }
-    if (k->bs != NULL) {
-      ctx->err = clGetKernelInfo(k->k, CL_KERNEL_NUM_ARGS, sizeof(num_args),
-                                 &num_args, NULL);
-      if (ctx->err == CL_SUCCESS) {
-        for (i = 0; i < num_args; i++) {
-          if (k->bs[i] != NULL)
-            cl_release(k->bs[i]);
-        }
-      } else {
-        fprintf(stderr, "Error in cl_releasekernel: cannot determine number "
-                "of arguments, will possibly leak gpu memory");
-      }
-      free(k->bs);
-    }
+    if (k->ev != NULL) clReleaseEvent(k->ev);
     if (k->k) clReleaseKernel(k->k);
     cl_free_ctx(k->ctx);
+    free(k->types);
     free(k);
   }
 }
 
-static int cl_setkernelarg(gpukernel *k, unsigned int index, int typecode,
-			   const void *val) {
-  size_t sz;
-  uint64_t t;
-  gpudata *b;
-
-  ASSERT_KER(k);
-
-  if (typecode == GA_BUFFER) {
-    b = (gpudata *)val;
-    ASSERT_BUF(b);
-    if (k->ctx != b->ctx) return GA_VALUE_ERROR;
-    if (k->bs[index] != NULL)
-      cl_release(k->bs[index]);
-    k->bs[index] = b;
-    cl_retain(k->bs[index]);
-    sz = sizeof(cl_mem);
-    val = &b->buf;
-  } else {
-    sz = compyte_get_elsize(typecode);
-    if (k->bs[index] != NULL)
-      cl_release(k->bs[index]);
-    k->bs[index] = NULL;
-  }
-  if (typecode == GA_SIZE) {
-    /* OpenCL doesn't support variable size types in arguments */
-    t = *((size_t *)val);
-    val = &t;
-  }
-  k->ctx->err = clSetKernelArg(k->k, index, sz, val);
-  if (k->ctx->err != CL_SUCCESS) {
-    return GA_IMPL_ERROR;
-  }
-  return GA_NO_ERROR;
-}
-
-static int cl_callkernel(gpukernel *k, size_t ls[2], size_t gs[2]) {
+static int cl_callkernel(gpukernel *k, size_t ls[2], size_t gs[2],
+                         void **args) {
   cl_ctx *ctx = k->ctx;
   size_t _gs[2];
-  cl_event ev, ev2;
+  cl_event ev;
   cl_event *evw;
-#ifdef OPENCL_1_2
-  cl_event evl[2];
-#endif
   cl_device_id dev;
+  cl_ulong temp;
   cl_uint num_ev;
-  cl_uint num_args;
   cl_uint i;
   int res;
 
@@ -842,20 +773,27 @@ static int cl_callkernel(gpukernel *k, size_t ls[2], size_t gs[2]) {
   dev = get_dev(ctx->ctx, &res);
   if (dev == NULL) return res;
 
-  ctx->err = clGetKernelInfo(k->k, CL_KERNEL_NUM_ARGS, sizeof(num_args),
-			     &num_args, NULL);
-  if (ctx->err != CL_SUCCESS) return GA_IMPL_ERROR;
-
   num_ev = 0;
-  evw = calloc(sizeof(cl_event), num_args);
+  evw = calloc(sizeof(cl_event), k->argcount);
   if (evw == NULL) {
     return GA_MEMORY_ERROR;
   }
   
-  for (i = 0; i < num_args; i++) {
-    if (k->bs[i] != NULL && k->bs[i]->ev != NULL) {
-      evw[num_ev++] = k->bs[i]->ev;
-      k->bs[i]->ev = NULL;
+  for (i = 0; i < k->argcount; i++) {
+    if (k->types[i] == GA_BUFFER) {
+      evw[num_ev++] = ((gpudata *)args[i])->ev;
+      ctx->err = clSetKernelArg(k->k, i, sizeof(cl_mem), &((gpudata *)args[i])->buf);
+    } else if (k->types[i] == GA_SIZE) {
+      temp = *((size_t *)args[i]);
+      ctx->err = clSetKernelArg(k->k, i, compyte_get_elsize(k->types[i]),
+                                &temp);
+    } else {
+      ctx->err = clSetKernelArg(k->k, i, compyte_get_elsize(k->types[i]),
+                                args[i]);
+    }
+    if (ctx->err != CL_SUCCESS) {
+      free(evw);
+      return GA_IMPL_ERROR;
     }
   }
 
@@ -871,32 +809,17 @@ static int cl_callkernel(gpukernel *k, size_t ls[2], size_t gs[2]) {
   free(evw);
   if (ctx->err != CL_SUCCESS) return GA_IMPL_ERROR;
 
-  for (i = 0; i < num_args; i++) {
-    if (k->bs[i] != NULL) {
-      if (k->bs[i]->ev != NULL) clReleaseEvent(k->bs[i]->ev);
-      k->bs[i]->ev = ev;
+  for (i = 0; i < k->argcount; i++) {
+    if (k->types[i] == GA_BUFFER) {
+      if (((gpudata *)args[i])->ev != NULL)
+        clReleaseEvent(((gpudata *)args[i])->ev);
+      ((gpudata *)args[i])->ev = ev;
       clRetainEvent(ev);
     }
   }
-#ifdef OPENCL_1_2
-  evl[0] = ev;
-  num_ev = 1;
-  if (k->ev != NULL) {
-    evl[1] = k->ev;
-    num_ev = 2;
-  }
-  ctx->err = clEnqueueMarkerWithWaitList(ctx->q, num_ev, evl, &ev2);
-#else
-  ctx->err = clEnqueueMarker(ctx->q, &ev2);
-#endif
-  clReleaseEvent(ev);
-  if (ctx->err != CL_SUCCESS) {
-    fprintf(stderr, "WARNING: in kernel call, could not create marker event, error = %d\n", ctx->err);
-  } else {
-    if (k->ev != NULL)
-      clReleaseEvent(k->ev);
-    k->ev = ev2;
-  }
+  if (k->ev != NULL)
+    clReleaseEvent(k->ev);
+  k->ev = ev;
 
   return GA_NO_ERROR;
 }
@@ -959,11 +882,13 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
   char *strs[64];
   size_t nEls, ls[2], gs[2];
   gpukernel *k;
+  void *args[2];
   cl_mem_flags fl;
   unsigned int count = 0;
   int res = GA_SYS_ERROR;
   unsigned int i;
   int flags = GA_USE_CLUDA;
+  int types[2];
 
   ASSERT_BUF(input);
   ASSERT_BUF(output);
@@ -1026,20 +951,19 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
 
   assert(count < (sizeof(strs)/sizeof(strs[0])));
 
+  types[0] = types[1] = GA_BUFFER;
   k = cl_newkernel(ctx, count, (const char **)strs, NULL, "elemk",
-                   flags, &res);
+                   2, types, flags, &res);
   if (k == NULL) goto fail;
-  res = cl_setkernelarg(k, 0, GA_BUFFER, input);
-  if (res != GA_NO_ERROR) goto kfail;
-  res = cl_setkernelarg(k, 1, GA_BUFFER, output);
-  if (res != GA_NO_ERROR) goto kfail;
   /* Cheap kernel scheduling */
   res = cl_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, &ls);
   if (res != GA_NO_ERROR) goto kfail;
 
   gs[0] = ((nEls-1) / ls[0]) + 1;
   gs[1] = ls[1] = 1;
-  res = cl_callkernel(k, ls, gs);
+  args[0] = input;
+  args[1] = output;
+  res = cl_callkernel(k, ls, gs, args);
 
  kfail:
   cl_releasekernel(k);
@@ -1242,6 +1166,14 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((size_t *)res) = sz;
     return GA_NO_ERROR;
 
+  case GA_KERNEL_PROP_NUMARGS:
+    *((unsigned int *)res) = k->argcount;
+    return GA_NO_ERROR;
+
+  case GA_KERNEL_PROP_TYPES:
+    *((const int **)res) = k->types;
+    return GA_NO_ERROR;
+
   default:
     return GA_INVALID_ERROR;
   }
@@ -1270,7 +1202,6 @@ const compyte_buffer_ops opencl_ops = {cl_init,
                                        cl_newkernel,
                                        cl_retainkernel,
                                        cl_releasekernel,
-                                       cl_setkernelarg,
                                        cl_callkernel,
                                        cl_sync,
                                        cl_extcopy,

@@ -260,7 +260,8 @@ typedef struct _compyte_buffer_ops {
    */
   gpukernel *(*kernel_alloc)(void *ctx, unsigned int count,
                              const char **strings, const size_t *lengths,
-                             const char *fname, int flags, int *ret);
+                             const char *fname, unsigned int numargs,
+                             int *typecodes, int flags, int *ret);
 
   /**
    * Retain a kernel.
@@ -283,30 +284,7 @@ typedef struct _compyte_buffer_ops {
   void (*kernel_release)(gpukernel *k);
 
   /**
-   * Set a kernel argument.
-   *
-   * `val` is a pointer to the actual argument value except for the
-   * pseudo-type GA_BUFFER where val is the gpudata pointer itself.
-   *
-   * If the argument is a buffer it will be retained until either a
-   * new argument is set in its place (buffer or otherwise) or the
-   * kernel is freed (reference count reaches 0).
-   *
-   * \param k kernel
-   * \param index argument index (0-based)
-   * \param typecode argument type
-   * \param val pointer to argument value
-   *
-   * \returns GA_NO_ERROR or an error code if an error occurred.
-   */
-  int (*kernel_setarg)(gpukernel *k, unsigned int index,
-                       int typecode, const void *val);
-
-  /**
    * Call a kernel.
-   *
-   * All arguments must have been specified by a previous call to
-   * kernel_setarg().  Arguments may be reused between call.
    *
    * \param k kernel
    * \param bs block size for this call (also known as local size)
@@ -314,7 +292,7 @@ typedef struct _compyte_buffer_ops {
    *
    * \returns GA_NO_ERROR or an error code if an error occurred.
    */
-  int (*kernel_call)(gpukernel *k, size_t bs[2], size_t gs[2]);
+int (*kernel_call)(gpukernel *k, size_t bs[2], size_t gs[2], void **args);
 
   /**
    * Synchronize a buffer.
@@ -528,6 +506,23 @@ typedef struct _compyte_buffer_ops {
  * Type: `size_t`
  */
 #define GA_KERNEL_PROP_PREFLSIZE 1026
+
+/**
+ * Get the number of kernel arguments.
+ *
+ * Type `unsigned int`
+ */
+#define GA_KERNEL_PROP_NUMARGS   1027
+
+/**
+ * Get the list of argument types for a kernel.
+ *
+ * This list is the same length as the number of arguments to the
+ * kernel. Do not modify the returned list.
+ *
+ * Type: `const int *`
+ */
+#define GA_KERNEL_PROP_TYPES     1028
 
 /**
  * @}

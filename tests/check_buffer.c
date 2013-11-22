@@ -254,55 +254,6 @@ START_TEST(test_buffer_move)
 }
 END_TEST
 
-static const char *KERNEL = "KERNEL void k(GLOBAL_MEM ga_float *a, ga_float b, GLOBAL_MEM ga_float *c) {}";
-
-START_TEST(test_kernel_setargs)
-{
-  gpukernel *k;
-  gpudata *d;
-  gpudata *d2;
-  int err;
-
-  if (setup(_i)) {
-    k = ops->kernel_alloc(ctx, 1, &KERNEL, NULL, "k", GA_USE_CLUDA, &err);
-    printf("%s\n", Gpu_error(ops, ctx, err));
-    ck_assert(k != NULL);
-    d = ops->buffer_alloc(ctx, 1024, NULL, 0, NULL);
-    ck_assert(d != NULL);
-    d2 = ops->buffer_alloc(ctx, 1024, NULL, 0, NULL);
-    ck_assert(d != NULL);
-
-    ck_assert_int_eq(refcnt(d), 1);
-    ck_assert_int_eq(refcnt(d2), 1);
-
-    err = ops->kernel_setarg(k, 0, GA_BUFFER, d);
-    ck_assert_int_eq(GA_NO_ERROR, err);
-    ck_assert_int_eq(refcnt(d), 2);
-
-    err = ops->kernel_setarg(k, 0, GA_BUFFER, d);
-    ck_assert_int_eq(GA_NO_ERROR, err);
-    ck_assert_int_eq(refcnt(d), 2);
-
-    err = ops->kernel_setarg(k, 2, GA_BUFFER, d);
-    ck_assert_int_eq(GA_NO_ERROR, err);
-    ck_assert_int_eq(refcnt(d), 3);
-
-    err = ops->kernel_setarg(k, 2, GA_BUFFER, d2);
-    ck_assert_int_eq(GA_NO_ERROR, err);
-    ck_assert_int_eq(refcnt(d), 2);
-    ck_assert_int_eq(refcnt(d2), 2);
-
-    ops->kernel_release(k);
-    ck_assert_int_eq(refcnt(d), 1);
-    ck_assert_int_eq(refcnt(d2), 1);
-
-    ops->buffer_release(d);
-    ops->buffer_release(d2);
-  }
-  teardown();
-}
-END_TEST
-
 Suite *get_suite(void) {
   Suite *s = suite_create("buffer");
   TCase *tc = tcase_create("All");
@@ -316,7 +267,6 @@ Suite *get_suite(void) {
   tcase_add_loop_test(tc, test_buffer_share, 0, nelems(BACKENDS));
   tcase_add_loop_test(tc, test_buffer_read_write, 0, nelems(BACKENDS));
   tcase_add_loop_test(tc, test_buffer_move, 0, nelems(BACKENDS));
-  tcase_add_loop_test(tc, test_kernel_setargs, 0, nelems(BACKENDS));
   suite_add_tcase(s, tc);
   return s;
 }

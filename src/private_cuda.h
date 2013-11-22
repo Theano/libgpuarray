@@ -74,19 +74,16 @@ COMPYTE_LOCAL gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz);
 COMPYTE_LOCAL CUdeviceptr cuda_get_ptr(gpudata *g);
 COMPYTE_LOCAL size_t cuda_get_sz(gpudata *g);
 
-/* The total size of the arguments is limited to 256 bytes */
-#define NUM_ARGS (256/sizeof(void*))
-
 struct _gpukernel {
 #ifdef DEBUG
   char tag[8];
 #endif
+  cuda_context *ctx;
   CUmodule m;
   CUfunction k;
-  void *args[NUM_ARGS];
+  void **args;
+  int *types;
   unsigned int argcount;
-  gpudata *bs[NUM_ARGS];
-  cuda_context *ctx;
   unsigned int refcnt;
 };
 

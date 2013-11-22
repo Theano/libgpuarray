@@ -62,7 +62,8 @@ struct _gpukernel {
 #endif
   cl_kernel k;
   cl_event ev;
-  gpudata **bs;
+  unsigned int argcount;
+  int *types;
   cl_ctx *ctx;
   unsigned int refcnt;
 };

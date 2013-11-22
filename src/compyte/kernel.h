@@ -26,6 +26,10 @@ typedef struct _GpuKernel {
    * Backend operations vector.
    */
   const compyte_buffer_ops *ops;
+  /**
+   * Argument buffer.
+   */
+  void **args;
 } GpuKernel;
 
 /**
@@ -50,7 +54,8 @@ typedef struct _GpuKernel {
 COMPYTE_PUBLIC int GpuKernel_init(GpuKernel *k, const compyte_buffer_ops *ops,
                                   void *ctx, unsigned int count,
                                   const char **strs, size_t *lens,
-                                  const char *name, int flags);
+                                  const char *name, unsigned int argcount,
+                                  int *types, int flags);
 
 /**
  * Clear and release data associated with a kernel.
@@ -67,32 +72,6 @@ COMPYTE_PUBLIC void GpuKernel_clear(GpuKernel *k);
  * \returns a context pointer
  */
 COMPYTE_PUBLIC void *GpuKernel_context(GpuKernel *k);
-
-/**
- * Set a scalar argument for a kernel.
- *
- * \param k a kernel
- * \param index argument index to set
- * \param typecode type of the argument to set
- * \param arg pointer to the scalar value
- *
- * \return GA_NO_ERROR if the operation is successful
- * \return any other value if an error occured
- */
-COMPYTE_PUBLIC int GpuKernel_setarg(GpuKernel *k, unsigned int index,
-                                    int typecode, void *arg);
-/**
- * Set an array argument for a kernel.
- *
- * \param k a kernel
- * \param index argument index to set
- * \param a array argument
- *
- * \return GA_NO_ERROR if the operation is successful
- * \return any other value if an error occured
- */
-COMPYTE_PUBLIC int GpuKernel_setbufarg(GpuKernel *k, unsigned int index,
-                                       GpuArray *a);
 
 /**
  * Launch the execution of a kernel.
@@ -115,10 +94,10 @@ COMPYTE_PUBLIC int GpuKernel_setbufarg(GpuKernel *k, unsigned int index,
  * \param gs size of launch grid
  */
 COMPYTE_PUBLIC int GpuKernel_call2(GpuKernel *k, size_t n[2],
-                                  size_t ls[2], size_t gs[2]);
+                                   size_t ls[2], size_t gs[2], void **args);
 
 COMPYTE_PUBLIC int GpuKernel_call(GpuKernel *k, size_t n,
-                                  size_t ls, size_t gs);
+                                  size_t ls, size_t gs, void **args);
 
 #ifdef __cplusplus
 }

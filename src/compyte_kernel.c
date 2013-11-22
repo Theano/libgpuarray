@@ -2,13 +2,20 @@
 #include "compyte/error.h"
 #include "compyte/types.h"
 
+#include <stdlib.h>
+
 int GpuKernel_init(GpuKernel *k, const compyte_buffer_ops *ops, void *ctx,
 		   unsigned int count, const char **strs, size_t *lens,
-		   const char *name, int flags) {
+		   const char *name, unsigned int argcount, int *types,
+                   int flags) {
   int res = GA_NO_ERROR;
 
+  k->args = calloc(argcount, sizeof(void *));
+  if (k->args == NULL)
+    return GA_MEMORY_ERROR;
   k->ops = ops;
-  k->k = k->ops->kernel_alloc(ctx, count, strs, lens, name, flags, &res);
+  k->k = k->ops->kernel_alloc(ctx, count, strs, lens, name, argcount, types,
+                              flags, &res);
   if (res != GA_NO_ERROR)
     GpuKernel_clear(k);
   return res;
@@ -17,25 +24,16 @@ int GpuKernel_init(GpuKernel *k, const compyte_buffer_ops *ops, void *ctx,
 void GpuKernel_clear(GpuKernel *k) {
   if (k->k)
     k->ops->kernel_release(k->k);
+  free(k->args);
   k->k = NULL;
   k->ops = NULL;
+  k->args = NULL;
 }
 
 void *GpuKernel_context(GpuKernel *k) {
-  void *res;
+  void *res = NULL;
   (void)k->ops->property(NULL, NULL, k->k, GA_KERNEL_PROP_CTX, &res);
   return res;
-}
-
-int GpuKernel_setarg(GpuKernel *k, unsigned int index, int typecode,
-		     void *arg) {
-  return k->ops->kernel_setarg(k->k, index, typecode, arg);
-}
-
-int GpuKernel_setbufarg(GpuKernel *k, unsigned int index, GpuArray *a) {
-  if (!(a->flags | GA_ALIGNED))
-    return GA_UNALIGNED_ERROR;
-  return k->ops->kernel_setarg(k->k, index, GA_BUFFER, a->data);
 }
 
 static int do_sched(GpuKernel *k, size_t n, size_t *ls, size_t *gs) {
@@ -72,24 +70,29 @@ static int do_sched(GpuKernel *k, size_t n, size_t *ls, size_t *gs) {
   return GA_NO_ERROR;
 }
 
-int GpuKernel_call(GpuKernel *k, size_t n, size_t bs, size_t gs) {
+int GpuKernel_call(GpuKernel *k, size_t n, size_t bs, size_t gs, void **args) {
   size_t _n[2], _bs[2], _gs[2];
   _n[1] = _bs[1] = _gs[1] = 1;
   _n[0] = n;
   _bs[0] = bs;
   _gs[0] = gs;
-  return GpuKernel_call2(k, _n, _bs, _gs);
+  return GpuKernel_call2(k, _n, _bs, _gs, args);
 }
 
-int GpuKernel_call2(GpuKernel *k, size_t n[2], size_t bs[2], size_t gs[2]) {
-  size_t _bs[2] = {0, 0}, _gs[2] = {0, 0};
+int GpuKernel_call2(GpuKernel *k, size_t n[2], size_t _bs[2], size_t _gs[2],
+                    void **args) {
+  size_t bs[2] = {0, 0}, gs[2] = {0, 0};
+  int *types;
+  unsigned int argcount;
+  unsigned int i;
   int err;
+
   if (n == NULL) {
     if (bs == NULL || gs == NULL)
       return GA_INVALID_ERROR;
   } else {
-    if (bs == NULL) bs = _bs;
-    if (gs == NULL) gs = _gs;
+    if (_bs != NULL) bs[0] = _bs[0], bs[1] = _bs[1];
+    if (_gs != NULL) gs[0] = _gs[0], gs[1] = _gs[1];
 
     if (bs[0] == 0 || gs[0] == 0) {
       err = do_sched(k, n[0], &bs[0], &gs[0]);
@@ -108,5 +111,15 @@ int GpuKernel_call2(GpuKernel *k, size_t n[2], size_t bs[2], size_t gs[2]) {
       }
     }
   }
-  return k->ops->kernel_call(k->k, bs, gs);
+  err = k->ops->property(NULL, NULL, k->k, GA_KERNEL_PROP_NUMARGS, &argcount);
+  if (err != GA_NO_ERROR) return err;
+  err = k->ops->property(NULL, NULL, k->k, GA_KERNEL_PROP_TYPES, &types);
+  if (err != GA_NO_ERROR) return err;
+
+  for (i = 0; i < argcount; i++)
+    if (types[i] == GA_BUFFER)
+      k->args[i] = ((GpuArray *)args[i])->data;
+    else
+      k->args[i] = args[i];
+  return k->ops->kernel_call(k->k, bs, gs, k->args);
 }
