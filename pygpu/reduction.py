@@ -201,7 +201,14 @@ class ReductionKernel(object):
                                   redux=self.redux,
                                   neutral=self.neutral,
                                   map_expr=self.expression)
-        k = gpuarray.GpuKernel(src, "reduk", context=self.context,
+        spec = ['uint32', gpuarray.GpuArray]
+        spec.extend('uint32' for _ in range(nd))
+        for i, arg in enumerate(self.arguments):
+            spec.append(arg.spec())
+            if arg.isarray():
+                spec.append('uint32')
+                spec.extend('int32' for _ in range(nd))
+        k = gpuarray.GpuKernel(src, "reduk", spec, context=self.context,
                                cluda=True, **self.flags)
         return k
 
@@ -241,15 +248,13 @@ class ReductionKernel(object):
         else:
             k, ls = self._get_basic_kernel(n, nd)
 
-        kargs = [numpy.asarray(n, dtype='uint32'), out]
-        kargs.extend(numpy.asarray(d, dtype='uint32') for d in dims)
+        kargs = [n, out]
+        kargs.extend(dims)
         for i, arg in enumerate(args):
+            kargs.append(arg)
             if isinstance(arg, gpuarray.GpuArray):
-                kargs.append(arg)
-                kargs.append(numpy.asarray(offsets[i], dtype='uint32'))
-                kargs.extend(numpy.asarray(s, dtype='int32') for s in strs[i])
-            else:
-                kargs.append(arg)
+                kargs.append(offsets[i])
+                kargs.extend(strs[i])
 
         k(*kargs, ls=ls, gs=gs)
 

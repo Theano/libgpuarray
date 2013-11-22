@@ -250,7 +250,7 @@ class ElemwiseKernel(object):
         self._spec_limit = spec_limit
         self._dimspec_limit = dimspec_limit
 
-        if not any(isinstance(arg, ArrayArg) for arg in self.arguments):
+        if not any(arg.isarray() for arg in self.arguments):
             raise RuntimeError("ElemwiseKernel can only be used with "
                                "functions that have at least one "
                                "vector argument.")
@@ -275,8 +275,9 @@ class ElemwiseKernel(object):
                                                    arguments=self.arguments,
                                                    expression=self.operation)
         self.contig_k = gpuarray.GpuKernel(self.contig_src, "elem_contig",
-                                           context=self.context,
-                                           cluda=True, **self.flags)
+                                           self.argspec_contig(),
+                                           context=self.context, cluda=True,
+                                           **self.flags)
         self._speckey = None
         self._dims = None
 
@@ -300,13 +301,21 @@ class ElemwiseKernel(object):
         self._make_specialized.clear()
 
     def prepare_args_contig(self, args, n, offsets):
-        kernel_args = []
+        kernel_args = [n]
         for i, arg in enumerate(args):
             kernel_args.append(arg)
             if isinstance(arg, gpuarray.GpuArray):
-                kernel_args.append(numpy.asarray(offsets[i], dtype='uint32'))
-        kernel_args.insert(0, numpy.asarray(n, dtype='uint32'))
+                kernel_args.append(offsets[i])
         return kernel_args
+
+    def argspec_contig(self):
+        spec = []
+        spec.append('uint32')
+        for i, arg in enumerate(self.arguments):
+            spec.append(arg.spec())
+            if arg.isarray():
+                spec.append('uint32')
+        return spec
 
     def render_basic(self, nd, name="elemk"):
         return basic_kernel.render(preamble=self.preamble, name=name,
@@ -317,25 +326,30 @@ class ElemwiseKernel(object):
     def _make_basic(self, nd):
         name = "elem_" + str(nd)
         src = self.render_basic(nd, name=name)
-        return gpuarray.GpuKernel(src, name, context=self.context,
-                                  cluda=True, **self.flags)
+        return gpuarray.GpuKernel(src, name, self.argspec_basic(nd),
+                                  context=self.context, cluda=True,
+                                  **self.flags)
 
     def prepare_args_basic(self, args, n, dims, strs, offsets):
-        kernel_args = []
+        kernel_args = [n]
+        kernel_args.extend(dims)
         for i, arg in enumerate(args):
+            kernel_args.append(arg)
             if isinstance(arg, gpuarray.GpuArray):
-                kernel_args.append(arg)
-                kernel_args.append(numpy.asarray(offsets[i], dtype='uint32'))
-                kernel_args.extend(numpy.asarray(s, dtype='int32')
-                                   for s in strs[i])
-            else:
-                kernel_args.append(arg)
-
-        for d in reversed(dims):
-            kernel_args.insert(0, numpy.asarray(d, dtype='uint32'))
-
-        kernel_args.insert(0, numpy.asarray(n, dtype='uint32'))
+                kernel_args.append(offsets[i])
+                kernel_args.extend(strs[i])
         return kernel_args
+
+    def argspec_basic(self, nd):
+        spec = []
+        spec.append('uint32')
+        spec.extend('uint32' for _ in range(nd))
+        for i, arg in enumerate(self.arguments):
+            spec.append(arg.spec())
+            if arg.isarray():
+                spec.append('uint32')
+                spec.extend('int32' for _ in range(nd))
+        return spec
 
     def get_basic(self, args, n, nd, dims, strs, offsets):
         args = self.prepare_args_basic(args, n, dims, strs, offsets)
@@ -352,21 +366,28 @@ class ElemwiseKernel(object):
                                     n=n, nd=nd, dims=dims,
                                     arguments=self.arguments,
                                     expression=self.expression)
-        return gpuarray.GpuKernel(src, "elemk", context=self.context,
-                                  cluda=True, **self.flags)
+        return gpuarray.GpuKernel(src, "elemk", self.argspec_dimspec(nd),
+                                  context=self.context, cluda=True,
+                                  **self.flags)
 
     def prepare_args_dimspec(self, args, strs, offsets):
         kernel_args = []
         for i, arg in enumerate(args):
+            kernel_args.append(arg),
             if isinstance(arg, gpuarray.GpuArray):
-                kernel_args.append(arg),
-                kernel_args.append(numpy.asarray(offsets[i], dtype='uint32'))
-                kernel_args.extend(numpy.asarray(s, dtype='int32')
-                                   for s in strs[i])
-            else:
-                kernel_args.append(arg)
+                kernel_args.append(offsets[i])
+                kernel_args.extend(strs[i])
 
         return kernel_args
+
+    def argspec_dimspec(self, nd):
+        spec = []
+        for i, arg in enumerate(self.arguments):
+            spec.append(arg.spec())
+            if arg.isarray():
+                spec.append('uint32')
+                spec.extend('int32' for _ in range(nd))
+        return spec
 
     def get_dimspec(self, args, n, nd, dims, strs, offsets):
         args = self.prepare_args_dimspec(args, strs, offsets)
@@ -380,6 +401,9 @@ class ElemwiseKernel(object):
     def prepare_args_specialized(self, args):
         return args
 
+    def argspec_specialized(self):
+        return [arg.spec() for arg in self.arguments]
+
     @lfu_cache()
     def _make_specialized(self, n, nd, dims, strs, offsets):
         src = specialized_kernel.render(preamble=self.preamble,
@@ -388,8 +412,9 @@ class ElemwiseKernel(object):
                                         arguments=self.arguments,
                                         expression=self.expression,
                                         offsets=offsets)
-        return gpuarray.GpuKernel(src, "elemk", context=self.context,
-                                  cluda=True, **self.flags)
+        return gpuarray.GpuKernel(src, "elemk", self.argspec_specialized(),
+                                  context=self.context, cluda=True,
+                                  **self.flags)
 
     def get_specialized(self, args, n, nd, dims, strs, offsets):
         args = self.prepare_args_specialized(args)
@@ -441,11 +466,11 @@ class ElemwiseKernel(object):
             args = self.prepare_args_specialized(args)
             self._prepare_k = self.get_specialized(args, n, nd, dims, strs, offsets)
 
-        self._prepare_k.setargs(args)
+        self._prepare_args = args
         self._prepare_n = n
 
     def prepared_call(self):
-        self._prepare_k.call(self._prepare_n, 0, 0)
+        self._prepare_k.call(self._prepare_n, 0, 0, self._prepare_args)
 
     def __call__(self, *args, **kwargs):
         (k, args), n = self.select_kernel(args, **kwargs)

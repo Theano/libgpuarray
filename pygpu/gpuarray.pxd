@@ -29,6 +29,7 @@ cdef extern from "compyte/types.h":
         int typecode
 
     enum COMPYTE_TYPES:
+        GA_BUFFER,
         GA_BOOL,
         GA_BYTE,
         GA_UBYTE,
@@ -42,6 +43,7 @@ cdef extern from "compyte/types.h":
         GA_DOUBLE,
         GA_CFLOAT,
         GA_CDOUBLE,
+        GA_SIZE,
         GA_NBASE
 
 cdef extern from "compyte/util.h":
@@ -75,6 +77,8 @@ cdef extern from "compyte/buffer.h":
     int GA_KERNEL_PROP_CTX
     int GA_KERNEL_PROP_MAXLSIZE
     int GA_KERNEL_PROP_PREFLSIZE
+    int GA_KERNEL_PROP_NUMARGS
+    int GA_KERNEL_PROP_TYPES
 
     cdef enum ga_usefl:
         GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF
@@ -88,15 +92,15 @@ cdef extern from "compyte/kernel.h":
         const compyte_buffer_ops *ops
 
     int GpuKernel_init(_GpuKernel *k, const compyte_buffer_ops *ops, void *ctx,
-                       unsigned int count, char **strs, size_t *lens,
-                       char *name, int flags)
+                       unsigned int count, const char **strs, size_t *lens,
+                       const char *name, unsigned int argcount, int *types,
+                       int flags)
     void GpuKernel_clear(_GpuKernel *k)
     void *GpuKernel_context(_GpuKernel *k)
-    int GpuKernel_setarg(_GpuKernel *k, unsigned int index, int typecode,
-                         void *arg)
-    int GpuKernel_setbufarg(_GpuKernel *k, unsigned int index,
-                            _GpuArray *a)
-    int GpuKernel_call(_GpuKernel *, size_t n, size_t ls, size_t gs)
+    int GpuKernel_call(_GpuKernel *, size_t n, size_t ls, size_t gs,
+                       void **args)
+    int GpuKernel_call2(_GpuKernel *, size_t n[2], size_t ls[2], size_t gs[2],
+                        void **args)
 
 cdef extern from "compyte/array.h":
     ctypedef struct _GpuArray "GpuArray":
@@ -215,14 +219,14 @@ cdef int array_transfer(GpuArray res, GpuArray a, void *new_ctx,
 cdef const char *kernel_error(GpuKernel k, int err) except NULL
 cdef int kernel_init(GpuKernel k, const compyte_buffer_ops *ops, void *ctx,
                      unsigned int count, const char **strs, size_t *len,
-                     char *name, int flags) except -1
+                     const char *name, unsigned int argcount, int *types,
+                     int flags) except -1
 cdef int kernel_clear(GpuKernel k) except -1
 cdef void *kernel_context(GpuKernel k) except NULL
-cdef int kernel_setarg(GpuKernel k, unsigned int index, int typecode,
-                       void *arg) except -1
-cdef int kernel_setbufarg(GpuKernel k, unsigned int index,
-                          GpuArray a) except -1
-cdef int kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs) except -1
+cdef int kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs,
+                     void **args) except -1
+cdef int kernel_call2(GpuKernel k, size_t n[2], size_t ls[2], size_t gs[2],
+                     void **args) except -1
 cdef int kernel_property(GpuKernel k, int prop_id, void *res) except -1
 
 cdef int ctx_property(GpuContext c, int prop_id, void *res) except -1
@@ -287,9 +291,8 @@ cdef api class GpuArray [type PyGpuArrayType, object PyGpuArrayObject]:
 cdef api class GpuKernel [type PyGpuKernelType, object PyGpuKernelObject]:
     cdef _GpuKernel k
     cdef readonly GpuContext context
+    cdef void **callbuf
     cdef object __weakref__
 
-    cpdef setargs(self, args)
-    cpdef setarg(self, unsigned int index, o)
-    cdef _setarg(self, unsigned int index, np.dtype t, object o)
-    cpdef call(self, size_t n, size_t ls, size_t gs)
+    cdef do_call(self, py_n, py_ls, py_gs, py_args)
+    cdef _setarg(self, unsigned int index, int typecode, object o)

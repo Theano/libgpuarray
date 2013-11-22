@@ -9,7 +9,7 @@ from cpython.object cimport Py_EQ, Py_NE
 
 def api_version():
     # major, minor
-    return (0, 1)
+    return (1, 0)
 
 np.import_array()
 
@@ -394,9 +394,11 @@ cdef const char *kernel_error(GpuKernel k, int err) except NULL:
 
 cdef int kernel_init(GpuKernel k, const compyte_buffer_ops *ops, void *ctx,
                      unsigned int count, const char **strs, size_t *len,
-                     char *name, int flags) except -1:
+                     const char *name, unsigned int argcount, int *types,
+                     int flags) except -1:
     cdef int err
-    err = GpuKernel_init(&k.k, ops, ctx, count, strs, len, name, flags)
+    err = GpuKernel_init(&k.k, ops, ctx, count, strs, len, name, argcount,
+                          types, flags)
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(ops, ctx, err), err)
 
@@ -410,23 +412,17 @@ cdef void *kernel_context(GpuKernel k) except NULL:
         raise GpuArrayException("Invalid kernel or destroyed context", None)
     return res
 
-cdef int kernel_setarg(GpuKernel k, unsigned int index, int typecode,
-                       void *arg) except -1:
+cdef int kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs,
+                     void **args) except -1:
     cdef int err
-    err = GpuKernel_setarg(&k.k, index, typecode, arg)
+    err = GpuKernel_call(&k.k, n, ls, gs, args)
     if err != GA_NO_ERROR:
         raise GpuArrayException(kernel_error(k, err), err)
 
-cdef int kernel_setbufarg(GpuKernel k, unsigned int index,
-                          GpuArray a) except -1:
+cdef int kernel_call2(GpuKernel k, size_t n[2], size_t ls[2], size_t gs[2],
+                     void **args) except -1:
     cdef int err
-    err = GpuKernel_setbufarg(&k.k, index, &a.ga)
-    if err != GA_NO_ERROR:
-        raise GpuArrayException(kernel_error(k, err), err)
-
-cdef int kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs) except -1:
-    cdef int err
-    err = GpuKernel_call(&k.k, n, ls, gs)
+    err = GpuKernel_call2(&k.k, n, ls, gs, args)
     if err != GA_NO_ERROR:
         raise GpuArrayException(kernel_error(k, err), err)
 
@@ -1688,13 +1684,17 @@ cdef class GpuKernel:
     limits of `k.maxlsize` and `ctx.maxgsize` or the call will fail.
     """
     def __dealloc__(self):
+        free(self.callbuf)
         kernel_clear(self)
 
-    def __cinit__(self, source, name, GpuContext context=None, cluda=True,
-                  have_double=False, have_small=False, have_complex=False,
-                  have_half=False, *a, **kwa):
+    def __cinit__(self, source, name, types, GpuContext context=None,
+                  cluda=True, have_double=False, have_small=False,
+                  have_complex=False, have_half=False, *a, **kwa):
         cdef const char *s[1]
         cdef size_t l
+        cdef unsigned int numargs
+        cdef unsigned int i
+        cdef int *_types
         cdef const compyte_buffer_ops *ops
         cdef int flags = 0
 
@@ -1718,122 +1718,126 @@ cdef class GpuKernel:
 
         s[0] = source
         l = len(source)
-        kernel_init(self, self.context.ops, self.context.ctx, 1, s, &l, name,
-                    flags)
+        numargs = len(types)
+        self.callbuf = <void **>calloc(len(types), sizeof(void *))
+        if self.callbuf == NULL:
+            raise MemoryError
+        _types = <int *>calloc(numargs, sizeof(int))
+        if _types == NULL:
+            raise MemoryError
+        try:
+            for i in range(numargs):
+                if (types[i] == GpuArray):
+                    _types[i] = GA_BUFFER
+                else:
+                    _types[i] = dtype_to_typecode(types[i])
+                self.callbuf[i] = malloc(compyte_get_elsize(_types[i]))
+                if self.callbuf[i] == NULL:
+                    raise MemoryError
+            kernel_init(self, self.context.ops, self.context.ctx, 1, s, &l,
+                        name, numargs, _types, flags)
+        finally:
+            free(_types)
 
-    def __call__(self, *args, n=0, ls=0, gs=0):
-        if n == 0 and (ls == 0 or gs == 0):
+    def __call__(self, *args, n=None, ls=None, gs=None):
+        if n == None and (ls == None or gs == None):
             raise ValueError, "Must specify size (n) or both gs and ls"
-        self.setargs(args)
-        self.call(n, ls, gs)
+        self.do_call(n, ls, gs, args)
 
-    cpdef setargs(self, args):
-        """
-        setargs(args)
+    cdef do_call(self, py_n, py_ls, py_gs, py_args):
+        cdef size_t _n[2]
+        cdef size_t _gs[2]
+        cdef size_t _ls[2]
+        cdef size_t *n
+        cdef size_t *gs
+        cdef size_t *ls
+        cdef size_t tmp
+        cdef const int *types
+        cdef unsigned int numargs
+        cdef unsigned int i
 
-        Sets the arguments of the kernel to prepare for a :meth:`.call`
-
-        :param args: kernel arguments
-        :type args: tuple or list
-        """
-        cdef size_t i
-        # Work backwards to avoid a lot of reallocations in the argument code.
-        for i in range(len(args), 0, -1):
-            self.setarg(<unsigned int>i-1, args[i-1])
-
-    cpdef setarg(self, unsigned int index, o):
-        """
-        setarg(index, o)
-
-        Set argument `index` to `o`.
-
-        :param index: argument index
-        :type index: int
-        :param o: argument value
-        :type o: GpuArray or numpy.ndarray
-
-        This overwrites any previous argument set for that index.
-
-        The type of scalar arguments is indicated by wrapping them in
-        a numpy.ndarray like this::
-
-            param1 = numpy.asarray(1.0, dtype='float32')
-
-        Arguments which are not wrapped will raise an exception.
-        """
-        if isinstance(o, GpuArray):
-            kernel_setbufarg(self, index, o)
-            # This is to keep the reference alive
+        if py_n is None:
+            n = NULL
         else:
-            try:
-                self._setarg(index, o.dtype, o)
-            except AttributeError:
-                raise TypeError, "Wrap your scalar arguments in numpy objects"
+            if isinstance(py_n, int):
+                _n[0] = py_n
+                _n[1] = 1
+            elif isinstance(py_n, (list, tuple)):
+                if len(py_n) != 2:
+                    raise ValueError, "n is not a len() 2 list"
+                _n[0] = py_n[0]
+                _n[1] = py_n[1]
+            else:
+                raise TypeError, "n is not int or list"
+            n = _n
 
-    cdef _setarg(self, unsigned int index, np.dtype t, object o):
-        cdef float f
-        cdef double d
-        cdef signed char b
-        cdef unsigned char ub
-        cdef short s
-        cdef unsigned short us
-        cdef int i
-        cdef unsigned int ui
-        cdef long l
-        cdef unsigned long ul
-        cdef unsigned int typecode
-        typecode = dtype_to_typecode(t)
-        if typecode == GA_FLOAT:
-            f = o
-            kernel_setarg(self, index, typecode, &f)
+        if py_ls is None:
+            ls = NULL
+        else:
+            if isinstance(py_ls, int):
+                _ls[0] = py_ls
+                _ls[1] = 1
+            elif isinstance(py_ls, (list, tuple)):
+                if len(py_ls) != 2:
+                    raise ValueError, "ls is not a len() 2 list"
+                _ls[0] = py_ls[0]
+                _ls[1] = py_ls[1]
+            else:
+                raise TypeError, "ls is not int or list"
+            ls = _ls
+
+        if py_gs is None:
+            gs = NULL
+        else:
+            if isinstance(py_gs, int):
+                _gs[0] = py_gs
+                _gs[1] = 1
+            elif isinstance(py_gs, (list, tuple)):
+                if len(py_gs) != 2:
+                    raise ValueError, "gs is not a len() 2 list"
+                _gs[0] = py_gs[0]
+                _gs[1] = py_gs[1]
+            else:
+                raise TypeError, "gs is not int or list"
+            gs = _gs
+
+        numargs = self.numargs
+        if len(py_args) != numargs:
+            raise TypeError, "Expected %d arguments, got %d," % (numargs, len(py_args))
+        kernel_property(self, GA_KERNEL_PROP_TYPES, &types)
+        for i in range(numargs):
+            self._setarg(i, types[i], py_args[i])
+        kernel_call2(self, n, ls, gs, self.callbuf)
+
+    cdef _setarg(self, unsigned int index, int typecode, object o):
+        if typecode == GA_BUFFER:
+            if not isinstance(o, GpuArray):
+                raise TypeError, "expected a GpuArray"
+            self.callbuf[index] = <void *>&(<GpuArray>o).ga
+        elif typecode == GA_SIZE:
+            (<size_t *>self.callbuf[index])[0] = o
+        elif typecode == GA_FLOAT:
+            (<float *>self.callbuf[index])[0] = o
         elif typecode == GA_DOUBLE:
-            d = o
-            kernel_setarg(self, index, typecode, &d)
+            (<double *>self.callbuf[index])[0] = o
         elif typecode == GA_BYTE:
-            b = o
-            kernel_setarg(self, index, typecode, &b)
+            (<signed char *>self.callbuf[index])[0] = o
         elif typecode == GA_UBYTE:
-            ub = o
-            kernel_setarg(self, index, typecode, &ub)
+            (<unsigned char *>self.callbuf[index])[0] = o
         elif typecode == GA_SHORT:
-            s = o
-            kernel_setarg(self, index, typecode, &s)
+            (<short *>self.callbuf[index])[0] = o
         elif typecode == GA_USHORT:
-            us = o
-            kernel_setarg(self, index, typecode, &us)
+            (<unsigned short *>self.callbuf[index])[0] = o
         elif typecode == GA_INT:
-            i = o
-            kernel_setarg(self, index, typecode, &i)
+            (<int *>self.callbuf[index])[0] = o
         elif typecode == GA_UINT:
-            ui = o
-            kernel_setarg(self, index, typecode, &ui)
+            (<unsigned int *>self.callbuf[index])[0] = o
         elif typecode == GA_LONG:
-            l = o
-            kernel_setarg(self, index, typecode, &l)
+            (<long *>self.callbuf[index])[0] = o
         elif typecode == GA_ULONG:
-            ul = o
-            kernel_setarg(self, index, typecode, &ul)
+            (<unsigned long *>self.callbuf[index])[0] = o
         else:
-            raise TypeError, ("Can't set argument of this type", t)
-
-    cpdef call(self, size_t n, size_t ls, size_t gs):
-        """
-        call(n, ls, gs)
-
-        Call the kernel with the prepered arguments
-
-        :param n: number of work elements
-        :param ls: local size
-        :param gs: global size
-
-        Either `n` or `gs` and `ls` must be set (not 0).  You can also
-        set `n` and one of `ls` or `gs` and the other will be filled
-        in.
-
-        For a friendlier interface try just calling the object
-        (documentation is in the class doc :class:`.GpuKernel`)
-        """
-        kernel_call(self, n, ls, gs)
+            raise ValueError, "Bad typecode in _setarg (please report this, it is a bug)"
 
     property maxlsize:
         "Maximum local size for this kernel"
@@ -1847,4 +1851,11 @@ cdef class GpuKernel:
         def __get__(self):
             cdef size_t res
             kernel_property(self, GA_KERNEL_PROP_PREFLSIZE, &res)
+            return res
+
+    property numargs:
+        "Number of arguments to kernel"
+        def __get__(self):
+            cdef unsigned int res
+            kernel_property(self, GA_KERNEL_PROP_NUMARGS, &res)
             return res

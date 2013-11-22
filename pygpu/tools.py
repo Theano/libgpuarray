@@ -45,6 +45,9 @@ class ArrayArg(Argument):
     def isarray(self):
         return True
 
+    def spec(self):
+        return GpuArray
+
 
 class ScalarArg(Argument):
     def decltype(self):
@@ -55,6 +58,9 @@ class ScalarArg(Argument):
 
     def isarray(self):
         return False
+
+    def spec(self):
+        return self.dtype
 
 
 def check_args(args, collapse=False, broadcast=False):
