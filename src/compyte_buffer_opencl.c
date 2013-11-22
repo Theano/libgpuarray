@@ -604,7 +604,6 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
 
   m = cl_newkernel(ctx, 1, rlk, &sz, "kmemset", 1, &type, 0, &res);
   if (m == NULL) return res;
-  if (res != GA_NO_ERROR) goto fail;
 
   /* Cheap kernel scheduling */
   res = cl_property(NULL, NULL, m, GA_KERNEL_PROP_MAXLSIZE, &ls[0]);
@@ -959,7 +958,7 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
                    2, types, flags, &res);
   if (k == NULL) goto fail;
   /* Cheap kernel scheduling */
-  res = cl_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, &ls);
+  res = cl_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, &ls[0]);
   if (res != GA_NO_ERROR) goto kfail;
 
   gs[0] = ((nEls-1) / ls[0]) + 1;
