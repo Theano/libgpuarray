@@ -761,6 +761,7 @@ static int cl_callkernel(gpukernel *k, size_t ls[2], size_t gs[2],
   size_t _gs[2];
   cl_event ev;
   cl_event *evw;
+  gpudata *btmp;
   cl_device_id dev;
   cl_ulong temp;
   cl_uint num_ev;
@@ -781,8 +782,10 @@ static int cl_callkernel(gpukernel *k, size_t ls[2], size_t gs[2],
   
   for (i = 0; i < k->argcount; i++) {
     if (k->types[i] == GA_BUFFER) {
-      evw[num_ev++] = ((gpudata *)args[i])->ev;
-      ctx->err = clSetKernelArg(k->k, i, sizeof(cl_mem), &((gpudata *)args[i])->buf);
+      btmp = (gpudata *)args[i];
+      if (btmp->ev != NULL)
+        evw[num_ev++] = btmp->ev;
+      ctx->err = clSetKernelArg(k->k, i, sizeof(cl_mem), &btmp->buf);
     } else if (k->types[i] == GA_SIZE) {
       temp = *((size_t *)args[i]);
       ctx->err = clSetKernelArg(k->k, i, compyte_get_elsize(k->types[i]),
