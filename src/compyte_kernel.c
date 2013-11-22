@@ -87,20 +87,25 @@ int GpuKernel_call2(GpuKernel *k, size_t n[2], size_t _bs[2], size_t _gs[2],
   unsigned int i;
   int err;
 
+  if (_bs != NULL) bs[0] = _bs[0], bs[1] = _bs[1];
+  if (_gs != NULL) gs[0] = _gs[0], gs[1] = _gs[1];
   if (n == NULL) {
-    if (bs == NULL || gs == NULL)
+    if (_bs == NULL || _gs == NULL ||
+        bs[0] == 0 || bs[1] == 0 ||
+        gs[0] == 0 || gs[1] == 0)
       return GA_INVALID_ERROR;
   } else {
-    if (_bs != NULL) bs[0] = _bs[0], bs[1] = _bs[1];
-    if (_gs != NULL) gs[0] = _gs[0], gs[1] = _gs[1];
-
     if (bs[0] == 0 || gs[0] == 0) {
+      if (n[0] == 0)
+        return GA_INVALID_ERROR;
       err = do_sched(k, n[0], &bs[0], &gs[0]);
       if (err != GA_NO_ERROR)
         return err;
     }
 
     if (bs[1] == 0 || gs[1] == 0) {
+      if (n[1] == 0)
+        return GA_INVALID_ERROR;
       if (n[1] == 1) {
         bs[1] = 1;
         gs[1] = 1;
