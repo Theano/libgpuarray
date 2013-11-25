@@ -99,6 +99,8 @@ COMPYTE_PUBLIC int GpuKernel_call2(GpuKernel *k, size_t n[2],
 COMPYTE_PUBLIC int GpuKernel_call(GpuKernel *k, size_t n,
                                   size_t ls, size_t gs, void **args);
 
+COMPYTE_PUBLIC const char *GpuKernel_error(const GpuKernel *k, int err);
+
 #ifdef __cplusplus
 }
 #endif

@@ -128,3 +128,14 @@ int GpuKernel_call2(GpuKernel *k, size_t n[2], size_t _bs[2], size_t _gs[2],
       k->args[i] = args[i];
   return k->ops->kernel_call(k->k, bs, gs, k->args);
 }
+
+const char *GpuKernel_error(const GpuKernel *k, int err) {
+  void *ctx;
+  int err2 = k->ops->property(NULL, NULL, k->k, GA_KERNEL_PROP_CTX, &ctx);
+  if (err2 != GA_NO_ERROR) {
+    /* If CUDA refuses to work after any kind of error in kernels
+       there is not much we can do about it. */
+    return compyte_error_str(err);
+  }
+  return Gpu_error(k->ops, ctx, err);
+}
