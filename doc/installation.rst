@@ -55,6 +55,24 @@ For pygpu:
   python setup.py build
   python setup.py install
 
+Mac-specific instructions
+-------------------------
+
+To get the compiler you need to install Xcode which is available for
+free from the App Store.  Don't forget to install the command-line
+tools afterwards.
+
+On Xcode 4.x these are installed by going to the download tab of the
+preferences window and selecting the "Command-line Tools" download.
+
+On Xcode 5.x these are installed by stating the GUI app once, then
+running 'xcode-select --install'.  There are tools installed by just
+running the GUI app but they have incomplete search path and you will
+encounter a lot of problems with them.
+
+It might be possible to use a version of gcc built using Homebrew or
+MacPorts, but this is untested and unsupported.
+
 Windows-specific instructions
 -----------------------------
 
