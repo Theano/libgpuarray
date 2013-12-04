@@ -55,14 +55,16 @@ else:
 
 exts = [Extension('pygpu.gpuarray',
                   sources = srcs,
-                  include_dirs = [np.get_include()],
+                  include_dirs = [np.get_include(), '/usr/local/include'],
                   libraries = ['compyte'],
+                  library_dirs = ['/usr/local/lib'],
                   define_macros = [('COMPYTE_SHARED', None)],
                   ),
         Extension('pygpu.blas',
                   sources = blas_src,
-                  include_dirs = [np.get_include()],
+                  include_dirs = [np.get_include(), '/usr/local/include'],
                   libraries = ['compyte'],
+                  library_dirs = ['/usr/local/lib'],
                   define_macros = [('COMPYTE_SHARED', None)],
                   )]
 
