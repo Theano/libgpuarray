@@ -65,10 +65,11 @@ tools afterwards.
 On Xcode 4.x these are installed by going to the download tab of the
 preferences window and selecting the "Command-line Tools" download.
 
-On Xcode 5.x these are installed by stating the GUI app once, then
-running 'xcode-select --install'.  There are tools installed by just
-running the GUI app but they have incomplete search path and you will
-encounter a lot of problems with them.
+If you have Xcode 5, ensure you update to 5.0.2 or later.  Prior
+versions will not look in /usr/local for includes or libraries and
+this will cause a lot of errors.  You can update by using the
+"Software Update..." function of the Apple menu or by running
+'xcode-select --install' on the command line.
 
 It might be possible to use a version of gcc built using Homebrew or
 MacPorts, but this is untested and unsupported.
@@ -95,6 +96,56 @@ If you don't have Visual Studio installed, you can get the free Express version 
 .. warning::
    While you may get the library to compile using cygwin, this is not
    recommended nor supported.
+
+Running Tests
+-------------
+
+.. warning::
+
+   In its current state, the C test suite is woefully incomplete.  It
+   will test very basic functionality, but nothing else.  It is
+   strongly recommended to run the python test suite to ensure
+   everything is ok even if you intend on just using the C library.
+
+To run the C tests, enter the build directory (the one where you ran
+cmake) and run 'make test'.  It will run using the first OpenCL and
+the first CUDA device it finds skipping these if the corresponding
+backend wasn't built.
+
+If you get an error message similar to this one:
+
+::
+
+  Running tests...
+  Test project /Users/anakha/ext/compyte/Debug
+  No tests were found!!!
+
+This means either you don't have check installed or it wasn't found by
+the cmake detection script.
+
+To run the python tests run nosetests in the pygpu subdirectory.  By
+default it will attempt to use 'opencl0:0' as the compute device but
+you can override this by setting the DEVICE or COMPYTE_DEVICE
+environement variable, with COMPYTE_DEVICE having priority, if set.
+The format for the device string is '<backend name><device id>'.
+Possible backend names are 'cuda' and 'opencl'.
+
+For 'cuda' possible device ids are from 0 to the number of cuda
+devices.
+
+For 'opencl' the devices id are of this format '<platform
+number>:<device number>'.  Both start at 0 and go up to the number of
+platforms/devices available.  There is no fixed order for the devices,
+but the order on a single machine should be stable across runs.
+
+The test script prints the device name of the chosen device so that
+you can confirm which device it is running on.
+
+.. note::
+
+   AMD GPUs tend to have really uninformative names, generally being
+   only the codename of the architecture the GPU belongs to (e.g.
+   'Tahiti').
 
 .. _cmake: http://cmake.org/
 
