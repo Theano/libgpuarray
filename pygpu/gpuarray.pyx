@@ -1624,7 +1624,7 @@ cdef class GpuKernel:
     """
     .. code-block:: python
 
-        GpuKernel(source, name, context=None, cluda=True, have_double=False, have_small=False, have_complex=False, have_half=False)
+        GpuKernel(source, name, types, context=None, cluda=True, have_double=False, have_small=False, have_complex=False, have_half=False)
 
     Compile a kernel on the device
 
@@ -1632,6 +1632,8 @@ cdef class GpuKernel:
     :type source: string
     :param name: function name of the kernel
     :type name: string
+    :param types: list of argument types
+    :type types: list or tuple
     :param context: device on which the kernel is compiled
     :type context: GpuContext
     :param cluda: use cluda layer?
