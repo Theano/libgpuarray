@@ -165,8 +165,10 @@ class ReductionKernel(object):
         self.init_local_size = min(context.lmemsize //
                                    self.out_arg.dtype.itemsize,
                                    context.maxlsize)
+
+        # this is to prep the cache
         if init_nd is not None:
-            k, ls = self._get_basic_kernel(self.init_local_size, init_nd)
+            self._get_basic_kernel(self.init_local_size, init_nd)
 
     def _find_kernel_ls(self, tmpl, max_ls, *tmpl_args):
         local_size = min(self.init_local_size, max_ls)
@@ -178,10 +180,10 @@ class ReductionKernel(object):
         local_size = 2**count_lim
         loop_count = 0
         while loop_count <= count_lim:
-            k = tmpl(local_size, *tmpl_args)
+            k, src, spec = tmpl(local_size, *tmpl_args)
 
             if local_size <= k.maxlsize:
-                return k, local_size
+                return k, src, spec, local_size
             else:
                 local_size /= 2
 
@@ -210,7 +212,7 @@ class ReductionKernel(object):
                 spec.extend('int32' for _ in range(nd))
         k = gpuarray.GpuKernel(src, "reduk", spec, context=self.context,
                                cluda=True, **self.flags)
-        return k
+        return k, src, spec
 
     @lfu_cache()
     def _get_basic_kernel(self, maxls, nd):
@@ -244,9 +246,9 @@ class ReductionKernel(object):
                         out_shape, self.dtype_out, out.shape, out.dtype))
         #Don't compile and cache for nothing for big size
         if self.init_local_size < n:
-            k, ls = self._get_basic_kernel(self.init_local_size, nd)
+            k, _, _, ls = self._get_basic_kernel(self.init_local_size, nd)
         else:
-            k, ls = self._get_basic_kernel(n, nd)
+            k, _, _, ls = self._get_basic_kernel(n, nd)
 
         kargs = [n, out]
         kargs.extend(dims)
