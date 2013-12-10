@@ -32,6 +32,17 @@ Requirements
    If you have neither an OpenCL runtime or a CUDA runtime, the
    library might still build, but will be rather useless.
 
+Download
+--------
+
+The code is currently in a github repo branch. It will be moved. To
+get it:
+::
+
+  git clone https://github.com/abergeron/compyte.git
+  cd compyte
+  git checkout reorg
+
 Step-by-step install
 --------------------
 
