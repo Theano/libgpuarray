@@ -66,6 +66,13 @@ For pygpu:
   python setup.py build
   python setup.py install
 
+If you installed libcompyte in a path that isn't a default one, you
+will need to specify where it is. Replace the first line by something
+like this:
+::
+
+  python setup.py build_ext -L $MY_PREFIX/lib -I $MY_PREFIX/include
+
 Mac-specific instructions
 -------------------------
 
