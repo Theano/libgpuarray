@@ -7,24 +7,24 @@
 #ifndef COMPYTE_BUFFER_CUDA_H
 #define COMPYTE_BUFFER_CUDA_H
 
-int PyGpuArray_NDIM(PyGpuArrayObject *arr) {
+int PyGpuArray_NDIM(const PyGpuArrayObject *arr) {
   return arr->ga.nd;
 }
-size_t *PyGpuArray_DIMS(PyGpuArrayObject *arr) {
+const size_t *PyGpuArray_DIMS(const PyGpuArrayObject *arr) {
   return arr->ga.dimensions;
 }
 
-ssize_t *PyGpuArray_STRIDES(PyGpuArrayObject* arr) {
+const ssize_t *PyGpuArray_STRIDES(const PyGpuArrayObject* arr) {
   return arr->ga.strides;
 }
-size_t PyGpuArray_DIM(PyGpuArrayObject* arr, int n) {
+size_t PyGpuArray_DIM(const PyGpuArrayObject* arr, int n) {
   return arr->ga.dimensions[n];
 }
-ssize_t PyGpuArray_STRIDE(PyGpuArrayObject* arr, int n) {
+ssize_t PyGpuArray_STRIDE(const PyGpuArrayObject* arr, int n) {
   return arr->ga.strides[n];
 }
 //int PyGpuArray_ITEMSIZE(PyGpuArrayObject* arr)
-size_t PyGpuArray_SIZE(PyGpuArrayObject* arr) {
+size_t PyGpuArray_SIZE(const PyGpuArrayObject* arr) {
   size_t size = 1;
   for(int i=0; i< arr->ga.nd; i++) {
     size *= arr->ga.dimensions[i];
