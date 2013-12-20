@@ -261,7 +261,7 @@ typedef struct _compyte_buffer_ops {
   gpukernel *(*kernel_alloc)(void *ctx, unsigned int count,
                              const char **strings, const size_t *lengths,
                              const char *fname, unsigned int numargs,
-                             int *typecodes, int flags, int *ret);
+                             const int *typecodes, int flags, int *ret);
 
   /**
    * Retain a kernel.

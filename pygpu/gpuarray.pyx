@@ -269,7 +269,7 @@ cdef bint py_ISONESEGMENT(GpuArray a):
     return GpuArray_ISONESEGMENT(&a.ga)
 
 cdef int array_empty(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
-                     int typecode, unsigned int nd, size_t *dims,
+                     int typecode, unsigned int nd, const size_t *dims,
                      ga_order ord) except -1:
     cdef int err
     err = GpuArray_empty(&a.ga, ops, ctx, typecode, nd, dims, ord)
@@ -310,8 +310,8 @@ cdef int array_sync(GpuArray a) except -1:
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
-cdef int array_index(GpuArray r, GpuArray a, const ssize_t *starts, const ssize_t *stops,
-                     const ssize_t *steps) except -1:
+cdef int array_index(GpuArray r, GpuArray a, const ssize_t *starts,
+                     const ssize_t *stops, const ssize_t *steps) except -1:
     cdef int err
     err = GpuArray_index(&r.ga, &a.ga, starts, stops, steps)
     if err != GA_NO_ERROR:
@@ -393,8 +393,8 @@ cdef const char *kernel_error(GpuKernel k, int err) except NULL:
     return Gpu_error(k.k.ops, kernel_context(k), err)
 
 cdef int kernel_init(GpuKernel k, const compyte_buffer_ops *ops, void *ctx,
-                     unsigned int count, const char **strs, size_t *len,
-                     const char *name, unsigned int argcount, int *types,
+                     unsigned int count, const char **strs, const size_t *len,
+                     const char *name, unsigned int argcount, const int *types,
                      int flags) except -1:
     cdef int err
     err = GpuKernel_init(&k.k, ops, ctx, count, strs, len, name, argcount,
@@ -565,14 +565,14 @@ def zeros(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
     array_memset(res, 0)
     return res
 
-cdef GpuArray pygpu_zeros(unsigned int nd, size_t *dims, int typecode,
+cdef GpuArray pygpu_zeros(unsigned int nd, const size_t *dims, int typecode,
                           ga_order order, GpuContext context, type cls):
     cdef GpuArray res
     res = pygpu_empty(nd, dims, typecode, order, context, cls)
     array_memset(res, 0)
     return res
 
-cdef GpuArray pygpu_empty(unsigned int nd, size_t *dims, int typecode,
+cdef GpuArray pygpu_empty(unsigned int nd, const size_t *dims, int typecode,
                           ga_order order, GpuContext context, type cls):
     cdef GpuArray res
 

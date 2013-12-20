@@ -144,7 +144,7 @@ cl_mem cl_get_buf(gpudata *g) { ASSERT_BUF(g); return g->buf; }
 static gpukernel *cl_newkernel(void *ctx, unsigned int count,
 			       const char **strings, const size_t *lengths,
 			       const char *fname, unsigned int argcount,
-                               int *types, int flags, int *ret);
+                               const int *types, int flags, int *ret);
 static void cl_releasekernel(gpukernel *k);
 static int cl_callkernel(gpukernel *k, size_t bs[2], size_t gs[2], void **args);
 
@@ -651,7 +651,7 @@ static int cl_check_extensions(const char **preamble, unsigned int *count,
 static gpukernel *cl_newkernel(void *c, unsigned int count,
 			       const char **strings, const size_t *lengths,
 			       const char *fname, unsigned int argcount,
-                               int *types, int flags, int *ret) {
+                               const int *types, int flags, int *ret) {
   cl_ctx *ctx = (cl_ctx *)c;
   gpukernel *res;
   cl_device_id dev;

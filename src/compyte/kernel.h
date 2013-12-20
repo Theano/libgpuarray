@@ -53,9 +53,9 @@ typedef struct _GpuKernel {
  */
 COMPYTE_PUBLIC int GpuKernel_init(GpuKernel *k, const compyte_buffer_ops *ops,
                                   void *ctx, unsigned int count,
-                                  const char **strs, size_t *lens,
+                                  const char **strs, const size_t *lens,
                                   const char *name, unsigned int argcount,
-                                  int *types, int flags);
+                                  const int *types, int flags);
 
 /**
  * Clear and release data associated with a kernel.

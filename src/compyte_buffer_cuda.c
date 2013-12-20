@@ -683,7 +683,7 @@ COMPYTE_LOCAL void cuda_set_compiler(void *(*compiler_f)(const char *, size_t,
 static gpukernel *cuda_newkernel(void *c, unsigned int count,
                                  const char **strings, const size_t *lengths,
                                  const char *fname, unsigned int argcount,
-                                 int *types, int flags, int *ret) {
+                                 const int *types, int flags, int *ret) {
     cuda_context *ctx = (cuda_context *)c;
     struct iovec *descr;
     char *buf;

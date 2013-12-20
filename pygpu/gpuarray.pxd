@@ -92,9 +92,9 @@ cdef extern from "compyte/kernel.h":
         const compyte_buffer_ops *ops
 
     int GpuKernel_init(_GpuKernel *k, const compyte_buffer_ops *ops, void *ctx,
-                       unsigned int count, const char **strs, size_t *lens,
-                       const char *name, unsigned int argcount, int *types,
-                       int flags)
+                       unsigned int count, const char **strs,
+                       const size_t *lens, const char *name,
+                       unsigned int argcount, const int *types, int flags)
     void GpuKernel_clear(_GpuKernel *k)
     void *GpuKernel_context(_GpuKernel *k)
     int GpuKernel_call(_GpuKernel *, size_t n, size_t ls, size_t gs,
@@ -128,7 +128,7 @@ cdef extern from "compyte/array.h":
         GA_ANY_ORDER, GA_C_ORDER, GA_F_ORDER
 
     int GpuArray_empty(_GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
-                       int typecode, int nd, size_t *dims, ga_order ord)
+                       int typecode, int nd, const size_t *dims, ga_order ord)
     int GpuArray_fromdata(_GpuArray *a, const compyte_buffer_ops *ops,
                           gpudata *data, size_t offset, int typecode,
                           unsigned int nd, const size_t *dims,
@@ -143,7 +143,7 @@ cdef extern from "compyte/array.h":
                        const ssize_t *stops, const ssize_t *steps)
     int GpuArray_setarray(_GpuArray *v, _GpuArray *a)
     int GpuArray_reshape(_GpuArray *res, _GpuArray *a, unsigned int nd,
-                         size_t *newdims, ga_order ord, int nocopy)
+                         const size_t *newdims, ga_order ord, int nocopy)
     int GpuArray_transpose(_GpuArray *res, _GpuArray *a,
                            const unsigned int *new_axes)
 
@@ -184,7 +184,7 @@ cdef bint py_CHKFLAGS(GpuArray a, int flags)
 cdef bint py_ISONESEGMENT(GpuArray a)
 
 cdef int array_empty(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
-                     int typecode, unsigned int nd, size_t *dims,
+                     int typecode, unsigned int nd, const size_t *dims,
                      ga_order ord) except -1
 cdef int array_fromdata(GpuArray a, const compyte_buffer_ops *ops,
                         gpudata *data, size_t offset, int typecode,
@@ -218,8 +218,8 @@ cdef int array_transfer(GpuArray res, GpuArray a, void *new_ctx,
 
 cdef const char *kernel_error(GpuKernel k, int err) except NULL
 cdef int kernel_init(GpuKernel k, const compyte_buffer_ops *ops, void *ctx,
-                     unsigned int count, const char **strs, size_t *len,
-                     const char *name, unsigned int argcount, int *types,
+                     unsigned int count, const char **strs, const size_t *len,
+                     const char *name, unsigned int argcount, const int *types,
                      int flags) except -1
 cdef int kernel_clear(GpuKernel k) except -1
 cdef void *kernel_context(GpuKernel k) except NULL
@@ -238,10 +238,12 @@ cdef api GpuContext pygpu_default_context()
 
 cdef api GpuContext pygpu_init(object dev)
 
-cdef api GpuArray pygpu_zeros(unsigned int nd, size_t *dims, int typecode,
-                              ga_order order, GpuContext context, type cls)
-cdef api GpuArray pygpu_empty(unsigned int nd, size_t *dims, int typecode,
-                              ga_order order, GpuContext context, type cls)
+cdef api GpuArray pygpu_zeros(unsigned int nd, const size_t *dims,
+                              int typecode, ga_order order,
+                              GpuContext context, type cls)
+cdef api GpuArray pygpu_empty(unsigned int nd, const size_t *dims,
+                              int typecode, ga_order order,
+                              GpuContext context, type cls)
 cdef api GpuArray pygpu_fromhostdata(void *buf, int typecode, unsigned int nd,
                                      const size_t *dims,
                                      const ssize_t *strides,

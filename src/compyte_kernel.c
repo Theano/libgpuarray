@@ -5,8 +5,8 @@
 #include <stdlib.h>
 
 int GpuKernel_init(GpuKernel *k, const compyte_buffer_ops *ops, void *ctx,
-		   unsigned int count, const char **strs, size_t *lens,
-		   const char *name, unsigned int argcount, int *types,
+		   unsigned int count, const char **strs, const size_t *lens,
+		   const char *name, unsigned int argcount, const int *types,
                    int flags) {
   int res = GA_NO_ERROR;
 
