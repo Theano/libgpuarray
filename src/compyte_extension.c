@@ -8,6 +8,8 @@ typedef struct _ext {
 } ext;
 
 #ifdef WITH_CUDA
+extern void cuda_enter(void);
+extern void cuda_exit(void);
 extern void *cuda_make_ctx(void);
 extern void *cuda_get_ctx(void);
 extern void *cuda_get_stream(void);
@@ -26,6 +28,8 @@ extern void *cl_get_buf(void);
 
 static ext ext_list[] = {
 #ifdef WITH_CUDA
+  {"cuda_enter", cuda_enter},
+  {"cuda_exit", cuda_exit},
   {"cuda_make_ctx", cuda_make_ctx},
   {"cuda_get_ctx", cuda_get_ctx},
   {"cuda_get_stream", cuda_get_stream},
