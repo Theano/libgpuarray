@@ -1,9 +1,6 @@
 /*
- * This file isn't recommanded. Using it make your code not able to work on OpenCL.
- *
  * But it allow faster conversion to this new library of existing code
  */
-#include "extension.h"
 #ifndef COMPYTE_BUFFER_CUDA_H
 #define COMPYTE_BUFFER_CUDA_H
 

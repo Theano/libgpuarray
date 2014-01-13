@@ -71,7 +71,7 @@ setup(name='pygpu',
       description='numpy-like wrapper on libcompyte for GPU computations',
       packages = ['pygpu'],
       data_files = [('pygpu', ['pygpu/gpuarray.h', 'pygpu/gpuarray_api.h',
-                               'pygpu/blas_api.h'])],
+                               'pygpu/blas_api.h', 'pygpu/numpy_compat.h'])],
       ext_modules=cythonize(exts),
       install_requires=['mako>=0.7'],
       )
