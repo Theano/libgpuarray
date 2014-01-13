@@ -116,6 +116,7 @@ SET(headers
   compyte/config.h
   compyte/error.h
   compyte/extension.h
+  compyte/ext_cuda.h
   compyte/kernel.h
   compyte/types.h
   compyte/util.h
