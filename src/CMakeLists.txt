@@ -119,7 +119,6 @@ SET(headers
   compyte/kernel.h
   compyte/types.h
   compyte/util.h
-  compyte/numpy_compat.h
 )
 
 INSTALL(FILES ${headers} DESTINATION include/compyte)
