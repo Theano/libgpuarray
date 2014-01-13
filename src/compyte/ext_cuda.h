@@ -13,20 +13,21 @@ static void *(*cuda_make_ctx)(CUcontext, int);
 static CUcontext (*cuda_get_ctx)(void *);
 static CUstream (*cuda_get_stream)(void *);
 static gpudata *(*cuda_make_buf)(void *, CUdeviceptr, size_t);
-static CUdeviceptr *(*cuda_get_ptr)(gpudata *);
-static size_t *(*cuda_get_sz)(gpudata *);
-static void *(*cuda_set_compiler)(void *(*)(const char *, size_t, int *));
+static CUdeviceptr (*cuda_get_ptr)(gpudata *);
+static size_t (*cuda_get_sz)(gpudata *);
+static void (*cuda_set_compiler)(void *(*)(const char *, size_t, int *));
 
 static void setup_ext_cuda(void) {
-  cuda_enter = compyte_get_extension("cuda_enter");
-  cuda_exit = compye_get_extension("cuda_exit");
-  cuda_make_ctx = compyte_get_extension("cuda_make_ctx");
-  cuda_get_ctx = compyte_get_extension("cuda_get_ctx");
-  cuda_get_stream = compyte_get_extension("cuda_get_stream");
-  cuda_make_buf = compyte_get_extension("cuda_make_buf");
-  cuda_get_ptr = compyte_get_extension("cuda_get_ptr");
-  cuda_get_sz = compyte_get_extension("cuda_get_sz");
-  cuda_set_compiler = compyte_get_extension("cuda_set_compiler");
+  // The casts are necessary to reassure C++ compilers
+  cuda_enter = (void (*)(void *))compyte_get_extension("cuda_enter");
+  cuda_exit = (void (*)(void *))compyte_get_extension("cuda_exit");
+  cuda_make_ctx = (void *(*)(CUcontext, int))compyte_get_extension("cuda_make_ctx");
+  cuda_get_ctx = (CUcontext (*)(void *))compyte_get_extension("cuda_get_ctx");
+  cuda_get_stream = (CUstream (*)(void *))compyte_get_extension("cuda_get_stream");
+  cuda_make_buf = (gpudata *(*)(void *, CUdeviceptr, size_t))compyte_get_extension("cuda_make_buf");
+  cuda_get_ptr = (CUdeviceptr (*)(gpudata *))compyte_get_extension("cuda_get_ptr");
+  cuda_get_sz = (size_t (*)(gpudata *))compyte_get_extension("cuda_get_sz");
+  cuda_set_compiler = (void (*)(void *(*)(const char *, size_t, int *)))compyte_get_extension("cuda_set_compiler");
 }
 
 #endif
