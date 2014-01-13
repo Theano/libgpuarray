@@ -497,6 +497,9 @@ cdef GpuContext ensure_context(GpuContext c):
         return default_context
     return c
 
+cdef bint pygpu_GpuArray_Check(object o):
+    return isinstance(o, GpuArray)
+
 cdef GpuContext pygpu_init(dev):
     if dev.startswith('cuda'):
         kind = "cuda"

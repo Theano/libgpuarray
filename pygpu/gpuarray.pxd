@@ -236,6 +236,8 @@ cdef GpuContext ensure_context(GpuContext c)
 
 cdef api GpuContext pygpu_default_context()
 
+cdef api bint pygpu_GpuArray_Check(object o)
+
 cdef api GpuContext pygpu_init(object dev)
 
 cdef api GpuArray pygpu_zeros(unsigned int nd, const size_t *dims,
