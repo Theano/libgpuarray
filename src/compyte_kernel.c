@@ -129,6 +129,10 @@ int GpuKernel_call2(GpuKernel *k, size_t n[2], size_t _bs[2], size_t _gs[2],
   return k->ops->kernel_call(k->k, bs, gs, k->args);
 }
 
+int GpuKernel_binary(const GpuKernel *k, size_t *sz, void **bin) {
+  return k->ops->kernel_binary(k->k, sz, bin);
+}
+
 const char *GpuKernel_error(const GpuKernel *k, int err) {
   void *ctx;
   int err2 = k->ops->property(NULL, NULL, k->k, GA_KERNEL_PROP_CTX, &ctx);
