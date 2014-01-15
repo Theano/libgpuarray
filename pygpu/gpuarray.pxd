@@ -101,6 +101,7 @@ cdef extern from "compyte/kernel.h":
                        void **args)
     int GpuKernel_call2(_GpuKernel *, size_t n[2], size_t ls[2], size_t gs[2],
                         void **args)
+    int GpuKernel_binary(_GpuKernel *, size_t *, void **)
 
 cdef extern from "compyte/array.h":
     ctypedef struct _GpuArray "GpuArray":
@@ -227,6 +228,7 @@ cdef int kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs,
                      void **args) except -1
 cdef int kernel_call2(GpuKernel k, size_t n[2], size_t ls[2], size_t gs[2],
                      void **args) except -1
+cdef int kernel_binary(GpuKernel k, size_t *, void **) except -1
 cdef int kernel_property(GpuKernel k, int prop_id, void *res) except -1
 
 cdef int ctx_property(GpuContext c, int prop_id, void *res) except -1

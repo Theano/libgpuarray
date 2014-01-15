@@ -426,6 +426,12 @@ cdef int kernel_call2(GpuKernel k, size_t n[2], size_t ls[2], size_t gs[2],
     if err != GA_NO_ERROR:
         raise GpuArrayException(kernel_error(k, err), err)
 
+cdef int kernel_binary(GpuKernel k, size_t *sz, void **bin) except -1:
+    cdef int err
+    err = GpuKernel_binary(&k.k, sz, bin)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(kernel_error(k, err), err)
+
 cdef int kernel_property(GpuKernel k, int prop_id, void *res) except -1:
     cdef int err
     err = k.k.ops.property(NULL, NULL, k.k.k, prop_id, res)
@@ -1864,3 +1870,14 @@ cdef class GpuKernel:
             cdef unsigned int res
             kernel_property(self, GA_KERNEL_PROP_NUMARGS, &res)
             return res
+
+    property _binary:
+        "Kernel compiled binary for the associated context."
+        def __get__(self):
+            cdef size_t sz
+            cdef char *bin
+            kernel_binary(self, &sz, <void **>&bin)
+            try:
+                return <bytes>bin[:sz]
+            finally:
+                free(bin)
