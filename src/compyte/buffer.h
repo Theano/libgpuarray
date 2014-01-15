@@ -292,7 +292,25 @@ typedef struct _compyte_buffer_ops {
    *
    * \returns GA_NO_ERROR or an error code if an error occurred.
    */
-int (*kernel_call)(gpukernel *k, size_t bs[2], size_t gs[2], void **args);
+  int (*kernel_call)(gpukernel *k, size_t bs[2], size_t gs[2], void **args);
+
+  /**
+   * Get the kernel binary.
+   *
+   * This can be use to cache kernel binaries after compilation of a
+   * specific device.  The kernel can be recreated by calling
+   * kernel_alloc with the binary and size and passing `GA_USE_BINARY`
+   * as the use flags.
+   *
+   * The returned pointer is allocated and must be freed by the caller.
+   *
+   * \param k kernel
+   * \param sz size of the returned binary
+   * \param obj pointer to the binary for the kernel.
+   *
+   * \returns GA_NO_ERROR or an error code if an error occurred.
+   */
+  int (*kernel_binary)(gpukernel *k, size_t *sz, void **obj);
 
   /**
    * Synchronize a buffer.
@@ -560,6 +578,10 @@ typedef enum _ga_usefl {
    * The kernel makes use of half-floats (also known as float16)
    */
   GA_USE_HALF =       0x10,
+  /**
+   * The source code passed is actually a kernel binary.
+   */
+  GA_USE_BINARY =     0x20,
   /* If you add a new flag, don't forget to update both
      compyte_buffer_{cuda,opencl}.c with the implementation of your flag */
   /**

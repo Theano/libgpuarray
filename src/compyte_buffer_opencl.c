@@ -671,45 +671,60 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
   dev = get_dev(ctx->ctx, ret);
   if (dev == NULL) return NULL;
 
-  error = cl_check_extensions(preamble, &n, flags, ctx);
-  if (error != GA_NO_ERROR) FAIL(NULL, error);
-
-  if (n != 0) {
-    news = calloc(count+n, sizeof(const char *));
-    if (news == NULL) {
-      FAIL(NULL, GA_SYS_ERROR);
-    }
-    memcpy(news, preamble, n*sizeof(const char *));
-    memcpy(news+n, strings, count*sizeof(const char *));
-    if (lengths == NULL) {
-      newl = NULL;
-    } else {
-      newl = calloc(count+n, sizeof(size_t));
-      if (newl == NULL) {
-        free(news);
-        FAIL(NULL, GA_MEMORY_ERROR);
-      }
-      memcpy(newl+n, lengths, count*sizeof(size_t));
+  if (flags & GA_USE_BINARY) {
+    // GA_USE_BINARY is exclusive
+    if (flags & ~GA_USE_BINARY)
+      FAIL(NULL, GA_INVALID_ERROR);
+    // We need the length for binary data and there is only one blob.
+    if (count != 1 || lengths == NULL || lengths[0] == 0)
+      FAIL(NULL, GA_VALUE_ERROR);
+    p = clCreateProgramWithBinary(ctx->ctx, 1, &dev, lengths, (const unsigned char **)strings, NULL, &ctx->err);
+    if (ctx->err != CL_SUCCESS) {
+      clReleaseProgram(p);
+      FAIL(NULL, GA_IMPL_ERROR);
     }
   } else {
-    news = strings;
-    newl = (size_t *)lengths;
-  }
 
-  p = clCreateProgramWithSource(ctx->ctx, count+n, news, newl, &ctx->err);
-  if (n != 0) {
-    free(news);
-    free(newl);
-  }
-  if (ctx->err != CL_SUCCESS) {
-    FAIL(NULL, GA_IMPL_ERROR);
-  }
+    error = cl_check_extensions(preamble, &n, flags, ctx);
+    if (error != GA_NO_ERROR) FAIL(NULL, error);
 
-  ctx->err = clBuildProgram(p, 1, &dev, "-w", NULL, NULL);
-  if (ctx->err != CL_SUCCESS) {
-    clReleaseProgram(p);
-    FAIL(NULL, GA_IMPL_ERROR);
-  }  
+    if (n != 0) {
+      news = calloc(count+n, sizeof(const char *));
+      if (news == NULL) {
+        FAIL(NULL, GA_SYS_ERROR);
+      }
+      memcpy(news, preamble, n*sizeof(const char *));
+      memcpy(news+n, strings, count*sizeof(const char *));
+      if (lengths == NULL) {
+        newl = NULL;
+      } else {
+        newl = calloc(count+n, sizeof(size_t));
+        if (newl == NULL) {
+          free(news);
+          FAIL(NULL, GA_MEMORY_ERROR);
+        }
+        memcpy(newl+n, lengths, count*sizeof(size_t));
+      }
+    } else {
+      news = strings;
+      newl = (size_t *)lengths;
+    }
+
+    p = clCreateProgramWithSource(ctx->ctx, count+n, news, newl, &ctx->err);
+    if (n != 0) {
+      free(news);
+      free(newl);
+    }
+    if (ctx->err != CL_SUCCESS) {
+      FAIL(NULL, GA_IMPL_ERROR);
+    }
+
+    ctx->err = clBuildProgram(p, 1, &dev, "-w", NULL, NULL);
+    if (ctx->err != CL_SUCCESS) {
+      clReleaseProgram(p);
+      FAIL(NULL, GA_IMPL_ERROR);
+    }
+  }
 
   res = malloc(sizeof(*res));
   if (res == NULL) FAIL(NULL, GA_MEMORY_ERROR);
@@ -823,6 +838,34 @@ static int cl_callkernel(gpukernel *k, size_t ls[2], size_t gs[2],
     clReleaseEvent(k->ev);
   k->ev = ev;
 
+  return GA_NO_ERROR;
+}
+
+static int cl_kernelbin(gpukernel *k, size_t *sz, void **obj) {
+  cl_ctx *ctx = k->ctx;
+  cl_program p;
+  size_t rsz;
+  void *res;
+
+  ASSERT_KER(k);
+  ASSERT_CTX(ctx);
+
+  ctx->err = clGetKernelInfo(k->k, CL_KERNEL_PROGRAM, sizeof(p), &p, NULL);
+  if (ctx->err != CL_SUCCESS)
+    return GA_IMPL_ERROR;
+  ctx->err = clGetProgramInfo(p, CL_PROGRAM_BINARY_SIZES, sizeof(rsz), &rsz, NULL);
+  if (ctx->err != CL_SUCCESS)
+    return GA_IMPL_ERROR;
+  res = malloc(rsz);
+  if (res == NULL)
+    return GA_MEMORY_ERROR;
+  ctx->err = clGetProgramInfo(p, CL_PROGRAM_BINARIES, sizeof(res), &res, NULL);
+  if (ctx->err != CL_SUCCESS) {
+    free(res);
+    return GA_IMPL_ERROR;
+  }
+  *sz = rsz;
+  *obj = res;
   return GA_NO_ERROR;
 }
 
@@ -1205,6 +1248,7 @@ const compyte_buffer_ops opencl_ops = {cl_init,
                                        cl_retainkernel,
                                        cl_releasekernel,
                                        cl_callkernel,
+                                       cl_kernelbin,
                                        cl_sync,
                                        cl_extcopy,
                                        cl_transfer,

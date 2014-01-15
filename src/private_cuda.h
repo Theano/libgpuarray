@@ -82,6 +82,8 @@ struct _gpukernel {
   CUmodule m;
   CUfunction k;
   void **args;
+  size_t bin_sz;
+  void *bin;
   int *types;
   unsigned int argcount;
   unsigned int refcnt;
