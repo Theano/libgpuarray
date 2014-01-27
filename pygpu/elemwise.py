@@ -474,29 +474,34 @@ class ElemwiseKernel(object):
 
     def __call__(self, *args, **kwargs):
         (k, args), n = self.select_kernel(args, **kwargs)
-        k(*args, n=n)
+        if n != 0:
+            k(*args, n=n)
 
     def call_contig(self, *args):
         n, nd, dims, strs, offsets, contig = check_args(args, collapse=False,
                                                         broadcast=False)
         if not contig:
             raise ValueError("Can't call contig on non-contiguous data")
-        self.contig_k(*self.prepare_args_contig(args, n, offsets), n=n)
+        if n != 0:
+            self.contig_k(*self.prepare_args_contig(args, n, offsets), n=n)
 
     def call_basic(self, *args, **kwargs):
         n, nd, dims, strs, offsets, _ = check_args(args, **kwargs)
-        k, args = self.get_basic(args, n, nd, dims, strs, offsets)
-        k(*args, n=n)
+        if n != 0:
+            k, args = self.get_basic(args, n, nd, dims, strs, offsets)
+            k(*args, n=n)
 
     def call_dimspec(self, *args, **kwargs):
         n, nd, dims, strs, offsets, _ = check_args(args, **kwargs)
-        k, args = self.get_dimspec(args, n, nd, dims, strs, offsets)
-        k(*args, n=n)
+        if n != 0:
+            k, args = self.get_dimspec(args, n, nd, dims, strs, offsets)
+            k(*args, n=n)
 
     def call_specialized(self, *args, **kwargs):
         n, nd, dims, strs, offsets, _ = check_args(args, **kwargs)
-        k, args = self.get_specialized(args, n, nd, dims, strs, offsets)
-        k(*args, n=n)
+        if n != 0:
+            k, args = self.get_specialized(args, n, nd, dims, strs, offsets)
+            k(*args, n=n)
 
 
 def elemwise1(a, op, oper=None, op_tmpl="res[i] = %(op)sa[i]", out=None):
