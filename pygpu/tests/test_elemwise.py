@@ -98,6 +98,10 @@ def test_elemwise_layouts():
                             offseted_inner, sliced, order
 
 
+def test_elemwise_0():
+    elemwise_layouts((0,), False, False, 1, 'c')
+
+
 @guard_devsup
 def elemwise_layouts(shape, offseted_outer, offseted_inner, sliced, order):
     ac, ag = gen_gpuarray(shape, dtype='float32', sliced=sliced, order=order,
