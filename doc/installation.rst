@@ -73,6 +73,31 @@ like this:
 
   python setup.py build_ext -L $MY_PREFIX/lib -I $MY_PREFIX/include
 
+
+If you can not or do not want to install it for every user of that
+computer, you can install them in your home directory like this:
+::
+
+  cd <dir>
+  mkdir Build
+  cd Build
+  cmake .. -DCMAKE_INSTALL_PREFIX=~/.local -DCMAKE_BUILD_TYPE=Release
+  make
+  make install
+
+  cd ..
+
+  # Run the following export and add them in your ~/.bashrc file
+  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/.local/lib64/
+  export LIBRARY_PATH=$LIBRARY_PATH:~/.local/lib64/
+  export CPATH=$CPATH:~/.local/include
+  export LIBRARY_PATH=$LIBRARY_PATH:~/.local/lib
+  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/.local/lib
+
+  python setup.py build
+  python setup.py install --user
+
+
 Mac-specific instructions
 -------------------------
 
