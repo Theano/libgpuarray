@@ -636,24 +636,14 @@ cdef extern from "compyte/blas.h":
 % endfor
 
 % for op in ops:
-cdef blas_r${op.name}(${op.format_simple_args('double', 'GpuArray ')},
-                      bint nocopy):
+cdef api int pygpu_blas_r${op.name}(${op.format_simple_args('double', 'GpuArray ')},
+                      bint nocopy) except -1:
     cdef int err
     err = GpuArray_r${op.name}(${op.format_simple_call('&%s.ga')}, nocopy);
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&${op.array_args()[0].name}.ga, err), err)
+    return 0
 
-cdef api GpuArray pygpu_blas_r${op.name}(${op.format_simple_args('double', 'GpuArray ')}):
-    blas_r${op.name}(${op.format_simple_call('%s')}, 0)
-<%
-outas = []
-for a in op.array_args():
-    if a.isoutput:
-        outas.append(a.name)
-assert len(outas) is not 0
-outa = ', '.join(outas)
-%>
-    return ${outa}
 % endfor
 
 % for op in ops:
@@ -682,7 +672,17 @@ def ${op.name}(${op.format_pyargs()}):
         ${a.name} = pygpu_copy(${a.name}, GA_ANY_ORDER)
   % endif
  % endfor
-    return pygpu_blas_r${op.name}(${op.format_simple_call('%s')})
+    pygpu_blas_r${op.name}(${op.format_simple_call('%s')}, 0)
+<%
+outas = []
+for a in op.array_args():
+    if a.isoutput:
+        outas.append(a.name)
+assert len(outas) is not 0
+outa = ', '.join(outas)
+%>
+    return ${outa}
+
 % endfor
 """)
 
