@@ -306,69 +306,56 @@ int GpuArray_index(GpuArray *r, const GpuArray *a, const ssize_t *starts,
 }
 
 int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
-  GpuArray tmp;
   unsigned int i;
   unsigned int off;
   int err = GA_NO_ERROR;
-  void *t;
+  size_t sz;
+  ssize_t *strs;
+  int simple_move = 1;
+
 
   if (a->nd < v->nd)
     return GA_VALUE_ERROR;
 
+  if (a->ops != v->ops)
+    return GA_INVALID_ERROR;
+  if (!GpuArray_ISWRITEABLE(a))
+    return GA_VALUE_ERROR;
+  if (!GpuArray_ISALIGNED(v) || !GpuArray_ISALIGNED(a))
+    return GA_UNALIGNED_ERROR;
+
   off = a->nd - v->nd;
 
   for (i = 0; i < v->nd; i++) {
+    if (v->dimensions[i] == 1)
+      simple_move = 0;
     if (v->dimensions[i] != 1 && v->dimensions[i] != a->dimensions[i+off])
       return GA_VALUE_ERROR;
   }
 
-  err = GpuArray_view(&tmp, v);
-  if (err != GA_NO_ERROR)
-    return err;
-
-  if (off != 0) {
-    t = realloc(tmp.dimensions, a->nd*sizeof(size_t));
-    if (t == NULL) {
-      err = GA_NO_ERROR;
-      goto exit;
-    }
-    tmp.dimensions = (size_t *)t;
-    t = realloc(tmp.strides, a->nd*sizeof(ssize_t));
-    if (t == NULL) {
-      err = GA_NO_ERROR;
-      goto exit;
-    }
-    tmp.strides = (ssize_t *)t;
-
-    tmp.nd = a->nd;
-    // Mark non-contiguous if we make broadcast dimensions
-    tmp.flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
+  if (simple_move && GpuArray_ISONESEGMENT(a) && GpuArray_ISONESEGMENT(v) &&
+      GpuArray_ISFORTRAN(a) == GpuArray_ISFORTRAN(v) &&
+      a->typecode == v->typecode &&
+      a->nd == v->nd) {
+    sz = compyte_get_elsize(a->typecode);
+    for (i = 0; i < a->nd; i++) sz *= a->dimensions[i];
+    return a->ops->buffer_move(a->data, a->offset, v->data, v->offset, sz);
   }
 
-  for (i = 0; i < tmp.nd; i++) {
-    tmp.dimensions[i] = a->dimensions[i];
-    if (i < off) {
-      tmp.strides[i] = 0;
-      // This was already marked non-contiguous by the realloc above
-    } else {
-      if (v->dimensions[i-off] != a->dimensions[i]) {
-	tmp.strides[i] = 0;
-	// Mark non-contiguous if we make broadcast dimensions
-	tmp.flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
-      } else {
-	tmp.strides[i] = v->strides[i-off];
-      }
+  strs = calloc(a->nd, sizeof(ssize_t));
+  if (strs == NULL)
+    return GA_MEMORY_ERROR;
+
+  for (i = off; i < a->nd; i++) {
+    if (v->dimensions[i-off] == a->dimensions[i]) {
+      strs[i] = v->strides[i-off];
     }
   }
 
-  if (!GpuArray_is_aligned(&tmp)) {
-    err = GA_UNALIGNED_ERROR;
-    goto exit;
-  }
-
-  err = GpuArray_move(a, &tmp);
-  exit:
-  GpuArray_clear(&tmp);
+  err = a->ops->buffer_extcopy(v->data, v->offset, a->data, a->offset,
+			       v->typecode, a->typecode, a->nd, a->dimensions,
+			       strs, a->nd, a->dimensions, a->strides);
+  free(strs);
   return err;
 }
 

@@ -398,7 +398,7 @@ static int cuda_move(gpudata *dst, size_t dstoff, gpudata *src,
 
     if (sz == 0) return GA_NO_ERROR;
 
-    if ((dst->sz - dstoff) < sz || (src->sz -srcoff) < sz)
+    if ((dst->sz - dstoff) < sz || (src->sz - srcoff) < sz)
         return GA_VALUE_ERROR;
 
     cuda_enter(ctx);
