@@ -6,6 +6,10 @@
 #include <compyte/buffer.h>
 #include <compyte/config.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum _cb_order {
   cb_row,
   cb_column
@@ -38,5 +42,9 @@ typedef struct _compyte_blas_ops {
   int (*sgemm)(cb_order order, cb_transpose transA, cb_transpose transB, size_t M, size_t N, size_t K, float alpha, gpudata *A, size_t offA, size_t lda, gpudata *B, size_t offB, size_t ldb, float beta, gpudata *C, size_t offC, size_t ldc);
   int (*dgemm)(cb_order order, cb_transpose transA, cb_transpose transB, size_t M, size_t N, size_t K, double alpha, gpudata *A, size_t offA, size_t lda, gpudata *B, size_t offB, size_t ldb, double beta, gpudata *C, size_t offC, size_t ldc);
 } compyte_blas_ops;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

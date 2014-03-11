@@ -443,6 +443,10 @@ BUFFERBLAS_TMPL = Template("""
 #include <compyte/buffer.h>
 #include <compyte/config.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum _cb_order {
   cb_row,
   cb_column
@@ -477,6 +481,10 @@ typedef struct _compyte_blas_ops {
 % endfor
 } compyte_blas_ops;
 
+#ifdef __cplusplus
+}
+#endif
+
 #endif
 """)
 
@@ -488,6 +496,10 @@ BLAS_TMPL = Template("""
 #include <compyte/buffer_blas.h>
 #include <compyte/array.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 % for op in ops:
 COMPYTE_PUBLIC int GpuArray_r${op.name}(${op.format_simple_args('double', 'GpuArray *')},
                                         int nocopy);
@@ -495,6 +507,11 @@ COMPYTE_PUBLIC int GpuArray_r${op.name}(${op.format_simple_args('double', 'GpuAr
 #define GpuArray_${type.c}${op.name} GpuArray_r${op.name}
  % endfor
 % endfor
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif
 """)
 
