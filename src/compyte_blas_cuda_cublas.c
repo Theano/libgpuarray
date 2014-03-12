@@ -109,6 +109,8 @@ static void teardown(void *c) {
   if (ctx->err != CUDA_SUCCESS) \
     return GA_IMPL_ERROR
 
+#define FUNC_FINI cuda_exit(ctx)
+
 #define ARRAY_INIT(A)				  \
   ctx->err = cuStreamWaitEvent(ctx->s, A->ev, 0); \
   if (ctx->err != CUDA_SUCCESS) {		  \
