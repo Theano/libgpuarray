@@ -16,6 +16,7 @@ add_custom_command(
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen_types.py)
 
 SET(COMPYTE_SRC
+strb.c
 compyte_types.c
 compyte_error.c
 compyte_util.c
