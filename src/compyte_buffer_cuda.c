@@ -954,30 +954,25 @@ static inline ssize_t ssabs(ssize_t v) {
     return (v < 0 ? -v : v);
 }
 
-static int cuda_perdim_ptx(strb *sb, unsigned int nd,
-                           const size_t *dims, const ssize_t *str,
-                           const char *id, unsigned int bits) {
+static void cuda_perdim_ptx(strb *sb, unsigned int nd,
+			    const size_t *dims, const ssize_t *str,
+			    const char *id, unsigned int bits) {
   int i;
 
   if (nd > 0) {
-    if (strb_appendf(sb, "mov.u%u %si, i;\n", bits, id) == -1)
-      return -1;
-
+    strb_appendf(sb, "mov.u%u %si, i;\n", bits, id);
     for (i = nd-1; i > 0; i--) {
-      if (strb_appendf(sb, "rem.u%u rl1, %si, %" SPREFIX "uU;\n"
-		       "mad.lo.s%u %s, rl1, %" SPREFIX "d, %s;\n"
-		       "div.u%u %si, %si, %" SPREFIX "uU;\n",
-		       bits, id, dims[i],
-		       bits, id, str[i], id,
-		       bits, id, id, dims[i]) == -1)
-	return -1;
+      strb_appendf(sb, "rem.u%u rl1, %si, %" SPREFIX "uU;\n"
+		   "mad.lo.s%u %s, rl1, %" SPREFIX "d, %s;\n"
+		   "div.u%u %si, %si, %" SPREFIX "uU;\n",
+		   bits, id, dims[i],
+		   bits, id, str[i], id,
+		   bits, id, id, dims[i]);
     }
 
-    if (strb_appendf(sb, "mad.lo.s%u %s, %si, %" SPREFIX "d, %s;\n",
-                     bits, id, id, str[0], id) == -1)
-      return -1;
+    strb_appendf(sb, "mad.lo.s%u %s, %si, %" SPREFIX "d, %s;\n",
+		 bits, id, id, str[0], id);
   }
-  return 0;
 }
 
 static const char ELEM_FOOTER_PTX[] = "add.u%u i, i, numThreads;\n"
@@ -1098,36 +1093,34 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
   arch = detect_arch(&res);
   if (arch == NULL) return res;
 
-  if (strb_appendf(&sb, ELEM_HEADER_PTX, arch, bits, bits, bits,
-		   bits, in_t, out_t, bits, bits, bits, bits, bits, nEls,
-		   bits, bits) == -1)
-    goto fail;
+  strb_appendf(&sb, ELEM_HEADER_PTX, arch, bits, bits, bits,
+	       bits, in_t, out_t, bits, bits, bits, bits, bits, nEls,
+	       bits, bits);
 
-  if (cuda_perdim_ptx(&sb, a_nd, a_dims, a_str, "a_p", bits) == -1)
-    goto fail;
-  if (cuda_perdim_ptx(&sb, b_nd, b_dims, b_str, "b_p", bits) == -1)
-    goto fail;
+  cuda_perdim_ptx(&sb, a_nd, a_dims, a_str, "a_p", bits);
+  cuda_perdim_ptx(&sb, b_nd, b_dims, b_str, "b_p", bits);
 
-  if (strb_appendf(&sb, "ld.param.u%u rp1, [a_data];\n"
-		   "cvt.s%u.s%u rp2, a_p;\n"
-		   "add.s%u rp1, rp1, rp2;\n"
-		   "ld.global.%s tmpa, [rp1+%" SPREFIX "u];\n"
-		   "cvt%s.%s.%s tmpb, tmpa;\n"
-		   "ld.param.u%u rp1, [b_data];\n"
-		   "cvt.s%u.s%u rp2, b_p;\n"
-		   "add.s%u rp1, rp1, rp2;\n"
-		   "st.global.%s [rp1+%" SPREFIX "u], tmpb;\n", bits,
-		   bits, bits,
-		   bits,
-		   in_t, ioff,
-		   rmod, out_t, in_t,
-		   bits,
-		   bits, bits,
-		   bits,
-		   out_t, ooff) == -1)
-    goto fail;
+  strb_appendf(&sb, "ld.param.u%u rp1, [a_data];\n"
+	       "cvt.s%u.s%u rp2, a_p;\n"
+	       "add.s%u rp1, rp1, rp2;\n"
+	       "ld.global.%s tmpa, [rp1+%" SPREFIX "u];\n"
+	       "cvt%s.%s.%s tmpb, tmpa;\n"
+	       "ld.param.u%u rp1, [b_data];\n"
+	       "cvt.s%u.s%u rp2, b_p;\n"
+	       "add.s%u rp1, rp1, rp2;\n"
+	       "st.global.%s [rp1+%" SPREFIX "u], tmpb;\n", bits,
+	       bits, bits,
+	       bits,
+	       in_t, ioff,
+	       rmod, out_t, in_t,
+	       bits,
+	       bits, bits,
+	       bits,
+	       out_t, ooff);
 
-  if (strb_appendf(&sb, ELEM_FOOTER_PTX, bits, bits, nEls) == -1)
+  strb_appendf(&sb, ELEM_FOOTER_PTX, bits, bits, nEls);
+
+  if (strb_error(&sb))
     goto fail;
 
   if (intype == GA_DOUBLE || outtype == GA_DOUBLE ||

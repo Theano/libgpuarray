@@ -18,16 +18,22 @@ void strb_free(strb *sb) {
 
 int strb_grow(strb *sb, size_t n) {
   char *s;
+  if (strb_error(sb)) return -1;
   if (sb->a == 0 && n < 1024) n = 1024;
-  if (sb->a * 2 > n) n = sb->a *2;
-  s = realloc(sb->s, n);
-  if (s == NULL) return -1;
+  if (sb->a > n) n = sb->a;
+  /* overflow */
+  if (sb->a > n) { strb_seterror(sb); return -1; }
+  s = realloc(sb->s, sb->a + n);
+  if (s == NULL) {
+    strb_seterror(sb);
+    return -1;
+  }
   sb->s = s;
   sb->a = n;
   return 0;
 }
 
-int strb_appendf(strb *sb, const char *f, ...) {
+void strb_appendf(strb *sb, const char *f, ...) {
   va_list ap;
   int s;
 
@@ -39,13 +45,12 @@ int strb_appendf(strb *sb, const char *f, ...) {
 #endif
   va_end(ap);
 
-  if (s < 0) return -1;
+  if (s < 0) { strb_seterror(sb); return; }
   s += 1;
   
-  if (strb_ensure(sb, s)) return -1;
+  if (strb_ensure(sb, s)) return;
   va_start(ap, f);
   s = vsnprintf(sb->s+sb->l, s, f, ap);
   va_end(ap);
   sb->l += s;
-  return 0;
 }
