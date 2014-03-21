@@ -63,7 +63,7 @@ cdef extern from "compyte/buffer.h":
         pass
 
     ctypedef struct compyte_buffer_ops:
-        void *buffer_init(int devno, int *ret)
+        void *buffer_init(int devno, int flags, int *ret)
         void buffer_deinit(void *ctx)
         char *ctx_error(void *ctx)
         int property(void *c, gpudata *b, gpukernel *k, int prop_id, void *res)

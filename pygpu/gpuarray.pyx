@@ -914,7 +914,7 @@ cdef class GpuContext:
         cdef int err = GA_NO_ERROR
         cdef void *ctx
         self.ops = get_ops(kind)
-        self.ctx = self.ops.buffer_init(devno, &err)
+        self.ctx = self.ops.buffer_init(devno, 0, &err)
         if (err != GA_NO_ERROR):
             if err == GA_VALUE_ERROR:
                 raise GpuArrayException("No device %d"%(devno,), err)
