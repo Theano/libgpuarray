@@ -43,7 +43,7 @@ static int setup(int i) {
   if (ops == NULL)
     return 0;
   for (j = 0; j < 5; j++) {
-    ctx = ops->buffer_init(j, NULL);
+    ctx = ops->buffer_init(j, 0, NULL);
     if (ctx != NULL)
       return 1;
   }

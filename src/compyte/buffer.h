@@ -48,13 +48,45 @@ typedef struct _compyte_buffer_ops {
    * \warning This function is not thread-safe.
    *
    * \param dev the device number.  The precise meaning of the device
-   *   number is backend-dependent
+   *            number is backend-dependent
+   * \param flags see \ref context_flags "Context flags"
    * \param ret error return location.  Will be ignored if set to NULL.
    *
    * \returns An opaque pointer to the created context or NULL if an
    * error occured.
    */
-  void *(*buffer_init)(int dev, int *ret);
+  void *(*buffer_init)(int dev, int flags, int *ret);
+
+/**
+ * \defgroup context_flags Context flags
+ * @{
+ */
+
+/**
+ * Let the backend decide on optimal parameters, using backend-defined
+ * heuristics and defaults.
+ *
+ * This is the default (0) value.
+ */
+#define GA_CTX_DEFAULT       0x0
+
+/**
+ * Optimize parameters for multi-thread performance.
+ *
+ * May decrease overall performance in single-thread scenarios.
+ */
+#define GA_CTX_MULTI_THREAD  0x1
+
+/**
+ * Optimize parameters for single-thread performance.
+ *
+ * May decrease overall performace in multithread scenarios.
+ */
+#define GA_CTX_SINGLE_THREAD 0x2
+
+/**
+ * @}
+ */
 
   /**
    * Destroy a context.

@@ -278,7 +278,7 @@ errcb(const char *errinfo, const void *pi, size_t cb, void *u) {
   fprintf(stderr, "%s\n", errinfo);
 }
 
-static void *cl_init(int devno, int *ret) {
+static void *cl_init(int devno, int flags, int *ret) {
   int platno;
   cl_device_id *ds;
   cl_device_id d;

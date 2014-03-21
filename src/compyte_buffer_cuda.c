@@ -254,11 +254,12 @@ static const char *get_error_string(CUresult err) {
     }
 }
 
-static void *cuda_init(int ord, int *ret) {
+static void *cuda_init(int ord, int flags, int *ret) {
     CUdevice dev;
     CUcontext ctx;
     cuda_context *res;
     static int init_done = 0;
+    unsigned int fl = CU_CTX_SCHED_AUTO;
 
     if (ord == -1) {
       /* Grab the ambient context */
@@ -278,7 +279,11 @@ static void *cuda_init(int ord, int *ret) {
     }
     err = cuDeviceGet(&dev, ord);
     CHKFAIL(NULL);
-    err = cuCtxCreate(&ctx, CU_CTX_SCHED_AUTO, dev);
+    if (flags & GA_CTX_SINGLE_THREAD)
+      fl = CU_CTX_SCHED_SPIN;
+    if (flags & GA_CTX_MULTI_THREAD)
+      fl = CU_CTX_SCHED_YIELD;
+    err = cuCtxCreate(&ctx, fl, dev);
     CHKFAIL(NULL);
     res = cuda_make_ctx(ctx, 0);
     if (res == NULL) {
