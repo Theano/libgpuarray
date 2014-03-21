@@ -278,7 +278,7 @@ static void *cuda_init(int ord, int *ret) {
     }
     err = cuDeviceGet(&dev, ord);
     CHKFAIL(NULL);
-    err = cuCtxCreate(&ctx, CU_CTX_SCHED_YIELD, dev);
+    err = cuCtxCreate(&ctx, CU_CTX_SCHED_AUTO, dev);
     CHKFAIL(NULL);
     res = cuda_make_ctx(ctx, 0);
     if (res == NULL) {
