@@ -22,7 +22,7 @@ int strb_grow(strb *sb, size_t n) {
   if (sb->a == 0 && n < 1024) n = 1024;
   if (sb->a > n) n = sb->a;
   /* overflow */
-  if (sb->a > n) { strb_seterror(sb); return -1; }
+  if (SIZE_MAX - sb->a < n) { strb_seterror(sb); return -1; }
   s = realloc(sb->s, sb->a + n);
   if (s == NULL) {
     strb_seterror(sb);
