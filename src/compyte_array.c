@@ -327,10 +327,12 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
   off = a->nd - v->nd;
 
   for (i = 0; i < v->nd; i++) {
-    if (v->dimensions[i] == 1)
-      simple_move = 0;
-    if (v->dimensions[i] != 1 && v->dimensions[i] != a->dimensions[i+off])
-      return GA_VALUE_ERROR;
+    if (v->dimensions[i] != a->dimensions[i+off]) {
+      if (v->dimensions[i] != 1)
+	return GA_VALUE_ERROR;
+      else
+	simple_move = 0;
+    }
   }
 
   if (simple_move && GpuArray_ISONESEGMENT(a) && GpuArray_ISONESEGMENT(v) &&
