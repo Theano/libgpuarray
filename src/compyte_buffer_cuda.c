@@ -139,7 +139,6 @@ gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
     res->ctx = ctx;
     ctx->refcnt++;
 
-    cuEventRecord(res->ev, ctx->s);
     cuda_exit(ctx);
     TAG_BUF(res);
     return res;
@@ -409,25 +408,12 @@ static int cuda_move(gpudata *dst, size_t dstoff, gpudata *src,
     if (ctx->err != CUDA_SUCCESS)
       return GA_IMPL_ERROR;
 
-    ctx->err = cuStreamWaitEvent(ctx->s, src->ev, 0);
-    if (ctx->err != CUDA_SUCCESS) {
-      cuda_exit(ctx);
-      return GA_IMPL_ERROR;
-    }
-    ctx->err = cuStreamWaitEvent(ctx->s, dst->ev, 0);
-    if (ctx->err != CUDA_SUCCESS) {
-      cuda_exit(ctx);
-      return GA_IMPL_ERROR;
-    }
-
     ctx->err = cuMemcpyDtoDAsync(dst->ptr + dstoff, src->ptr + srcoff, sz,
                                  ctx->s);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
-    cuEventRecord(src->ev, ctx->s);
-    cuEventRecord(dst->ev, ctx->s);
     cuda_exit(ctx);
     return res;
 }
@@ -502,19 +488,12 @@ static int cuda_memset(gpudata *dst, size_t dstoff, int data) {
     if (ctx->err != CUDA_SUCCESS)
       return GA_IMPL_ERROR;
 
-    ctx->err = cuStreamWaitEvent(ctx->s, dst->ev, 0);
-    if (ctx->err != CUDA_SUCCESS) {
-      cuda_exit(ctx);
-      return GA_IMPL_ERROR;
-    }
-
     ctx->err = cuMemsetD8Async(dst->ptr + dstoff, data, dst->sz - dstoff,
                                ctx->s);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
-    cuEventRecord(dst->ev, ctx->s);
     cuda_exit(ctx);
     return GA_NO_ERROR;
 }
@@ -901,12 +880,6 @@ static int cuda_callkernel(gpukernel *k, size_t bs[2], size_t gs[2],
 
     for (i = 0; i < k->argcount; i++) {
       if (k->types[i] == GA_BUFFER) {
-        ASSERT_BUF((gpudata *)args[i]);
-        ctx->err = cuStreamWaitEvent(ctx->s, ((gpudata *)args[i])->ev, 0);
-        if (ctx->err != CUDA_SUCCESS) {
-          cuda_exit(ctx);
-          return GA_IMPL_ERROR;
-        }
         k->args[i] = &((gpudata *)args[i])->ptr;
       } else {
         k->args[i] = args[i];
@@ -920,10 +893,6 @@ static int cuda_callkernel(gpukernel *k, size_t bs[2], size_t gs[2],
       return GA_IMPL_ERROR;
     }
 
-    for (i = 0; i < k->argcount; i++) {
-      if (k->types[i] == GA_BUFFER)
-        cuEventRecord(((gpudata *)args[i])->ev, ctx->s);
-    }
     cuda_exit(ctx);
     return GA_NO_ERROR;
 }
@@ -1212,12 +1181,14 @@ fail:
 }
 
 static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
-                              void *dst_ctx, int may_share) {
+                              void *dst_c, int may_share) {
   cuda_context *ctx = src->ctx;
+  cuda_context *dst_ctx = (cuda_context *)dst_c;
   gpudata *dst;
 
   ASSERT_BUF(src);
-  ASSERT_CTX((cuda_context *)dst_ctx);
+  ASSERT_CTX(ctx);
+  ASSERT_CTX(dst_ctx);
 
   if (ctx == dst_ctx) {
     if (may_share && offset == 0) {
@@ -1232,15 +1203,12 @@ static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
       cuda_free(dst);
       return NULL;
     }
-    cuStreamWaitEvent(ctx->s, src->ev, 0);
     ctx->err = cuMemcpyDtoDAsync(dst->ptr, src->ptr+offset, sz, ctx->s);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       cuda_free(dst);
       return NULL;
     }
-    cuEventRecord(src->ev, ctx->s);
-    cuEventRecord(dst->ev, ctx->s);
     cuda_exit(ctx);
     return dst;
   }
@@ -1255,17 +1223,15 @@ static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
     cuda_free(dst);
     return NULL;
   }
-  cuStreamWaitEvent(ctx->s, src->ev, 0);
   ctx->err = cuMemcpyPeerAsync(dst->ptr, dst->ctx->ctx, src->ptr+offset,
-			       src->ctx->ctx, sz, ctx->s);
+			       src->ctx->ctx, sz, dst_ctx->s);
+  cuEventRecord(dst->ev, dst_ctx->s);
+  cuStreamWaitEvent(ctx->s, dst->ev, 0);
   if (ctx->err != CUDA_SUCCESS) {
     cuda_free(dst);
     cuda_exit(ctx);
     return NULL;
   }
-  cuEventRecord(src->ev, ctx->s);
-  cuStreamWaitEvent(dst->ctx->s, src->ev, 0);
-  cuEventRecord(dst->ev, dst->ctx->s);
   cuda_exit(ctx);
   if (ctx->err != CUDA_SUCCESS) {
     cuda_free(dst);
