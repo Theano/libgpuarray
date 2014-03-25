@@ -128,6 +128,7 @@ void cuda_exit(cuda_context *ctx) {
 gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
     cuda_context *ctx = (cuda_context *)c;
     gpudata *res;
+    int flags = CU_EVENT_DISABLE_TIMING;
 
     res = malloc(sizeof(*res));
     if (res == NULL) return NULL;
@@ -140,8 +141,9 @@ gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
     }
 
     res->ptr = p;
-    ctx->err = cuEventCreate(&res->ev,
-		      CU_EVENT_DISABLE_TIMING|CU_EVENT_BLOCKING_SYNC);
+    if (ctx->flags & GA_CTX_MULTI_THREAD)
+      flags |= CU_EVENT_BLOCKING_SYNC;
+    ctx->err = cuEventCreate(&res->ev, flags);
     if (ctx->err != CUDA_SUCCESS) {
       free(res);
       cuda_exit(ctx);
@@ -281,6 +283,7 @@ static void *cuda_init(int ord, int flags, int *ret) {
       if (res == NULL) {
         FAIL(NULL, GA_IMPL_ERROR);
       }
+      res->flags |= flags;
       return res;
     }
 
@@ -298,6 +301,7 @@ static void *cuda_init(int ord, int flags, int *ret) {
     err = cuCtxCreate(&ctx, fl, dev);
     CHKFAIL(NULL);
     res = cuda_make_ctx(ctx, 0);
+    res->flags |= flags;
     if (res == NULL) {
       cuCtxDestroy(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
@@ -315,6 +319,7 @@ static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
 			   int *ret) {
     gpudata *res;
     cuda_context *ctx = (cuda_context *)c;
+    int fl = CU_EVENT_DISABLE_TIMING;
 
     if ((flags & GA_BUFFER_INIT) && data == NULL) FAIL(NULL, GA_VALUE_ERROR);
     if ((flags & (GA_BUFFER_READ_ONLY|GA_BUFFER_WRITE_ONLY)) ==
@@ -336,8 +341,10 @@ static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
       FAIL(NULL, GA_IMPL_ERROR);
     }
 
-    ctx->err = cuEventCreate(&res->ev,
-                             CU_EVENT_DISABLE_TIMING|CU_EVENT_BLOCKING_SYNC);
+    if (ctx->flags & GA_CTX_MULTI_THREAD)
+      fl |= CU_EVENT_BLOCKING_SYNC;
+    ctx->err = cuEventCreate(&res->ev, fl);
+
     if (ctx->err != CUDA_SUCCESS) {
       free(res);
       cuda_exit(ctx);

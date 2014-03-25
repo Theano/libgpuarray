@@ -37,7 +37,7 @@
 #endif
 
 
-#define DONTFREE 0x1000
+#define DONTFREE 0x10000000
 
 typedef struct _cache cache;
 
