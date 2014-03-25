@@ -39,6 +39,8 @@
 
 #define DONTFREE 0x1000
 
+typedef struct _cache cache;
+
 typedef struct _cuda_context {
 #ifdef DEBUG
   char tag[8];
@@ -50,6 +52,7 @@ typedef struct _cuda_context {
   void *blas_handle;
   unsigned int refcnt;
   int flags;
+  cache *extcopy_cache;
 } cuda_context;
 
 COMPYTE_LOCAL void *cuda_make_ctx(CUcontext ctx, int flags);

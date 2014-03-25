@@ -3,7 +3,7 @@
 
 /** \cond INTERNAL_DOCS */
 
-/* 
+/*
  * This file contains function definition that are shared in multiple
  * files but not exposed in the interface.
  */
@@ -50,6 +50,13 @@ struct iovec {
 #endif
 
 #include <string.h>
+
+static inline void *memdup(const void *p, size_t s) {
+  void *res = malloc(s);
+  if (res != NULL)
+    memcpy(res, p, s);
+  return res;
+}
 
 COMPYTE_LOCAL int GpuArray_is_c_contiguous(const GpuArray *a);
 COMPYTE_LOCAL int GpuArray_is_f_contiguous(const GpuArray *a);
