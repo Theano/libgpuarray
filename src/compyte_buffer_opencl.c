@@ -718,12 +718,12 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
     if (ctx->err != CL_SUCCESS) {
       FAIL(NULL, GA_IMPL_ERROR);
     }
+  }
 
-    ctx->err = clBuildProgram(p, 1, &dev, "-w", NULL, NULL);
-    if (ctx->err != CL_SUCCESS) {
-      clReleaseProgram(p);
-      FAIL(NULL, GA_IMPL_ERROR);
-    }
+  ctx->err = clBuildProgram(p, 0, NULL, NULL, NULL, NULL);
+  if (ctx->err != CL_SUCCESS) {
+    clReleaseProgram(p);
+    FAIL(NULL, GA_IMPL_ERROR);
   }
 
   res = malloc(sizeof(*res));
