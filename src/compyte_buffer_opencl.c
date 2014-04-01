@@ -732,6 +732,7 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
   res->ev = NULL;
   res->argcount = argcount;
   res->k = clCreateKernel(p, fname, &ctx->err);
+  res->types = NULL;  /* This avoids a crash in cl_releasekernel */
   res->ctx = ctx;
   ctx->refcnt++;
   clReleaseProgram(p);
