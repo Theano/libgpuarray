@@ -735,6 +735,7 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
   res->ctx = ctx;
   ctx->refcnt++;
   clReleaseProgram(p);
+  TAG_KER(res);
   if (ctx->err != CL_SUCCESS) {
     cl_releasekernel(res);
     FAIL(NULL, GA_IMPL_ERROR);
@@ -746,7 +747,6 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
   }
   memcpy(res->types, types, argcount * sizeof(int));
 
-  TAG_KER(res);
   return res;
 }
 
