@@ -18,7 +18,13 @@ def make_ops():
                 matrix('B'), size('ldb'), scalar('beta'),
                 matrix('C', output=True), size('ldc')],
                check_dims=check_dims_gemm, setup_order=setup_order_gemm,
-               py_decls=py_decls_gemm, py_ensure_output=py_ensure_output_gemm)
+               py_decls=py_decls_gemm, py_ensure_output=py_ensure_output_gemm),
+        BlasOp('ger', (float, double),
+               [size('M'), size('N'), scalar('alpha'),
+                vector('X'), inc('incX'), vector('Y'), inc('incY'),
+                matrix('A', output=True), size('lda')],
+               check_dims=check_dims_ger, setup_order=setup_order_ger,
+               py_decls=py_decls_ger, py_ensure_output=py_ensure_output_ger),
         ]
 
 class Argument(object):
@@ -335,6 +341,37 @@ py_ensure_output_gemm = """
             raise ValueError, "C not provided and beta != 0"
         C = pygpu_empty(2, Cshp, A.ga.typecode, GA_ANY_ORDER, A.context, None)
         overwrite_c = True
+"""
+
+check_dims_ger = """
+  m = X->dimensions[0];
+  n = Y->dimensions[0];
+  if (A->dimensions[0] != m || A->dimensions[1] != n)
+    return GA_VALUE_ERROR;
+"""
+
+setup_order_ger = """
+  if (Ap->flags & GA_F_CONTIGUOUS) {
+    o = cb_fortran;
+    lda = Ap->dimensions[0];
+  } else if (Ap->flags & GA_C_CONTIGUOUS) {
+    o = cb_c;
+    lda = Ap->dimensions[1];
+  } else {
+    /* Might be worth looking at making degenerate matrices (1xn) work here. */
+    err = GA_VALUE_ERROR;
+    goto cleanup;
+  }
+"""
+
+py_decls_ger = "cdef size_t[2] Ashp"
+
+py_ensure_output_ger = """
+    if A is None:
+        Ashp[0] = X.ga.dimensions[0];
+        Ashp[1] = Y.ga.dimensions[1];
+        A = pygpu_zeros(2, Ashp, X.ga.typecode, GA_ANY_ORDER, X.context, None)
+        overwrite_a = True
 """
 
 # having two (or three) layers of backslash-interpreting can be pretty

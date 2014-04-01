@@ -264,3 +264,100 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha, GpuAr
     GpuArray_clear(&copyB);
   return err;
 }
+int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
+                         int nocopy) {
+  GpuArray *Xp = X;
+  GpuArray copyX;
+  GpuArray *Yp = Y;
+  GpuArray copyY;
+  GpuArray *Ap = A;
+  compyte_blas_ops *blas;
+  void *ctx;
+  size_t elsize;
+  size_t m, n, lda;
+  cb_order o;
+  int err;
+
+
+  if (X->typecode != GA_FLOAT && X->typecode != GA_DOUBLE)
+    return GA_INVALID_ERROR;
+
+
+  if (X->nd != 1||Y->nd != 1||A->nd != 2 ||
+      X->typecode != X->typecode||Y->typecode != X->typecode||A->typecode != X->typecode)
+    return GA_VALUE_ERROR;
+
+  if (!(X->flags & GA_ALIGNED)||!(Y->flags & GA_ALIGNED)||!(A->flags & GA_ALIGNED))
+    return GA_UNALIGNED_ERROR;
+
+  
+  m = X->dimensions[0];
+  n = Y->dimensions[0];
+  if (A->dimensions[0] != m || A->dimensions[1] != n)
+    return GA_VALUE_ERROR;
+
+
+  elsize = compyte_get_elsize(X->typecode);
+
+  if (X->strides[0] < 0) {
+    if (nocopy)
+      return GA_COPY_ERROR;
+    else {
+      err = GpuArray_copy(&copyX, X, GA_ANY_ORDER);
+      if (err != GA_NO_ERROR)
+	goto cleanup;
+      Xp = &copyX;
+    }
+  }
+  if (Y->strides[0] < 0) {
+    if (nocopy)
+      return GA_COPY_ERROR;
+    else {
+      err = GpuArray_copy(&copyY, Y, GA_ANY_ORDER);
+      if (err != GA_NO_ERROR)
+	goto cleanup;
+      Yp = &copyY;
+    }
+  }
+  if (!GpuArray_ISONESEGMENT(A)) {
+    err = GA_VALUE_ERROR;
+    goto cleanup;
+  }
+
+  
+  if (Ap->flags & GA_F_CONTIGUOUS) {
+    o = cb_fortran;
+    lda = Ap->dimensions[0];
+  } else if (Ap->flags & GA_C_CONTIGUOUS) {
+    o = cb_c;
+    lda = Ap->dimensions[1];
+  } else {
+    /* Might be worth looking at making degenerate matrices (1xn) work here. */
+    err = GA_VALUE_ERROR;
+    goto cleanup;
+  }
+
+
+  err = Xp->ops->property(NULL, Xp->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
+  if (err != GA_NO_ERROR)
+    goto cleanup;
+  err = Xp->ops->property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas);
+  if (err != GA_NO_ERROR)
+    goto cleanup;
+
+  err = blas->setup(ctx);
+  if (err != GA_NO_ERROR)
+    goto cleanup;
+
+  if (Xp->typecode == GA_FLOAT)
+    err = blas->sger(o, m, n, (float)alpha, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize, Ap->data, Ap->offset / elsize, lda);
+  else
+    err = blas->dger(o, m, n, (double)alpha, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize, Ap->data, Ap->offset / elsize, lda);
+
+ cleanup:
+  if (Xp == &copyX)
+    GpuArray_clear(&copyX);
+  if (Yp == &copyY)
+    GpuArray_clear(&copyY);
+  return err;
+}
