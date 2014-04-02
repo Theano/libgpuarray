@@ -50,7 +50,11 @@ typedef struct {char c; CUdeviceptr x; } st_devptr;
 static CUresult err;
 
 static void cuda_free(gpudata *);
+static void cuda_freekernel(gpukernel *);
 static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
+
+#define val_free(v) cuda_freekernel(*v);
+#include "cache_extcopy.h"
 
 void *cuda_make_ctx(CUcontext ctx, int flags) {
   cuda_context *res;
@@ -62,8 +66,14 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
   res->blas_handle = NULL;
   res->refcnt = 1;
   res->flags = flags;
+  res->extcopy_cache = cache_alloc(64, 32);
+  if (res->extcopy_cache == NULL) {
+    free(res);
+    return NULL;
+  }
   err = cuStreamCreate(&res->s, 0);
   if (err != CUDA_SUCCESS) {
+    cache_free(res->extcopy_cache);
     free(res);
     return NULL;
   }
@@ -84,6 +94,7 @@ static void cuda_free_ctx(cuda_context *ctx) {
     cuStreamDestroy(ctx->s);
     if (!(ctx->flags & DONTFREE))
       cuCtxDestroy(ctx->ctx);
+    cache_free(ctx->extcopy_cache);
     CLEAR(ctx);
     free(ctx);
   }
@@ -117,6 +128,7 @@ void cuda_exit(cuda_context *ctx) {
 gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
     cuda_context *ctx = (cuda_context *)c;
     gpudata *res;
+    int flags = CU_EVENT_DISABLE_TIMING;
 
     res = malloc(sizeof(*res));
     if (res == NULL) return NULL;
@@ -129,8 +141,9 @@ gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
     }
 
     res->ptr = p;
-    ctx->err = cuEventCreate(&res->ev,
-		      CU_EVENT_DISABLE_TIMING|CU_EVENT_BLOCKING_SYNC);
+    if (ctx->flags & GA_CTX_MULTI_THREAD)
+      flags |= CU_EVENT_BLOCKING_SYNC;
+    ctx->err = cuEventCreate(&res->ev, flags);
     if (ctx->err != CUDA_SUCCESS) {
       free(res);
       cuda_exit(ctx);
@@ -270,6 +283,7 @@ static void *cuda_init(int ord, int flags, int *ret) {
       if (res == NULL) {
         FAIL(NULL, GA_IMPL_ERROR);
       }
+      res->flags |= flags;
       return res;
     }
 
@@ -287,6 +301,7 @@ static void *cuda_init(int ord, int flags, int *ret) {
     err = cuCtxCreate(&ctx, fl, dev);
     CHKFAIL(NULL);
     res = cuda_make_ctx(ctx, 0);
+    res->flags |= flags;
     if (res == NULL) {
       cuCtxDestroy(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
@@ -304,6 +319,7 @@ static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
 			   int *ret) {
     gpudata *res;
     cuda_context *ctx = (cuda_context *)c;
+    int fl = CU_EVENT_DISABLE_TIMING;
 
     if ((flags & GA_BUFFER_INIT) && data == NULL) FAIL(NULL, GA_VALUE_ERROR);
     if ((flags & (GA_BUFFER_READ_ONLY|GA_BUFFER_WRITE_ONLY)) ==
@@ -325,8 +341,10 @@ static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
       FAIL(NULL, GA_IMPL_ERROR);
     }
 
-    ctx->err = cuEventCreate(&res->ev,
-                             CU_EVENT_DISABLE_TIMING|CU_EVENT_BLOCKING_SYNC);
+    if (ctx->flags & GA_CTX_MULTI_THREAD)
+      fl |= CU_EVENT_BLOCKING_SYNC;
+    ctx->err = cuEventCreate(&res->ev, fl);
+
     if (ctx->err != CUDA_SUCCESS) {
       free(res);
       cuda_exit(ctx);
@@ -1055,40 +1073,22 @@ static inline unsigned int xmin(unsigned long a, unsigned long b) {
     return (unsigned int)((a < b) ? a : b);
 }
 
-static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t ooff,
-                        int intype, int outtype, unsigned int a_nd,
-                        const size_t *a_dims, const ssize_t *a_str,
-                        unsigned int b_nd, const size_t *b_dims,
-                        const ssize_t *b_str) {
+static inline int gen_extcopy_kernel(const cache_key_t *a,
+				     cuda_context *ctx, cache_val_t *v,
+				     size_t nEls) {
   strb sb = STRB_STATIC_INIT;
-  void *args[2];
-  int types[2];
   int res = GA_SYS_ERROR;
-    
-  size_t nEls = 1, ls[2], gs[2];
-  gpukernel *k;
-  unsigned int i;
   int flags = GA_USE_PTX;
-
   unsigned int bits = sizeof(void *)*8;
+  int types[2];
   const char *in_t;
   const char *out_t;
   const char *rmod;
   const char *arch;
 
-  ASSERT_BUF(input);
-  ASSERT_BUF(output);
-  if (input->ctx != output->ctx)
-    return GA_INVALID_ERROR;
-
-  for (i = 0; i < a_nd; i++) {
-    nEls *= a_dims[i];
-  }
-  if (nEls == 0) return GA_NO_ERROR;
-
-  in_t = map_t(intype);
-  out_t = map_t(outtype);
-  rmod = get_rmod(intype, outtype);
+  in_t = map_t(a->itype);
+  out_t = map_t(a->otype);
+  rmod = get_rmod(a->itype, a->otype);
   if (in_t == NULL || out_t == NULL) return GA_DEVSUP_ERROR;
   arch = detect_arch(&res);
   if (arch == NULL) return res;
@@ -1097,8 +1097,8 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
 	       bits, in_t, out_t, bits, bits, bits, bits, bits, nEls,
 	       bits, bits);
 
-  cuda_perdim_ptx(&sb, a_nd, a_dims, a_str, "a_p", bits);
-  cuda_perdim_ptx(&sb, b_nd, b_dims, b_str, "b_p", bits);
+  cuda_perdim_ptx(&sb, a->ind, a->idims, a->istr, "a_p", bits);
+  cuda_perdim_ptx(&sb, a->ond, a->odims, a->ostr, "b_p", bits);
 
   strb_appendf(&sb, "ld.param.u%u rp1, [a_data];\n"
 	       "cvt.s%u.s%u rp2, a_p;\n"
@@ -1111,56 +1111,123 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t oof
 	       "st.global.%s [rp1+%" SPREFIX "u], tmpb;\n", bits,
 	       bits, bits,
 	       bits,
-	       in_t, ioff,
+	       in_t, a->ioff,
 	       rmod, out_t, in_t,
 	       bits,
 	       bits, bits,
 	       bits,
-	       out_t, ooff);
+	       out_t, a->ooff);
 
   strb_appendf(&sb, ELEM_FOOTER_PTX, bits, bits, nEls);
 
   if (strb_error(&sb))
     goto fail;
 
-  if (intype == GA_DOUBLE || outtype == GA_DOUBLE ||
-      intype == GA_CDOUBLE || outtype == GA_CDOUBLE) {
+  if (a->itype == GA_DOUBLE || a->otype == GA_DOUBLE ||
+      a->itype == GA_CDOUBLE || a->otype == GA_CDOUBLE) {
     flags |= GA_USE_DOUBLE;
   }
 
-  if (outtype == GA_HALF || intype == GA_HALF) {
+  if (a->otype == GA_HALF || a->itype == GA_HALF) {
     flags |= GA_USE_HALF;
   }
 
-  if (compyte_get_elsize(outtype) < 4 || compyte_get_elsize(intype) < 4) {
+  if (compyte_get_elsize(a->otype) < 4 || compyte_get_elsize(a->itype) < 4) {
     /* Should check for non-mod4 strides too */
     flags |= GA_USE_SMALL;
   }
 
-  if (outtype == GA_CFLOAT || intype == GA_CFLOAT ||
-      outtype == GA_CDOUBLE || intype == GA_CDOUBLE) {
+  if (a->otype == GA_CFLOAT || a->itype == GA_CFLOAT ||
+      a->otype == GA_CDOUBLE || a->itype == GA_CDOUBLE) {
     flags |= GA_USE_COMPLEX;
   }
 
   types[0] = types[1] = GA_BUFFER;
-  k = cuda_newkernel(input->ctx, 1, (const char **)&sb.s, &sb.l, "extcpy",
+  res = GA_NO_ERROR;
+  *v = cuda_newkernel(ctx, 1, (const char **)&sb.s, &sb.l, "extcpy",
 		     2, types, flags, &res);
-  if (k == NULL) goto fail;
+ fail:
+  strb_clear(&sb);
+  return res;
+}
+
+#include <time.h>
+
+static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t ooff,
+                        int intype, int outtype, unsigned int a_nd,
+                        const size_t *a_dims, const ssize_t *a_str,
+                        unsigned int b_nd, const size_t *b_dims,
+                        const ssize_t *b_str) {
+  cuda_context *ctx = input->ctx;
+  void *args[2];
+  int res = GA_SYS_ERROR;
+  int in_cache = 1;
+  unsigned int i;
+  size_t nEls = 1, ls[2], gs[2];
+  gpukernel *k;
+  cache_val_t *v;
+  cache_key_t a;
+
+  ASSERT_BUF(input);
+  ASSERT_BUF(output);
+  if (input->ctx != output->ctx)
+    return GA_INVALID_ERROR;
+
+  for (i = 0; i < a_nd; i++) {
+    nEls *= a_dims[i];
+  }
+  if (nEls == 0) return GA_NO_ERROR;
+
+  a.ind = a_nd;
+  a.ond = b_nd;
+  a.itype = intype;
+  a.otype = outtype;
+  a.ioff = ioff;
+  a.ooff = ooff;
+  a.idims = a_dims;
+  a.odims = b_dims;
+  a.istr = a_str;
+  a.ostr = b_str;
+
+  do_key_hash(&a);
+
+  v = cache_get(ctx->extcopy_cache, &a);
+  if (v == NULL) {
+    v = &k;
+    res = gen_extcopy_kernel(&a, input->ctx, v, nEls);
+    if (res != GA_NO_ERROR)
+      return res;
+
+    /* Cache the kernel */
+    a.idims = memdup(a_dims, a_nd*sizeof(size_t));
+    a.odims = memdup(b_dims, b_nd*sizeof(size_t));
+    a.istr = memdup(a_str, a_nd*sizeof(ssize_t));
+    a.ostr = memdup(b_str, b_nd*sizeof(ssize_t));
+    if (a.idims == NULL || a.odims == NULL ||
+	a.istr == NULL || a.ostr == NULL ||
+	cache_insert(ctx->extcopy_cache, &a, v)) {
+      /* Cache insert or memdup failed */
+      free((void *)a.idims);
+      free((void *)a.odims);
+      free((void *)a.istr);
+      free((void *)a.ostr);
+      in_cache = 0;
+    }
+  }
 
   /* Cheap kernel scheduling */
-  res = cuda_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, ls);
-  if (res != GA_NO_ERROR) goto failk;
+  res = cuda_property(NULL, NULL, *v, GA_KERNEL_PROP_MAXLSIZE, ls);
+  if (res != GA_NO_ERROR) goto fail;
 
   gs[0] = ((nEls-1) / ls[0]) + 1;
   gs[1] = ls[1] = 1;
   args[0] = input;
   args[1] = output;
-  res = cuda_callkernel(k, ls, gs, args);
+  res = cuda_callkernel(*v, ls, gs, args);
 
-failk:
-  cuda_freekernel(k);
 fail:
-  strb_clear(&sb);
+  if (!in_cache)
+    cuda_freekernel(*v);
   return res;
 }
 
