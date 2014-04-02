@@ -81,8 +81,13 @@ static void teardown(void *c) {
   }
 
 #define PREP_ORDER_GEMM							\
-  size_t t;								\
+  size_t lt, t;								\
   gpudata *T;								\
+  cb_transpose transT
+
+#define PREP_ORDER_GEMMBATCH						\
+  size_t *lt, t;                                                        \
+  gpudata **T;								\
   cb_transpose transT
 
 #define HANDLE_ORDER_GEMM			       \
@@ -99,10 +104,13 @@ static void teardown(void *c) {
     transT = transA;				       \
     transA = transB;				       \
     transB = transT;				       \
-    t = offA;					       \
+    lt = offA;					       \
     offA = offB;				       \
-    offB = t;					       \
+    offB = lt;					       \
   }
+
+
+#define HANDLE_ORDER_GEMMBATCH HANDLE_ORDER_GEMM
 
 #define PREP_ORDER_GER \
   size_t t;	       \
@@ -124,6 +132,7 @@ static void teardown(void *c) {
     Y = td;		 \
   }
 
+
 #define FUNC_INIT		\
   cuda_enter(ctx);		\
   if (ctx->err != CUDA_SUCCESS) \
@@ -131,14 +140,16 @@ static void teardown(void *c) {
 
 #define FUNC_FINI cuda_exit(ctx)
 
-#define ARRAY_INIT(A)				  \
-  ctx->err = cuStreamWaitEvent(ctx->s, A->ev, 0); \
+/*#define ARRAY_INIT(A)				  \
+  ctx->err = cuStreamWaitEvent(ctx->s, (A)->ev, 0); \
   if (ctx->err != CUDA_SUCCESS) {		  \
     cuda_exit(ctx);				  \
     return GA_IMPL_ERROR;			  \
-  }
+    }*/
+#define ARRAY_INIT(A)
 
-#define ARRAY_FINI(A) cuEventRecord(A->ev, ctx->s)
+/*#define ARRAY_FINI(A) cuEventRecord((A)->ev, ctx->s)*/
+#define ARRAY_FINI(A)
 
 #define PRE_CALL err =
 #define PREFIX(typec, TYPEC) cublas ## TYPEC
@@ -153,6 +164,96 @@ static void teardown(void *c) {
     return GA_DEVSUP_ERROR;		  \
   if (err != CUBLAS_STATUS_SUCCESS)	  \
     return GA_BLAS_ERROR
+
+static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
+                      size_t M, size_t N, size_t K, float alpha,
+                      gpudata **A, size_t *offA, size_t lda,
+                      gpudata **B, size_t *offB, size_t ldb,
+                      float beta, gpudata **C, size_t *offC, size_t ldc,
+                      size_t batchCount) {
+  FETCH_CONTEXT(A[0]);
+  FUNC_DECLS;
+  float **A_l = alloca(sizeof(float *) * batchCount);
+  float **B_l = alloca(sizeof(float *) * batchCount);
+  float **C_l = alloca(sizeof(float *) * batchCount);
+  PREP_ORDER_GEMMBATCH;
+
+  HANDLE_ORDER_GEMMBATCH;
+  FUNC_INIT;
+
+  {
+    size_t i;
+    for (i = 0; i < batchCount; i++) {
+      ARRAY_INIT(A[i]);
+      A_l[i] = A[i]->ptr + offA[i];
+      ARRAY_INIT(B[i]);
+      B_l[i] = B[i]->ptr + offB[i];
+      ARRAY_INIT(C[i]);
+      C_l[i] = C[i]->ptr + offC[i];
+    }
+  }
+
+  PRE_CALL cublasSgemmBatched(INIT_ARGS TRANS(transA), TRANS(transB), SZ(M), SZ(N), SZ(K), SCAL(alpha), A_l, SZ(lda), B_l, SZ(ldb), SCAL(beta), C_l, SZ(ldc) TRAIL_ARGS);
+  POST_CALL;
+
+  {
+    size_t i;
+    for (i = 0; i < batchCount; i++) {
+      ARRAY_FINI(A[i]);
+      ARRAY_FINI(B[i]);
+      ARRAY_FINI(C[i]);
+    }
+  }
+
+  FUNC_FINI;
+
+  return GA_NO_ERROR;
+}
+
+static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
+                      size_t M, size_t N, size_t K, double alpha,
+                      gpudata **A, size_t *offA, size_t lda,
+                      gpudata **B, size_t *offB, size_t ldb,
+                      double beta, gpudata **C, size_t *offC, size_t ldc,
+                      size_t batchCount) {
+  FETCH_CONTEXT(A[0]);
+  FUNC_DECLS;
+  double **A_l = alloca(sizeof(double *) * batchCount);
+  double **B_l = alloca(sizeof(double *) * batchCount);
+  double **C_l = alloca(sizeof(double *) * batchCount);
+  PREP_ORDER_GEMMBATCH;
+
+  HANDLE_ORDER_GEMMBATCH;
+  FUNC_INIT;
+
+  {
+    size_t i;
+    for (i = 0; i < batchCount; i++) {
+      ARRAY_INIT(A[i]);
+      A_l[i] = A[i]->ptr + offA[i];
+      ARRAY_INIT(B[i]);
+      B_l[i] = B[i]->ptr + offB[i];
+      ARRAY_INIT(C[i]);
+      C_l[i] = C[i]->ptr + offC[i];
+    }
+  }
+
+  PRE_CALL cublasDgemmBatched(INIT_ARGS TRANS(transA), TRANS(transB), SZ(M), SZ(N), SZ(K), SCAL(alpha), A_l, SZ(lda), B_l, SZ(ldb), SCAL(beta), C_l, SZ(ldc) TRAIL_ARGS);
+  POST_CALL;
+
+  {
+    size_t i;
+    for (i = 0; i < batchCount; i++) {
+      ARRAY_FINI(A[i]);
+      ARRAY_FINI(B[i]);
+      ARRAY_FINI(C[i]);
+    }
+  }
+
+  FUNC_FINI;
+
+  return GA_NO_ERROR;
+}
 
 #include "generic_blas.inc.c"
 

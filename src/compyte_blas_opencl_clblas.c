@@ -81,6 +81,9 @@ static void teardown(void *c) {
 #define PREFIX(typec, TYPEC) clblas ## TYPEC
 #define TRANS(tr) convT(tr)
 #define ARRAY(A, dtype) A->buf, off ## A
+#define SCAL(s) s
+#define SZ(s) s
+#define INIT_ARGS
 #define TRAIL_ARGS , 1, &ctx->q, num_ev, num_ev == 0 ? NULL : evl, &ev
 
 #define POST_CALL                               \
@@ -88,5 +91,53 @@ static void teardown(void *c) {
     return GA_BLAS_ERROR
 
 #define ORDER convO(order),
+
+static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
+                      size_t M, size_t N, size_t K, float alpha,
+                      gpudata **A, size_t *offA, size_t lda,
+                      gpudata **B, size_t *offB, size_t ldb,
+                      float beta, gpudata **C, size_t *offC, size_t ldc,
+                      size_t batchCount) {
+  FETCH_CONTEXT(A[0]);
+  FUNC_DECLS;
+  size_t i;
+
+  for (i = 0; i < batchCount; i++) {
+    ARRAY_INIT(A[i]);
+    ARRAY_INIT(B[i]);
+    ARRAY_INIT(C[i]);
+    PRE_CALL clblasSgemm(INIT_ARGS ORDER TRANS(transA), TRANS(transB), SZ(M), SZ(N), SZ(K), SCAL(alpha), ARRAY(A[i], float), SZ(lda), ARRAY(B[i], float), SZ(ldb), SCAL(beta), ARRAY(C[i], float), SZ(ldc) TRAIL_ARGS);
+    POST_CALL;
+    ARRAY_FINI(A[i]);
+    ARRAY_FINI(B[i]);
+    ARRAY_FINI(C[i]);
+  }
+
+  return GA_NO_ERROR;
+}
+
+static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
+                      size_t M, size_t N, size_t K, double alpha,
+                      gpudata **A, size_t *offA, size_t lda,
+                      gpudata **B, size_t *offB, size_t ldb,
+                      double beta, gpudata **C, size_t *offC, size_t ldc,
+                      size_t batchCount) {
+  FETCH_CONTEXT(A[0]);
+  FUNC_DECLS;
+  size_t i;
+
+  for (i = 0; i < batchCount; i++) {
+    ARRAY_INIT(A[i]);
+    ARRAY_INIT(B[i]);
+    ARRAY_INIT(C[i]);
+    PRE_CALL clblasDgemm(INIT_ARGS ORDER TRANS(transA), TRANS(transB), SZ(M), SZ(N), SZ(K), SCAL(alpha), ARRAY(A[i], double), SZ(lda), ARRAY(B[i], double), SZ(ldb), SCAL(beta), ARRAY(C[i], double), SZ(ldc) TRAIL_ARGS);
+    POST_CALL;
+    ARRAY_FINI(A[i]);
+    ARRAY_FINI(B[i]);
+    ARRAY_FINI(C[i]);
+  }
+
+  return GA_NO_ERROR;
+}
 
 #include "generic_blas.inc.c"
