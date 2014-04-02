@@ -18,6 +18,10 @@ COMPYTE_PUBLIC int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, doub
                                         int nocopy);
 #define GpuArray_sgemm GpuArray_rgemm
 #define GpuArray_dgemm GpuArray_rgemm
+COMPYTE_PUBLIC int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
+                                        int nocopy);
+#define GpuArray_sger GpuArray_rger
+#define GpuArray_dger GpuArray_rger
 
 #ifdef __cplusplus
 }

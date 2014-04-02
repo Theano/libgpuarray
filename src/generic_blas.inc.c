@@ -17,6 +17,12 @@
 #ifndef HANDLE_ORDER_GEMM
 #define HANDLE_ORDER_GEMM
 #endif
+#ifndef PREP_ORDER_GER
+#define PREP_ORDER_GER
+#endif
+#ifndef HANDLE_ORDER_GER
+#define HANDLE_ORDER_GER
+#endif
 #else
 #define ORDER
 #endif
@@ -104,6 +110,32 @@ GEMV(double, d, D)
 
 GEMM(float, s, S)
 GEMM(double, d, D)
+#define GER(dtype, typec, TYPEC)			    \
+  static int typec ## ger(cb_order order, size_t M, size_t N, dtype alpha, gpudata *X, size_t offX, int incX, gpudata *Y, size_t offY, int incY, gpudata *A, size_t offA, size_t lda) { \
+    FETCH_CONTEXT(X);			    \
+    FUNC_DECLS;							    \
+    PREP_ORDER_GER;		                    \
+								    \
+    HANDLE_ORDER_GER;	                            \
+    FUNC_INIT;							    \
+								    \
+    ARRAY_INIT(X);					    \
+    ARRAY_INIT(Y);					    \
+    ARRAY_INIT(A);					    \
+								    \
+    PRE_CALL __GLUE(PREFIX(typec, TYPEC), ger)(INIT_ARGS ORDER SZ(M), SZ(N), SCAL(alpha), ARRAY(X, dtype), (incX), ARRAY(Y, dtype), (incY), ARRAY(A, dtype), SZ(lda) TRAIL_ARGS); \
+    POST_CALL;							    \
+								    \
+    ARRAY_FINI(X);					    \
+    ARRAY_FINI(Y);					    \
+    ARRAY_FINI(A);					    \
+    FUNC_FINI;							    \
+								    \
+    return GA_NO_ERROR;						    \
+  }
+
+GER(float, s, S)
+GER(double, d, D)
 
 COMPYTE_LOCAL compyte_blas_ops __GLUE(NAME, _ops) = {
   setup,
@@ -112,4 +144,6 @@ COMPYTE_LOCAL compyte_blas_ops __GLUE(NAME, _ops) = {
   dgemv,
   sgemm,
   dgemm,
+  sger,
+  dger,
 };
