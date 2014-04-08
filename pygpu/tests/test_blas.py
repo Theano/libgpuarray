@@ -120,3 +120,37 @@ def gemm(m, n, k, dtype, order, trans, offseted_o, sliced, overwrite,
                     trans_b=trans[1], overwrite_c=overwrite)
 
     numpy.testing.assert_allclose(cr, numpy.asarray(gr), rtol=1e-6)
+
+
+def test_ger():
+    for m, n in [(4, 5)]:
+        for order in ['f', 'c']:
+            for sliced_x in [1, 2, -2, -1]:
+                for sliced_y in [1, 2, -2, -1]:
+                    yield ger, m, n, 'float32', order, sliced_x, sliced_y, \
+                        False
+
+    yield ger, 4, 5, 'float64', 'f', 1, 1, False
+
+    for init_res in [True, False]:
+        for overwrite in [True, False]:
+            yield ger, 4, 5, 'float32', 'f', 1, 1, init_res, overwrite
+
+
+def ger(m, n, dtype, order, sliced_x, sliced_y, init_res, overwrite=False):
+    cX, gX = gen_gpuarray((m,), dtype, order, sliced=sliced_x, ctx=context)
+    cY, gY = gen_gpuarray((n,), dtype, order, sliced=sliced_y, ctx=context)
+
+    if init_res:
+        cA, gA = gen_gpuarray((m, n), dtype, order, ctx=context)
+    else:
+        cA, gA = None, None
+
+    if dtype == 'float32':
+        cr = fblas.sger(1.0, cX, cY, a=cA, overwrite_a=overwrite)
+    else:
+        cr = fblas.dger(1.0, cX, cY, a=cA, overwrite_a=overwrite)
+
+    gr = gblas.ger(1.0, gX, gY, gA, overwrite_a=overwrite)
+
+    numpy.testing.assert_allclose(cr, numpy.asarray(gr), rtol=1e-6)
