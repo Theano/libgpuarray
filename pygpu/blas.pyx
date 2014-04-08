@@ -120,7 +120,7 @@ def ger(double alpha, GpuArray X, GpuArray Y, GpuArray A=None, overwrite_a=False
     
     if A is None:
         Ashp[0] = X.ga.dimensions[0];
-        Ashp[1] = Y.ga.dimensions[1];
+        Ashp[1] = Y.ga.dimensions[0];
         A = pygpu_zeros(2, Ashp, X.ga.typecode, GA_ANY_ORDER, X.context, None)
         overwrite_a = True
 
