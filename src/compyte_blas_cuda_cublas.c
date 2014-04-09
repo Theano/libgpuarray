@@ -104,6 +104,26 @@ static void teardown(void *c) {
     offB = t;					       \
   }
 
+#define PREP_ORDER_GER \
+  size_t t;	       \
+  gpudata *td
+
+#define HANDLE_ORDER_GER \
+  if (order == cb_c) {	 \
+    t = M;		 \
+    M = N;		 \
+    N = t;		 \
+    t = offX;		 \
+    offX = offY;	 \
+    offY = t;		 \
+    t = incX;		 \
+    incX = incY;	 \
+    incY = t;		 \
+    td = X;		 \
+    X = Y;		 \
+    Y = td;		 \
+  }
+
 #define FUNC_INIT		\
   cuda_enter(ctx);		\
   if (ctx->err != CUDA_SUCCESS) \
