@@ -173,10 +173,10 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
                       size_t batchCount) {
   FETCH_CONTEXT(A[0]);
   FUNC_DECLS;
-  float **A_l = alloca(sizeof(float *) * batchCount);
-  float **B_l = alloca(sizeof(float *) * batchCount);
-  float **C_l = alloca(sizeof(float *) * batchCount);
   PREP_ORDER_GEMMBATCH;
+  const float **A_l = alloca(sizeof(float *) * batchCount);
+  const float **B_l = alloca(sizeof(float *) * batchCount);
+  float **C_l = alloca(sizeof(float *) * batchCount);
 
   HANDLE_ORDER_GEMMBATCH;
   FUNC_INIT;
@@ -185,15 +185,15 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     size_t i;
     for (i = 0; i < batchCount; i++) {
       ARRAY_INIT(A[i]);
-      A_l[i] = A[i]->ptr + offA[i];
+      A_l[i] = ((float *)A[i]->ptr) + offA[i];
       ARRAY_INIT(B[i]);
-      B_l[i] = B[i]->ptr + offB[i];
+      B_l[i] = ((float *)B[i]->ptr) + offB[i];
       ARRAY_INIT(C[i]);
-      C_l[i] = C[i]->ptr + offC[i];
+      C_l[i] = ((float *)C[i]->ptr) + offC[i];
     }
   }
 
-  PRE_CALL cublasSgemmBatched(INIT_ARGS TRANS(transA), TRANS(transB), SZ(M), SZ(N), SZ(K), SCAL(alpha), A_l, SZ(lda), B_l, SZ(ldb), SCAL(beta), C_l, SZ(ldc) TRAIL_ARGS);
+  PRE_CALL cublasSgemmBatched(INIT_ARGS TRANS(transA), TRANS(transB), SZ(M), SZ(N), SZ(K), SCAL(alpha), A_l, SZ(lda), B_l, SZ(ldb), SCAL(beta), C_l, SZ(ldc), batchCount);
   POST_CALL;
 
   {
@@ -218,8 +218,8 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
                       size_t batchCount) {
   FETCH_CONTEXT(A[0]);
   FUNC_DECLS;
-  double **A_l = alloca(sizeof(double *) * batchCount);
-  double **B_l = alloca(sizeof(double *) * batchCount);
+  const double **A_l = alloca(sizeof(double *) * batchCount);
+  const double **B_l = alloca(sizeof(double *) * batchCount);
   double **C_l = alloca(sizeof(double *) * batchCount);
   PREP_ORDER_GEMMBATCH;
 
@@ -230,15 +230,15 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     size_t i;
     for (i = 0; i < batchCount; i++) {
       ARRAY_INIT(A[i]);
-      A_l[i] = A[i]->ptr + offA[i];
+      A_l[i] = ((double *)A[i]->ptr) + offA[i];
       ARRAY_INIT(B[i]);
-      B_l[i] = B[i]->ptr + offB[i];
+      B_l[i] = ((double *)B[i]->ptr) + offB[i];
       ARRAY_INIT(C[i]);
-      C_l[i] = C[i]->ptr + offC[i];
+      C_l[i] = ((double *)C[i]->ptr) + offC[i];
     }
   }
 
-  PRE_CALL cublasDgemmBatched(INIT_ARGS TRANS(transA), TRANS(transB), SZ(M), SZ(N), SZ(K), SCAL(alpha), A_l, SZ(lda), B_l, SZ(ldb), SCAL(beta), C_l, SZ(ldc) TRAIL_ARGS);
+  PRE_CALL cublasDgemmBatched(INIT_ARGS TRANS(transA), TRANS(transB), SZ(M), SZ(N), SZ(K), SCAL(alpha), A_l, SZ(lda), B_l, SZ(ldb), SCAL(beta), C_l, SZ(ldc), batchCount);
   POST_CALL;
 
   {
