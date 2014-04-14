@@ -146,4 +146,6 @@ COMPYTE_LOCAL compyte_blas_ops __GLUE(NAME, _ops) = {
   dgemm,
   sger,
   dger,
+  sgemmBatch,
+  dgemmBatch,
 };

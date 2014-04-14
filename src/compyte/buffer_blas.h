@@ -43,6 +43,8 @@ typedef struct _compyte_blas_ops {
   int (*dgemm)(cb_order order, cb_transpose transA, cb_transpose transB, size_t M, size_t N, size_t K, double alpha, gpudata *A, size_t offA, size_t lda, gpudata *B, size_t offB, size_t ldb, double beta, gpudata *C, size_t offC, size_t ldc);
   int (*sger)(cb_order order, size_t M, size_t N, float alpha, gpudata *X, size_t offX, int incX, gpudata *Y, size_t offY, int incY, gpudata *A, size_t offA, size_t lda);
   int (*dger)(cb_order order, size_t M, size_t N, double alpha, gpudata *X, size_t offX, int incX, gpudata *Y, size_t offY, int incY, gpudata *A, size_t offA, size_t lda);
+  int (*sgemmBatch)(cb_order order, cb_transpose transA, cb_transpose transB, size_t M, size_t N, size_t K, float alpha, gpudata **A, size_t *offA, size_t lda, gpudata **B, size_t *offB, size_t ldb, float beta, gpudata **C, size_t *offC, size_t ldc, size_t batchCount);
+  int (*dgemmBatch)(cb_order order, cb_transpose transA, cb_transpose transB, size_t M, size_t N, size_t K, double alpha, gpudata **A, size_t *offA, size_t lda, gpudata **B, size_t *offB, size_t ldb, double beta, gpudata **C, size_t *offC, size_t ldc, size_t batchCount);
 } compyte_blas_ops;
 
 #ifdef __cplusplus
