@@ -174,10 +174,11 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   FETCH_CONTEXT(A[0]);
   FUNC_DECLS;
   PREP_ORDER_GEMMBATCH;
-  const float **A_l = alloca(sizeof(float *) * batchCount);
-  const float **B_l = alloca(sizeof(float *) * batchCount);
-  float **C_l = alloca(sizeof(float *) * batchCount);
-  CUdeviceptr Aa, Ba, Ca;
+  float **T_l = alloca(sizeof(float *) * batchCount * 3);
+  const float **A_l = (const float **)T_l;
+  const float **B_l = (const float **)T_l + batchCount;
+  float **C_l = T_l + (batchCount * 2);
+  CUdeviceptr Ta, Aa, Ba, Ca;
 
   HANDLE_ORDER_GEMMBATCH;
   FUNC_INIT;
@@ -194,19 +195,17 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     }
   }
 
-  cuMemAlloc(&Aa, sizeof(float *) * batchCount);
-  cuMemAlloc(&Ba, sizeof(float *) * batchCount);
-  cuMemAlloc(&Ca, sizeof(float *) * batchCount);
-  cuMemcpyHtoD(Aa, A_l, sizeof(float *) * batchCount);
-  cuMemcpyHtoD(Ba, B_l, sizeof(float *) * batchCount);
-  cuMemcpyHtoD(Ca, C_l, sizeof(float *) * batchCount);
+  cuMemAlloc(&Ta, sizeof(float *) * batchCount * 3);
+  Aa = Ta;
+  Ba = Ta + (batchCount * sizeof(float *));
+  Ca = Ta + (batchCount * sizeof(float *) * 2);
+
+  cuMemcpyHtoD(Ta, T_l, sizeof(float *) * batchCount * 3);
 
   PRE_CALL cublasSgemmBatched(INIT_ARGS TRANS(transA), TRANS(transB), SZ(M), SZ(N), SZ(K), SCAL(alpha), (const float **)Aa, SZ(lda), (const float **)Ba, SZ(ldb), SCAL(beta), (float **)Ca, SZ(ldc), batchCount);
   POST_CALL;
 
-  cuMemFree(Aa);
-  cuMemFree(Ba);
-  cuMemFree(Ca);
+  cuMemFree(Ta);
 
   {
     size_t i;
@@ -230,10 +229,12 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
                       size_t batchCount) {
   FETCH_CONTEXT(A[0]);
   FUNC_DECLS;
-  const double **A_l = alloca(sizeof(double *) * batchCount);
-  const double **B_l = alloca(sizeof(double *) * batchCount);
-  double **C_l = alloca(sizeof(double *) * batchCount);
   PREP_ORDER_GEMMBATCH;
+  double **T_l = alloca(sizeof(double *) * batchCount * 3);
+  const double **A_l = (const double **)T_l;
+  const double **B_l = (const double **)T_l + batchCount;
+  double **C_l = T_l + (batchCount * 2);
+  CUdeviceptr Ta, Aa, Ba, Ca;
 
   HANDLE_ORDER_GEMMBATCH;
   FUNC_INIT;
@@ -250,8 +251,17 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     }
   }
 
-  PRE_CALL cublasDgemmBatched(INIT_ARGS TRANS(transA), TRANS(transB), SZ(M), SZ(N), SZ(K), SCAL(alpha), A_l, SZ(lda), B_l, SZ(ldb), SCAL(beta), C_l, SZ(ldc), batchCount);
+  cuMemAlloc(&Ta, sizeof(double *) * batchCount * 3);
+  Aa = Ta;
+  Ba = Ta + (batchCount * sizeof(double *));
+  Ca = Ta + (batchCount * sizeof(double *) * 2);
+
+  cuMemcpyHtoD(Ta, T_l, sizeof(double *) * batchCount * 3);
+
+  PRE_CALL cublasDgemmBatched(INIT_ARGS TRANS(transA), TRANS(transB), SZ(M), SZ(N), SZ(K), SCAL(alpha), (const double **)Aa, SZ(lda), (const double **)Ba, SZ(ldb), SCAL(beta), (double **)Ca, SZ(ldc), batchCount);
   POST_CALL;
+
+  cuMemFree(Ta);
 
   {
     size_t i;
