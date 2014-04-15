@@ -781,7 +781,7 @@ static int cl_callkernel(gpukernel *k, size_t ls[2], size_t gs[2],
   cl_ulong temp;
   cl_uint num_ev;
   cl_uint i;
-  int res;
+  int res = 0;
 
   ASSERT_KER(k);
   ASSERT_CTX(ctx);
