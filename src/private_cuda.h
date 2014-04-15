@@ -11,6 +11,8 @@
 
 #include "compyte/buffer.h"
 
+#include "cache_decls.h"
+
 #ifdef DEBUG
 #include <assert.h>
 
@@ -38,8 +40,6 @@
 
 
 #define DONTFREE 0x10000000
-
-typedef struct _cache cache;
 
 typedef struct _cuda_context {
 #ifdef DEBUG

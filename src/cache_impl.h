@@ -7,9 +7,9 @@
  *
  */
 
-typedef struct node node;
+#include "cache_decls.h"
 
-struct node {
+struct _node {
   node *prev;
   node *next;
   node *h_next;
@@ -51,11 +51,11 @@ static inline void node_unlink(node *n) {
   n->prev = NULL;
 }
 
-typedef struct _list {
+struct _list {
   node *head;
   node *tail;
   size_t size;
-} list;
+};
 
 static inline void list_init(list *l) {
   l->head = NULL;
@@ -109,11 +109,11 @@ static inline void list_push(list *l, node *n) {
     l->size++;
 }
 
-typedef struct hash {
+struct _hash {
   node **keyval;
   size_t nbuckets;
   size_t size;
-} hash;
+};
 
 static inline size_t roundup2(size_t s) {
   s--;
@@ -202,12 +202,12 @@ static inline size_t hash_size(hash *h) {
   return h->size;
 }
 
-typedef struct _cache {
+struct _cache {
   hash cache;
   list keys;
   size_t maxSize;
   size_t elasticity;
-} cache;
+};
 
 static inline void cache_init(cache *c, size_t maxSize, size_t elasticity) {
   hash_init(&c->cache, maxSize+elasticity);
