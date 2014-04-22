@@ -21,14 +21,14 @@ cdef extern from "Python.h":
                              Py_ssize_t *step,
                              Py_ssize_t *slicelength) except -1
 
-cdef extern from "compyte/types.h":
-    ctypedef struct compyte_type:
+cdef extern from "gpuarray/types.h":
+    ctypedef struct gpuarray_type:
         const char *cluda_name
         size_t size
         size_t align
         int typecode
 
-    enum COMPYTE_TYPES:
+    enum GPUARRAY_TYPES:
         GA_BUFFER,
         GA_BOOL,
         GA_BYTE,
@@ -46,23 +46,23 @@ cdef extern from "compyte/types.h":
         GA_SIZE,
         GA_NBASE
 
-cdef extern from "compyte/util.h":
-    int compyte_register_type(compyte_type *t, int *ret)
-    size_t compyte_get_elsize(int typecode)
-    compyte_type *compyte_get_type(int typecode)
+cdef extern from "gpuarray/util.h":
+    int gpuarray_register_type(gpuarray_type *t, int *ret)
+    size_t gpuarray_get_elsize(int typecode)
+    gpuarray_type *gpuarray_get_type(int typecode)
 
-cdef extern from "compyte/error.h":
+cdef extern from "gpuarray/error.h":
     cdef enum ga_error:
         GA_NO_ERROR, GA_MEMORY_ERROR, GA_VALUE_ERROR, GA_IMPL_ERROR,
         GA_INVALID_ERROR, GA_UNSUPPORTED_ERROR, GA_SYS_ERROR, GA_RUN_ERROR
 
-cdef extern from "compyte/buffer.h":
+cdef extern from "gpuarray/buffer.h":
     ctypedef struct gpudata:
         pass
     ctypedef struct gpukernel:
         pass
 
-    ctypedef struct compyte_buffer_ops:
+    ctypedef struct gpuarray_buffer_ops:
         void *buffer_init(int devno, int flags, int *ret)
         void buffer_deinit(void *ctx)
         char *ctx_error(void *ctx)
@@ -83,15 +83,15 @@ cdef extern from "compyte/buffer.h":
     cdef enum ga_usefl:
         GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF
 
-    char *Gpu_error(const compyte_buffer_ops *o, void *ctx, int err)
-    const compyte_buffer_ops *compyte_get_ops(const char *) nogil
+    char *Gpu_error(const gpuarray_buffer_ops *o, void *ctx, int err)
+    const gpuarray_buffer_ops *gpuarray_get_ops(const char *) nogil
 
-cdef extern from "compyte/kernel.h":
+cdef extern from "gpuarray/kernel.h":
     ctypedef struct _GpuKernel "GpuKernel":
         gpukernel *k
-        const compyte_buffer_ops *ops
+        const gpuarray_buffer_ops *ops
 
-    int GpuKernel_init(_GpuKernel *k, const compyte_buffer_ops *ops, void *ctx,
+    int GpuKernel_init(_GpuKernel *k, const gpuarray_buffer_ops *ops, void *ctx,
                        unsigned int count, const char **strs,
                        const size_t *lens, const char *name,
                        unsigned int argcount, const int *types, int flags)
@@ -103,10 +103,10 @@ cdef extern from "compyte/kernel.h":
                         void **args)
     int GpuKernel_binary(_GpuKernel *, size_t *, void **)
 
-cdef extern from "compyte/array.h":
+cdef extern from "gpuarray/array.h":
     ctypedef struct _GpuArray "GpuArray":
         gpudata *data
-        const compyte_buffer_ops *ops
+        const gpuarray_buffer_ops *ops
         size_t offset
         size_t *dimensions
         ssize_t *strides
@@ -128,13 +128,13 @@ cdef extern from "compyte/array.h":
     ctypedef enum ga_order:
         GA_ANY_ORDER, GA_C_ORDER, GA_F_ORDER
 
-    int GpuArray_empty(_GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
+    int GpuArray_empty(_GpuArray *a, const gpuarray_buffer_ops *ops, void *ctx,
                        int typecode, int nd, const size_t *dims, ga_order ord)
-    int GpuArray_fromdata(_GpuArray *a, const compyte_buffer_ops *ops,
+    int GpuArray_fromdata(_GpuArray *a, const gpuarray_buffer_ops *ops,
                           gpudata *data, size_t offset, int typecode,
                           unsigned int nd, const size_t *dims,
                           const ssize_t *strides, int writable)
-    int GpuArray_copy_from_host(_GpuArray *a, const compyte_buffer_ops *ops,
+    int GpuArray_copy_from_host(_GpuArray *a, const gpuarray_buffer_ops *ops,
                             void *ctx, void *buf, int typecode,
                             unsigned int nd, const size_t *dims,
                             const ssize_t *strides)
@@ -160,7 +160,7 @@ cdef extern from "compyte/array.h":
     int GpuArray_copy(_GpuArray *res, _GpuArray *a, ga_order order)
 
     int GpuArray_transfer(_GpuArray *res, const _GpuArray *a, void *new_ctx,
-                          const compyte_buffer_ops *new_ops, int may_share)
+                          const gpuarray_buffer_ops *new_ops, int may_share)
 
     char *GpuArray_error(_GpuArray *a, int err)
 
@@ -168,9 +168,9 @@ cdef extern from "compyte/array.h":
     bint GpuArray_is_c_contiguous(_GpuArray *a)
     bint GpuArray_is_f_contiguous(_GpuArray *a)
 
-cdef extern from "compyte/extension.h":
-    void *compyte_get_extension(const char *) nogil
-    cdef int COMPYTE_CUDA_CTX_NOFREE
+cdef extern from "gpuarray/extension.h":
+    void *gpuarray_get_extension(const char *) nogil
+    cdef int GPUARRAY_CUDA_CTX_NOFREE
 
 # If you change the api interface, you MUST increment either the minor
 # (if you add a function) or the major version (if you change
@@ -184,14 +184,14 @@ cdef ga_order to_ga_order(ord) except <ga_order>-2
 cdef bint py_CHKFLAGS(GpuArray a, int flags)
 cdef bint py_ISONESEGMENT(GpuArray a)
 
-cdef int array_empty(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
+cdef int array_empty(GpuArray a, const gpuarray_buffer_ops *ops, void *ctx,
                      int typecode, unsigned int nd, const size_t *dims,
                      ga_order ord) except -1
-cdef int array_fromdata(GpuArray a, const compyte_buffer_ops *ops,
+cdef int array_fromdata(GpuArray a, const gpuarray_buffer_ops *ops,
                         gpudata *data, size_t offset, int typecode,
                         unsigned int nd, const size_t *dims,
                         const ssize_t *strides, int writeable) except -1
-cdef int array_copy_from_host(GpuArray a, const compyte_buffer_ops *ops,
+cdef int array_copy_from_host(GpuArray a, const gpuarray_buffer_ops *ops,
                               void *ctx, void *buf, int typecode,
                               unsigned int nd, const size_t *dims,
                               const ssize_t *strides) except -1
@@ -214,11 +214,11 @@ cdef int array_read(void *dst, size_t sz, GpuArray src) except -1
 cdef int array_memset(GpuArray a, int data) except -1
 cdef int array_copy(GpuArray res, GpuArray a, ga_order order) except -1
 cdef int array_transfer(GpuArray res, GpuArray a, void *new_ctx,
-                        const compyte_buffer_ops *ops,
+                        const gpuarray_buffer_ops *ops,
                         bint may_share) except -1
 
 cdef const char *kernel_error(GpuKernel k, int err) except NULL
-cdef int kernel_init(GpuKernel k, const compyte_buffer_ops *ops, void *ctx,
+cdef int kernel_init(GpuKernel k, const gpuarray_buffer_ops *ops, void *ctx,
                      unsigned int count, const char **strs, const size_t *len,
                      const char *name, unsigned int argcount, const int *types,
                      int flags) except -1
@@ -232,8 +232,8 @@ cdef int kernel_binary(GpuKernel k, size_t *, void **) except -1
 cdef int kernel_property(GpuKernel k, int prop_id, void *res) except -1
 
 cdef int ctx_property(GpuContext c, int prop_id, void *res) except -1
-cdef const compyte_buffer_ops *get_ops(kind) except NULL
-cdef ops_kind(const compyte_buffer_ops *ops)
+cdef const gpuarray_buffer_ops *get_ops(kind) except NULL
+cdef ops_kind(const gpuarray_buffer_ops *ops)
 cdef GpuContext ensure_context(GpuContext c)
 
 cdef api GpuContext pygpu_default_context()
@@ -280,7 +280,7 @@ cdef api GpuArray pygpu_transfer(GpuArray a, GpuContext new_ctx,
                                  bint may_share)
 
 cdef api class GpuContext [type PyGpuContextType, object PyGpuContextObject]:
-    cdef const compyte_buffer_ops *ops
+    cdef const gpuarray_buffer_ops *ops
     cdef void* ctx
 
 cdef GpuArray new_GpuArray(type cls, GpuContext ctx, object base)

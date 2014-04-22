@@ -64,7 +64,7 @@ def set_cuda_compiler_fn(fn):
     .. warning::
 
         Exceptions raised by the function will not be propagated
-        because the call path goes through libcompyte.  They are only
+        because the call path goes through libgpuarray.  They are only
         used to indicate that there was a problem during the
         compilation.
 
@@ -74,10 +74,10 @@ def set_cuda_compiler_fn(fn):
     multi-threaded context.
 
     .. note::
-        If the "cuda" module was not compiled in libcompyte then this function will raise a `RuntimeError` unconditionaly.
+        If the "cuda" module was not compiled in libgpuarray then this function will raise a `RuntimeError` unconditionaly.
     """
     cdef void (*set_comp)(comp_f f)
-    set_comp = <void (*)(comp_f)>compyte_get_extension("cuda_set_compiler")
+    set_comp = <void (*)(comp_f)>gpuarray_get_extension("cuda_set_compiler")
     if set_comp == NULL:
         raise RuntimeError, "cannot set compiler, extension is absent"
     if callable(fn):
@@ -97,7 +97,7 @@ def cl_wrap_ctx(size_t ptr):
     """
     cdef void *(*cl_make_ctx)(void *)
     cdef GpuContext res
-    cl_make_ctx = <void *(*)(void *)>compyte_get_extension("cl_make_ctx")
+    cl_make_ctx = <void *(*)(void *)>gpuarray_get_extension("cl_make_ctx")
     if cl_make_ctx == NULL:
         raise RuntimeError, "cl_make_ctx extension is absent"
     res = GpuContext.__new__(GpuContext)
@@ -114,7 +114,7 @@ def cuda_wrap_ctx(size_t ptr, bint own):
     Wrap an existing CUDA driver context (CUcontext) into a GpuContext
     class.
 
-    If `own` is true, libcompyte is now reponsible for the context and
+    If `own` is true, libgpuarray is now reponsible for the context and
     it will be destroyed once there are no references to it.
     Otherwise, the context will not be destroyed and it is the calling
     code's reponsability.
@@ -122,14 +122,14 @@ def cuda_wrap_ctx(size_t ptr, bint own):
     cdef void *(*cuda_make_ctx)(void *, int)
     cdef int flags
     cdef GpuContext res
-    cuda_make_ctx = <void *(*)(void *, int)>compyte_get_extension("cuda_make_ctx")
+    cuda_make_ctx = <void *(*)(void *, int)>gpuarray_get_extension("cuda_make_ctx")
     if cuda_make_ctx == NULL:
         raise RuntimeError, "cuda_make_ctx extension is absent"
     res = GpuContext.__new__(GpuContext)
     res.ops = get_ops('cuda')
     flags = 0
     if not own:
-        flags |= COMPYTE_CUDA_CTX_NOFREE
+        flags |= GPUARRAY_CUDA_CTX_NOFREE
     res.ctx = cuda_make_ctx(<void *>ptr, flags)
     if res.ctx == NULL:
         raise RuntimeError, "cuda_make_ctx call failed"
@@ -170,11 +170,11 @@ def register_dtype(np.dtype dtype, cname):
     :type cname: string
     :rtype: int
     """
-    cdef compyte_type *t
+    cdef gpuarray_type *t
     cdef int typecode
     cdef char *tmp
 
-    t = <compyte_type *>malloc(sizeof(compyte_type))
+    t = <gpuarray_type *>malloc(sizeof(gpuarray_type))
     if t == NULL:
         raise MemoryError, "Can't allocate new type"
     tmp = <char *>malloc(len(cname)+1)
@@ -185,7 +185,7 @@ def register_dtype(np.dtype dtype, cname):
     t.size = dtype.itemsize
     t.align = dtype.alignment
     t.cluda_name = tmp
-    typecode = compyte_register_type(t, NULL)
+    typecode = gpuarray_register_type(t, NULL)
     if typecode == -1:
         free(tmp)
         free(t)
@@ -236,7 +236,7 @@ def dtype_to_ctype(dtype):
     :rtype: string
     """
     cdef int typecode = dtype_to_typecode(dtype)
-    cdef const compyte_type *t = compyte_get_type(typecode)
+    cdef const gpuarray_type *t = gpuarray_get_type(typecode)
     if t.cluda_name == NULL:
         raise ValueError, "No mapping for %s"%(dtype,)
     return t.cluda_name
@@ -253,7 +253,7 @@ cdef ga_order to_ga_order(ord) except <ga_order>-2:
 
 class GpuArrayException(Exception):
     """
-    Exception used for all errors related to libcompyte.
+    Exception used for all errors related to libgpuarray.
     """
     def __init__(self, msg, errcode=None):
         """
@@ -268,7 +268,7 @@ cdef bint py_CHKFLAGS(GpuArray a, int flags):
 cdef bint py_ISONESEGMENT(GpuArray a):
     return GpuArray_ISONESEGMENT(&a.ga)
 
-cdef int array_empty(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
+cdef int array_empty(GpuArray a, const gpuarray_buffer_ops *ops, void *ctx,
                      int typecode, unsigned int nd, const size_t *dims,
                      ga_order ord) except -1:
     cdef int err
@@ -276,7 +276,7 @@ cdef int array_empty(GpuArray a, const compyte_buffer_ops *ops, void *ctx,
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(ops, ctx, err), err)
 
-cdef int array_fromdata(GpuArray a, const compyte_buffer_ops *ops,
+cdef int array_fromdata(GpuArray a, const gpuarray_buffer_ops *ops,
                         gpudata *data, size_t offset, int typecode,
                         unsigned int nd, const size_t *dims,
                         const ssize_t *strides, int writeable) except -1:
@@ -288,7 +288,7 @@ cdef int array_fromdata(GpuArray a, const compyte_buffer_ops *ops,
         ops.property(NULL, data, NULL, GA_BUFFER_PROP_CTX, &ctx)
         raise GpuArrayException(Gpu_error(ops, ctx, err), err)
 
-cdef int array_copy_from_host(GpuArray a, const compyte_buffer_ops *ops,
+cdef int array_copy_from_host(GpuArray a, const gpuarray_buffer_ops *ops,
                               void *ctx, void *buf, int typecode,
                               unsigned int nd, const size_t *dims,
                               const ssize_t *strides) except -1:
@@ -382,7 +382,7 @@ cdef int array_copy(GpuArray res, GpuArray a, ga_order order) except -1:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
 
 cdef int array_transfer(GpuArray res, GpuArray a, void *new_ctx,
-                        const compyte_buffer_ops *new_ops,
+                        const gpuarray_buffer_ops *new_ops,
                         bint may_share) except -1:
     cdef int err
     err = GpuArray_transfer(&res.ga, &a.ga, new_ctx, new_ops, may_share)
@@ -392,7 +392,7 @@ cdef int array_transfer(GpuArray res, GpuArray a, void *new_ctx,
 cdef const char *kernel_error(GpuKernel k, int err) except NULL:
     return Gpu_error(k.k.ops, kernel_context(k), err)
 
-cdef int kernel_init(GpuKernel k, const compyte_buffer_ops *ops, void *ctx,
+cdef int kernel_init(GpuKernel k, const gpuarray_buffer_ops *ops, void *ctx,
                      unsigned int count, const char **strs, const size_t *len,
                      const char *name, unsigned int argcount, const int *types,
                      int flags) except -1:
@@ -449,17 +449,17 @@ cdef int ctx_property(GpuContext c, int prop_id, void *res) except -1:
     if err != GA_NO_ERROR:
         raise GpuArrayException(Gpu_error(c.ops, c.ctx, err), err)
 
-cdef const compyte_buffer_ops *get_ops(kind) except NULL:
-    cdef const compyte_buffer_ops *res
-    res = compyte_get_ops(kind)
+cdef const gpuarray_buffer_ops *get_ops(kind) except NULL:
+    cdef const gpuarray_buffer_ops *res
+    res = gpuarray_get_ops(kind)
     if res == NULL:
         raise RuntimeError, "Unsupported kind: %s" % (kind,)
     return res
 
-cdef ops_kind(const compyte_buffer_ops *ops):
-    if ops == compyte_get_ops("opencl"):
+cdef ops_kind(const gpuarray_buffer_ops *ops):
+    if ops == gpuarray_get_ops("opencl"):
         return "opencl"
-    if ops == compyte_get_ops("cuda"):
+    if ops == gpuarray_get_ops("cuda"):
         return "cuda"
     raise RuntimeError, "Unknown ops vector"
 
@@ -759,7 +759,7 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
 
     .. note::
         This function might be deprecated in a later relase since the
-        only way to create gpudata pointers is through libcompyte
+        only way to create gpudata pointers is through libgpuarray
         functions that aren't exposed at the python level. It can be
         used with the value of the `gpudata` attribute of an existing
         GpuArray.
@@ -789,7 +789,7 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
             for i, s in enumerate(strides):
                 cstrides[i] = s
         else:
-            size = compyte_get_elsize(typecode)
+            size = gpuarray_get_elsize(typecode)
             for i in range(nd-1, -1, -1):
                 strides[i] = size
                 size *= cdims[i]
@@ -902,7 +902,7 @@ cdef class GpuContext:
 
     The currently implemented modules (for the `kind` parameter) are
     "cuda" and "opencl".  Which are available depends on the build
-    options for libcompyte.
+    options for libgpuarray.
 
     If you want an alternative interface check :meth:`~pygpu.gpuarray.init`.
     """
@@ -1599,21 +1599,21 @@ cdef class GpuArray:
             return typecode_to_dtype(self.ga.typecode)
 
     property typecode:
-        "The compyte typecode for the data type of the array"
+        "The gpuarray typecode for the data type of the array"
         def __get__(self):
             return self.ga.typecode
 
     property itemsize:
         "The size of the base element."
         def __get__(self):
-            return compyte_get_elsize(self.ga.typecode)
+            return gpuarray_get_elsize(self.ga.typecode)
 
     property flags:
         """Return a flags object describing the properties of this array.
 
         This is mostly numpy-compatible with some exceptions:
           * Flags are always constant (numpy allows modification of certain flags in certain cicumstances).
-          * OWNDATA is always True, since the data is refcounted in libcompyte.
+          * OWNDATA is always True, since the data is refcounted in libgpuarray.
           * UPDATEIFCOPY is not supported, therefore always False.
         """
         def __get__(self):
@@ -1662,7 +1662,7 @@ cdef class GpuKernel:
         function 'extern "C"', because cuda uses a C++ compiler
         unconditionally.
 
-    The `have_*` parameter are there to tell libcompyte that we need
+    The `have_*` parameter are there to tell libgpuarray that we need
     the particular type or feature to work for this kernel.  If the
     request can't be satified a
     :class:`~pygpu.gpuarray.GpuArrayException` will be raised in the
@@ -1679,7 +1679,7 @@ cdef class GpuKernel:
         k = GpuKernel(...)
         k(param1, param2, n=n)
 
-    where `n` is the minimum number of threads to run.  libcompyte
+    where `n` is the minimum number of threads to run.  libgpuarray
     will try to stay close to this number but may run a few more
     threads to match the hardware preferred multiple and stay
     efficient.  You should watch out for this in your code and make
@@ -1706,7 +1706,7 @@ cdef class GpuKernel:
         cdef unsigned int numargs
         cdef unsigned int i
         cdef int *_types
-        cdef const compyte_buffer_ops *ops
+        cdef const gpuarray_buffer_ops *ops
         cdef int flags = 0
 
         if not isinstance(source, (str, unicode)):
@@ -1742,7 +1742,7 @@ cdef class GpuKernel:
                     _types[i] = GA_BUFFER
                 else:
                     _types[i] = dtype_to_typecode(types[i])
-                self.callbuf[i] = malloc(compyte_get_elsize(_types[i]))
+                self.callbuf[i] = malloc(gpuarray_get_elsize(_types[i]))
                 if self.callbuf[i] == NULL:
                     raise MemoryError
             kernel_init(self, self.context.ops, self.context.ctx, 1, s, &l,

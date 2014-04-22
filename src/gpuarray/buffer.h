@@ -7,14 +7,14 @@
  * \see array.h For managing buffers
  * \see kernel.h For using kernels
  */
-#ifndef COMPYTE_BUFFER_H
-#define COMPYTE_BUFFER_H
+#ifndef GPUARRAY_BUFFER_H
+#define GPUARRAY_BUFFER_H
 
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdarg.h>
 
-#include <compyte/config.h>
+#include <gpuarray/config.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,9 +39,9 @@ typedef struct _gpukernel gpukernel;
 
 /**
  * Function table that a backend must provide.
- * \headerfile compyte/buffer.h
+ * \headerfile gpuarray/buffer.h
  */
-typedef struct _compyte_buffer_ops {
+typedef struct _gpuarray_buffer_ops {
   /**
    * Create a context on the specified device.
    *
@@ -448,7 +448,7 @@ typedef struct _compyte_buffer_ops {
    * \returns string description of the last error
    */
   const char *(*ctx_error)(void *ctx);
-} compyte_buffer_ops;
+} gpuarray_buffer_ops;
 
 /**
  * \defgroup props Properties
@@ -504,7 +504,7 @@ typedef struct _compyte_buffer_ops {
  * depending of the availability and performance of various BLAS
  * libraries.
  *
- * Type: `const compyte_blas_ops *`
+ * Type: `const gpuarray_blas_ops *`
  */
 #define GA_CTX_PROP_BLAS_OPS  6
 
@@ -579,7 +579,7 @@ typedef struct _compyte_buffer_ops {
  */
 
 /**
- * Flags for compyte_buffer_ops#buffer_newkernel.
+ * Flags for gpuarray_buffer_ops#buffer_newkernel.
  *
  * It is important to specify these properly as the compilation
  * machinery will ensure that the proper configuration is made to
@@ -615,7 +615,7 @@ typedef enum _ga_usefl {
    */
   GA_USE_BINARY =     0x20,
   /* If you add a new flag, don't forget to update both
-     compyte_buffer_{cuda,opencl}.c with the implementation of your flag */
+     gpuarray_buffer_{cuda,opencl}.c with the implementation of your flag */
   /**
    * The kernel is made of PTX code.
    */
@@ -633,7 +633,7 @@ typedef enum _ga_usefl {
  *
  * \returns A string description of the error.
  */
-COMPYTE_PUBLIC const char *Gpu_error(const compyte_buffer_ops *o, void *ctx,
+GPUARRAY_PUBLIC const char *Gpu_error(const gpuarray_buffer_ops *o, void *ctx,
 				     int err);
 /**
  * Get operations vector for a backend.
@@ -644,7 +644,7 @@ COMPYTE_PUBLIC const char *Gpu_error(const compyte_buffer_ops *o, void *ctx,
  *
  * \returns the operation vector or NULL if the backend name is unrecognized.
  */
-COMPYTE_PUBLIC const compyte_buffer_ops *compyte_get_ops(const char *name);
+GPUARRAY_PUBLIC const gpuarray_buffer_ops *gpuarray_get_ops(const char *name);
 
 /**
  * Transfer a buffer from one context to another.
@@ -653,11 +653,11 @@ COMPYTE_PUBLIC const compyte_buffer_ops *compyte_get_ops(const char *name);
  * available and fallback to going through host memory if nothing else
  * can be done.
  */
-COMPYTE_PUBLIC gpudata *compyte_buffer_transfer(gpudata *buf, size_t offset,
+GPUARRAY_PUBLIC gpudata *gpuarray_buffer_transfer(gpudata *buf, size_t offset,
                                              size_t sz, void *src_ctx,
-                                             const compyte_buffer_ops *src_ops,
+                                             const gpuarray_buffer_ops *src_ops,
                                              void *dst_ctx,
-                                             const compyte_buffer_ops *dst_ops,
+                                             const gpuarray_buffer_ops *dst_ops,
                                              int may_share, int *ret);
 
 #ifdef __cplusplus

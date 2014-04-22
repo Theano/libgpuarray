@@ -18,8 +18,8 @@ typedef struct _strb {
 
 #define STRB_STATIC_INIT {NULL, 0, 0}
 
-COMPYTE_LOCAL strb *strb_alloc(size_t);
-COMPYTE_LOCAL void strb_free(strb *);
+GPUARRAY_LOCAL strb *strb_alloc(size_t);
+GPUARRAY_LOCAL void strb_free(strb *);
 
 #define strb_new() strb_alloc(1024)
 
@@ -43,7 +43,7 @@ static inline void strb_clear(strb *sb) {
   sb->l = 0;
 }
 
-COMPYTE_LOCAL int strb_grow(strb *, size_t);
+GPUARRAY_LOCAL int strb_grow(strb *, size_t);
 
 static inline int strb_ensure(strb *sb, size_t s) {
   if (strb_error(sb)) return -1;
@@ -72,7 +72,7 @@ static inline void strb_appendb(strb *sb, strb *sb2) {
   strb_appendn(sb, sb2->s, sb2->l);
 }
 
-COMPYTE_LOCAL void strb_appendf(strb *, const char *, ...);
+GPUARRAY_LOCAL void strb_appendf(strb *, const char *, ...);
 
 static inline const char *strb_cstr(strb *sb) {
   strb_append0(sb);

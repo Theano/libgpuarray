@@ -1,5 +1,5 @@
-#ifndef COMPYTE_UTIL
-#define COMPYTE_UTIL
+#ifndef GPUARRAY_UTIL
+#define GPUARRAY_UTIL
 /** \file util.h
  *  \brief Utility functions.
  */
@@ -11,13 +11,13 @@ extern "C" {
 }
 #endif
 
-#include <compyte/config.h>
-#include <compyte/types.h>
+#include <gpuarray/config.h>
+#include <gpuarray/types.h>
 
 /**
  * Registers a type with the kernel machinery.
  *
- * \param t is a preallocated and filled compyte_type structure. The
+ * \param t is a preallocated and filled gpuarray_type structure. The
  *   memory can be allocated from static memory as it will never be
  *   freed.
  * \param ret is a pointer where the error code (if any) will be
@@ -31,7 +31,7 @@ extern "C" {
  *
  * On error this function will return -1.
  */
-COMPYTE_PUBLIC int compyte_register_type(compyte_type *t, int *ret);
+GPUARRAY_PUBLIC int gpuarray_register_type(gpuarray_type *t, int *ret);
 
 /**
  * Get the type structure for a type.
@@ -42,7 +42,7 @@ COMPYTE_PUBLIC int compyte_register_type(compyte_type *t, int *ret);
  *
  * \returns A type structure pointer or NULL
  */
-COMPYTE_PUBLIC const compyte_type *compyte_get_type(int typecode);
+GPUARRAY_PUBLIC const gpuarray_type *gpuarray_get_type(int typecode);
 
 /**
  * Get the size of one element of a type.
@@ -53,10 +53,10 @@ COMPYTE_PUBLIC const compyte_type *compyte_get_type(int typecode);
  *
  * \returns the size
  */
-COMPYTE_PUBLIC size_t compyte_get_elsize(int typecode);
+GPUARRAY_PUBLIC size_t gpuarray_get_elsize(int typecode);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* COMPYTE_UTIL */
+#endif /* GPUARRAY_UTIL */

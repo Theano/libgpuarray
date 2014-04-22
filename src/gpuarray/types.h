@@ -3,12 +3,12 @@
  *  \brief Type declarations and access.
  */
 
-#ifndef COMPYTE_TYPES_H
-#define COMPYTE_TYPES_H
+#ifndef GPUARRAY_TYPES_H
+#define GPUARRAY_TYPES_H
 #include <sys/types.h>
 #include <stddef.h>
 
-#include <compyte/config.h>
+#include <gpuarray/config.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,7 +20,7 @@ extern "C" {
 /**
  * Structure that holds the properties of a type.
  */
-typedef struct _compyte_type {
+typedef struct _gpuarray_type {
  /**
   * Type name to use in the buffers.
   */
@@ -37,12 +37,12 @@ typedef struct _compyte_type {
   * Code for the type.
   */
   int typecode;
-} compyte_type;
+} gpuarray_type;
 
 /**
  * List of all built-in types.
  */
-enum COMPYTE_TYPES {
+enum GPUARRAY_TYPES {
   GA_BUFFER = -1,
   GA_BOOL = 0,
   GA_BYTE = 1,
@@ -133,4 +133,4 @@ enum COMPYTE_TYPES {
 }
 #endif
 
-#endif /* COMPYTE_TYPES */
+#endif /* GPUARRAY_TYPES */

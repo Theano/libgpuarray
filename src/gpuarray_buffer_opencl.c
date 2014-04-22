@@ -2,10 +2,10 @@
 
 #include "private.h"
 #include "private_opencl.h"
-#include "compyte/buffer.h"
-#include "compyte/util.h"
-#include "compyte/error.h"
-#include "compyte/buffer_blas.h"
+#include "gpuarray/buffer.h"
+#include "gpuarray/util.h"
+#include "gpuarray/error.h"
+#include "gpuarray/buffer_blas.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -87,7 +87,7 @@ cl_command_queue cl_get_stream(void *ctx) {
 }
 
 static void cl_free_ctx(cl_ctx *ctx) {
-  compyte_blas_ops *blas_ops;
+  gpuarray_blas_ops *blas_ops;
 
   ASSERT_CTX(ctx);
   assert(ctx->refcnt != 0);
@@ -803,10 +803,10 @@ static int cl_callkernel(gpukernel *k, size_t ls[2], size_t gs[2],
       ctx->err = clSetKernelArg(k->k, i, sizeof(cl_mem), &btmp->buf);
     } else if (k->types[i] == GA_SIZE) {
       temp = *((size_t *)args[i]);
-      ctx->err = clSetKernelArg(k->k, i, compyte_get_elsize(k->types[i]),
+      ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(k->types[i]),
                                 &temp);
     } else {
-      ctx->err = clSetKernelArg(k->k, i, compyte_get_elsize(k->types[i]),
+      ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(k->types[i]),
                                 args[i]);
     }
     if (ctx->err != CL_SUCCESS) {
@@ -968,7 +968,7 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
     flags |= GA_USE_HALF;
   }
 
-  if (compyte_get_elsize(outtype) < 4 || compyte_get_elsize(intype) < 4) {
+  if (gpuarray_get_elsize(outtype) < 4 || gpuarray_get_elsize(intype) < 4) {
     /* Should check for non-mod4 strides too */
     flags |= GA_USE_SMALL;
   }
@@ -979,15 +979,15 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
   }
 
   if (asprintf(&strs[count], ELEM_HEADER,
-	       compyte_get_type(intype)->cluda_name,
-	       compyte_get_type(outtype)->cluda_name,
+	       gpuarray_get_type(intype)->cluda_name,
+	       gpuarray_get_type(outtype)->cluda_name,
                ioff, ooff, nEls) == -1)
     goto fail;
   count++;
   
-  if (compyte_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a_p") == -1)
+  if (gpuarray_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a_p") == -1)
     goto fail;
-  if (compyte_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b_p") == -1)
+  if (gpuarray_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b_p") == -1)
     goto fail;
 
   strs[count] = strdup(ELEM_FOOTER);
@@ -1021,7 +1021,7 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
 }
 
 #ifdef WITH_OPENCL_CLBLAS
-extern compyte_blas_ops clblas_ops;
+extern gpuarray_blas_ops clblas_ops;
 #endif
 
 static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
@@ -1146,7 +1146,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
   case GA_CTX_PROP_BLAS_OPS:
 #ifdef WITH_OPENCL_CLBLAS
-    *((compyte_blas_ops **)res) = &clblas_ops;
+    *((gpuarray_blas_ops **)res) = &clblas_ops;
     return GA_NO_ERROR;
 #else
     *((void **)res) = NULL;
@@ -1234,8 +1234,8 @@ static const char *cl_error(void *c) {
     return get_error_string(ctx->err);
 }
 
-COMPYTE_LOCAL
-const compyte_buffer_ops opencl_ops = {cl_init,
+GPUARRAY_LOCAL
+const gpuarray_buffer_ops opencl_ops = {cl_init,
                                        cl_deinit,
                                        cl_alloc,
                                        cl_retain,

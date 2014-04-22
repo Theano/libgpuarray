@@ -9,22 +9,22 @@ find_package(OpenCL)
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/compyte_types.c
-         ${CMAKE_CURRENT_SOURCE_DIR}/compyte/types.h
+  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/gpuarray_types.c
+         ${CMAKE_CURRENT_SOURCE_DIR}/gpuarray/types.h
   COMMAND python gen_types.py
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen_types.py)
 
-SET(COMPYTE_SRC
+SET(GPUARRAY_SRC
 strb.c
-compyte_types.c
-compyte_error.c
-compyte_util.c
-compyte_buffer.c
-compyte_array.c
-compyte_array_blas.c
-compyte_kernel.c
-compyte_extension.c
+gpuarray_types.c
+gpuarray_error.c
+gpuarray_util.c
+gpuarray_buffer.c
+gpuarray_array.c
+gpuarray_array_blas.c
+gpuarray_kernel.c
+gpuarray_extension.c
 )
 
 check_function_exists(strlcat HAVE_STRL)
@@ -36,15 +36,15 @@ if(UNIX)
 endif()
 
 if(NOT HAVE_STRL)
-  set(COMPYTE_SRC ${COMPYTE_SRC} compyte_strl.c)
+  set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_strl.c)
 endif()
 
 if(NOT HAVE_ASPRINTF)
-  set(COMPYTE_SRC ${COMPYTE_SRC} compyte_asprintf.c)
+  set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_asprintf.c)
 endif()
 
 if(NOT HAVE_MKSTEMP)
-  set(COMPYTE_SRC ${COMPYTE_SRC} compyte_mkstemp.c)
+  set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_mkstemp.c)
 endif()
 
 if (CUDA_FOUND)
@@ -64,20 +64,20 @@ if (CUDA_FOUND)
     SET(CUDADRV_INCLUDE ${CUDA_TOOLKIT_INCLUDE})
   endif()
 
-  set(COMPYTE_SRC ${COMPYTE_SRC} compyte_buffer_cuda.c)
+  set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_buffer_cuda.c)
   add_definitions(-DNVCC_BIN="${CUDA_NVCC_EXECUTABLE}" -DWITH_CUDA)
   include_directories("${CUDADRV_INCLUDE}")
-  set(COMPYTE_SRC ${COMPYTE_SRC} compyte_blas_cuda_cublas.c)
+  set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_blas_cuda_cublas.c)
   add_definitions(-DWITH_CUDA_CUBLAS)
 endif()
 
 if(OPENCL_FOUND)
-  set(COMPYTE_SRC ${COMPYTE_SRC} compyte_buffer_opencl.c)
+  set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_buffer_opencl.c)
   add_definitions(-DWITH_OPENCL)
   include_directories("${OPENCL_INCLUDE_DIRS}")
   find_package(clBLAS)
   if (CLBLAS_FOUND)
-    set(COMPYTE_SRC ${COMPYTE_SRC} compyte_blas_opencl_clblas.c)
+    set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_blas_opencl_clblas.c)
     add_definitions(-DWITH_OPENCL_CLBLAS)
     include_directories("${CLBLAS_INCLUDE_DIRS}")
   endif()
@@ -88,48 +88,48 @@ configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/private_config.h
   )
 
-add_library(compyte SHARED ${COMPYTE_SRC})
-add_dependencies(compyte gen_blas)
-set_target_properties(compyte PROPERTIES COMPILE_FLAGS "-DCOMPYTE_BUILDING_DLL -DCOMPYTE_SHARED")
+add_library(gpuarray SHARED ${GPUARRAY_SRC})
+add_dependencies(gpuarray gen_blas)
+set_target_properties(gpuarray PROPERTIES COMPILE_FLAGS "-DGPUARRAY_BUILDING_DLL -DGPUARRAY_SHARED")
 
-add_library(compyte-static STATIC ${COMPYTE_SRC})
-add_dependencies(compyte-static gen_blas)
+add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
+add_dependencies(gpuarray-static gen_blas)
 
 if(CUDA_FOUND)
-  target_link_libraries(compyte ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
-  target_link_libraries(compyte-static ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARY})
+  target_link_libraries(gpuarray ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
+  target_link_libraries(gpuarray-static ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARY})
 endif()
 
 if(OPENCL_FOUND)
-  target_link_libraries(compyte ${OPENCL_LIBRARIES})
-  target_link_libraries(compyte-static ${OPENCL_LIBRARIES})
+  target_link_libraries(gpuarray ${OPENCL_LIBRARIES})
+  target_link_libraries(gpuarray-static ${OPENCL_LIBRARIES})
   if (CLBLAS_FOUND)
-    target_link_libraries(compyte ${CLBLAS_LIBRARIES})
-    target_link_libraries(compyte-static ${CLBLAS_LIBRARIES})
+    target_link_libraries(gpuarray ${CLBLAS_LIBRARIES})
+    target_link_libraries(gpuarray-static ${CLBLAS_LIBRARIES})
   endif()
 endif()
 
 SET(headers
-  compyte/array.h
-  compyte/blas.h
-  compyte/buffer.h
-  compyte/buffer_blas.h
-  compyte/config.h
-  compyte/error.h
-  compyte/extension.h
-  compyte/ext_cuda.h
-  compyte/kernel.h
-  compyte/types.h
-  compyte/util.h
+  gpuarray/array.h
+  gpuarray/blas.h
+  gpuarray/buffer.h
+  gpuarray/buffer_blas.h
+  gpuarray/config.h
+  gpuarray/error.h
+  gpuarray/extension.h
+  gpuarray/ext_cuda.h
+  gpuarray/kernel.h
+  gpuarray/types.h
+  gpuarray/util.h
 )
 
-INSTALL(FILES ${headers} DESTINATION include/compyte)
+INSTALL(FILES ${headers} DESTINATION include/gpuarray)
 
 if(NOT UNIX)
-  INSTALL(FILES compyte/wincompat/stdint.h DESTINATION include/compyte/wincompat)
+  INSTALL(FILES gpuarray/wincompat/stdint.h DESTINATION include/gpuarray/wincompat)
 endif()
 
-INSTALL(TARGETS compyte compyte-static
+INSTALL(TARGETS gpuarray gpuarray-static
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib

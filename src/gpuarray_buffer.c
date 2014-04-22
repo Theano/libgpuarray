@@ -2,24 +2,24 @@
 #include <errno.h>
 #include <stdlib.h>
 
-#include "compyte/buffer.h"
-#include "compyte/error.h"
+#include "gpuarray/buffer.h"
+#include "gpuarray/error.h"
 
-const char *Gpu_error(const compyte_buffer_ops *o, void *ctx, int err) {
+const char *Gpu_error(const gpuarray_buffer_ops *o, void *ctx, int err) {
   if (err == GA_IMPL_ERROR)
     return o->ctx_error(ctx);
   else
-    return compyte_error_str(err);
+    return gpuarray_error_str(err);
 }
 
 #ifdef WITH_CUDA
-extern const compyte_buffer_ops cuda_ops;
+extern const gpuarray_buffer_ops cuda_ops;
 #endif
 #ifdef WITH_OPENCL
-extern const compyte_buffer_ops opencl_ops;
+extern const gpuarray_buffer_ops opencl_ops;
 #endif
 
-const compyte_buffer_ops *compyte_get_ops(const char *name) {
+const gpuarray_buffer_ops *gpuarray_get_ops(const char *name) {
 #ifdef WITH_CUDA
   if (strcmp("cuda", name) == 0) return &cuda_ops;
 #endif
@@ -31,11 +31,11 @@ const compyte_buffer_ops *compyte_get_ops(const char *name) {
 
 #define FAIL(v, e) { if (ret) *ret = e; return v; }
 
-gpudata *compyte_buffer_transfer(gpudata *buf, size_t offset, size_t sz,
+gpudata *gpuarray_buffer_transfer(gpudata *buf, size_t offset, size_t sz,
                                  void *src_ctx,
-                                 const compyte_buffer_ops *src_ops,
+                                 const gpuarray_buffer_ops *src_ops,
                                  void *dst_ctx,
-                                 const compyte_buffer_ops *dst_ops,
+                                 const gpuarray_buffer_ops *dst_ops,
                                  int may_share, int *ret) {
   gpudata *res;
   void *tmp;

@@ -1,10 +1,10 @@
 #define _CRT_SECURE_NO_WARNINGS
-#include "compyte/error.h"
+#include "gpuarray/error.h"
 
 #include <string.h>
 #include <errno.h>
 
-const char *compyte_error_str(int err) {
+const char *gpuarray_error_str(int err) {
   switch (err) {
   case GA_NO_ERROR:          return "No error";
   case GA_MEMORY_ERROR:      return "Out of memory";

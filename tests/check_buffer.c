@@ -1,20 +1,20 @@
 #include <check.h>
 
-#include "compyte/buffer.h"
-#include "compyte/error.h"
+#include "gpuarray/buffer.h"
+#include "gpuarray/error.h"
 #include "private.h"
 
 START_TEST(test_get_ops)
 {
-  const compyte_buffer_ops *ops;
+  const gpuarray_buffer_ops *ops;
   int valid_ops = 0;
-  ops = compyte_get_ops("cuda");
+  ops = gpuarray_get_ops("cuda");
   if (ops != NULL) valid_ops++;
-  ops = compyte_get_ops("opencl");
+  ops = gpuarray_get_ops("opencl");
   if (ops != NULL) valid_ops++;
   ck_assert_msg(valid_ops > 0, "No backends are available");
 
-  ops = compyte_get_ops("potato");
+  ops = gpuarray_get_ops("potato");
   ck_assert(ops == NULL);
 }
 END_TEST
@@ -23,9 +23,9 @@ static char *BACKENDS[] = {"opencl", "cuda"};
 
 START_TEST(test_gpu_error)
 {
-  const compyte_buffer_ops *ops;
+  const gpuarray_buffer_ops *ops;
   const char *msg;
-  ops = compyte_get_ops(BACKENDS[_i]);
+  ops = gpuarray_get_ops(BACKENDS[_i]);
   if (ops == NULL) return;
   msg = Gpu_error(ops, NULL, -1);
   msg = Gpu_error(ops, NULL, 99);
@@ -34,12 +34,12 @@ START_TEST(test_gpu_error)
 }
 END_TEST
 
-static const compyte_buffer_ops *ops;
+static const gpuarray_buffer_ops *ops;
 static void *ctx;
 
 static int setup(int i) {
   int j;
-  ops = compyte_get_ops(BACKENDS[i]);
+  ops = gpuarray_get_ops(BACKENDS[i]);
   if (ops == NULL)
     return 0;
   for (j = 0; j < 5; j++) {

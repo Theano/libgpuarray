@@ -1,5 +1,5 @@
-#ifndef _COMPYTE_PRIVATE_OPENCL
-#define _COMPYTE_PRIVATE_OPENCL
+#ifndef _GPUARRAY_PRIVATE_OPENCL
+#define _GPUARRAY_PRIVATE_OPENCL
 
 #include "private.h"
 
@@ -68,10 +68,10 @@ struct _gpukernel {
   unsigned int refcnt;
 };
 
-COMPYTE_LOCAL cl_ctx *cl_make_ctx(cl_context ctx);
-COMPYTE_LOCAL cl_context cl_get_ctx(void *ctx);
-COMPYTE_LOCAL cl_command_queue cl_get_stream(void *ctx);
-COMPYTE_LOCAL gpudata *cl_make_buf(void *c, cl_mem buf);
-COMPYTE_LOCAL cl_mem cl_get_buf(gpudata *g);
+GPUARRAY_LOCAL cl_ctx *cl_make_ctx(cl_context ctx);
+GPUARRAY_LOCAL cl_context cl_get_ctx(void *ctx);
+GPUARRAY_LOCAL cl_command_queue cl_get_stream(void *ctx);
+GPUARRAY_LOCAL gpudata *cl_make_buf(void *c, cl_mem buf);
+GPUARRAY_LOCAL cl_mem cl_get_buf(gpudata *g);
 
 #endif

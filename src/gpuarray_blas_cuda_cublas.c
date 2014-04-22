@@ -1,8 +1,8 @@
 #include "private.h"
 #include "private_cuda.h"
 
-#include "compyte/buffer_blas.h"
-#include "compyte/error.h"
+#include "gpuarray/buffer_blas.h"
+#include "gpuarray/error.h"
 
 #include "cublas_v2.h"
 

@@ -9,7 +9,7 @@
 
 #include "private.h"
 
-#include "compyte/buffer.h"
+#include "gpuarray/buffer.h"
 
 #include "cache_decls.h"
 
@@ -55,11 +55,11 @@ typedef struct _cuda_context {
   cache *extcopy_cache;
 } cuda_context;
 
-COMPYTE_LOCAL void *cuda_make_ctx(CUcontext ctx, int flags);
-COMPYTE_LOCAL CUcontext cuda_get_ctx(void *ctx);
-COMPYTE_LOCAL CUstream cuda_get_stream(void *ctx);
-COMPYTE_LOCAL void cuda_enter(cuda_context *ctx);
-COMPYTE_LOCAL void cuda_exit(cuda_context *ctx);
+GPUARRAY_LOCAL void *cuda_make_ctx(CUcontext ctx, int flags);
+GPUARRAY_LOCAL CUcontext cuda_get_ctx(void *ctx);
+GPUARRAY_LOCAL CUstream cuda_get_stream(void *ctx);
+GPUARRAY_LOCAL void cuda_enter(cuda_context *ctx);
+GPUARRAY_LOCAL void cuda_exit(cuda_context *ctx);
 
 struct _gpudata {
 #ifdef DEBUG
@@ -73,9 +73,9 @@ struct _gpudata {
   unsigned int refcnt;
 };
 
-COMPYTE_LOCAL gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz);
-COMPYTE_LOCAL CUdeviceptr cuda_get_ptr(gpudata *g);
-COMPYTE_LOCAL size_t cuda_get_sz(gpudata *g);
+GPUARRAY_LOCAL gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz);
+GPUARRAY_LOCAL CUdeviceptr cuda_get_ptr(gpudata *g);
+GPUARRAY_LOCAL size_t cuda_get_sz(gpudata *g);
 
 struct _gpukernel {
 #ifdef DEBUG

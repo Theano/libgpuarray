@@ -1,6 +1,6 @@
 #include <string.h>
 
-#include "compyte/extension.h"
+#include "gpuarray/extension.h"
 
 typedef struct _ext {
   const char *name;
@@ -49,7 +49,7 @@ static ext ext_list[] = {
 
 #define N_EXT (sizeof(ext_list)/sizeof(ext_list[0]))
 
-void *compyte_get_extension(const char *name) {
+void *gpuarray_get_extension(const char *name) {
   unsigned int i;
   for (i = 0; i < N_EXT; i++) {
     if (strcmp(name, ext_list[i].name) == 0) return ext_list[i].val;

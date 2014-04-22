@@ -1,11 +1,11 @@
-#ifndef COMPYTE_ARRAY_H
-#define COMPYTE_ARRAY_H
+#ifndef GPUARRAY_ARRAY_H
+#define GPUARRAY_ARRAY_H
 /**
  * \file array.h
  * \brief Array functions.
  */
 
-#include <compyte/buffer.h>
+#include <gpuarray/buffer.h>
 
 #ifdef _MSC_VER
 #define inline
@@ -29,7 +29,7 @@ typedef struct _GpuArray {
   /**
    * Backend operations vector.
    */
-  const compyte_buffer_ops *ops;
+  const gpuarray_buffer_ops *ops;
   /**
    * Size of each dimension.  The number of elements is #nd.
    */
@@ -177,7 +177,7 @@ static inline int GpuArray_CHKFLAGS(const GpuArray *a, int flags) {
  *
  * \returns the size of the array elements.
  */
-#define GpuArray_ITEMSIZE(a) compyte_get_elsize((a)->typecode)
+#define GpuArray_ITEMSIZE(a) gpuarray_get_elsize((a)->typecode)
 
 /**
  * Initialize and allocate a new empty (uninitialized data) array.
@@ -197,7 +197,7 @@ static inline int GpuArray_CHKFLAGS(const GpuArray *a, int flags) {
  * the device.  Any other error code means that the structure is
  * left uninitialized.
  */
-COMPYTE_PUBLIC int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops,
+GPUARRAY_PUBLIC int GpuArray_empty(GpuArray *a, const gpuarray_buffer_ops *ops,
                                   void *ctx, int typecode, unsigned int nd,
                                   const size_t *dims, ga_order ord);
 
@@ -219,7 +219,7 @@ COMPYTE_PUBLIC int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops,
  * the device.  Any other error code means that the structure is
  * left uninitialized.
  */
-COMPYTE_PUBLIC int GpuArray_zeros(GpuArray *a, const compyte_buffer_ops *ops,
+GPUARRAY_PUBLIC int GpuArray_zeros(GpuArray *a, const gpuarray_buffer_ops *ops,
                                   void *ctx, int typecode, unsigned int nd,
                                   const size_t *dims, ga_order ord);
 
@@ -245,15 +245,15 @@ COMPYTE_PUBLIC int GpuArray_zeros(GpuArray *a, const compyte_buffer_ops *ops,
  * properly initialized. Any other error code means that the structure
  * is left uninitialized and the provided buffer is deallocated.
  */
-COMPYTE_PUBLIC int GpuArray_fromdata(GpuArray *a,
-                                     const compyte_buffer_ops *ops,
+GPUARRAY_PUBLIC int GpuArray_fromdata(GpuArray *a,
+                                     const gpuarray_buffer_ops *ops,
                                      gpudata *data, size_t offset,
                                      int typecode, unsigned int nd,
                                      const size_t *dims,
                                      const ssize_t *strides, int writeable);
 
-COMPYTE_PUBLIC int GpuArray_copy_from_host(GpuArray *a,
-                                           const compyte_buffer_ops *ops,
+GPUARRAY_PUBLIC int GpuArray_copy_from_host(GpuArray *a,
+                                           const gpuarray_buffer_ops *ops,
                                            void *ctx, void *buf, int typecode,
                                            unsigned int nd, const size_t *dims,
                                            const ssize_t *strides);
@@ -273,7 +273,7 @@ COMPYTE_PUBLIC int GpuArray_copy_from_host(GpuArray *a,
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_view(GpuArray *v, const GpuArray *a);
+GPUARRAY_PUBLIC int GpuArray_view(GpuArray *v, const GpuArray *a);
 
 /**
  * Blocks until all operations (kernels, copies) involving `a` are finished.
@@ -283,7 +283,7 @@ COMPYTE_PUBLIC int GpuArray_view(GpuArray *v, const GpuArray *a);
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_sync(GpuArray *a);
+GPUARRAY_PUBLIC int GpuArray_sync(GpuArray *a);
 
 /**
  * Returns a sub-view of a source array.
@@ -308,11 +308,11 @@ COMPYTE_PUBLIC int GpuArray_sync(GpuArray *a);
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_index(GpuArray *r, const GpuArray *a,
+GPUARRAY_PUBLIC int GpuArray_index(GpuArray *r, const GpuArray *a,
                                   const ssize_t *starts, const ssize_t *stops,
                                   const ssize_t *steps);
 
-COMPYTE_PUBLIC int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
+GPUARRAY_PUBLIC int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
                                           const ssize_t *stops,
                                           const ssize_t *steps);
 
@@ -332,7 +332,7 @@ COMPYTE_PUBLIC int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_setarray(GpuArray *a, const GpuArray *v);
+GPUARRAY_PUBLIC int GpuArray_setarray(GpuArray *a, const GpuArray *v);
 
 /**
  * Change the dimensions of an array.
@@ -352,11 +352,11 @@ COMPYTE_PUBLIC int GpuArray_setarray(GpuArray *a, const GpuArray *v);
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_reshape(GpuArray *res, const GpuArray *a,
+GPUARRAY_PUBLIC int GpuArray_reshape(GpuArray *res, const GpuArray *a,
                                     unsigned int nd, const size_t *newdims,
                                     ga_order ord, int nocopy);
 
-COMPYTE_PUBLIC int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
+GPUARRAY_PUBLIC int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
                                             const size_t *newdims,
                                             ga_order ord);
 
@@ -375,10 +375,10 @@ COMPYTE_PUBLIC int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
  * \return GA_NO_ERROR if the operation was successful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_transpose(GpuArray *res, const GpuArray *a,
+GPUARRAY_PUBLIC int GpuArray_transpose(GpuArray *res, const GpuArray *a,
                                       const unsigned int *new_axes);
 
-COMPYTE_PUBLIC int GpuArray_transpose_inplace(GpuArray *a,
+GPUARRAY_PUBLIC int GpuArray_transpose_inplace(GpuArray *a,
                                               const unsigned int *new_axes);
 
 /**
@@ -394,7 +394,7 @@ COMPYTE_PUBLIC int GpuArray_transpose_inplace(GpuArray *a,
  *
  * \param a the array to clear
  */
-COMPYTE_PUBLIC void GpuArray_clear(GpuArray *a);
+GPUARRAY_PUBLIC void GpuArray_clear(GpuArray *a);
 
 /**
  * Checks if two arrays may share device memory.
@@ -404,7 +404,7 @@ COMPYTE_PUBLIC void GpuArray_clear(GpuArray *a);
  *
  * \returns 1 if `a` and `b` may share a portion of their data.
  */
-COMPYTE_PUBLIC int GpuArray_share(const GpuArray *a, const GpuArray *b);
+GPUARRAY_PUBLIC int GpuArray_share(const GpuArray *a, const GpuArray *b);
 
 /**
  * Retursns the context of an array.
@@ -413,7 +413,7 @@ COMPYTE_PUBLIC int GpuArray_share(const GpuArray *a, const GpuArray *b);
  *
  * \returns the context in which `a` was allocated.
  */
-COMPYTE_PUBLIC void *GpuArray_context(const GpuArray *a);
+GPUARRAY_PUBLIC void *GpuArray_context(const GpuArray *a);
 
 /**
  * Copies all the elements of and array to another.
@@ -427,7 +427,7 @@ COMPYTE_PUBLIC void *GpuArray_context(const GpuArray *a);
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_move(GpuArray *dst, const GpuArray *src);
+GPUARRAY_PUBLIC int GpuArray_move(GpuArray *dst, const GpuArray *src);
 
 /**
  * Copy data from the host memory to the device memory.
@@ -439,7 +439,7 @@ COMPYTE_PUBLIC int GpuArray_move(GpuArray *dst, const GpuArray *src);
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_write(GpuArray *dst, const void *src,
+GPUARRAY_PUBLIC int GpuArray_write(GpuArray *dst, const void *src,
                                   size_t src_sz);
 
 /**
@@ -452,7 +452,7 @@ COMPYTE_PUBLIC int GpuArray_write(GpuArray *dst, const void *src,
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_read(void *dst, size_t dst_sz,
+GPUARRAY_PUBLIC int GpuArray_read(void *dst, size_t dst_sz,
                                  const GpuArray *src);
 
 /**
@@ -464,7 +464,7 @@ COMPYTE_PUBLIC int GpuArray_read(void *dst, size_t dst_sz,
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_memset(GpuArray *a, int data);
+GPUARRAY_PUBLIC int GpuArray_memset(GpuArray *a, int data);
 
 /**
  * Make a copy of an array.
@@ -475,7 +475,7 @@ COMPYTE_PUBLIC int GpuArray_memset(GpuArray *a, int data);
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_copy(GpuArray *res, const GpuArray *a,
+GPUARRAY_PUBLIC int GpuArray_copy(GpuArray *res, const GpuArray *a,
                                  ga_order order);
 
 /**
@@ -496,9 +496,9 @@ COMPYTE_PUBLIC int GpuArray_copy(GpuArray *res, const GpuArray *a,
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
-COMPYTE_PUBLIC int GpuArray_transfer(GpuArray *res, const GpuArray *a,
+GPUARRAY_PUBLIC int GpuArray_transfer(GpuArray *res, const GpuArray *a,
                                      void *new_ctx,
-                                     const compyte_buffer_ops *new_ops,
+                                     const gpuarray_buffer_ops *new_ops,
                                      int may_share);
 
 /**
@@ -516,7 +516,7 @@ COMPYTE_PUBLIC int GpuArray_transfer(GpuArray *res, const GpuArray *a,
  *
  * \returns A user-readable string describing the nature of the error.
  */
-COMPYTE_PUBLIC const char *GpuArray_error(const GpuArray *a, int err);
+GPUARRAY_PUBLIC const char *GpuArray_error(const GpuArray *a, int err);
 
 /**
  * Print a textual description of `a` to the specified file
@@ -525,7 +525,7 @@ COMPYTE_PUBLIC const char *GpuArray_error(const GpuArray *a, int err);
  * \param fd a file descriptior open for writing
  * \param a an array
  */
-COMPYTE_PUBLIC void GpuArray_fprintf(FILE *fd, const GpuArray *a);
+GPUARRAY_PUBLIC void GpuArray_fprintf(FILE *fd, const GpuArray *a);
 
 #ifdef __cplusplus
 }

@@ -1,10 +1,10 @@
-#ifndef COMPYTE_EXTENSIONS_H
-#define COMPYTE_EXTENSIONS_H
+#ifndef GPUARRAY_EXTENSIONS_H
+#define GPUARRAY_EXTENSIONS_H
 /** \file extension.h
  *  \brief Extensions access.
  */
 
-#include <compyte/config.h>
+#include <gpuarray/config.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,15 +13,15 @@ extern "C" {
 }
 #endif
 
-/* Keep in sync with the flags in compyte_buffer_cuda.c */
-#define COMPYTE_CUDA_CTX_NOFREE 0x1
+/* Keep in sync with the flags in gpuarray_buffer_cuda.c */
+#define GPUARRAY_CUDA_CTX_NOFREE 0x1
 
 /**
  * Obtain a function pointer for an extension.
  *
  * \returns A function pointer or NULL if the extension was not found.
  */
-COMPYTE_PUBLIC void * compyte_get_extension(const char *name);
+GPUARRAY_PUBLIC void * gpuarray_get_extension(const char *name);
 
 #ifdef __cplusplus
 }

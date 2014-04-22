@@ -38,11 +38,11 @@
 
 #include "strb.h"
 
-#include "compyte/buffer.h"
-#include "compyte/util.h"
-#include "compyte/error.h"
-#include "compyte/extension.h"
-#include "compyte/buffer_blas.h"
+#include "gpuarray/buffer.h"
+#include "gpuarray/util.h"
+#include "gpuarray/error.h"
+#include "gpuarray/extension.h"
+#include "gpuarray/buffer_blas.h"
 
 typedef struct {char c; CUdeviceptr x; } st_devptr;
 #define DEVPTR_ALIGN (sizeof(st_devptr) - sizeof(CUdeviceptr))
@@ -82,7 +82,7 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
 }
 
 static void cuda_free_ctx(cuda_context *ctx) {
-  compyte_blas_ops *blas_ops;
+  gpuarray_blas_ops *blas_ops;
 
   ASSERT_CTX(ctx);
   ctx->refcnt--;
@@ -550,7 +550,7 @@ static const char *detect_arch(int *ret) {
     }
 }
 
-static const char *TMP_VAR_NAMES[] = {"COMPYTE_TMPDIR", "TMPDIR", "TMP",
+static const char *TMP_VAR_NAMES[] = {"GPUARRAY_TMPDIR", "TMPDIR", "TMP",
 				      "TEMP", "USERPROFILE"};
 
 static void *call_compiler_impl(const char *src, size_t len, int *ret) {
@@ -585,7 +585,7 @@ static void *call_compiler_impl(const char *src, size_t len, int *ret) {
     }
 
     strlcpy(namebuf, tmpdir, sizeof(namebuf));
-    strlcat(namebuf, "/compyte.cuda.XXXXXXXX", sizeof(namebuf));
+    strlcat(namebuf, "/gpuarray.cuda.XXXXXXXX", sizeof(namebuf));
 
     fd = mkstemp(namebuf);
     if (fd == -1) FAIL(NULL, GA_SYS_ERROR);
@@ -674,7 +674,7 @@ static void *call_compiler_impl(const char *src, size_t len, int *ret) {
 
 static void *(*call_compiler)(const char *src, size_t len, int *ret) = call_compiler_impl;
 
-COMPYTE_LOCAL void cuda_set_compiler(void *(*compiler_f)(const char *, size_t,
+GPUARRAY_LOCAL void cuda_set_compiler(void *(*compiler_f)(const char *, size_t,
                                                          int *)) {
     if (compiler_f == NULL) {
         call_compiler = call_compiler_impl;
@@ -1132,7 +1132,7 @@ static inline int gen_extcopy_kernel(const cache_key_t *a,
     flags |= GA_USE_HALF;
   }
 
-  if (compyte_get_elsize(a->otype) < 4 || compyte_get_elsize(a->itype) < 4) {
+  if (gpuarray_get_elsize(a->otype) < 4 || gpuarray_get_elsize(a->itype) < 4) {
     /* Should check for non-mod4 strides too */
     flags |= GA_USE_SMALL;
   }
@@ -1292,7 +1292,7 @@ static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
 }
 
 #ifdef WITH_CUDA_CUBLAS
-extern compyte_blas_ops cublas_ops;
+extern gpuarray_blas_ops cublas_ops;
 #endif
 
 static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
@@ -1429,7 +1429,7 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
   case GA_CTX_PROP_BLAS_OPS:
 #ifdef WITH_CUDA_CUBLAS
-    *((compyte_blas_ops **)res) = &cublas_ops;
+    *((gpuarray_blas_ops **)res) = &cublas_ops;
     return GA_NO_ERROR;
 #else
     *((void **)res) = NULL;
@@ -1501,8 +1501,8 @@ static const char *cuda_error(void *c) {
     return get_error_string(ctx->err);
 }
 
-COMPYTE_LOCAL
-const compyte_buffer_ops cuda_ops = {cuda_init,
+GPUARRAY_LOCAL
+const gpuarray_buffer_ops cuda_ops = {cuda_init,
                                      cuda_deinit,
                                      cuda_alloc,
                                      cuda_retain,

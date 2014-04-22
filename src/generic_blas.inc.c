@@ -137,7 +137,7 @@ GEMM(double, d, D)
 GER(float, s, S)
 GER(double, d, D)
 
-COMPYTE_LOCAL compyte_blas_ops __GLUE(NAME, _ops) = {
+GPUARRAY_LOCAL gpuarray_blas_ops __GLUE(NAME, _ops) = {
   setup,
   teardown,
   sgemv,

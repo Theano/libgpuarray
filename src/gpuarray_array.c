@@ -13,9 +13,9 @@
 #include <errno.h>
 
 #include "private.h"
-#include "compyte/array.h"
-#include "compyte/error.h"
-#include "compyte/util.h"
+#include "gpuarray/array.h"
+#include "gpuarray/error.h"
+#include "gpuarray/util.h"
 
 /*
  * Returns the boundaries of an array.
@@ -52,10 +52,10 @@ static void ga_boundaries(size_t *start, size_t *end, size_t offset,
 /* Value below which a size_t multiplication will never overflow. */
 #define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
 
-int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
+int GpuArray_empty(GpuArray *a, const gpuarray_buffer_ops *ops, void *ctx,
 		   int typecode, unsigned int nd, const size_t *dims,
                    ga_order ord) {
-  size_t size = compyte_get_elsize(typecode);
+  size_t size = gpuarray_get_elsize(typecode);
   unsigned int i;
   int res = GA_NO_ERROR;
 
@@ -94,7 +94,7 @@ int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
   /* Mult will not overflow since calloc succeded */
   memcpy(a->dimensions, dims, sizeof(size_t)*nd);
 
-  size = compyte_get_elsize(typecode);
+  size = gpuarray_get_elsize(typecode);
   /* mults will not overflow, checked on entry */
   switch (ord) {
   case GA_C_ORDER:
@@ -121,7 +121,7 @@ int GpuArray_empty(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
   return GA_NO_ERROR;
 }
 
-int GpuArray_zeros(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
+int GpuArray_zeros(GpuArray *a, const gpuarray_buffer_ops *ops, void *ctx,
                    int typecode, unsigned int nd, const size_t *dims,
                    ga_order ord) {
   int err;
@@ -135,11 +135,11 @@ int GpuArray_zeros(GpuArray *a, const compyte_buffer_ops *ops, void *ctx,
   return err;
 }
 
-int GpuArray_fromdata(GpuArray *a, const compyte_buffer_ops *ops,
+int GpuArray_fromdata(GpuArray *a, const gpuarray_buffer_ops *ops,
                       gpudata *data, size_t offset, int typecode,
                       unsigned int nd, const size_t *dims,
                       const ssize_t *strides, int writeable) {
-  if (compyte_get_type(typecode)->typecode != typecode)
+  if (gpuarray_get_type(typecode)->typecode != typecode)
     return GA_VALUE_ERROR;
   a->ops = ops;
   assert(data != NULL);
@@ -165,13 +165,13 @@ int GpuArray_fromdata(GpuArray *a, const compyte_buffer_ops *ops,
   return GA_NO_ERROR;
 }
 
-int GpuArray_copy_from_host(GpuArray *a, const compyte_buffer_ops *ops,
+int GpuArray_copy_from_host(GpuArray *a, const gpuarray_buffer_ops *ops,
                             void *ctx, void *buf, int typecode,
                             unsigned int nd, const size_t *dims,
                             const ssize_t *strides) {
   char *base = (char *)buf;
   size_t offset = 0;
-  size_t size = compyte_get_elsize(typecode);
+  size_t size = gpuarray_get_elsize(typecode);
   gpudata *b;
   int err;
   unsigned int i;
@@ -339,7 +339,7 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
       GpuArray_ISFORTRAN(a) == GpuArray_ISFORTRAN(v) &&
       a->typecode == v->typecode &&
       a->nd == v->nd) {
-    sz = compyte_get_elsize(a->typecode);
+    sz = gpuarray_get_elsize(a->typecode);
     for (i = 0; i < a->nd; i++) sz *= a->dimensions[i];
     return a->ops->buffer_move(a->data, a->offset, v->data, v->offset, sz);
   }
@@ -465,7 +465,7 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
     }
   } else {
     for (i = nj-1; i < nd; i++) {
-      newstrides[i] = compyte_get_elsize(a->typecode);
+      newstrides[i] = gpuarray_get_elsize(a->typecode);
     }
   }
 
@@ -498,12 +498,12 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
   memcpy(tmpdims, newdims, nd*sizeof(size_t));
   if (nd > 0) {
     if (ord == GA_F_ORDER) {
-      newstrides[0] = compyte_get_elsize(a->typecode);
+      newstrides[0] = gpuarray_get_elsize(a->typecode);
       for (i = 1; i < nd; i++) {
         newstrides[i] = newstrides[i-1] * tmpdims[i-1];
       }
     } else {
-      newstrides[nd-1] = compyte_get_elsize(a->typecode);
+      newstrides[nd-1] = gpuarray_get_elsize(a->typecode);
       for (i = nd-1; i > 0; i--) {
         newstrides[i-1] = newstrides[i] * tmpdims[i];
       }
@@ -627,7 +627,7 @@ int GpuArray_move(GpuArray *dst, const GpuArray *src) {
                                     src->nd, src->dimensions, src->strides,
                                     dst->nd, dst->dimensions, dst->strides);
   }
-  sz = compyte_get_elsize(dst->typecode);
+  sz = gpuarray_get_elsize(dst->typecode);
   for (i = 0; i < dst->nd; i++) sz *= dst->dimensions[i];
   return dst->ops->buffer_move(dst->data, dst->offset, src->data, src->offset,
                                sz);
@@ -665,7 +665,7 @@ int GpuArray_copy(GpuArray *res, const GpuArray *a, ga_order order) {
 }
 
 int GpuArray_transfer(GpuArray *res, const GpuArray *a, void *new_ctx,
-                      const compyte_buffer_ops *new_ops, int may_share) {
+                      const gpuarray_buffer_ops *new_ops, int may_share) {
   size_t start, end;
   gpudata *tmp;
   int err;
@@ -673,7 +673,7 @@ int GpuArray_transfer(GpuArray *res, const GpuArray *a, void *new_ctx,
   ga_boundaries(&start, &end, a->offset, a->nd, a->dimensions, a->strides);
   end += GpuArray_ITEMSIZE(a);
 
-  tmp = compyte_buffer_transfer(a->data, start, end - start,
+  tmp = gpuarray_buffer_transfer(a->data, start, end - start,
                                 GpuArray_context(a), a->ops,
                                 new_ctx, new_ops, may_share, &err);
   if (tmp == NULL)
@@ -689,7 +689,7 @@ const char *GpuArray_error(const GpuArray *a, int err) {
   if (err2 != GA_NO_ERROR) {
     /* If CUDA refuses to work after any kind of error in kernels
        there is not much we can do about it. */
-    return compyte_error_str(err);
+    return gpuarray_error_str(err);
   }
   return Gpu_error(a->ops, ctx, err);
 }
@@ -750,7 +750,7 @@ int GpuArray_is_f_contiguous(const GpuArray *a) {
 }
 
 int GpuArray_is_aligned(const GpuArray *a) {
-  size_t align = compyte_get_type(a->typecode)->align;
+  size_t align = gpuarray_get_type(a->typecode)->align;
   unsigned int i;
 
   if (a->offset % align != 0)

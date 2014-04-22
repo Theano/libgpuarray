@@ -8,9 +8,9 @@
  * files but not exposed in the interface.
  */
 
-#include "compyte/config.h"
-#include "compyte/array.h"
-#include "compyte/types.h"
+#include "gpuarray/config.h"
+#include "gpuarray/array.h"
+#include "gpuarray/types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,27 +58,27 @@ static inline void *memdup(const void *p, size_t s) {
   return res;
 }
 
-COMPYTE_LOCAL int GpuArray_is_c_contiguous(const GpuArray *a);
-COMPYTE_LOCAL int GpuArray_is_f_contiguous(const GpuArray *a);
-COMPYTE_LOCAL int GpuArray_is_aligned(const GpuArray *a);
+GPUARRAY_LOCAL int GpuArray_is_c_contiguous(const GpuArray *a);
+GPUARRAY_LOCAL int GpuArray_is_f_contiguous(const GpuArray *a);
+GPUARRAY_LOCAL int GpuArray_is_aligned(const GpuArray *a);
 
 #ifndef HAVE_ASPRINTF
-COMPYTE_LOCAL int asprintf(char **ret, const char *fmt, ...);
+GPUARRAY_LOCAL int asprintf(char **ret, const char *fmt, ...);
 #endif
 
 #ifndef HAVE_MKSTEMP
-COMPYTE_LOCAL int mkstemp(char *path);
+GPUARRAY_LOCAL int mkstemp(char *path);
 #endif
 
 #ifndef HAVE_STRL
-COMPYTE_LOCAL size_t strlcpy(char *dst, const char *src, size_t size);
-COMPYTE_LOCAL size_t strlcat(char *dst, const char *src, size_t size);
+GPUARRAY_LOCAL size_t strlcpy(char *dst, const char *src, size_t size);
+GPUARRAY_LOCAL size_t strlcat(char *dst, const char *src, size_t size);
 #endif
 
-COMPYTE_LOCAL extern const compyte_type scalar_types[];
-COMPYTE_LOCAL extern const compyte_type vector_types[];
+GPUARRAY_LOCAL extern const gpuarray_type scalar_types[];
+GPUARRAY_LOCAL extern const gpuarray_type vector_types[];
 
-COMPYTE_LOCAL int compyte_elem_perdim(char *strs[], unsigned int *count,
+GPUARRAY_LOCAL int gpuarray_elem_perdim(char *strs[], unsigned int *count,
                                       unsigned int nd, const size_t *dims,
                                       const ssize_t *str, const char *id);
 

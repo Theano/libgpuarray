@@ -1,10 +1,10 @@
-#ifndef COMPYTE_ERROR_H
-#define COMPYTE_ERROR_H
+#ifndef GPUARRAY_ERROR_H
+#define GPUARRAY_ERROR_H
 /** \file error.h
  *  \brief Error functions.
  */
 
-#include <compyte/config.h>
+#include <gpuarray/config.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,7 +41,7 @@ enum ga_error {
  * Some errors only happen in a context and in those cases Gpu_error()
  * will provide more details as to the reason for the error.
  */
-COMPYTE_PUBLIC const char *compyte_error_str(int err);
+GPUARRAY_PUBLIC const char *gpuarray_error_str(int err);
 
 #ifdef __cplusplus
 }

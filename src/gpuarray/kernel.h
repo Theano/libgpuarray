@@ -1,11 +1,11 @@
-#ifndef COMPYTE_KERNEL_H
-#define COMPYTE_KERNEL_H
+#ifndef GPUARRAY_KERNEL_H
+#define GPUARRAY_KERNEL_H
 /** \file kernel.h
  *  \brief Kernel functions.
  */
 
-#include <compyte/buffer.h>
-#include <compyte/array.h>
+#include <gpuarray/buffer.h>
+#include <gpuarray/array.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,7 +25,7 @@ typedef struct _GpuKernel {
   /**
    * Backend operations vector.
    */
-  const compyte_buffer_ops *ops;
+  const gpuarray_buffer_ops *ops;
   /**
    * Argument buffer.
    */
@@ -51,7 +51,7 @@ typedef struct _GpuKernel {
  * \return GA_NO_ERROR if the operation is successful
  * \return any other value if an error occured
  */
-COMPYTE_PUBLIC int GpuKernel_init(GpuKernel *k, const compyte_buffer_ops *ops,
+GPUARRAY_PUBLIC int GpuKernel_init(GpuKernel *k, const gpuarray_buffer_ops *ops,
                                   void *ctx, unsigned int count,
                                   const char **strs, const size_t *lens,
                                   const char *name, unsigned int argcount,
@@ -62,7 +62,7 @@ COMPYTE_PUBLIC int GpuKernel_init(GpuKernel *k, const compyte_buffer_ops *ops,
  *
  * \param k the kernel to release
  */
-COMPYTE_PUBLIC void GpuKernel_clear(GpuKernel *k);
+GPUARRAY_PUBLIC void GpuKernel_clear(GpuKernel *k);
 
 /**
  * Returns the context in which a kernel was built.
@@ -71,7 +71,7 @@ COMPYTE_PUBLIC void GpuKernel_clear(GpuKernel *k);
  *
  * \returns a context pointer
  */
-COMPYTE_PUBLIC void *GpuKernel_context(GpuKernel *k);
+GPUARRAY_PUBLIC void *GpuKernel_context(GpuKernel *k);
 
 /**
  * Launch the execution of a kernel.
@@ -93,16 +93,16 @@ COMPYTE_PUBLIC void *GpuKernel_context(GpuKernel *k);
  * \param ls size of launch blocks
  * \param gs size of launch grid
  */
-COMPYTE_PUBLIC int GpuKernel_call2(GpuKernel *k, size_t n[2],
+GPUARRAY_PUBLIC int GpuKernel_call2(GpuKernel *k, size_t n[2],
                                    size_t ls[2], size_t gs[2], void **args);
 
-COMPYTE_PUBLIC int GpuKernel_call(GpuKernel *k, size_t n,
+GPUARRAY_PUBLIC int GpuKernel_call(GpuKernel *k, size_t n,
                                   size_t ls, size_t gs, void **args);
 
-COMPYTE_PUBLIC int GpuKernel_binary(const GpuKernel *k, size_t *sz,
+GPUARRAY_PUBLIC int GpuKernel_binary(const GpuKernel *k, size_t *sz,
                                     void **obj);
 
-COMPYTE_PUBLIC const char *GpuKernel_error(const GpuKernel *k, int err);
+GPUARRAY_PUBLIC const char *GpuKernel_error(const GpuKernel *k, int err);
 
 #ifdef __cplusplus
 }

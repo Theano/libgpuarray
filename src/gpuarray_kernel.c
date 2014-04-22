@@ -1,10 +1,10 @@
-#include "compyte/kernel.h"
-#include "compyte/error.h"
-#include "compyte/types.h"
+#include "gpuarray/kernel.h"
+#include "gpuarray/error.h"
+#include "gpuarray/types.h"
 
 #include <stdlib.h>
 
-int GpuKernel_init(GpuKernel *k, const compyte_buffer_ops *ops, void *ctx,
+int GpuKernel_init(GpuKernel *k, const gpuarray_buffer_ops *ops, void *ctx,
 		   unsigned int count, const char **strs, const size_t *lens,
 		   const char *name, unsigned int argcount, const int *types,
                    int flags) {
@@ -139,7 +139,7 @@ const char *GpuKernel_error(const GpuKernel *k, int err) {
   if (err2 != GA_NO_ERROR) {
     /* If CUDA refuses to work after any kind of error in kernels
        there is not much we can do about it. */
-    return compyte_error_str(err);
+    return gpuarray_error_str(err);
   }
   return Gpu_error(k->ops, ctx, err);
 }

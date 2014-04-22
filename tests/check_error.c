@@ -1,17 +1,17 @@
 #include <check.h>
 #include <stdio.h>
 
-#include "compyte/error.h"
+#include "gpuarray/error.h"
 
 START_TEST(test_error_str)
 {
   const char *msg;
   
-  msg = compyte_error_str(-1);
+  msg = gpuarray_error_str(-1);
   ck_assert_str_eq(msg, "Unknown GA error");
-  msg = compyte_error_str(99);
+  msg = gpuarray_error_str(99);
   ck_assert_str_eq(msg, "Unknown GA error");
-  msg = compyte_error_str(GA_NO_ERROR);
+  msg = gpuarray_error_str(GA_NO_ERROR);
   ck_assert_str_eq(msg, "No error");
 }
 END_TEST

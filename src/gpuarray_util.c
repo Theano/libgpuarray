@@ -1,19 +1,19 @@
 #include <assert.h>
 
 #include "private.h"
-#include "compyte/util.h"
-#include "compyte/error.h"
+#include "gpuarray/util.h"
+#include "gpuarray/error.h"
 
-static compyte_type **custom_types = NULL;
+static gpuarray_type **custom_types = NULL;
 static int n_types = 0;
-static compyte_type no_type = {NULL, 0, 0, -1};
+static gpuarray_type no_type = {NULL, 0, 0, -1};
 typedef struct _buf_st { char c; GpuArray *a; } buf_st;
 #define BUF_ALIGN (sizeof(buf_st) - sizeof(GpuArray *))
-static compyte_type buffer_type = {NULL, sizeof(GpuArray *),
+static gpuarray_type buffer_type = {NULL, sizeof(GpuArray *),
                                    BUF_ALIGN, GA_BUFFER};
 
-int compyte_register_type(compyte_type *t, int *ret) {
-  compyte_type **tmp;
+int gpuarray_register_type(gpuarray_type *t, int *ret) {
+  gpuarray_type **tmp;
   tmp = realloc(custom_types, (n_types+1)*sizeof(*tmp));
   if (tmp == NULL) {
     if (ret) *ret = GA_SYS_ERROR;
@@ -25,7 +25,7 @@ int compyte_register_type(compyte_type *t, int *ret) {
   return t->typecode;
 }
 
-const compyte_type *compyte_get_type(int typecode) {
+const gpuarray_type *gpuarray_get_type(int typecode) {
   if (typecode <= GA_DELIM) {
     if (typecode == GA_BUFFER)
       return &buffer_type;
@@ -46,15 +46,15 @@ const compyte_type *compyte_get_type(int typecode) {
   }
 }
 
-size_t compyte_get_elsize(int typecode) {
-  return compyte_get_type(typecode)->size;
+size_t gpuarray_get_elsize(int typecode) {
+  return gpuarray_get_type(typecode)->size;
 }
 
 static inline ssize_t ssabs(ssize_t v) {
   return (v < 0 ? -v : v);
 }
 
-int compyte_elem_perdim(char *strs[], unsigned int *count, unsigned int nd,
+int gpuarray_elem_perdim(char *strs[], unsigned int *count, unsigned int nd,
 			const size_t *dims, const ssize_t *str,
 			const char *id) {
   int i;

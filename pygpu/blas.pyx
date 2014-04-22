@@ -5,13 +5,13 @@ from pygpu.gpuarray cimport (_GpuArray, GpuArray, GA_NO_ERROR, GpuArray_error,
                              pygpu_copy, pygpu_empty, pygpu_zeros,
                              GA_ANY_ORDER, GA_F_ORDER, GpuArray_ISONESEGMENT)
 
-cdef extern from "compyte/buffer_blas.h":
+cdef extern from "gpuarray/buffer_blas.h":
     ctypedef enum cb_transpose:
         cb_no_trans,
         cb_trans,
         cb_conj_trans
 
-cdef extern from "compyte/blas.h":
+cdef extern from "gpuarray/blas.h":
     int GpuArray_rgemv(cb_transpose transA, double alpha, _GpuArray *A, _GpuArray *X, double beta, _GpuArray *Y,
                              int nocopy)
     int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha, _GpuArray *A, _GpuArray *B, double beta, _GpuArray *C,
