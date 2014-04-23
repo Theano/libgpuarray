@@ -39,8 +39,8 @@ The code is currently in a github repo branch. It will be moved. To
 get it:
 ::
 
-  git clone https://github.com/abergeron/compyte.git
-  cd compyte
+  git clone https://github.com/abergeron/libgpuarray.git
+  cd gpuarray
   git checkout reorg
 
 Step-by-step install
@@ -48,7 +48,7 @@ Step-by-step install
 
 extract/clone the source to <dir>
 
-For libcompyte:
+For libgpuarray:
 ::
 
   cd <dir>
@@ -62,11 +62,11 @@ For libcompyte:
 For pygpu:
 ::
 
-  # This must be done after libcompyte is installed as per instructions above.
+  # This must be done after libgpuarray is installed as per instructions above.
   python setup.py build
   python setup.py install
 
-If you installed libcompyte in a path that isn't a default one, you
+If you installed libgpuarray in a path that isn't a default one, you
 will need to specify where it is. Replace the first line by something
 like this:
 ::
@@ -160,7 +160,7 @@ If you get an error message similar to this one:
 ::
 
   Running tests...
-  Test project /Users/anakha/ext/compyte/Debug
+  Test project /Users/anakha/ext/gpuarray/Debug
   No tests were found!!!
 
 This means either you don't have check installed or it wasn't found by
@@ -168,8 +168,8 @@ the cmake detection script.
 
 To run the python tests run nosetests in the pygpu subdirectory.  By
 default it will attempt to use 'opencl0:0' as the compute device but
-you can override this by setting the DEVICE or COMPYTE_DEVICE
-environement variable, with COMPYTE_DEVICE having priority, if set.
+you can override this by setting the DEVICE or GPUARRAY_DEVICE
+environement variable, with GPUARRAY_DEVICE having priority, if set.
 The format for the device string is '<backend name><device id>'.
 Possible backend names are 'cuda' and 'opencl'.
 

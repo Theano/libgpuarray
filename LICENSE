@@ -19,4 +19,4 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 The instances that have a different copyright or license are:
 
-src/compyte_strl.c (MIT, but different copyright)
+src/gpuarray_strl.c (MIT, but different copyright)

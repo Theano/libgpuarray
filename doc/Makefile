@@ -82,17 +82,17 @@ qthelp: doxy
 	@echo
 	@echo "Build finished; now you can run "qcollectiongenerator" with the" \
 	      ".qhcp project file in $(BUILDDIR)/qthelp, like this:"
-	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/compyte.qhcp"
+	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/gpuarray.qhcp"
 	@echo "To view the help file:"
-	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/compyte.qhc"
+	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/gpuarray.qhc"
 
 devhelp: doxy
 	$(SPHINXBUILD) -b devhelp $(ALLSPHINXOPTS) $(BUILDDIR)/devhelp
 	@echo
 	@echo "Build finished."
 	@echo "To view the help file:"
-	@echo "# mkdir -p $$HOME/.local/share/devhelp/compyte"
-	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/compyte"
+	@echo "# mkdir -p $$HOME/.local/share/devhelp/gpuarray"
+	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/gpuarray"
 	@echo "# devhelp"
 
 epub: doxy

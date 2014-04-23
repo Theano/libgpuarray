@@ -1,10 +1,10 @@
-.. compyte documentation master file, created by
+.. libgpuarray documentation master file, created by
    sphinx-quickstart on Wed Nov 21 16:23:37 2012.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to compyte's documentation!
-===================================
+Welcome to libgpuarray's documentation!
+=======================================
 
 Contents:
 
