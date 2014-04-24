@@ -90,7 +90,10 @@ configure_file(
 
 add_library(gpuarray SHARED ${GPUARRAY_SRC})
 add_dependencies(gpuarray gen_blas)
-set_target_properties(gpuarray PROPERTIES COMPILE_FLAGS "-DGPUARRAY_BUILDING_DLL -DGPUARRAY_SHARED")
+set_target_properties(gpuarray PROPERTIES
+  COMPILE_FLAGS "-DGPUARRAY_BUILDING_DLL -DGPUARRAY_SHARED"
+  INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/lib
+  )
 
 add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
 add_dependencies(gpuarray-static gen_blas)
