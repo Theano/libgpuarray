@@ -161,6 +161,10 @@ cdef extern from "gpuarray/array.h":
 
     int GpuArray_transfer(_GpuArray *res, const _GpuArray *a, void *new_ctx,
                           const gpuarray_buffer_ops *new_ops, int may_share)
+    int GpuArray_split(_GpuArray **rs, const _GpuArray *a, size_t n,
+                       size_t *p, unsigned int axis)
+    int GpuArray_concatenate(_GpuArray *r, const _GpuArray **as, size_t n,
+                             unsigned int axis, int restype)
 
     char *GpuArray_error(_GpuArray *a, int err)
 

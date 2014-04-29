@@ -8,5 +8,6 @@ from . import gpuarray
 from .gpuarray import (init, set_default_context, get_default_context,
                        array, zeros, empty, asarray, ascontiguousarray,
                        asfortranarray, register_dtype)
+from .operations import (split, array_split, hsplit, vsplit, dsplit)
 import elemwise
 import reduction

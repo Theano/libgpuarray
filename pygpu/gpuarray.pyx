@@ -1,5 +1,6 @@
 cimport libc.stdio
 from libc.stdlib cimport malloc, calloc, free
+from cpython.mem cimport PyMem_Malloc, PyMem_Free
 from libc.string cimport strncmp
 
 cimport numpy as np
@@ -388,6 +389,22 @@ cdef int array_transfer(GpuArray res, GpuArray a, void *new_ctx,
     err = GpuArray_transfer(&res.ga, &a.ga, new_ctx, new_ops, may_share)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
+
+cdef int array_split(_GpuArray **res, GpuArray a, size_t n, size_t *p,
+                     unsigned int axis) except -1:
+    cdef int err
+    cdef size_t i
+    err = GpuArray_split(res, &a.ga, n, p, axis)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(GpuArray_error(&a.ga, err), err)
+
+cdef int array_concatenate(GpuArray r, const _GpuArray **a, size_t n,
+                           unsigned int axis, int restype) except -1:
+    cdef int err
+    cdef size_t i
+    err = GpuArray_concatenate(&r.ga, a, n, axis, restype)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(GpuArray_error(a[0], err), err)
 
 cdef const char *kernel_error(GpuKernel k, int err) except NULL:
     return Gpu_error(k.k.ops, kernel_context(k), err)
@@ -1237,6 +1254,34 @@ cdef GpuArray pygpu_transfer(GpuArray a, GpuContext new_ctx, bint may_share):
     res = new_GpuArray(type(a), new_ctx, None)
     array_transfer(res, a, new_ctx.ctx, new_ctx.ops, may_share)
     return res
+
+def _split(GpuArray a, ind, size_t axis):
+    cdef list r = [None] * (len(ind) + 1)
+    cdef Py_ssize_t i
+    if not 0 <= axis < a.ga.nd:
+        raise ValueError, "split on non-existant axis"
+    cdef size_t m = a.ga.dimensions[axis]
+    cdef size_t v
+    cdef size_t *p = <size_t *>PyMem_Malloc(sizeof(size_t) * len(ind))
+    if p == NULL:
+        raise MemoryError()
+    cdef _GpuArray **rs = <_GpuArray **>PyMem_Malloc(sizeof(_GpuArray *) * len(r))
+    if rs == NULL:
+        PyMem_Free(p)
+        raise MemoryError()
+    try:
+        for i in range(len(r)):
+            r[i] = new_GpuArray(type(a), a.context, a)
+            rs[i] = &(<GpuArray>r[i]).ga
+        for i in range(len(ind)):
+            v = ind[i]
+            # cap the values to the end of the array
+            p[i] = v if v < m else m
+        array_split(rs, a, len(ind), p, axis)
+        return r
+    finally:
+        PyMem_Free(p)
+        PyMem_Free(rs)
 
 cdef class GpuArray:
     """
