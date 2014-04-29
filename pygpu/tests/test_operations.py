@@ -24,7 +24,7 @@ def test_xsplit():
         yield xsplit, l, (2, 2, 2), 2
     for spl in (2, [3, 6]):
         yield xsplit, 'd', (2, 2, 4), spl
-        
+
 def xsplit(l, shp, spl):
     xc, xg = gen_gpuarray(shp, 'float32', ctx=context)
     n = l + 'split'

@@ -393,7 +393,6 @@ cdef int array_transfer(GpuArray res, GpuArray a, void *new_ctx,
 cdef int array_split(_GpuArray **res, GpuArray a, size_t n, size_t *p,
                      unsigned int axis) except -1:
     cdef int err
-    cdef size_t i
     err = GpuArray_split(res, &a.ga, n, p, axis)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&a.ga, err), err)
@@ -401,7 +400,6 @@ cdef int array_split(_GpuArray **res, GpuArray a, size_t n, size_t *p,
 cdef int array_concatenate(GpuArray r, const _GpuArray **a, size_t n,
                            unsigned int axis, int restype) except -1:
     cdef int err
-    cdef size_t i
     err = GpuArray_concatenate(&r.ga, a, n, axis, restype)
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(a[0], err), err)
@@ -1255,7 +1253,7 @@ cdef GpuArray pygpu_transfer(GpuArray a, GpuContext new_ctx, bint may_share):
     array_transfer(res, a, new_ctx.ctx, new_ctx.ops, may_share)
     return res
 
-def _split(GpuArray a, ind, size_t axis):
+def _split(GpuArray a, ind, unsigned int axis):
     cdef list r = [None] * (len(ind) + 1)
     cdef Py_ssize_t i
     if not 0 <= axis < a.ga.nd:
