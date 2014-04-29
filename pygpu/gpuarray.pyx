@@ -1283,6 +1283,24 @@ def _split(GpuArray a, ind, size_t axis):
         PyMem_Free(p)
         PyMem_Free(rs)
 
+def _concatenate(list al, unsigned int axis, int restype, type cls,
+                 GpuContext context):
+    cdef Py_ssize_t i
+    context = ensure_context(context)
+    cdef GpuArray res = new_GpuArray(cls, context, None)
+    cdef _GpuArray **als = <_GpuArray **>PyMem_Malloc(sizeof(_GpuArray *) * len(al))
+    if als == NULL:
+        raise MemoryError()
+    try:
+        for i in range(len(al)):
+            if not isinstance(al[i], GpuArray):
+                raise TypeError, "expected GpuArrays ot concatenate"
+            als[i] = &(<GpuArray>al[i]).ga
+        array_concatenate(res, als, len(al), axis, restype)
+        return res
+    finally:
+        PyMem_Free(als)
+
 cdef class GpuArray:
     """
     Device array

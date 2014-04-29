@@ -735,9 +735,8 @@ int GpuArray_split(GpuArray **rs, const GpuArray *a, size_t n, size_t *p,
 int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
                          unsigned int axis, int restype) {
   size_t *dims;
-  size_t i, j;
+  size_t i;
   size_t res_off;
-  size_t sz;
   unsigned int p;
   int err = GA_NO_ERROR;
 
@@ -779,33 +778,22 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
   }
 
   err = GpuArray_empty(r, as[0]->ops, GpuArray_context(as[0]), restype,
-                       as[0]->nd, dims, GA_C_ORDER);
+                       as[0]->nd, dims, GA_ANY_ORDER);
   free(dims);
   if (err != GA_NO_ERROR) {
     return err;
   }
 
-  res_off = 0;
+  res_off = r->offset;
   for (i = 0; i < n; i++) {
-    sz = gpuarray_get_elsize(restype);
-    for (j = 0; j < as[i]->nd; j++) sz *= as[i]->dimensions[j];
-
-    if (!GpuArray_ISONESEGMENT(as[i]) || GpuArray_ISFORTRAN(as[i]) ||
-        as[i]->typecode != r->typecode) {
-      err = r->ops->buffer_extcopy(as[i]->data, as[i]->offset, r->data,
-                                   res_off, as[i]->typecode, r->typecode,
-                                   as[i]->nd, as[i]->dimensions,
-                                   as[i]->strides, r->nd, r->dimensions,
-                                   r->strides);
-      if (err != GA_NO_ERROR)
-        goto fail;
-    } else {
-      err = r->ops->buffer_move(r->data, res_off, as[i]->data, as[i]->offset,
-                                sz);
-      if (err != GA_NO_ERROR)
-        goto fail;
-    }
-    res_off += sz;
+    err = r->ops->buffer_extcopy(as[i]->data, as[i]->offset, r->data,
+                                 res_off, as[i]->typecode, r->typecode,
+                                 as[i]->nd, as[i]->dimensions,
+                                 as[i]->strides, r->nd, as[i]->dimensions,
+                                 r->strides);
+    if (err != GA_NO_ERROR)
+      goto fail;
+    res_off += r->strides[axis] * as[i]->dimensions[axis];
   }
 
   return GA_NO_ERROR;
