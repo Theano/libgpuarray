@@ -1631,6 +1631,10 @@ cdef class GpuArray:
             res.ga.nd = 0
             array_clear(res)
 
+    property T:
+        def __get__(self):
+            return pygpu_transpose(self, NULL)
+
     property size:
         "The number of elements in this object."
         def __get__(self):
