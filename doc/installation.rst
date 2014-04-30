@@ -57,6 +57,7 @@ For libgpuarray:
   cmake .. -DCMAKE_BUILD_TYPE=Release # or Debug if you are investigating a crash
   make
   make install
+  cd ..
 
 For pygpu:
 ::
@@ -70,7 +71,6 @@ will need to specify where it is. Replace the first line by something
 like this:
 ::
 
-  cd <dir>
   python setup.py build_ext -L $MY_PREFIX/lib -I $MY_PREFIX/include
 
 
