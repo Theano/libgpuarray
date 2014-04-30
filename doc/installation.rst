@@ -39,9 +39,8 @@ The code is currently in a github repo branch. It will be moved. To
 get it:
 ::
 
-  git clone https://github.com/abergeron/libgpuarray.git
-  cd gpuarray
-  git checkout reorg
+  git clone https://github.com/Theano/libgpuarray.git
+  cd libgpuarray
 
 Step-by-step install
 --------------------
@@ -71,6 +70,7 @@ will need to specify where it is. Replace the first line by something
 like this:
 ::
 
+  cd <dir>
   python setup.py build_ext -L $MY_PREFIX/lib -I $MY_PREFIX/include
 
 
