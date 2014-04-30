@@ -1281,21 +1281,25 @@ def _split(GpuArray a, ind, unsigned int axis):
         PyMem_Free(p)
         PyMem_Free(rs)
 
+cdef GpuArray pygpu_concatenate(_GpuArray **a, size_t n, unsigned int axis,
+                                int restype, type cls, GpuContext context):
+    cdef res = new_GpuArray(cls, context, None)
+    array_concatenate(res, a, n, axis, restype)
+    return res
+
 def _concatenate(list al, unsigned int axis, int restype, type cls,
                  GpuContext context):
     cdef Py_ssize_t i
     context = ensure_context(context)
-    cdef GpuArray res = new_GpuArray(cls, context, None)
     cdef _GpuArray **als = <_GpuArray **>PyMem_Malloc(sizeof(_GpuArray *) * len(al))
     if als == NULL:
         raise MemoryError()
     try:
         for i in range(len(al)):
             if not isinstance(al[i], GpuArray):
-                raise TypeError, "expected GpuArrays ot concatenate"
+                raise TypeError, "expected GpuArrays to concatenate"
             als[i] = &(<GpuArray>al[i]).ga
-        array_concatenate(res, als, len(al), axis, restype)
-        return res
+        return pygpu_concatenate(als, len(al), axis, restype, cls, context)
     finally:
         PyMem_Free(als)
 
