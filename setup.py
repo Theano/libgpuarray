@@ -15,6 +15,23 @@ except Exception:
     def cythonize(arg):
         return arg
 
+# clang gives an error if passed -mno-fused-madd
+# (and I don't even understand why it's passed in the first place)
+if sys.platform =='darwin':
+    from distutils import sysconfig, ccompiler
+    sysconfig_customize_compiler = sysconfig.customize_compiler
+    def customize_compiler(compiler):
+        sysconfig_customize_compiler(compiler)
+        if sys.platform == 'darwin':
+            while '-mno-fused-madd' in compiler.compiler:
+                compiler.compiler.remove('-mno-fused-madd')
+            while '-mno-fused-madd' in compiler.compiler_so:
+                compiler.compiler_so.remove('-mno-fused-madd')
+            while '-mno-fused-madd' in compiler.linker_so:
+                compiler.linker_so.remove('-mno-fused-madd')
+    sysconfig.customize_compiler = customize_compiler
+    ccompiler.customize_compiler = customize_compiler
+
 try:
     from setuptools import setup, Extension as _Extension
 
@@ -33,23 +50,6 @@ except ImportError:
     from distutils.core import setup, Extension
 
 import numpy as np
-
-# clang gives an error if passed -mno-fused-madd
-# (and I don't even understand why it's passed in the first place)
-if sys.platform =='darwin':
-    from distutils import sysconfig, ccompiler
-    sysconfig_customize_compiler = sysconfig.customize_compiler
-    def customize_compiler(compiler):
-        sysconfig_customize_compiler(compiler)
-        if sys.platform == 'darwin':
-            while '-mno-fused-madd' in compiler.compiler:
-                compiler.compiler.remove('-mno-fused-madd')
-            while '-mno-fused-madd' in compiler.compiler_so:
-                compiler.compiler_so.remove('-mno-fused-madd')
-            while '-mno-fused-madd' in compiler.linker_so:
-                compiler.linker_so.remove('-mno-fused-madd')
-    sysconfig.customize_compiler = customize_compiler
-    ccompiler.customize_compiler = customize_compiler
 
 to_del = []
 

@@ -166,20 +166,21 @@ If you get an error message similar to this one:
 This means either you don't have check installed or it wasn't found by
 the cmake detection script.
 
-To run the python tests run nosetests in the pygpu subdirectory.  By
-default it will attempt to use 'opencl0:0' as the compute device but
-you can override this by setting the DEVICE or GPUARRAY_DEVICE
-environement variable, with GPUARRAY_DEVICE having priority, if set.
-The format for the device string is '<backend name><device id>'.
-Possible backend names are 'cuda' and 'opencl'.
+To run the python tests you need to make sure that gpuarray.so is in
+the pygpu dir.  You can make sure by running
 
-For 'cuda' possible device ids are from 0 to the number of cuda
-devices.
+::
 
-For 'opencl' the devices id are of this format '<platform
-number>:<device number>'.  Both start at 0 and go up to the number of
-platforms/devices available.  There is no fixed order for the devices,
-but the order on a single machine should be stable across runs.
+  python setup.py build_ext --inplace
+
+from the distribution root.  Then you only need to point nosetests to
+the pygpu/tests directory.
+
+By default it will attempt to run the test on 'opencl0:0'.  To use a
+different device set the environment variable DEVICE or
+GPUARRAY_DEVICE to the desired device name.  See the documentation for
+:py:meth:`pygpu.gpuarray.init` for more details on the syntax of the
+device name.
 
 The test script prints the device name of the chosen device so that
 you can confirm which device it is running on.
