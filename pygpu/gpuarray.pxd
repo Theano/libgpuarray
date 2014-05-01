@@ -54,7 +54,9 @@ cdef extern from "gpuarray/util.h":
 cdef extern from "gpuarray/error.h":
     cdef enum ga_error:
         GA_NO_ERROR, GA_MEMORY_ERROR, GA_VALUE_ERROR, GA_IMPL_ERROR,
-        GA_INVALID_ERROR, GA_UNSUPPORTED_ERROR, GA_SYS_ERROR, GA_RUN_ERROR
+        GA_INVALID_ERROR, GA_UNSUPPORTED_ERROR, GA_SYS_ERROR, GA_RUN_ERROR,
+        GA_DEVSUP_ERROR, GA_READONLY_ERROR, GA_WRITEONLY_ERROR, GA_BLAS_ERROR,
+        GA_UNALIGNED_ERROR, GA_COPY_ERROR
 
 cdef extern from "gpuarray/buffer.h":
     ctypedef struct gpudata:
@@ -282,6 +284,8 @@ cdef api GpuArray pygpu_transpose(GpuArray a, const unsigned int *newaxes)
 
 cdef api GpuArray pygpu_transfer(GpuArray a, GpuContext new_ctx,
                                  bint may_share)
+cdef api GpuArray pygpu_concatenate(_GpuArray **a, size_t n, unsigned int axis,
+                                    int restype, type cls, GpuContext context)
 
 cdef api class GpuContext [type PyGpuContextType, object PyGpuContextObject]:
     cdef const gpuarray_buffer_ops *ops
