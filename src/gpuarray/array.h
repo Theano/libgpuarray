@@ -502,6 +502,48 @@ GPUARRAY_PUBLIC int GpuArray_transfer(GpuArray *res, const GpuArray *a,
                                      int may_share);
 
 /**
+ * Split an array into multiple views.
+ *
+ * The created arrays will be sub-portions of `a` where `axis` is
+ * divided according to the values in `p`.  No checks are performed on
+ * the values in `p` except to make sure that they don't reference
+ * values outside of the bounds of the source array.
+ *
+ * If an error occurs partway during the operation, the created arrays
+ * will be cleared before returning.
+ *
+ * \param rs list of array pointers to store results (must be of length n+1)
+ * \param a array to split
+ * \param n number of splits (length of p)
+ * \param p list of split points
+ * \param axis axis to split
+ *
+ * \return GA_NO_ERROR if the operation was succesful.
+ * \return an error code otherwise
+ */
+GPUARRAY_PUBLIC int GpuArray_split(GpuArray **rs, const GpuArray *a, size_t n,
+                                   size_t *p, unsigned int axis);
+
+/**
+ * Concatenate the arrays in `as` along the axis `axis`.
+ *
+ * If an error occurs during the operation, the result array may be
+ * cleared before returning.
+ *
+ * \param r the result array
+ * \param as list of pointer to arrays to concatenate
+ * \param n number of array in list `as`
+ * \param axis the axis along which to concatenate
+ * \param restype the typecode of the result array
+ *
+ * \return GA_NO_ERROR if the operation was succesful.
+ * \return an error code otherwise
+ */
+GPUARRAY_PUBLIC int GpuArray_concatenate(GpuArray *r, const GpuArray **as,
+                                         size_t n, unsigned int axis,
+                                         int restype);
+
+/**
  * Get a description of the last error in the context of `a`.
  *
  * The description may reflect operations with other arrays in the
