@@ -166,15 +166,11 @@ If you get an error message similar to this one:
 This means either you don't have check installed or it wasn't found by
 the cmake detection script.
 
-To run the python tests you need to make sure that gpuarray.so is in
-the pygpu dir.  You can make sure by running
+To run the python tests, install pygpu, then move outside its directory and run this command:
 
 ::
 
-  python setup.py build_ext --inplace
-
-from the distribution root.  Then you only need to point nosetests to
-the pygpu/tests directory.
+  python -c "import pygpu;pygpu.test()"
 
 By default it will attempt to run the test on 'opencl0:0'.  To use a
 different device set the environment variable DEVICE or
