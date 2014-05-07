@@ -19,4 +19,4 @@ if hasattr(main, "NoseTester"):
 else:
     def test():
         raise ImportError("The nose module is not installed."
-                          " It is needed for Theano tests.")
+                          " It is needed for pygpu tests.")
