@@ -25,7 +25,7 @@ cdef object PyArray_Empty(int a, np.npy_intp *b, np.dtype c, int d):
 cdef object call_compiler_fn = None
 
 cdef void *call_compiler_python(const char *src, size_t sz,
-                                int *ret) with gil:
+                                size_t *bin_len, int *ret) with gil:
     cdef bytes res
     cdef void *buf
     cdef char *tmp
@@ -38,6 +38,7 @@ cdef void *call_compiler_python(const char *src, size_t sz,
             return NULL
         tmp = res
         memcpy(buf, tmp, len(res))
+        bin_len[0] = len(res);
         return buf
     except:
         # XXX: maybe should store the exception somewhere
@@ -45,7 +46,7 @@ cdef void *call_compiler_python(const char *src, size_t sz,
             ret[0] = GA_RUN_ERROR
         return NULL
 
-ctypedef void *(*comp_f)(const char *, size_t, int*)
+ctypedef void *(*comp_f)(const char *, size_t, size_t *, int*)
 
 def set_cuda_compiler_fn(fn):
     """
