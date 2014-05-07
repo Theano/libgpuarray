@@ -553,7 +553,8 @@ static const char *detect_arch(int *ret) {
 static const char *TMP_VAR_NAMES[] = {"GPUARRAY_TMPDIR", "TMPDIR", "TMP",
 				      "TEMP", "USERPROFILE"};
 
-static void *call_compiler_impl(const char *src, size_t len, int *ret) {
+static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
+				int *ret) {
     char namebuf[PATH_MAX];
     char outbuf[PATH_MAX];
     char *tmpdir;
@@ -669,13 +670,14 @@ static void *call_compiler_impl(const char *src, size_t len, int *ret) {
         FAIL(NULL, GA_SYS_ERROR);
     }
 
+    *bin_len = (size_t)st.st_size;
     return buf;
 }
 
-static void *(*call_compiler)(const char *src, size_t len, int *ret) = call_compiler_impl;
+static void *(*call_compiler)(const char *src, size_t len, size_t *bin_len, int *ret) = call_compiler_impl;
 
 GPUARRAY_LOCAL void cuda_set_compiler(void *(*compiler_f)(const char *, size_t,
-                                                         int *)) {
+							  size_t *, int *)) {
     if (compiler_f == NULL) {
         call_compiler = call_compiler_impl;
     } else {
@@ -693,6 +695,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     char *p;
     gpukernel *res;
     size_t tot_len;
+    size_t bin_len = 0;
     CUdevice dev;
     unsigned int i;
     unsigned int pre;
@@ -748,13 +751,12 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     }
 
     if (binary_mode) {
-      tot_len = lengths[0];
-      p = malloc(tot_len);
+      p = memdup(strings[0], lengths[0]);
+      bin_len = lengths[0];
       if (p == NULL) {
         cuda_exit(ctx);
         FAIL(NULL, GA_MEMORY_ERROR);
       }
-      memcpy(p, strings[0], tot_len);
     } else {
       pre = 0;
       if (flags & GA_USE_CLUDA) pre++;
@@ -806,7 +808,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
       if (ptx_mode) {
         p = buf;
       } else {
-        p = call_compiler(buf, tot_len, ret);
+        p = call_compiler(buf, tot_len, &bin_len, ret);
         free(buf);
         if (p == NULL) {
           cuda_exit(ctx);
@@ -836,7 +838,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
       FAIL(NULL, GA_MEMORY_ERROR);
     }
 
-    res->bin_sz = tot_len;
+    res->bin_sz = bin_len;
     res->bin = p;
     ctx->err = cuModuleLoadData(&res->m, p);
 
