@@ -12,3 +12,11 @@ from .operations import (split, array_split, hsplit, vsplit, dsplit,
                          concatenate, hstack, vstack, dstack)
 import elemwise
 import reduction
+
+from .tests import main
+if hasattr(main, "NoseTester"):
+    test = main.NoseTester().test
+else:
+    def test():
+        raise ImportError("The nose module is not installed."
+                          " It is needed for pygpu tests.")
