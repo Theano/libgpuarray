@@ -58,6 +58,8 @@ if (CUDA_FOUND)
   if (APPLE)
     FIND_LIBRARY(CUDADRV_LIBRARY CUDA)
     FIND_PATH(CUDADRV_INCLUDE CUDA/cuda.h)
+    # this is somewhat a hack, but otherwise cublas_v2.h isn't found
+    set(CUDADRV_INCLUDE "${CUDADRV_INCLUDE}" "${CUDA_TOOLKIT_INCLUDE}")
   endif()
   if(NOT CUDADRV_LIBRARY)
     SET(CUDADRV_LIBRARY ${CUDA_CUDA_LIBRARY})
