@@ -1,9 +1,11 @@
 #
-#  This file taken from FindOpenCL project @ http://gitorious.com/findopencl
+# This file taken from FindOpenCL project @ http://gitorious.com/findopencl
+# and heavily modified to follow changes and make it better on Windows
 #
 # - Try to find OpenCL
-# This module tries to find an OpenCL implementation on your system. It supports
-# AMD / ATI, Apple and NVIDIA implementations, but should work, too.
+#
+# This module tries to find an OpenCL implementation on your
+# system. It supports AMD / ATI, Apple Intel and NVIDIA implementations.
 #
 # To set manually the paths, define these environment variables:
 # OpenCL_INCPATH    - Include path (e.g. OpenCL_INCPATH=/opt/cuda/4.0/cuda/include)
@@ -13,8 +15,6 @@
 #  OPENCL_FOUND        - system has OpenCL
 #  OPENCL_INCLUDE_DIRS  - the OpenCL include directory
 #  OPENCL_LIBRARIES    - link these to use OpenCL
-#
-# WIN32 should work, but is untested
 
 FIND_PACKAGE(PackageHandleStandardArgs)
 
@@ -32,8 +32,17 @@ IF (APPLE)
 ELSE ()
    IF (WIN32)
 
-      FIND_PATH(OPENCL_INCLUDE_DIRS CL/cl.h)
-      FIND_PATH(_OPENCL_CPP_INCLUDE_DIRS CL/cl.hpp)
+      SET(OPENCL_LIB_DIR "$ENV{AMDAPPSDKROOT}/include"
+                         "$ENV{INTELOCLSDKROOT}/include"
+                         "$ENV{NVSDKCOMPUTE_ROOT}/OpenCL/common/inc"
+                         "$ENV{ATISTREAMSDKROOT}/include")
+
+      FIND_PATH(OPENCL_INCLUDE_DIRS CL/cl.h
+                PATHS ${OPENCL_LIB_DIR}
+                ENV OpenCL_INCPATH)
+      FIND_PATH(_OPENCL_CPP_INCLUDE_DIRS CL/cl.hpp
+                PATHS ${OPENCL_LIB_DIR}
+                ENV OpenCL_INCPATH)
 
       # The AMD SDK currently installs both x86 and x86_64 libraries
       # This is only a hack to find out architecture
@@ -50,12 +59,6 @@ ELSE ()
       ENDIF()
 
       FIND_LIBRARY(OPENCL_LIBRARIES OpenCL.lib PATHS ${OPENCL_LIB_DIR} ENV OpenCL_LIBPATH)
-
-      GET_FILENAME_COMPONENT(_OPENCL_INC_CAND ${OPENCL_LIB_DIR}/../../include ABSOLUTE)
-
-      # On Win32 search relative to the library
-      FIND_PATH(OPENCL_INCLUDE_DIRS CL/cl.h PATHS "${_OPENCL_INC_CAND}" ENV OpenCL_INCPATH)
-      FIND_PATH(_OPENCL_CPP_INCLUDE_DIRS CL/cl.hpp PATHS "${_OPENCL_INC_CAND}" ENV OpenCL_INCPATH)
 
   ELSE ()
 
