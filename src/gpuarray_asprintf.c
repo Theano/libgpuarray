@@ -2,8 +2,9 @@
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
-#include "gpuarray/compat.h"
+#include "gpuarray/config.h"
 
+#include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
 
