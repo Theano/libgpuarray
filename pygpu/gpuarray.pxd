@@ -266,6 +266,8 @@ cdef api GpuArray pygpu_fromgpudata(gpudata *buf, size_t offset, int typecode,
 
 cdef api GpuArray pygpu_copy(GpuArray a, ga_order ord)
 
+cdef api GpuArray pygpu_move(GpuArray a, GpuArray src)
+
 cdef api GpuArray pygpu_view(GpuArray a, type cls)
 
 cdef api int pygpu_sync(GpuArray a) except -1

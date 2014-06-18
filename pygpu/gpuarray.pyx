@@ -644,6 +644,10 @@ cdef GpuArray pygpu_copy(GpuArray a, ga_order ord):
     array_copy(res, a, ord)
     return res
 
+cdef GpuArray pygpu_move(GpuArray a, GpuArray src):
+    array_move(a, src)
+    return a
+
 def empty(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
           cls=None):
     """
