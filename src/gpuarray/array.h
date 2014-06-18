@@ -163,13 +163,33 @@ static inline int GpuArray_CHKFLAGS(const GpuArray *a, int flags) {
  */
 #define GpuArray_ISONESEGMENT(a) ((a)->flags & (GA_C_CONTIGUOUS|GA_F_CONTIGUOUS))
 /**
- * Checks if the array elements are laid out if Fortran order.
+ * Checks if the array elements are c contiguous in memory.
+ *
+ * \param a array
+ *
+ * \returns true if the data area of `a` is contiguous
+ */
+#define GpuArray_IS_C_CONTIGUOUS(a) ((a)->flags & GA_C_CONTIGUOUS)
+/**
+ * Checks if the array elements are f contiguous in memory.
+ *
+ * \param a array
+ *
+ * \returns true if the data area of `a` is contiguous
+ */
+#define GpuArray_IS_F_CONTIGUOUS(a) ((a)->flags & GA_F_CONTIGUOUS)
+/**
+ * Checks if the array elements are laid out if Fortran order and NOT
+ * c order.
+ *
+ * GpuArray_IS_F_CONTIGUOUS is the correct way to test for
+ * Fortran-style contiguity.
  *
  * \param a array
  *
  * \returns true if the data area of `a` is Fortran-contiguous
  */
-#define GpuArray_ISFORTRAN(a) GpuArray_CHKFLAGS(a, GA_F_CONTIGUOUS)
+#define GpuArray_ISFORTRAN(a) (GpuArray_CHKFLAGS(a, GA_F_CONTIGUOUS) && ! GpuArray_CHKFLAGS(a, GA_C_CONTIGUOUS))
 /**
  * Retrive the size of the elements in the array.
  *
