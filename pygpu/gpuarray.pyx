@@ -1553,7 +1553,7 @@ cdef class GpuArray:
 
             d = 0
 
-            if isinstance(key, tuple):
+            if isinstance(key, (tuple, list)):
                 if Ellipsis in key:
                     # The following code replaces the first Ellipsis
                     # found in the key by a bunch of them depending on
