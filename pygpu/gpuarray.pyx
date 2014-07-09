@@ -1562,9 +1562,14 @@ cdef class GpuArray:
                     # a[..., 1:] on any array (including 1-dim).  This
                     # is also required for numpy compat.
                     el = key.index(Ellipsis)
-                    key = key[:el] + \
-                        (Ellipsis,)*(self.ga.nd - (len(key) - 1)) + \
-                        key[el+1:]
+                    if isinstance(key, tuple):
+                        key = key[:el] + \
+                              (Ellipsis,)*(self.ga.nd - (len(key) - 1)) + \
+                              key[el+1:]
+                    else:
+                        key = key[:el] + \
+                              [Ellipsis,]*(self.ga.nd - (len(key) - 1)) + \
+                              key[el+1:]
                 if len(key) > self.ga.nd:
                     raise IndexError, "too many indices"
                 for i in range(0, len(key)):
