@@ -179,17 +179,16 @@ static inline int GpuArray_CHKFLAGS(const GpuArray *a, int flags) {
  */
 #define GpuArray_IS_F_CONTIGUOUS(a) ((a)->flags & GA_F_CONTIGUOUS)
 /**
- * Checks if the array elements are laid out if Fortran order and NOT
- * c order.
+ * This is the same as GpuArray_IS_F_CONTIGUOUS, but not the same as PyArray_ISFORTRAN.
  *
- * GpuArray_IS_F_CONTIGUOUS is the correct way to test for
- * Fortran-style contiguity.
+ * PyArray_ISFORTRAN checks if the array elements are laid out if
+ * Fortran order and NOT c order.
  *
  * \param a array
  *
  * \returns true if the data area of `a` is Fortran-contiguous
  */
-#define GpuArray_ISFORTRAN(a) (GpuArray_CHKFLAGS(a, GA_F_CONTIGUOUS) && ! GpuArray_CHKFLAGS(a, GA_C_CONTIGUOUS))
+#define GpuArray_ISFORTRAN(a) (GpuArray_CHKFLAGS(a, GA_F_CONTIGUOUS))
 /**
  * Retrive the size of the elements in the array.
  *
