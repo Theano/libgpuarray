@@ -644,7 +644,7 @@ cdef GpuArray pygpu_copy(GpuArray a, ga_order ord):
     array_copy(res, a, ord)
     return res
 
-cdef GpuArray pygpu_move(GpuArray a, GpuArray src):
+cdef int pygpu_move(GpuArray a, GpuArray src) except -1:
     array_move(a, src)
     return a
 
