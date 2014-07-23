@@ -646,7 +646,7 @@ cdef GpuArray pygpu_copy(GpuArray a, ga_order ord):
 
 cdef int pygpu_move(GpuArray a, GpuArray src) except -1:
     array_move(a, src)
-    return a
+    return 0
 
 def empty(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
           cls=None):
@@ -1176,6 +1176,7 @@ cdef GpuArray pygpu_view(GpuArray a, type cls):
 
 cdef int pygpu_sync(GpuArray a) except -1:
     array_sync(a)
+    return 0
 
 cdef GpuArray pygpu_empty_like(GpuArray a, ga_order ord, int typecode):
     cdef GpuArray res
