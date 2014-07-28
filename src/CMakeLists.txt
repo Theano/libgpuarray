@@ -45,7 +45,6 @@ gpuarray_extension.c
 )
 
 check_function_exists(strlcat HAVE_STRL)
-check_function_exists(asprintf HAVE_ASPRINTF)
 check_function_exists(mkstemp HAVE_MKSTEMP)
 
 if(UNIX)
@@ -54,10 +53,6 @@ endif()
 
 if(NOT HAVE_STRL)
   set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_strl.c)
-endif()
-
-if(NOT HAVE_ASPRINTF)
-  set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_asprintf.c)
 endif()
 
 if(NOT HAVE_MKSTEMP)

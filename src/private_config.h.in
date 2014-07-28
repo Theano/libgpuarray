@@ -1,9 +1,10 @@
-/* This file is generated from private_config.h.in.  Do not edit. */
+/******************************************************************
+ * This file is generated from private_config.h.in.  Do not edit. *
+ ******************************************************************/
 #ifndef PRIVATE_CONFIG_H
 #define PRIVATE_CONFIG_H
 
 #cmakedefine HAVE_STRL
-#cmakedefine HAVE_ASPRINTF
 #cmakedefine HAVE_MKSTEMP
 
 #include <stdio.h>
@@ -35,10 +36,6 @@ extern "C" {
 #endif
 
 #define nelems(a) (sizeof(a)/sizeof(a[0]))
-
-#ifndef HAVE_ASPRINTF
-GPUARRAY_LOCAL int asprintf(char **ret, const char *fmt, ...);
-#endif
 
 #ifndef HAVE_MKSTEMP
 GPUARRAY_LOCAL int mkstemp(char *path);
