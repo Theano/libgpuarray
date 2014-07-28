@@ -917,7 +917,7 @@ static int cuda_sync(gpudata *b) {
   return GA_NO_ERROR;
 }
 
-static const char ELEM_HEADER_PTX[] = ".version 3.0\n.target %s\n\n"
+static const char ELEM_HEADER_PTX[] = ".version 4.0\n.target %s\n\n"
     ".entry extcpy (\n"
     ".param .u%u a_data,\n"
     ".param .u%u b_data ) {\n"
