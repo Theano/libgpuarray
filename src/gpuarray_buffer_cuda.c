@@ -36,7 +36,7 @@
 #include <unistd.h>
 #endif
 
-#include "strb.h"
+#include "util/strb.h"
 
 #include "gpuarray/buffer.h"
 #include "gpuarray/util.h"

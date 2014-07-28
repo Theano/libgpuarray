@@ -15,8 +15,25 @@ add_custom_command(
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen_types.py)
 
-SET(GPUARRAY_SRC
-strb.c
+macro (set_rel var)
+  file (RELATIVE_PATH _relPath "${CMAKE_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}")
+  # clear previous list (if any)
+  set(SET_REL_TMP)
+  foreach (_src ${ARGN})
+    if (_relPath)
+      list(APPEND SET_REL_TMP "${_relPath}/${_src}")
+    else()
+      list(APPEND SET_REL_TMP "${_src}")
+    endif()
+  endforeach()
+  if (_relPath)
+    set(${var} ${SET_REL_TMP} PARENT_SCOPE)
+  else()
+    set(${var} ${SET_REL_TMP})
+  endif()
+endmacro()
+
+set_rel(GPUARRAY_SRC
 gpuarray_types.c
 gpuarray_error.c
 gpuarray_util.c
@@ -89,6 +106,10 @@ configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/private_config.h.in
   ${CMAKE_CURRENT_SOURCE_DIR}/private_config.h
   )
+
+add_subdirectory(util)
+
+set(GPUARRAY_SRC ${GPUARRAY_SRC} ${UTIL_SRC})
 
 add_library(gpuarray SHARED ${GPUARRAY_SRC})
 add_dependencies(gpuarray gen_blas)
