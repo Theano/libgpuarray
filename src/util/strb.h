@@ -1,7 +1,8 @@
 #ifndef STRB_H
 #define STRB_H
 
-#include "private.h"
+#include "private_config.h"
+#include "util/halloc.h"
 
 #ifdef __cplusplus
 extern "C" {

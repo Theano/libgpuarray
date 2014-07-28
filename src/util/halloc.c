@@ -34,6 +34,7 @@
 #include <assert.h>
 #include <stdlib.h>  /* realloc */
 #include <string.h>  /* memset & co */
+#include <stddef.h>
 
 #include "util/halloc.h"
 

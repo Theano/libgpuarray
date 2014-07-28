@@ -1,4 +1,5 @@
 
+#include <stdarg.h>
 #include "util/strb.h"
 #include "util/halloc.h"
 

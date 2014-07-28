@@ -34,7 +34,7 @@
 #ifndef GPUARRAY_UTIL_HALLOC_H
 #define GPUARRAY_UTIL_HALLOC_H
 
-#include "private.h"
+#include "private_config.h"
 
 /*
  *	Core API

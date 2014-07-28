@@ -1,4 +1,56 @@
 /* This file is generated from private_config.h.in.  Do not edit. */
+#ifndef PRIVATE_CONFIG_H
+#define PRIVATE_CONFIG_H
+
 #cmakedefine HAVE_STRL
 #cmakedefine HAVE_ASPRINTF
 #cmakedefine HAVE_MKSTEMP
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "gpuarray/config.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+#ifdef CONFUSE_EMACS
+}
+#endif
+
+#ifdef _MSC_VER
+/* God damn Microsoft ... */
+#define snprintf _snprintf
+#endif
+
+#ifdef _MSC_VER
+/* MS VC++ 2008 does not support inline */
+#define inline
+#endif
+
+#ifdef _MSC_VER
+#define SPREFIX "I"
+#else
+#define SPREFIX "z"
+#endif
+
+#define nelems(a) (sizeof(a)/sizeof(a[0]))
+
+#ifndef HAVE_ASPRINTF
+GPUARRAY_LOCAL int asprintf(char **ret, const char *fmt, ...);
+#endif
+
+#ifndef HAVE_MKSTEMP
+GPUARRAY_LOCAL int mkstemp(char *path);
+#endif
+
+#ifndef HAVE_STRL
+GPUARRAY_LOCAL size_t strlcpy(char *dst, const char *src, size_t size);
+GPUARRAY_LOCAL size_t strlcat(char *dst, const char *src, size_t size);
+#endif
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
