@@ -690,15 +690,12 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
                                  const char *fname, unsigned int argcount,
                                  const int *types, int flags, int *ret) {
     cuda_context *ctx = (cuda_context *)c;
-    struct iovec *descr;
-    char *buf;
-    char *p;
+    strb sb = STRB_STATIC_INIT;
+    char *bin;
     gpukernel *res;
-    size_t tot_len;
     size_t bin_len = 0;
     CUdevice dev;
     unsigned int i;
-    unsigned int pre;
     int ptx_mode = 0;
     int binary_mode = 0;
     int major, minor;
@@ -751,66 +748,43 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     }
 
     if (binary_mode) {
-      p = memdup(strings[0], lengths[0]);
+      bin = memdup(strings[0], lengths[0]);
       bin_len = lengths[0];
-      if (p == NULL) {
+      if (bin == NULL) {
         cuda_exit(ctx);
         FAIL(NULL, GA_MEMORY_ERROR);
       }
     } else {
-      pre = 0;
-      if (flags & GA_USE_CLUDA) pre++;
-      descr = calloc(count+pre, sizeof(*descr));
-      if (descr == NULL) {
-        cuda_exit(ctx);
-        FAIL(NULL, GA_SYS_ERROR);
-      }
-
       if (flags & GA_USE_CLUDA) {
-        descr[0].iov_base = (void *)CUDA_PREAMBLE;
-        descr[0].iov_len = strlen(CUDA_PREAMBLE);
+	strb_appends(&sb, CUDA_PREAMBLE);
       }
-      tot_len = descr[0].iov_len;
 
       if (lengths == NULL) {
-        for (i = 0; i < count; i++) {
-          descr[i+pre].iov_base = (void *)strings[i];
-          descr[i+pre].iov_len = strlen(strings[i]);
-          tot_len += descr[i+pre].iov_len;
-        }
+        for (i = 0; i < count; i++)
+	  strb_appends(&sb, strings[i]);
       } else {
         for (i = 0; i < count; i++) {
-          descr[i+pre].iov_base = (void *)strings[i];
-          descr[i+pre].iov_len = lengths[i]?lengths[i]:strlen(strings[i]);
-          tot_len += descr[i+pre].iov_len;
+	  if (lengths[i] == 0)
+	    strb_appends(&sb, strings[i]);
+	  else
+	    strb_appendn(&sb, strings[i], lengths[i]);
         }
       }
 
-      if (ptx_mode) tot_len += 1;
+      if (ptx_mode) strb_append0(&sb);
 
-      buf = malloc(tot_len);
-      if (buf == NULL) {
-        free(descr);
-        cuda_exit(ctx);
-        FAIL(NULL, GA_SYS_ERROR);
+      if (strb_error(&sb)) {
+	strb_clear(&sb);
+	cuda_exit(ctx);
+	return NULL;
       }
-
-      p = buf;
-      for (i = 0; i < count+pre; i++) {
-        memcpy(p, descr[i].iov_base, descr[i].iov_len);
-        p += descr[i].iov_len;
-      }
-
-      if (ptx_mode) p[0] = '\0';
-
-      free(descr);
 
       if (ptx_mode) {
-        p = buf;
+        bin = sb.s;
       } else {
-        p = call_compiler(buf, tot_len, &bin_len, ret);
-        free(buf);
-        if (p == NULL) {
+        bin = call_compiler(sb.s, sb.l, &bin_len, ret);
+	strb_clear(&sb);
+        if (bin == NULL) {
           cuda_exit(ctx);
           return NULL;
         }
@@ -839,8 +813,8 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     }
 
     res->bin_sz = bin_len;
-    res->bin = p;
-    ctx->err = cuModuleLoadData(&res->m, p);
+    res->bin = bin;
+    ctx->err = cuModuleLoadData(&res->m, bin);
 
     if (ctx->err != CUDA_SUCCESS) {
       free(res->types);
