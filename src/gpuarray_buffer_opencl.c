@@ -925,12 +925,11 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
                       unsigned int b_nd, const size_t *b_dims,
                       const ssize_t *b_str) {
   cl_ctx *ctx = input->ctx;
-  char *strs[64];
+  strb sb = STRB_STATIC_INIT;
   size_t nEls, ls[2], gs[2];
   gpukernel *k;
   void *args[2];
   cl_mem_flags fl;
-  unsigned int count = 0;
   int res = GA_SYS_ERROR;
   unsigned int i;
   int flags = GA_USE_CLUDA;
@@ -978,27 +977,21 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
     flags |= GA_USE_COMPLEX;
   }
 
-  if (asprintf(&strs[count], ELEM_HEADER,
+  strb_appendf(&sb, ELEM_HEADER,
 	       gpuarray_get_type(intype)->cluda_name,
 	       gpuarray_get_type(outtype)->cluda_name,
-               ioff, ooff, nEls) == -1)
-    goto fail;
-  count++;
-  
-  if (gpuarray_elem_perdim(strs, &count, a_nd, a_dims, a_str, "a_p") == -1)
-    goto fail;
-  if (gpuarray_elem_perdim(strs, &count, b_nd, b_dims, b_str, "b_p") == -1)
-    goto fail;
+	       ioff, ooff, nEls);
 
-  strs[count] = strdup(ELEM_FOOTER);
-  if (strs[count] == NULL) 
-    goto fail;
-  count++;
+  gpuarray_elem_perdim(&sb, a_nd, a_dims, a_str, "a_p");
+  gpuarray_elem_perdim(&sb, b_nd, b_dims, b_str, "b_p");
 
-  assert(count < (sizeof(strs)/sizeof(strs[0])));
+  strb_appends(&sb, ELEM_FOOTER);
+
+  if (strb_error(&sb))
+    goto fail;
 
   types[0] = types[1] = GA_BUFFER;
-  k = cl_newkernel(ctx, count, (const char **)strs, NULL, "elemk",
+  k = cl_newkernel(ctx, 1, (const char **)&sb.s, &sb.l, "elemk",
                    2, types, flags, &res);
   if (k == NULL) goto fail;
   /* Cheap kernel scheduling */
@@ -1014,9 +1007,7 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
  kfail:
   cl_releasekernel(k);
  fail:
-  for (i = 0; i< count; i++) {
-    free(strs[i]);
-  }
+  strb_clear(&sb);
   return res;
 }
 
