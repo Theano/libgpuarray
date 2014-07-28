@@ -620,6 +620,14 @@ typedef enum _ga_usefl {
    * The kernel is made of PTX code.
    */
   GA_USE_PTX =      0x1000,
+  /**
+   * The kernel is made of CUDA code.
+   */
+  GA_USE_CUDA =     0x2000,
+  /**
+   * The kernel is make of OpenCL code.
+   */
+  GA_USE_OPENCL =   0x4000,
 } ga_usefl;
 
 /**
