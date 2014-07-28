@@ -748,7 +748,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     }
 
     if (binary_mode) {
-      bin = memdup(strings[0], lengths[0]);
+      bin = h_memdup(strings[0], lengths[0]);
       bin_len = lengths[0];
       if (bin == NULL) {
         cuda_exit(ctx);
@@ -791,7 +791,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
       }
     }
 
-    res = malloc(sizeof(*res));
+    res = h_malloc(sizeof(*res));
     if (res == NULL) {
       cuda_exit(ctx);
       FAIL(NULL, GA_SYS_ERROR);
@@ -799,28 +799,27 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     memset(res, 0, sizeof(*res));
     res->refcnt = 1;
     res->argcount = argcount;
-    res->types = calloc(argcount, sizeof(int));
+    res->types = h_calloc(argcount, sizeof(int));
+    hattach(res->types, res);
     if (res->types == NULL) {
-      free(res);
+      h_free(res);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
     memcpy(res->types, types, argcount*sizeof(int));
-    res->args = calloc(argcount, sizeof(void *));
+    res->args = h_calloc(argcount, sizeof(void *));
+    hattach(res->args, res);
     if (res->args == NULL) {
-      free(res->types);
-      free(res);
+      h_free(res);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
 
     res->bin_sz = bin_len;
     res->bin = bin;
+    hattach(res->bin, res);
     ctx->err = cuModuleLoadData(&res->m, bin);
 
     if (ctx->err != CUDA_SUCCESS) {
-      free(res->types);
-      free(res->args);
-      free(res->bin);
-      free(res);
+      h_free(res);
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
@@ -828,10 +827,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     ctx->err = cuModuleGetFunction(&res->k, res->m, fname);
     if (ctx->err != CUDA_SUCCESS) {
         cuModuleUnload(res->m);
-        free(res->types);
-        free(res->args);
-        free(res->bin);
-        free(res);
+        h_free(res);
         cuda_exit(ctx);
         FAIL(NULL, GA_IMPL_ERROR);
     }
@@ -857,10 +853,7 @@ static void cuda_freekernel(gpukernel *k) {
     cuda_exit(k->ctx);
     cuda_free_ctx(k->ctx);
     CLEAR(k);
-    free(k->types);
-    free(k->args);
-    free(k->bin);
-    free(k);
+    h_free(k);
   }
 }
 
