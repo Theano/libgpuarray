@@ -37,7 +37,7 @@ static inline int strb_error(strb *sb) {
 }
 
 static inline void strb_clear(strb *sb) {
-  free(sb->s);
+  h_free(sb->s);
   sb->s = NULL;
   sb->a = 0;
   sb->l = 0;
@@ -74,9 +74,12 @@ static inline void strb_appendb(strb *sb, strb *sb2) {
 
 GPUARRAY_LOCAL void strb_appendf(strb *, const char *, ...);
 
-static inline const char *strb_cstr(strb *sb) {
+static inline char *strb_cstr(strb *sb) {
   strb_append0(sb);
-  if (strb_error(sb)) return NULL;
+  if (strb_error(sb)) {
+    strb_clear(sb);
+    return NULL;
+  }
   sb->l--;
   return sb->s;
 }

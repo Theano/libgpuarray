@@ -31,7 +31,7 @@ int strb_grow(strb *sb, size_t n) {
     return -1;
   }
   sb->s = s;
-  sb->a = n;
+  sb->a += n;
   return 0;
 }
 
