@@ -36,6 +36,10 @@ GPUARRAY_LOCAL int GpuArray_is_aligned(const GpuArray *a);
 GPUARRAY_LOCAL extern const gpuarray_type scalar_types[];
 GPUARRAY_LOCAL extern const gpuarray_type vector_types[];
 
+/*
+ * This function generates the kernel code to perform indexing on var id
+ * from planar index 'i' using the dimensions and strides provided.
+ */
 GPUARRAY_LOCAL void gpuarray_elem_perdim(strb *sb, unsigned int nd,
 					 const size_t *dims,
 					 const ssize_t *str,
