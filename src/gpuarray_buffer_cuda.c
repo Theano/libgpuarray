@@ -518,36 +518,18 @@ static int cuda_memset(gpudata *dst, size_t dstoff, int data) {
     return GA_NO_ERROR;
 }
 
-static const char *detect_arch(int *ret) {
+static int detect_arch(char *ret) {
     CUdevice dev;
     int major, minor;
+    int res;
     CUresult err;
     err = cuCtxGetDevice(&dev);
-    if (err != CUDA_SUCCESS) FAIL(NULL, GA_IMPL_ERROR);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
     err = cuDeviceComputeCapability(&major, &minor, dev);
-    if (err != CUDA_SUCCESS) FAIL(NULL, GA_IMPL_ERROR);
-    switch (major) {
-    case 1:
-        switch (minor) {
-        case 0:
-            return "sm_10";
-        case 1:
-            return "sm_11";
-        case 2:
-            return "sm_12";
-        default:
-            return "sm_13";
-        }
-    case 2:
-        switch (minor) {
-        case 0:
-            return "sm_20";
-        default:
-            return "sm_21";
-        }
-    default:
-        return "sm_30";
-    }
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+    res = snprintf(ret, 6, "sm_%d%d", major, minor);
+    if (res == -1 || res > 6) return GA_UNSUPPORTED_ERROR;
+    return GA_NO_ERROR;
 }
 
 static const char *TMP_VAR_NAMES[] = {"GPUARRAY_TMPDIR", "TMPDIR", "TMP",
@@ -558,7 +540,7 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
     char namebuf[PATH_MAX];
     char outbuf[PATH_MAX];
     char *tmpdir;
-    const char *arch_arg;
+    char arch_arg[6]; /* Must be at least 6, see detect_arch() */
     struct stat st;
     ssize_t s;
 #ifndef _WIN32
@@ -570,8 +552,8 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
     char *buf;
     int res;
 
-    arch_arg = detect_arch(&res);
-    if (arch_arg == NULL) FAIL(NULL, res);
+    res = detect_arch(arch_arg);
+    if (res != GA_NO_ERROR) FAIL(NULL, res);
 
     for (i = 0; i < sizeof(TMP_VAR_NAMES)/sizeof(TMP_VAR_NAMES[0]); i++) {
         tmpdir = getenv(TMP_VAR_NAMES[i]);
@@ -1053,14 +1035,14 @@ static inline int gen_extcopy_kernel(const cache_key_t *a,
   const char *in_t;
   const char *out_t;
   const char *rmod;
-  const char *arch;
+  char arch[6]; /* Must be at least 6, see detect_arch() */
 
   in_t = map_t(a->itype);
   out_t = map_t(a->otype);
   rmod = get_rmod(a->itype, a->otype);
   if (in_t == NULL || out_t == NULL) return GA_DEVSUP_ERROR;
-  arch = detect_arch(&res);
-  if (arch == NULL) return res;
+  res = detect_arch(arch);
+  if (res != GA_NO_ERROR) return res;
 
   strb_appendf(&sb, ELEM_HEADER_PTX, arch, bits, bits, bits,
 	       bits, in_t, out_t, bits, bits, bits, bits, bits, nEls,
