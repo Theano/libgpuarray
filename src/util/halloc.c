@@ -31,6 +31,14 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+/* Small hack to make NDEBUG respect DEBUG */
+#ifdef DEBUG
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+#endif
+
 #include <assert.h>
 #include <stdlib.h>  /* realloc */
 #include <string.h>  /* memset & co */
@@ -79,14 +87,8 @@ struct hlist_item
  */
 struct hlist_item hlist_null;
 
-/*
- *
- */
 #define __hlist_init(h)      { &hlist_null }
-#define __hlist_init_item(i) { &hlist_null, &(i).next }
-
-//static_inline void hlist_init(hlist_head_t * h);
-//static_inline void hlist_init_item(hlist_item_t * i);
+#define __hlist_init_item(i) { &hlist_null, NULL }
 
 #define hlist_for_each(i, h) \
   for (i = (h)->next; i != &hlist_null; i = i->next)
@@ -105,7 +107,7 @@ static void hlist_init(hlist_head_t * h)
 static void hlist_init_item(hlist_item_t * i)
 {
   assert(i);
-  i->prev = &i->next;
+  i->prev = NULL;
   i->next = &hlist_null;
 }
 
@@ -127,7 +129,8 @@ static void hlist_del(hlist_item_t * i)
 
   next = i->next;
   next->prev = i->prev;
-  *i->prev = next;
+  if (i->prev)
+    *i->prev = next;
 
   hlist_init_item(i);
 }
@@ -135,7 +138,8 @@ static void hlist_del(hlist_item_t * i)
 static void hlist_relink(hlist_item_t * i)
 {
   assert(i);
-  *i->prev = i;
+  if (i->prev)
+    *i->prev = i;
   i->next->prev = &i->next;
 }
 
@@ -150,7 +154,7 @@ static void hlist_relink_head(hlist_head_t * h)
  */
 typedef struct hblock
 {
-#ifndef NDEBUG
+#ifdef DEBUG
 #define HH_MAGIC    0x20040518L
 	long          magic;
 #endif
@@ -181,52 +185,49 @@ static void _free_children(hblock_t * p);
 /*
  *	Core API
  */
-void * halloc(void * ptr, size_t len)
-{
-	hblock_t * p;
+void * halloc(void * ptr, size_t len) {
+  hblock_t * p;
 
-        assert(allocator);
+  assert(allocator);
 
-	/* calloc */
-	if (! ptr)
-	{
-		if (! len)
-			return NULL;
+  /* calloc */
+  if (! ptr) {
+    if (! len)
+      return NULL;
 
-		p = allocator(0, len + sizeof_hblock);
-		if (! p)
-			return NULL;
-#ifndef NDEBUG
-		p->magic = HH_MAGIC;
+    p = allocator(0, len + sizeof_hblock);
+    if (! p)
+      return NULL;
+#ifdef DEBUG
+    p->magic = HH_MAGIC;
 #endif
-		hlist_init(&p->children);
-		hlist_init_item(&p->siblings);
+    hlist_init(&p->children);
+    hlist_init_item(&p->siblings);
 
-		return p->data;
-	}
+    return p->data;
+  }
 
-	p = structof(ptr, hblock_t, data);
-	assert(p->magic == HH_MAGIC);
+  p = structof(ptr, hblock_t, data);
+  assert(p->magic == HH_MAGIC);
 
-	/* realloc */
-	if (len)
-	{
-		p = allocator(p, len + sizeof_hblock);
-		if (! p)
-			return NULL;
+  /* realloc */
+  if (len) {
+    p = allocator(p, len + sizeof_hblock);
+    if (p == NULL)
+      return NULL;
 
-		hlist_relink(&p->siblings);
-		hlist_relink_head(&p->children);
+    hlist_relink(&p->siblings);
+    hlist_relink_head(&p->children);
 
-		return p->data;
-	}
+    return p->data;
+  }
 
-	/* free */
-	_free_children(p);
-	hlist_del(&p->siblings);
-	allocator(p, 0);
+  /* free */
+  _free_children(p);
+  hlist_del(&p->siblings);
+  allocator(p, 0);
 
-	return NULL;
+  return NULL;
 }
 
 void hattach(void * block, void * parent)
@@ -315,13 +316,13 @@ void * h_memdup(const void * p, size_t s)
 
 static void * _realloc(void * ptr, size_t n)
 {
-	/*
-	 *	free'ing realloc()
-	 */
-	if (n)
-		return realloc(ptr, n);
-	free(ptr);
-	return NULL;
+  /* free'ing realloc() */
+  if (n != 0) {
+    return realloc(ptr, n);
+  } else {
+    free(ptr);
+    return NULL;
+  }
 }
 
 static int _relate(hblock_t * b, hblock_t * p)
@@ -349,7 +350,7 @@ static void _free_children(hblock_t * p)
 {
 	hlist_item_t * i, * tmp;
 
-#ifndef NDEBUG
+#ifdef DEBUG
 	/*
 	 *	this catches loops in hierarchy with almost zero
 	 *	overhead (compared to _relate() running time)
