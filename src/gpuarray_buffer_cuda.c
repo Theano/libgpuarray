@@ -561,9 +561,9 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
     }
     if (tmpdir == NULL) {
 #ifdef _WIN32
-            tmpdir = ".";
+      tmpdir = ".";
 #else
-            tmpdir = "/tmp";
+      tmpdir = "/tmp";
 #endif
     }
 
@@ -636,7 +636,7 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
         FAIL(NULL, GA_SYS_ERROR);
     }
 
-    buf = malloc((size_t)st.st_size);
+    buf = h_malloc((size_t)st.st_size);
     if (buf == NULL) {
         close(fd);
         unlink(outbuf);
@@ -646,9 +646,9 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
     s = read(fd, buf, (size_t)st.st_size);
     close(fd);
     unlink(outbuf);
-    /* fd is not non-blocking; should have complete read */
+    /* fd is blocking; should have complete read */
     if (s == -1) {
-        free(buf);
+        h_free(buf);
         FAIL(NULL, GA_SYS_ERROR);
     }
 
@@ -660,11 +660,14 @@ static void *(*call_compiler)(const char *src, size_t len, size_t *bin_len, int 
 
 GPUARRAY_LOCAL void cuda_set_compiler(void *(*compiler_f)(const char *, size_t,
 							  size_t *, int *)) {
-    if (compiler_f == NULL) {
-        call_compiler = call_compiler_impl;
-    } else {
-        call_compiler = compiler_f;
-    }
+  return;
+  /* Disable custom compilers
+  if (compiler_f == NULL) {
+    call_compiler = call_compiler_impl;
+  } else {
+    call_compiler = compiler_f;
+  }
+  */
 }
 
 static gpukernel *cuda_newkernel(void *c, unsigned int count,
@@ -773,12 +776,17 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
       }
     }
 
-    res = h_malloc(sizeof(*res));
+    res = h_calloc(1, sizeof(*res));
     if (res == NULL) {
+      h_free(bin);
       cuda_exit(ctx);
       FAIL(NULL, GA_SYS_ERROR);
     }
-    memset(res, 0, sizeof(*res));
+
+    res->bin_sz = bin_len;
+    res->bin = bin;
+    hattach(res->bin, res);
+
     res->refcnt = 1;
     res->argcount = argcount;
     res->types = h_calloc(argcount, sizeof(int));
@@ -795,9 +803,6 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
       FAIL(NULL, GA_MEMORY_ERROR);
     }
 
-    res->bin_sz = bin_len;
-    res->bin = bin;
-    hattach(res->bin, res);
     ctx->err = cuModuleLoadData(&res->m, bin);
 
     if (ctx->err != CUDA_SUCCESS) {
