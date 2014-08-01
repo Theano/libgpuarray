@@ -36,7 +36,7 @@
 #include <unistd.h>
 #endif
 
-#include "strb.h"
+#include "util/strb.h"
 
 #include "gpuarray/buffer.h"
 #include "gpuarray/util.h"
@@ -518,36 +518,18 @@ static int cuda_memset(gpudata *dst, size_t dstoff, int data) {
     return GA_NO_ERROR;
 }
 
-static const char *detect_arch(int *ret) {
+static int detect_arch(char *ret) {
     CUdevice dev;
     int major, minor;
+    int res;
     CUresult err;
     err = cuCtxGetDevice(&dev);
-    if (err != CUDA_SUCCESS) FAIL(NULL, GA_IMPL_ERROR);
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
     err = cuDeviceComputeCapability(&major, &minor, dev);
-    if (err != CUDA_SUCCESS) FAIL(NULL, GA_IMPL_ERROR);
-    switch (major) {
-    case 1:
-        switch (minor) {
-        case 0:
-            return "sm_10";
-        case 1:
-            return "sm_11";
-        case 2:
-            return "sm_12";
-        default:
-            return "sm_13";
-        }
-    case 2:
-        switch (minor) {
-        case 0:
-            return "sm_20";
-        default:
-            return "sm_21";
-        }
-    default:
-        return "sm_30";
-    }
+    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+    res = snprintf(ret, 6, "sm_%d%d", major, minor);
+    if (res == -1 || res > 6) return GA_UNSUPPORTED_ERROR;
+    return GA_NO_ERROR;
 }
 
 static const char *TMP_VAR_NAMES[] = {"GPUARRAY_TMPDIR", "TMPDIR", "TMP",
@@ -558,7 +540,7 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
     char namebuf[PATH_MAX];
     char outbuf[PATH_MAX];
     char *tmpdir;
-    const char *arch_arg;
+    char arch_arg[6]; /* Must be at least 6, see detect_arch() */
     struct stat st;
     ssize_t s;
 #ifndef _WIN32
@@ -570,8 +552,8 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
     char *buf;
     int res;
 
-    arch_arg = detect_arch(&res);
-    if (arch_arg == NULL) FAIL(NULL, res);
+    res = detect_arch(arch_arg);
+    if (res != GA_NO_ERROR) FAIL(NULL, res);
 
     for (i = 0; i < sizeof(TMP_VAR_NAMES)/sizeof(TMP_VAR_NAMES[0]); i++) {
         tmpdir = getenv(TMP_VAR_NAMES[i]);
@@ -579,9 +561,9 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
     }
     if (tmpdir == NULL) {
 #ifdef _WIN32
-            tmpdir = ".";
+      tmpdir = ".";
 #else
-            tmpdir = "/tmp";
+      tmpdir = "/tmp";
 #endif
     }
 
@@ -654,7 +636,7 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
         FAIL(NULL, GA_SYS_ERROR);
     }
 
-    buf = malloc((size_t)st.st_size);
+    buf = h_malloc((size_t)st.st_size);
     if (buf == NULL) {
         close(fd);
         unlink(outbuf);
@@ -664,9 +646,9 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
     s = read(fd, buf, (size_t)st.st_size);
     close(fd);
     unlink(outbuf);
-    /* fd is not non-blocking; should have complete read */
+    /* fd is blocking; should have complete read */
     if (s == -1) {
-        free(buf);
+        h_free(buf);
         FAIL(NULL, GA_SYS_ERROR);
     }
 
@@ -678,11 +660,14 @@ static void *(*call_compiler)(const char *src, size_t len, size_t *bin_len, int 
 
 GPUARRAY_LOCAL void cuda_set_compiler(void *(*compiler_f)(const char *, size_t,
 							  size_t *, int *)) {
-    if (compiler_f == NULL) {
-        call_compiler = call_compiler_impl;
-    } else {
-        call_compiler = compiler_f;
-    }
+  return;
+  /* Disable custom compilers
+  if (compiler_f == NULL) {
+    call_compiler = call_compiler_impl;
+  } else {
+    call_compiler = compiler_f;
+  }
+  */
 }
 
 static gpukernel *cuda_newkernel(void *c, unsigned int count,
@@ -690,15 +675,12 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
                                  const char *fname, unsigned int argcount,
                                  const int *types, int flags, int *ret) {
     cuda_context *ctx = (cuda_context *)c;
-    struct iovec *descr;
-    char *buf;
-    char *p;
+    strb sb = STRB_STATIC_INIT;
+    char *bin;
     gpukernel *res;
-    size_t tot_len;
     size_t bin_len = 0;
     CUdevice dev;
     unsigned int i;
-    unsigned int pre;
     int ptx_mode = 0;
     int binary_mode = 0;
     int major, minor;
@@ -751,102 +733,80 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     }
 
     if (binary_mode) {
-      p = memdup(strings[0], lengths[0]);
+      bin = h_memdup(strings[0], lengths[0]);
       bin_len = lengths[0];
-      if (p == NULL) {
+      if (bin == NULL) {
         cuda_exit(ctx);
         FAIL(NULL, GA_MEMORY_ERROR);
       }
     } else {
-      pre = 0;
-      if (flags & GA_USE_CLUDA) pre++;
-      descr = calloc(count+pre, sizeof(*descr));
-      if (descr == NULL) {
-        cuda_exit(ctx);
-        FAIL(NULL, GA_SYS_ERROR);
-      }
-
       if (flags & GA_USE_CLUDA) {
-        descr[0].iov_base = (void *)CUDA_PREAMBLE;
-        descr[0].iov_len = strlen(CUDA_PREAMBLE);
+	strb_appends(&sb, CUDA_PREAMBLE);
       }
-      tot_len = descr[0].iov_len;
 
       if (lengths == NULL) {
-        for (i = 0; i < count; i++) {
-          descr[i+pre].iov_base = (void *)strings[i];
-          descr[i+pre].iov_len = strlen(strings[i]);
-          tot_len += descr[i+pre].iov_len;
-        }
+        for (i = 0; i < count; i++)
+	  strb_appends(&sb, strings[i]);
       } else {
         for (i = 0; i < count; i++) {
-          descr[i+pre].iov_base = (void *)strings[i];
-          descr[i+pre].iov_len = lengths[i]?lengths[i]:strlen(strings[i]);
-          tot_len += descr[i+pre].iov_len;
+	  if (lengths[i] == 0)
+	    strb_appends(&sb, strings[i]);
+	  else
+	    strb_appendn(&sb, strings[i], lengths[i]);
         }
       }
 
-      if (ptx_mode) tot_len += 1;
+      if (ptx_mode) strb_append0(&sb);
 
-      buf = malloc(tot_len);
-      if (buf == NULL) {
-        free(descr);
-        cuda_exit(ctx);
-        FAIL(NULL, GA_SYS_ERROR);
+      if (strb_error(&sb)) {
+	strb_clear(&sb);
+	cuda_exit(ctx);
+	return NULL;
       }
-
-      p = buf;
-      for (i = 0; i < count+pre; i++) {
-        memcpy(p, descr[i].iov_base, descr[i].iov_len);
-        p += descr[i].iov_len;
-      }
-
-      if (ptx_mode) p[0] = '\0';
-
-      free(descr);
 
       if (ptx_mode) {
-        p = buf;
+        bin = sb.s;
       } else {
-        p = call_compiler(buf, tot_len, &bin_len, ret);
-        free(buf);
-        if (p == NULL) {
+        bin = call_compiler(sb.s, sb.l, &bin_len, ret);
+	strb_clear(&sb);
+        if (bin == NULL) {
           cuda_exit(ctx);
           return NULL;
         }
       }
     }
 
-    res = malloc(sizeof(*res));
+    res = h_calloc(1, sizeof(*res));
     if (res == NULL) {
+      h_free(bin);
       cuda_exit(ctx);
       FAIL(NULL, GA_SYS_ERROR);
     }
-    memset(res, 0, sizeof(*res));
+
+    res->bin_sz = bin_len;
+    res->bin = bin;
+    hattach(res->bin, res);
+
     res->refcnt = 1;
     res->argcount = argcount;
-    res->types = calloc(argcount, sizeof(int));
+    res->types = h_calloc(argcount, sizeof(int));
+    hattach(res->types, res);
     if (res->types == NULL) {
-      free(res);
+      h_free(res);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
     memcpy(res->types, types, argcount*sizeof(int));
-    res->args = calloc(argcount, sizeof(void *));
+    res->args = h_calloc(argcount, sizeof(void *));
+    hattach(res->args, res);
     if (res->args == NULL) {
-      free(res->types);
-      free(res);
+      h_free(res);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
 
-    res->bin_sz = bin_len;
-    res->bin = p;
-    ctx->err = cuModuleLoadData(&res->m, p);
+    ctx->err = cuModuleLoadData(&res->m, bin);
 
     if (ctx->err != CUDA_SUCCESS) {
-      free(res->types);
-      free(res->args);
-      free(res->bin);
-      free(res);
+      h_free(res);
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
@@ -854,10 +814,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     ctx->err = cuModuleGetFunction(&res->k, res->m, fname);
     if (ctx->err != CUDA_SUCCESS) {
         cuModuleUnload(res->m);
-        free(res->types);
-        free(res->args);
-        free(res->bin);
-        free(res);
+        h_free(res);
         cuda_exit(ctx);
         FAIL(NULL, GA_IMPL_ERROR);
     }
@@ -883,10 +840,7 @@ static void cuda_freekernel(gpukernel *k) {
     cuda_exit(k->ctx);
     cuda_free_ctx(k->ctx);
     CLEAR(k);
-    free(k->types);
-    free(k->args);
-    free(k->bin);
-    free(k);
+    h_free(k);
   }
 }
 
@@ -943,7 +897,7 @@ static int cuda_sync(gpudata *b) {
   return GA_NO_ERROR;
 }
 
-static const char ELEM_HEADER_PTX[] = ".version 3.0\n.target %s\n\n"
+static const char ELEM_HEADER_PTX[] = ".version 4.0\n.target %s\n\n"
     ".entry extcpy (\n"
     ".param .u%u a_data,\n"
     ".param .u%u b_data ) {\n"
@@ -1086,14 +1040,14 @@ static inline int gen_extcopy_kernel(const cache_key_t *a,
   const char *in_t;
   const char *out_t;
   const char *rmod;
-  const char *arch;
+  char arch[6]; /* Must be at least 6, see detect_arch() */
 
   in_t = map_t(a->itype);
   out_t = map_t(a->otype);
   rmod = get_rmod(a->itype, a->otype);
   if (in_t == NULL || out_t == NULL) return GA_DEVSUP_ERROR;
-  arch = detect_arch(&res);
-  if (arch == NULL) return res;
+  res = detect_arch(arch);
+  if (res != GA_NO_ERROR) return res;
 
   strb_appendf(&sb, ELEM_HEADER_PTX, arch, bits, bits, bits,
 	       bits, in_t, out_t, bits, bits, bits, bits, bits, nEls,

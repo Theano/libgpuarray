@@ -3,6 +3,7 @@
 #include "private.h"
 #include "gpuarray/util.h"
 #include "gpuarray/error.h"
+#include "util/strb.h"
 
 static gpuarray_type **custom_types = NULL;
 static int n_types = 0;
@@ -54,29 +55,22 @@ static inline ssize_t ssabs(ssize_t v) {
   return (v < 0 ? -v : v);
 }
 
-int gpuarray_elem_perdim(char *strs[], unsigned int *count, unsigned int nd,
-			const size_t *dims, const ssize_t *str,
-			const char *id) {
+void gpuarray_elem_perdim(strb *sb, unsigned int nd,
+			  const size_t *dims, const ssize_t *str,
+			  const char *id) {
   int i;
 
   if (nd > 0) {
-    if (asprintf(&strs[*count], "int %si = i;", id) == -1)
-      return -1;
-    (*count)++;
+    strb_appendf(sb, "int %si = i;", id);
 
     for (i = nd-1; i > 0; i--) {
-      if (asprintf(&strs[*count], "%s %c= ((%si %% %" SPREFIX "u) * "
+      strb_appendf(sb, "%s %c= ((%si %% %" SPREFIX "u) * "
                    "%" SPREFIX "d);%si = %si / %" SPREFIX "u;", id,
 		   (str[i] < 0 ? '-' : '+'), id, dims[i],
-		   ssabs(str[i]), id, id, dims[i]) == -1)
-	return -1;
-      (*count)++;
-    }
+		   ssabs(str[i]), id, id, dims[i]);
  
-    if (asprintf(&strs[*count], "%s %c= (%si * %" SPREFIX "d);", id,
-		 (str[0] < 0 ? '-' : '+'), id, ssabs(str[0])) == -1)
-      return -1;
-    (*count)++;
+      strb_appendf(sb, "%s %c= (%si * %" SPREFIX "d);", id,
+		   (str[0] < 0 ? '-' : '+'), id, ssabs(str[0]));
+    }
   }
-  return 0;
 }
