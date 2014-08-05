@@ -19,7 +19,7 @@ Requirements
 
  - cmake >= 2.8 (cmake_).
  - a c99-compliant compiler (or MSVC if on windows).
-
+ - mako (mako_)
  - (optional) CUDA >= 4.0 (cuda_).
  - (optional) OpenCL runtime.
  - (optional) clBLAS (clblas_).
@@ -200,3 +200,5 @@ you can confirm which device it is running on.
 .. _cython: http://cython.org/
 
 .. _nosetests: http://nose.readthedocs.org/en/latest/
+
+.. _mako: http://www.makotemplates.org/
