@@ -19,12 +19,12 @@ Requirements
 
  - cmake >= 2.8 (cmake_).
  - a c99-compliant compiler (or MSVC if on windows).
-
  - (optional) CUDA >= 4.0 (cuda_).
  - (optional) OpenCL runtime.
  - (optional) clBLAS (clblas_).
  - (optional) libcheck (check_) to run the C tests.
  - (optional) python (python_) for the python bindings.
+ - (optional) mako (mako_) for development or running the python bindings.
  - (optional) Cython >= 0.19 (cython_) for the python bindings.
  - (optional) nosetests (nosetests_) to run the python tests.
 
@@ -200,3 +200,5 @@ you can confirm which device it is running on.
 .. _cython: http://cython.org/
 
 .. _nosetests: http://nose.readthedocs.org/en/latest/
+
+.. _mako: http://www.makotemplates.org/
