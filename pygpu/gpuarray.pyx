@@ -1268,7 +1268,7 @@ cdef GpuArray pygpu_transfer(GpuArray a, GpuContext new_ctx, bint may_share):
 def _split(GpuArray a, ind, unsigned int axis):
     cdef list r = [None] * (len(ind) + 1)
     cdef Py_ssize_t i
-    if not 0 <= axis < a.ga.nd:
+    if not axis < a.ga.nd:
         raise ValueError, "split on non-existant axis"
     cdef size_t m = a.ga.dimensions[axis]
     cdef size_t v
@@ -1293,8 +1293,9 @@ def _split(GpuArray a, ind, unsigned int axis):
         PyMem_Free(p)
         PyMem_Free(rs)
 
-cdef GpuArray pygpu_concatenate(_GpuArray **a, size_t n, unsigned int axis,
-                                int restype, type cls, GpuContext context):
+cdef GpuArray pygpu_concatenate(const _GpuArray **a, size_t n,
+                                unsigned int axis, int restype,
+                                type cls, GpuContext context):
     cdef res = new_GpuArray(cls, context, None)
     array_concatenate(res, a, n, axis, restype)
     return res
@@ -1303,7 +1304,7 @@ def _concatenate(list al, unsigned int axis, int restype, type cls,
                  GpuContext context):
     cdef Py_ssize_t i
     context = ensure_context(context)
-    cdef _GpuArray **als = <_GpuArray **>PyMem_Malloc(sizeof(_GpuArray *) * len(al))
+    cdef const _GpuArray **als = <const _GpuArray **>PyMem_Malloc(sizeof(_GpuArray *) * len(al))
     if als == NULL:
         raise MemoryError()
     try:
@@ -1492,6 +1493,7 @@ cdef class GpuArray:
         cdef size_t *newdims
         cdef unsigned int nd
         cdef unsigned int i
+        cdef int compute_axis
         nd = <unsigned int>len(shape)
         newdims = <size_t *>calloc(nd, sizeof(size_t))
         if newdims == NULL:
@@ -1828,7 +1830,7 @@ cdef class GpuKernel:
 
         s[0] = source
         l = len(source)
-        numargs = len(types)
+        numargs = <unsigned int>len(types)
         self.callbuf = <void **>calloc(len(types), sizeof(void *))
         if self.callbuf == NULL:
             raise MemoryError

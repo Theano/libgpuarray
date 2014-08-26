@@ -287,8 +287,9 @@ cdef api GpuArray pygpu_transpose(GpuArray a, const unsigned int *newaxes)
 
 cdef api GpuArray pygpu_transfer(GpuArray a, GpuContext new_ctx,
                                  bint may_share)
-cdef api GpuArray pygpu_concatenate(_GpuArray **a, size_t n, unsigned int axis,
-                                    int restype, type cls, GpuContext context)
+cdef api GpuArray pygpu_concatenate(const _GpuArray **a, size_t n,
+                                    unsigned int axis, int restype,
+                                    type cls, GpuContext context)
 
 cdef api class GpuContext [type PyGpuContextType, object PyGpuContextObject]:
     cdef const gpuarray_buffer_ops *ops
