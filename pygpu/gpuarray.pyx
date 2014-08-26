@@ -1736,6 +1736,10 @@ cdef class GpuKernel:
     :param have_small: ensure types smaller than float will work?
     :param have_complex: ensure complex types will work?
     :param have_half: ensure half-floats will work?
+    :param binary: kernel is pre-compiled binary blob?
+    :param ptx: kernel is PTX code?
+    :param cuda: kernel is cuda code?
+    :param opencl: kernel is opencl code?
 
     The kernel function is retrieved using the provided `name` which
     must match what you named your kernel in `source`.  You can safely
@@ -1786,7 +1790,8 @@ cdef class GpuKernel:
 
     def __cinit__(self, source, name, types, GpuContext context=None,
                   cluda=True, have_double=False, have_small=False,
-                  have_complex=False, have_half=False, *a, **kwa):
+                  have_complex=False, have_half=False, binary=False,
+                  ptx=False, cuda=False, opencl=False, *a, **kwa):
         cdef const char *s[1]
         cdef size_t l
         cdef unsigned int numargs
@@ -1812,6 +1817,14 @@ cdef class GpuKernel:
             flags |= GA_USE_COMPLEX
         if have_half:
             flags |= GA_USE_HALF
+        if binary:
+            flags |= GA_USE_BINARY
+        if ptx:
+            flags |= GA_USE_PTX
+        if cuda:
+            flags |= GA_USE_CUDA
+        if opencl:
+            flags |= GA_USE_OPENCL
 
         s[0] = source
         l = len(source)
