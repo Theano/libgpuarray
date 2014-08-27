@@ -642,7 +642,7 @@ static int cl_check_extensions(const char **preamble, unsigned int *count,
     preamble[*count] = PRAGMA CL_HALF ENABLE;
     (*count)++;
   }
-  if (flags & GA_USE_PTX) {
+  if (flags & (GA_USE_PTX|GA_USE_CUDA)) {
     return GA_DEVSUP_ERROR;
   }
   return GA_NO_ERROR;

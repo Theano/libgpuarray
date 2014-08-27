@@ -1268,7 +1268,7 @@ cdef GpuArray pygpu_transfer(GpuArray a, GpuContext new_ctx, bint may_share):
 def _split(GpuArray a, ind, unsigned int axis):
     cdef list r = [None] * (len(ind) + 1)
     cdef Py_ssize_t i
-    if not 0 <= axis < a.ga.nd:
+    if not axis < a.ga.nd:
         raise ValueError, "split on non-existant axis"
     cdef size_t m = a.ga.dimensions[axis]
     cdef size_t v
@@ -1293,8 +1293,9 @@ def _split(GpuArray a, ind, unsigned int axis):
         PyMem_Free(p)
         PyMem_Free(rs)
 
-cdef GpuArray pygpu_concatenate(_GpuArray **a, size_t n, unsigned int axis,
-                                int restype, type cls, GpuContext context):
+cdef GpuArray pygpu_concatenate(const _GpuArray **a, size_t n,
+                                unsigned int axis, int restype,
+                                type cls, GpuContext context):
     cdef res = new_GpuArray(cls, context, None)
     array_concatenate(res, a, n, axis, restype)
     return res
@@ -1303,7 +1304,7 @@ def _concatenate(list al, unsigned int axis, int restype, type cls,
                  GpuContext context):
     cdef Py_ssize_t i
     context = ensure_context(context)
-    cdef _GpuArray **als = <_GpuArray **>PyMem_Malloc(sizeof(_GpuArray *) * len(al))
+    cdef const _GpuArray **als = <const _GpuArray **>PyMem_Malloc(sizeof(_GpuArray *) * len(al))
     if als == NULL:
         raise MemoryError()
     try:
@@ -1492,6 +1493,7 @@ cdef class GpuArray:
         cdef size_t *newdims
         cdef unsigned int nd
         cdef unsigned int i
+        cdef int compute_axis
         nd = <unsigned int>len(shape)
         newdims = <size_t *>calloc(nd, sizeof(size_t))
         if newdims == NULL:
@@ -1736,6 +1738,10 @@ cdef class GpuKernel:
     :param have_small: ensure types smaller than float will work?
     :param have_complex: ensure complex types will work?
     :param have_half: ensure half-floats will work?
+    :param binary: kernel is pre-compiled binary blob?
+    :param ptx: kernel is PTX code?
+    :param cuda: kernel is cuda code?
+    :param opencl: kernel is opencl code?
 
     The kernel function is retrieved using the provided `name` which
     must match what you named your kernel in `source`.  You can safely
@@ -1786,7 +1792,8 @@ cdef class GpuKernel:
 
     def __cinit__(self, source, name, types, GpuContext context=None,
                   cluda=True, have_double=False, have_small=False,
-                  have_complex=False, have_half=False, *a, **kwa):
+                  have_complex=False, have_half=False, binary=False,
+                  ptx=False, cuda=False, opencl=False, *a, **kwa):
         cdef const char *s[1]
         cdef size_t l
         cdef unsigned int numargs
@@ -1812,10 +1819,18 @@ cdef class GpuKernel:
             flags |= GA_USE_COMPLEX
         if have_half:
             flags |= GA_USE_HALF
+        if binary:
+            flags |= GA_USE_BINARY
+        if ptx:
+            flags |= GA_USE_PTX
+        if cuda:
+            flags |= GA_USE_CUDA
+        if opencl:
+            flags |= GA_USE_OPENCL
 
         s[0] = source
         l = len(source)
-        numargs = len(types)
+        numargs = <unsigned int>len(types)
         self.callbuf = <void **>calloc(len(types), sizeof(void *))
         if self.callbuf == NULL:
             raise MemoryError

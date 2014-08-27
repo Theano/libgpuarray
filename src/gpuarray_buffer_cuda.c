@@ -687,6 +687,9 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
 
     if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
 
+    if (flags & GA_USE_OPENCL)
+      FAIL(NULL, GA_DEVSUP_ERROR);
+
     if (flags & GA_USE_BINARY) {
       // GA_USE_BINARY is exclusive
       if (flags & ~GA_USE_BINARY)

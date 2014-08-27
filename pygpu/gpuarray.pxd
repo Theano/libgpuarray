@@ -83,7 +83,8 @@ cdef extern from "gpuarray/buffer.h":
     int GA_KERNEL_PROP_TYPES
 
     cdef enum ga_usefl:
-        GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF
+        GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF,
+        GA_USE_BINARY, GA_USE_PTX, GA_USE_CUDA, GA_USE_OPENCL
 
     char *Gpu_error(const gpuarray_buffer_ops *o, void *ctx, int err)
     const gpuarray_buffer_ops *gpuarray_get_ops(const char *) nogil
@@ -286,8 +287,9 @@ cdef api GpuArray pygpu_transpose(GpuArray a, const unsigned int *newaxes)
 
 cdef api GpuArray pygpu_transfer(GpuArray a, GpuContext new_ctx,
                                  bint may_share)
-cdef api GpuArray pygpu_concatenate(_GpuArray **a, size_t n, unsigned int axis,
-                                    int restype, type cls, GpuContext context)
+cdef api GpuArray pygpu_concatenate(const _GpuArray **a, size_t n,
+                                    unsigned int axis, int restype,
+                                    type cls, GpuContext context)
 
 cdef api class GpuContext [type PyGpuContextType, object PyGpuContextObject]:
     cdef const gpuarray_buffer_ops *ops
