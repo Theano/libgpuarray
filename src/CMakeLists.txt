@@ -72,6 +72,10 @@ if (CUDA_FOUND)
     FIND_PATH(CUDADRV_INCLUDE CUDA/cuda.h)
     # this is somewhat a hack, but otherwise cublas_v2.h isn't found
     set(CUDADRV_INCLUDE "${CUDADRV_INCLUDE}" "${CUDA_TOOLKIT_INCLUDE}")
+    if (CUDA_VERSION_MAJOR GREATER 6)
+      message( "Cuda 6.0+ does not come in universal flavor anymore so we disable the universal build." )
+      set(CMAKE_OSX_ARCHITECTURES x86_64)
+    endif()
   endif()
   if(NOT CUDADRV_LIBRARY)
     SET(CUDADRV_LIBRARY ${CUDA_CUDA_LIBRARY})
@@ -107,14 +111,16 @@ add_subdirectory(util)
 set(GPUARRAY_SRC ${GPUARRAY_SRC} ${UTIL_SRC})
 
 add_library(gpuarray SHARED ${GPUARRAY_SRC})
-add_dependencies(gpuarray gen_blas)
 set_target_properties(gpuarray PROPERTIES
   COMPILE_FLAGS "-DGPUARRAY_BUILDING_DLL -DGPUARRAY_SHARED"
   INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/lib
   )
 
+if (CMAKE_MAJOR_VERSION GREATER 2)
+  set_target_properties(gpuarray PROPERTIES MACOSX_RPATH OFF)
+endif()
+
 add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
-add_dependencies(gpuarray-static gen_blas)
 
 if(CUDA_FOUND)
   target_link_libraries(gpuarray ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
