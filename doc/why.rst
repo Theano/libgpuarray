@@ -35,6 +35,12 @@ Design Goals
 * Have the base object in C to allow collaboration with more projects.
     * We want people from C, C++, ruby, R, ... all use the same base GPU ndarray.
 * Have a python binding separate from the c code.
+* Support mixed back-end OpenCL/CUDA in the same binary.
+    * But still keep it easy to use only one.
+    * This would allow an easier transition to a new platform if the need come.
+* Support dynamic compilation
+    * This allow optimization at run time based on the shapes for example.
+    * You don't need to use this.
 
 In the end, we need a NumPy ndarray on the GPU! There is restriction
 that don't allow us to reuse that object directly, but you will find
