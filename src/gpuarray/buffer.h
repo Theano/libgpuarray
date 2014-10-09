@@ -508,6 +508,15 @@ typedef struct _gpuarray_buffer_ops {
  */
 #define GA_CTX_PROP_BLAS_OPS  6
 
+/**
+ * Get the compatibility ID for the binaries generated with this context.
+ *
+ * Those binaries should work with any context which has the same ID.
+ *
+ * Type: `const char *`
+ */
+#define GA_CTX_PROP_BIN_ID    7
+
 /* Start at 512 for GA_BUFFER_PROP_ */
 /**
  * Get the context in which this buffer was allocated.

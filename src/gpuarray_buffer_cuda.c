@@ -56,6 +56,8 @@ static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
 #define val_free(v) cuda_freekernel(*v);
 #include "cache_extcopy.h"
 
+static int detect_arch(char *ret);
+
 void *cuda_make_ctx(CUcontext ctx, int flags) {
   cuda_context *res;
   res = malloc(sizeof(*res));
@@ -66,6 +68,10 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
   res->blas_handle = NULL;
   res->refcnt = 1;
   res->flags = flags;
+  if (detect_arch(res->bin_id)) {
+    free(res);
+    return NULL;
+  }
   res->extcopy_cache = cache_alloc(64, 32);
   if (res->extcopy_cache == NULL) {
     free(res);
@@ -518,6 +524,22 @@ static int cuda_memset(gpudata *dst, size_t dstoff, int data) {
     return GA_NO_ERROR;
 }
 
+static CUresult get_cc(CUdevice dev, int *maj, int *min) {
+#if CUDA_VERSION < 6500
+  return cuDeviceComputeCapability(&major, &minor, dev);
+#else
+  CUresult lerr;
+  lerr = cuDeviceGetAttribute(maj,
+                              CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
+                              dev);
+  if (lerr != CUDA_SUCCESS)
+    return lerr;
+  return cuDeviceGetAttribute(min,
+                              CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
+                              dev);
+#endif
+}
+
 static int detect_arch(char *ret) {
     CUdevice dev;
     int major, minor;
@@ -525,7 +547,7 @@ static int detect_arch(char *ret) {
     CUresult err;
     err = cuCtxGetDevice(&dev);
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-    err = cuDeviceComputeCapability(&major, &minor, dev);
+    err = get_cc(dev, &major, &minor);
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
     res = snprintf(ret, 6, "sm_%d%d", major, minor);
     if (res == -1 || res > 6) return GA_UNSUPPORTED_ERROR;
@@ -1394,6 +1416,10 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((void **)res) = NULL;
     return GA_DEVSUP_ERROR;
 #endif
+
+  case GA_CTX_PROP_BIN_ID:
+    *((const char **)res) = ctx->bin_id;
+    return GA_NO_ERROR;
 
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;

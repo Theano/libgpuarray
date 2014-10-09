@@ -48,12 +48,28 @@ cl_ctx *cl_make_ctx(cl_context ctx) {
   cl_ctx *res;
   cl_device_id id;
   cl_command_queue_properties qprop;
+  char vendor[32];
+  char driver_version[16];
+  cl_uint vendor_id;
+  size_t len;
 
   id = get_dev(ctx, NULL);
   if (id == NULL) return NULL;
   err = clGetDeviceInfo(id, CL_DEVICE_QUEUE_PROPERTIES, sizeof(qprop),
                         &qprop, NULL);
   if (err != CL_SUCCESS) return NULL;
+
+  err = clGetDeviceInfo(id, CL_DEVICE_VENDOR, sizeof(vendor), vendor, NULL);
+  if (err != CL_SUCCESS)
+    return NULL;
+  err = clGetDeviceInfo(id, CL_DEVICE_VENDOR_ID, sizeof(vendor_id), &vendor_id,
+                        NULL);
+  if (err != CL_SUCCESS)
+    return NULL;
+  err = clGetDeviceInfo(id, CL_DRIVER_VERSION, sizeof(driver_version),
+                        driver_version, NULL);
+  if (err != CL_SUCCESS)
+    return NULL;
 
   res = malloc(sizeof(*res));
   if (res == NULL) return NULL;
@@ -70,6 +86,11 @@ cl_ctx *cl_make_ctx(cl_context ctx) {
     free(res);
     return NULL;
   }
+
+  /* Can't overflow (source is 32 + 16 + 12 and buffer is 64) */
+  len = strlcpy(res->bin_id, vendor, sizeof(res->bin_id));
+  snprintf(res->bin_id + len, sizeof(res->bin_id) - len, " %#x ", vendor_id);
+  strlcat(res->bin_id, driver_version, sizeof(res->bin_id));
 
   clRetainContext(res->ctx);
   TAG_CTX(res);
@@ -1143,6 +1164,10 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((void **)res) = NULL;
     return GA_DEVSUP_ERROR;
 #endif
+
+  case GA_CTX_PROP_BIN_ID:
+    *((const char **)res) = ctx->bin_id;
+    return GA_NO_ERROR;
 
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;
