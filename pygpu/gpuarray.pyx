@@ -1000,6 +1000,13 @@ cdef class GpuContext:
             ctx_property(self, GA_CTX_PROP_MAXGSIZE, &res)
             return res
 
+    property bin_id:
+        "Binary compatibility id"
+        def __get__(self):
+            cdef const char *res;
+            ctx_property(self, GA_CTX_PROP_BIN_ID, &res)
+            return res;
+
 cdef class flags(object):
     cdef int fl
 
