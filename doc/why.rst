@@ -22,10 +22,10 @@ Design Goals
 
 * Have a n dimensional array.
     * Otherwise, not all project can reuse it. And you never know when you will need more dimensions.
-* Support many data type (int, float, double).
+* Support many data types (int, float, double).
     * Otherwise, we are limited in what we can do with it.
 * Support strided view, c and f memory layout
-    * This lower memory usage and memory copy. A scare resource on GPU.
+    * This lowers memory usage and memory copies. A scarce resource on GPU.
     * You never know which memory layout is the best for your future need.
 * Be compatible with CUDA and OpenCL
     * You never know the future. Also, this make it possible to support other future language.
@@ -42,6 +42,6 @@ Design Goals
     * This allow optimization at run time based on the shapes for example.
     * You don't need to use this.
 
-In the end, we need a NumPy ndarray on the GPU! There is restriction
-that don't allow us to reuse that object directly, but you will find
+In the end, we need a NumPy ndarray on the GPU! There is a restriction
+that does not allow us to reuse that object directly, but you will find
 it very similar.
