@@ -526,7 +526,7 @@ static int cuda_memset(gpudata *dst, size_t dstoff, int data) {
 
 static CUresult get_cc(CUdevice dev, int *maj, int *min) {
 #if CUDA_VERSION < 6500
-  return cuDeviceComputeCapability(&major, &minor, dev);
+  return cuDeviceComputeCapability(maj, min, dev);
 #else
   CUresult lerr;
   lerr = cuDeviceGetAttribute(maj,
