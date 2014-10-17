@@ -1003,7 +1003,7 @@ cdef class GpuContext:
     property bin_id:
         "Binary compatibility id"
         def __get__(self):
-            cdef const char *res;
+            cdef const char *res
             ctx_property(self, GA_CTX_PROP_BIN_ID, &res)
             return res;
 
