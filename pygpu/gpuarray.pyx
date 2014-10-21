@@ -540,7 +540,12 @@ cdef GpuContext pygpu_init(dev):
     elif dev.startswith('opencl'):
         kind = "opencl"
         devspec = dev[6:].split(':')
-        devnum = int(devspec[0]) << 16 | int(devspec[1])
+        if len(devspec) < 2:
+            raise ValueError, "OpenCL name incorrect. Should be opencl<int>:<int> instead got: " + dev
+        if not devspec[0].isdigit() or not devspec[1].isdigit():
+            raise ValueError, "OpenCL name incorrect. Should be opencl<int>:<int> instead got: " + dev
+        else:
+            devnum = int(devspec[0]) << 16 | int(devspec[1])
     else:
         raise ValueError, "Unknown device format:" + dev
     return GpuContext(kind, devnum)
