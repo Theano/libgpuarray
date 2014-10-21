@@ -540,10 +540,10 @@ cdef GpuContext pygpu_init(dev):
     elif dev.startswith('opencl'):
         kind = "opencl"
         devspec = dev[6:].split(':')
-        if len( devspec ) < 2:
-            raise ValueError, "OpenCL name incorrect should be opencl<int>:<int> instead got: " + dev
+        if len(devspec) < 2:
+            raise ValueError, "OpenCL name incorrect. Should be opencl<int>:<int> instead got: " + dev
         if not devspec[0].isdigit() or not devspec[1].isdigit():
-            raise ValueError, "OpenCL name incorrect should be opencl<int>:<int> instead got: " + dev
+            raise ValueError, "OpenCL name incorrect. Should be opencl<int>:<int> instead got: " + dev
         else:
             devnum = int(devspec[0]) << 16 | int(devspec[1])
     else:
