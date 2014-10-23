@@ -44,6 +44,7 @@ typedef struct _cl_ctx {
   void *blas_handle;
   cl_int err;
   unsigned int refcnt;
+  char bin_id[64];
 } cl_ctx;
 
 struct _gpudata {
