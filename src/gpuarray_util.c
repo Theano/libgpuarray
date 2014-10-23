@@ -68,9 +68,8 @@ void gpuarray_elem_perdim(strb *sb, unsigned int nd,
                    "%" SPREFIX "d);%si = %si / %" SPREFIX "u;", id,
 		   (str[i] < 0 ? '-' : '+'), id, dims[i],
 		   ssabs(str[i]), id, id, dims[i]);
- 
-      strb_appendf(sb, "%s %c= (%si * %" SPREFIX "d);", id,
-		   (str[0] < 0 ? '-' : '+'), id, ssabs(str[0]));
     }
+    strb_appendf(sb, "%s %c= (%si * %" SPREFIX "d);", id,
+                 (str[0] < 0 ? '-' : '+'), id, ssabs(str[0]));
   }
 }
