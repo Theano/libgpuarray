@@ -73,6 +73,7 @@ cdef extern from "gpuarray/buffer.h":
     int GA_CTX_PROP_DEVNAME
     int GA_CTX_PROP_MAXLSIZE
     int GA_CTX_PROP_LMEMSIZE
+    int GA_CTX_PROP_LMEMPRESENT
     int GA_CTX_PROP_NUMPROCS
     int GA_CTX_PROP_MAXGSIZE
     int GA_BUFFER_PROP_CTX

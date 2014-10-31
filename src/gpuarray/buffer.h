@@ -508,6 +508,13 @@ typedef struct _gpuarray_buffer_ops {
  */
 #define GA_CTX_PROP_BLAS_OPS  6
 
+/**
+ * Check if local memory is available for a call in the context.
+ *
+ * Type: `size_t`
+ */
+#define GA_CTX_PROP_LMEMPRESENT 7
+
 /* Start at 512 for GA_BUFFER_PROP_ */
 /**
  * Get the context in which this buffer was allocated.

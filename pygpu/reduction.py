@@ -162,9 +162,15 @@ class ReductionKernel(object):
                           have_complex=have_complex)
         self.preamble = preamble
 
-        self.init_local_size = min(context.lmemsize //
-                                   self.out_arg.dtype.itemsize,
-                                   context.maxlsize)
+        if context.lmempresent:
+            self.init_local_size = min(context.lmemsize //
+                                        self.out_arg.dtype.itemsize,
+                                        context.maxlsize)
+        else:
+            self.init_local_size = min(context.maxlsize // 
+                                        self.out_arg.dtype.itemsize,
+                                        context.maxlsize)
+			
 
         # this is to prep the cache
         if init_nd is not None:

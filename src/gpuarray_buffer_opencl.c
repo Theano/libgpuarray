@@ -1100,6 +1100,19 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((size_t *)res) = sz;
     return GA_NO_ERROR;
 
+  case GA_CTX_PROP_LMEMPRESENT:
+    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
+                                &id, NULL);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_LOCAL_MEM_TYPE, sizeof(sz), &sz,
+                               NULL);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+      
+    *((unsigned int *)res) = ( sz == CL_LOCAL );
+    return GA_NO_ERROR;
+
   case GA_CTX_PROP_NUMPROCS:
     ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
                                 &id, NULL);

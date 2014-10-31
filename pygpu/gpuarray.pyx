@@ -991,6 +991,13 @@ cdef class GpuContext:
             ctx_property(self, GA_CTX_PROP_LMEMSIZE, &res)
             return res
 
+    property lmempresent:
+        "Returns if local memory is present for this context"
+        def __get__(self):
+            cdef unsigned int res
+            ctx_property(self, GA_CTX_PROP_LMEMPRESENT, &res)
+            return res
+
     property numprocs:
         "Number of compute units for this context"
         def __get__(self):
