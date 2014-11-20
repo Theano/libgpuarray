@@ -1,9 +1,8 @@
 import operator
 import numpy
 
-from pygpu import gpuarray
+from pygpu import gpuarray, PyGpuArray as elemary
 from pygpu.reduction import ReductionKernel
-from pygpu.array import gpuarray as elemary
 
 from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
                       check_meta_content, context, gen_gpuarray,

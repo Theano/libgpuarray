@@ -1,13 +1,13 @@
 from __future__ import division
 import numpy as np
 
-from elemwise import elemwise1, elemwise2, ielemwise2, compare, ElemwiseKernel
-from reduction import reduce1, ReductionKernel
-from dtypes import dtype_to_ctype, get_np_obj, get_common_dtype
-from tools import as_argument, ArrayArg
-import gpuarray as array
+from .elemwise import elemwise1, elemwise2, ielemwise2, compare, ElemwiseKernel
+from .reduction import reduce1, ReductionKernel
+from .dtypes import dtype_to_ctype, get_np_obj, get_common_dtype
+from .tools import as_argument, ArrayArg
+from . import gpuarray
 
-class gpuarray(array.GpuArray):
+class PyGpuArray(gpuarray.GpuArray):
     """
     Extension class for gpuarray.GpuArray to add numpy mathematical
     operations between arrays.  These operations are all performed on
