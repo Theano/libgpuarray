@@ -419,10 +419,10 @@ cdef const char *kernel_error(GpuKernel k, int err) except NULL:
 cdef int kernel_init(GpuKernel k, const gpuarray_buffer_ops *ops, void *ctx,
                      unsigned int count, const char **strs, const size_t *len,
                      const char *name, unsigned int argcount, const int *types,
-                     int flags) except -1:
+                     int flags, char **err_str) except -1:
     cdef int err
     err = GpuKernel_init(&k.k, ops, ctx, count, strs, len, name, argcount,
-                          types, flags)
+                          types, flags, err_str)
     if err != GA_NO_ERROR:
         raise get_exc(err), Gpu_error(ops, ctx, err)
 
@@ -1813,6 +1813,7 @@ cdef class GpuKernel:
         cdef int *_types
         cdef const gpuarray_buffer_ops *ops
         cdef int flags = 0
+        cdef char *err_str=NULL
 
         if not isinstance(source, (str, unicode)):
             raise TypeError, "Expected a string for the kernel source"
@@ -1841,6 +1842,10 @@ cdef class GpuKernel:
             flags |= GA_USE_OPENCL
 
         s[0] = source
+        if False:  ## TODO : remove if kernel printout remains in gpuarray_buffer_opencl.c
+          print "<gpuarray-source>\n"
+          for line_num, line_contents in enumerate(source.split("\n")): print "%04d %s" % (int(line_num),line_contents)
+          print "</gpuarray-source>"
         l = len(source)
         numargs = <unsigned int>len(types)
         self.callbuf = <void **>calloc(len(types), sizeof(void *))
@@ -1859,8 +1864,12 @@ cdef class GpuKernel:
                 if self.callbuf[i] == NULL:
                     raise MemoryError
             kernel_init(self, self.context.ops, self.context.ctx, 1, s, &l,
-                        name, numargs, _types, flags)
+                        name, numargs, _types, flags, &err_str)
         finally:
+            if err_str != NULL:
+                print "gpuarray.pyx PRINTING err_str\n"
+                print err_str ## TODO : Pass up further...
+                free(err_str)
             free(_types)
 
     def __call__(self, *args, n=None, ls=None, gs=None):

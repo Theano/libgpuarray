@@ -163,9 +163,9 @@ cl_mem cl_get_buf(gpudata *g) { ASSERT_BUF(g); return g->buf; }
 #define CL_HALF "cl_khr_fp16"
 
 static gpukernel *cl_newkernel(void *ctx, unsigned int count,
-			       const char **strings, const size_t *lengths,
-			       const char *fname, unsigned int argcount,
-                               const int *types, int flags, int *ret);
+                               const char **strings, const size_t *lengths,
+                               const char *fname, unsigned int argcount,
+                               const int *types, int flags, int *ret, char **err_str);
 static void cl_releasekernel(gpukernel *k);
 static int cl_callkernel(gpukernel *k, size_t bs[2], size_t gs[2], void **args);
 
@@ -585,7 +585,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
                  "unsigned int i; __global char *tmp = (__global char *)mem;"
                  "tmp += %" SPREFIX "u; mem = (__global uint4 *)tmp;"
                  "for (i = get_global_id(0); i < %" SPREFIX "u; "
-		 "i += get_global_size(0)) {mem[i] = (uint4)(%u,%u,%u,%u); }}",
+                 "i += get_global_size(0)) {mem[i] = (uint4)(%u,%u,%u,%u); }}",
                  offset, n, pattern, pattern, pattern, pattern);
   } else if ((bytes % 8) == 0) {
     n = bytes/8;
@@ -594,7 +594,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
                  "unsigned int i; __global char *tmp = (__global char *)mem;"
                  "tmp += %" SPREFIX "u; mem = (__global uint2 *)tmp;"
                  "for (i = get_global_id(0); i < %" SPREFIX "u;"
-		 "i += get_global_size(0)) {mem[i] = (uint2)(%u,%u); }}",
+                 "i += get_global_size(0)) {mem[i] = (uint2)(%u,%u); }}",
                  offset, n, pattern, pattern);
   } else if ((bytes % 4) == 0) {
     n = bytes/4;
@@ -603,7 +603,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
                  "unsigned int i; __global char *tmp = (__global char *)mem;"
                  "tmp += %" SPREFIX "u; mem = (__global unsigned int *)tmp;"
                  "for (i = get_global_id(0); i < %" SPREFIX "u;"
-		 "i += get_global_size(0)) {mem[i] = %u; }}",
+                 "i += get_global_size(0)) {mem[i] = %u; }}",
                  offset, n, pattern);
   } else {
     if (check_ext(ctx, CL_SMALL))
@@ -613,7 +613,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
                  "__kernel void kmemset(__global unsigned char *mem) {"
                  "unsigned int i; mem += %" SPREFIX "u;"
                  "for (i = get_global_id(0); i < %" SPREFIX "u;"
-		 "i += get_global_size(0)) {mem[i] = %u; }}",
+                 "i += get_global_size(0)) {mem[i] = %u; }}",
                  offset, n, val);
   }
   /* If this assert fires, increase the size of local_kern above. */
@@ -623,7 +623,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
   rlk[0] = local_kern;
   type = GA_BUFFER;
 
-  m = cl_newkernel(ctx, 1, rlk, &sz, "kmemset", 1, &type, 0, &res);
+  m = cl_newkernel(ctx, 1, rlk, &sz, "kmemset", 1, &type, 0, &res, NULL);
   if (m == NULL) return res;
 
   /* Cheap kernel scheduling */
@@ -669,10 +669,135 @@ static int cl_check_extensions(const char **preamble, unsigned int *count,
   return GA_NO_ERROR;
 }
 
+/*
+char *gpukernel_debug_info_two_phase(unsigned int count,
+                                     const char **news, size_t *newl, char *log) {
+  unsigned int len_total=0, len_log=0;
+  unsigned int section, line, i, j, len;
+  char *buf_base,*buf;
+  int r;
+
+  if(log != NULL) 
+    len_log = strlen(log);
+  len_total += len_log;
+
+  len_total += (count * 50); // Max length of section-string (see below)
+  line=1;
+  for(section=0; section<count; section++) {
+    // Count up the total length of each section (in chars)
+    len = (int)newl[section];
+    if(len<=0)
+      len=strlen(news[section]);
+    len_total+=len;
+
+    // now count the '\n' to allow for the line numbers output
+    for(j=0; j<len; j++) {
+      if(news[section][j] == '\n') {
+        line++;
+      }
+    }
+    line++; // to account for the last line (no '\n')
+  }
+  assert(line<9999); // If not, then will overflow '%04d' specification
+  len_total += (4+3)*(line+1); // Each line has a 4 digit number, and 3 spaces
+
+  buf_base = (char *)calloc(len_total, sizeof(char));
+  if(buf_base == NULL)
+    return NULL;
+
+  // Prepend the log, if it exists
+  buf=buf_base;
+  if(log != NULL) {
+    memcpy(buf, log, len_log);
+    buf+=len_log;
+  }
+
+  line=1;  // restart the line counter
+  for(section=0; section<count; section++) {
+    len = (int)newl[section];
+    if(len<=0)
+      len=strlen(news[section]);
+    r=snprintf(buf, 50, "// source.section[%d].length=%d\n", section, len);
+    buf+=r;
+
+    i=0; // position of line starts within news[section]
+    while(i<len) {
+      r=snprintf(buf, 4+3, "%04d  ", line);
+      buf += r;
+
+      for(j=i; j<len && news[section][j] != '\n'; j++); // look for next line-end
+      memcpy(buf, news[section]+i, (j-i));
+      buf += (j-i);
+      i = j+1;  // Character after the newline
+
+      line++;
+    }
+  }
+  return buf_base;
+}
+*/
+
+#define KERNEL_DEBUG_INFO_PRINT_MAX 256
+int gpukernel_debug_info(unsigned int count, const char **news, size_t *newl, char *log,
+                         char *buf, size_t *buf_size) {
+  char temp_str[KERNEL_DEBUG_INFO_PRINT_MAX];
+  int r=0;
+  size_t offset=0;
+  unsigned int section, line, i, j, len;
+
+  // Prepend the log, if it exists
+  if(log != NULL) {
+    len=strlen(log);
+    if(buf != NULL) {
+      memcpy(buf+offset, log, len);
+    }
+    offset+=len;
+  }
+
+  line=1;  // start the line counter at 1
+  for(section=0; section<count; section++) {
+    len = (int)newl[section];
+    if(len<=0)
+      len=strlen(news[section]);
+    r=snprintf(temp_str, KERNEL_DEBUG_INFO_PRINT_MAX, "// source.section[%d].length=%d\n", section, len);
+    if(buf != NULL) {
+      if(r>KERNEL_DEBUG_INFO_PRINT_MAX)
+        r=KERNEL_DEBUG_INFO_PRINT_MAX;
+      memcpy(buf+offset, temp_str, r);
+    }
+    offset += r;
+
+    i=0; // position of line-starts within news[section]
+    while(i<len) {
+      r=snprintf(temp_str, KERNEL_DEBUG_INFO_PRINT_MAX, "%04d\t", line);
+      if(buf != NULL) {
+        if(r>KERNEL_DEBUG_INFO_PRINT_MAX)
+          r=KERNEL_DEBUG_INFO_PRINT_MAX;
+        memcpy(buf+offset, temp_str, r);
+      }
+      offset += r;
+
+      for(j=i; j<len && news[section][j] != '\n'; j++); // look for next line-end
+      if(buf != NULL) {
+        memcpy(buf+offset, news[section]+i, (j-i));
+        *(buf+offset + j-i) = '\n'; // Force a new-line in (even at end of buffer)
+      }
+      offset += (j-i+1);
+      i = j+1;  // Character after the newline
+
+      line++;
+    }
+  }
+  if(buf_size != NULL) {
+    *buf_size = offset;
+  }
+  return GA_NO_ERROR;
+}
+
 static gpukernel *cl_newkernel(void *c, unsigned int count,
-			       const char **strings, const size_t *lengths,
-			       const char *fname, unsigned int argcount,
-                               const int *types, int flags, int *ret) {
+                               const char **strings, const size_t *lengths,
+                               const char *fname, unsigned int argcount,
+                               const int *types, int flags, int *ret, char **err_str) {
   cl_ctx *ctx = (cl_ctx *)c;
   gpukernel *res;
   cl_device_id dev;
@@ -680,8 +805,8 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
   // Sync this table size with the number of flags that can add stuff
   // at the beginning
   const char *preamble[4];
-  size_t *newl;
-  const char **news;
+  size_t *newl=NULL;
+  const char **news=NULL;
   unsigned int n = 0;
   int error;
 
@@ -717,6 +842,7 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
       memcpy(news, preamble, n*sizeof(const char *));
       memcpy(news+n, strings, count*sizeof(const char *));
       if (lengths == NULL) {
+        fprintf(stderr, "lengths==NULL\n");
         newl = NULL;
       } else {
         newl = calloc(count+n, sizeof(size_t));
@@ -732,19 +858,67 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
     }
 
     p = clCreateProgramWithSource(ctx->ctx, count+n, news, newl, &ctx->err);
-    if (n != 0) {
-      free(news);
-      free(newl);
-    }
     if (ctx->err != CL_SUCCESS) {
+      if (n != 0) {
+        free(news);
+        free(newl);
+      }
       FAIL(NULL, GA_IMPL_ERROR);
     }
   }
 
   ctx->err = clBuildProgram(p, 0, NULL, NULL, NULL, NULL);
   if (ctx->err != CL_SUCCESS) {
+    if (ctx->err == CL_BUILD_PROGRAM_FAILURE && err_str!=NULL) {
+      // Determine the size of the log
+      size_t log_size;
+      clGetProgramBuildInfo(p, dev, CL_PROGRAM_BUILD_LOG, 0, NULL, &log_size);
+
+      // Allocate memory for the log
+      char *log = (char *) calloc(log_size, sizeof(char));
+
+      // Get the log
+      clGetProgramBuildInfo(p, dev, CL_PROGRAM_BUILD_LOG, log_size, log, NULL);
+
+      if (flags & GA_USE_BINARY) {
+        // Not clear what to do with binary 'source'
+      } else {
+        size_t buf_size;
+        gpukernel_debug_info(count+n, news, newl, log, NULL, &buf_size);
+        //fprintf(stderr, "Full buffer size : %d\n", (int)buf_size);
+        
+        char *buf = (char *) calloc(buf_size, sizeof(char));
+        if(buf == NULL) {
+          free(log);
+          FAIL(NULL, GA_MEMORY_ERROR);
+        }
+
+        // Get the buffer
+        gpukernel_debug_info(count+n, news, newl, log, buf, NULL);
+
+        /*  PREVIOUS STYLE
+        char *buf = gpukernel_debug_info_two_phase(count+n, news, newl, log);
+        */
+
+        // This is quick-and-dirty
+        //fprintf(stderr, "%s", buf);
+
+        if(err_str != NULL) {
+          //fprintf(stderr, "Setting *err_str\n");
+          *err_str = buf;
+        }
+        //free(buf);  // TODO :: Make sure this is freed somewhere!
+      }
+      free(log);
+    }
+
     clReleaseProgram(p);
     FAIL(NULL, GA_IMPL_ERROR);
+  }
+
+  if (n != 0) {
+    free(news);
+    free(newl);
   }
 
   res = malloc(sizeof(*res));
@@ -1013,7 +1187,7 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
 
   types[0] = types[1] = GA_BUFFER;
   k = cl_newkernel(ctx, 1, (const char **)&sb.s, &sb.l, "elemk",
-                   2, types, flags, &res);
+                   2, types, flags, &res, NULL);
   if (k == NULL) goto fail;
   /* Cheap kernel scheduling */
   res = cl_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, &ls[0]);

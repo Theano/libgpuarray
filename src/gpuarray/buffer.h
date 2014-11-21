@@ -293,7 +293,7 @@ typedef struct _gpuarray_buffer_ops {
   gpukernel *(*kernel_alloc)(void *ctx, unsigned int count,
                              const char **strings, const size_t *lengths,
                              const char *fname, unsigned int numargs,
-                             const int *typecodes, int flags, int *ret);
+                             const int *typecodes, int flags, int *ret, char **err_str);
 
   /**
    * Retain a kernel.

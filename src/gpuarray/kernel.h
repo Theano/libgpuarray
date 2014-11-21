@@ -55,7 +55,7 @@ GPUARRAY_PUBLIC int GpuKernel_init(GpuKernel *k, const gpuarray_buffer_ops *ops,
                                   void *ctx, unsigned int count,
                                   const char **strs, const size_t *lens,
                                   const char *name, unsigned int argcount,
-                                  const int *types, int flags);
+                                  const int *types, int flags, char **err_str);
 
 /**
  * Clear and release data associated with a kernel.

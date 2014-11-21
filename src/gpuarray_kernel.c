@@ -5,9 +5,9 @@
 #include <stdlib.h>
 
 int GpuKernel_init(GpuKernel *k, const gpuarray_buffer_ops *ops, void *ctx,
-		   unsigned int count, const char **strs, const size_t *lens,
-		   const char *name, unsigned int argcount, const int *types,
-                   int flags) {
+                   unsigned int count, const char **strs, const size_t *lens,
+                   const char *name, unsigned int argcount, const int *types,
+                   int flags, char **err_str) {
   int res = GA_NO_ERROR;
 
   k->args = calloc(argcount, sizeof(void *));
@@ -15,7 +15,7 @@ int GpuKernel_init(GpuKernel *k, const gpuarray_buffer_ops *ops, void *ctx,
     return GA_MEMORY_ERROR;
   k->ops = ops;
   k->k = k->ops->kernel_alloc(ctx, count, strs, lens, name, argcount, types,
-                              flags, &res);
+                              flags, &res, err_str);
   if (res != GA_NO_ERROR)
     GpuKernel_clear(k);
   return res;
