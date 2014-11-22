@@ -229,7 +229,7 @@ cdef const char *kernel_error(GpuKernel k, int err) except NULL
 cdef int kernel_init(GpuKernel k, const gpuarray_buffer_ops *ops, void *ctx,
                      unsigned int count, const char **strs, const size_t *len,
                      const char *name, unsigned int argcount, const int *types,
-                     int flags, char **err_str) except -1
+                     int flags) except -1
 cdef int kernel_clear(GpuKernel k) except -1
 cdef void *kernel_context(GpuKernel k) except NULL
 cdef int kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs,

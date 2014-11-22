@@ -47,6 +47,9 @@ typedef struct _GpuKernel {
  * \param lens C array with the size of each string or NULL
  * \param name name of the kernel function
  * \param flags kernel use flags (see \ref ga_usefl)
+ * \param err_str (if not NULL) location to write GPU-backend provided debug info 
+ * 
+ * If `*err_str` is returned not NULL then it must be free()d by the caller
  *
  * \return GA_NO_ERROR if the operation is successful
  * \return any other value if an error occured

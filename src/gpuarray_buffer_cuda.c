@@ -695,7 +695,7 @@ GPUARRAY_LOCAL void cuda_set_compiler(void *(*compiler_f)(const char *, size_t,
 static gpukernel *cuda_newkernel(void *c, unsigned int count,
                                  const char **strings, const size_t *lengths,
                                  const char *fname, unsigned int argcount,
-                                 const int *types, int flags, int *ret) {
+                                 const int *types, int flags, int *ret, char **err_str) {
     cuda_context *ctx = (cuda_context *)c;
     strb sb = STRB_STATIC_INIT;
     char *bin;
@@ -1126,7 +1126,7 @@ static inline int gen_extcopy_kernel(const cache_key_t *a,
   types[0] = types[1] = GA_BUFFER;
   res = GA_NO_ERROR;
   *v = cuda_newkernel(ctx, 1, (const char **)&sb.s, &sb.l, "extcpy",
-		     2, types, flags, &res);
+                      2, types, flags, &res, NULL);
  fail:
   strb_clear(&sb);
   return res;
