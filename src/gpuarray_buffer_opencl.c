@@ -669,7 +669,7 @@ static int cl_check_extensions(const char **preamble, unsigned int *count,
   return GA_NO_ERROR;
 }
 
-static int gpukernel_source_with_line_numbers(unsigned int count, const char **news, size_t *newl, 
+static void gpukernel_source_with_line_numbers(unsigned int count, const char **news, size_t *newl, 
                                               strb *src) {
   assert(src != NULL);
   unsigned int section, line, i, j, len;
@@ -692,7 +692,6 @@ static int gpukernel_source_with_line_numbers(unsigned int count, const char **n
       line++;
     }
   }
-  return GA_NO_ERROR;
 }
 
 static gpukernel *cl_newkernel(void *c, unsigned int count,
@@ -770,54 +769,40 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
   ctx->err = clBuildProgram(p, 0, NULL, NULL, NULL, NULL);
   if (ctx->err != CL_SUCCESS) {
     if (ctx->err == CL_BUILD_PROGRAM_FAILURE && err_str!=NULL) {
-      strb *debug_msg = strb_new();
+      *err_str = NULL;  // Fallback, in case there's an error
+
+      strb debug_msg = STRB_STATIC_INIT;
       // We're substituting debug_msg for a string with this first line:
-      strb_appends(debug_msg, "Program build failure ::\n"); 
+      strb_appends(&debug_msg, "Program build failure ::\n"); 
 
       // Determine the size of the log
       size_t log_size;
       clGetProgramBuildInfo(p, dev, CL_PROGRAM_BUILD_LOG, 0, NULL, &log_size);
 
-      // Allocate memory for the log
-      char *log = calloc(log_size, sizeof(char));
-      if(log == NULL) {
-        clReleaseProgram(p);
-        if (n != 0) {
-          free(news);
-          free(newl);
-        }
-        FAIL(NULL, GA_MEMORY_ERROR);
+      strb_ensure(&debug_msg, debug_msg.l + log_size);
+      if(!strb_error(&debug_msg) && log_size>=1) { // Make sure the strb is in a valid state
+        // Get the log directly into the debug_msg
+        clGetProgramBuildInfo(p, dev, CL_PROGRAM_BUILD_LOG, log_size, debug_msg.s+debug_msg.l, NULL);
+        debug_msg.l += (log_size-1); 
       }
-
-      // Get the log
-      clGetProgramBuildInfo(p, dev, CL_PROGRAM_BUILD_LOG, log_size, log, NULL);
-      strb_appends(debug_msg, log);
-
-      free(log);
 
       if (flags & GA_USE_BINARY) {
         // Not clear what to do with binary 'source' - the log will have to suffice
       } else {
-        gpukernel_source_with_line_numbers(count+n, news, newl, debug_msg);
+        gpukernel_source_with_line_numbers(count+n, news, newl, &debug_msg);
       }
 
-      // Now create a cstr buffer (free-able with regular free()), and copy the debug_msg into it
-      char *debug_msg_cstr = strb_cstr(debug_msg);
-      *err_str = calloc(strlen(debug_msg_cstr)+1, sizeof(char));
-      if(*err_str == NULL) {
-        //h_free(debug_msg_cstr);
-        strb_free(debug_msg);
-        clReleaseProgram(p);
-        if (n != 0) {
-          free(news);
-          free(newl);
+      if(!strb_error(&debug_msg)) { // Make sure the strb is in a valid state
+        *err_str = strndup(debug_msg.s, debug_msg.l);
+        if(*err_str == NULL) {
+          clReleaseProgram(p);
+          if (n != 0) {
+            free(news);
+            free(newl);
+          }
+          FAIL(NULL, GA_MEMORY_ERROR);
         }
-        FAIL(NULL, GA_MEMORY_ERROR);
       }
-      strcpy(*err_str, debug_msg_cstr);
-
-      //h_free(debug_msg_cstr);  // This seemed to comply with strb.h, but fails
-      strb_free(debug_msg);
 
       //free(*err_str);  // *err_str must be free()d by the caller (see docs in kernel.h)
     }
