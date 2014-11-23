@@ -792,6 +792,8 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
         gpukernel_source_with_line_numbers(count+n, news, newl, &debug_msg);
       }
 
+      strb_append0(&debug_msg); // Make sure a final '\0' is present
+      
       if(!strb_error(&debug_msg)) { // Make sure the strb is in a valid state
         *err_str = strndup(debug_msg.s, debug_msg.l);
         if(*err_str == NULL) {
