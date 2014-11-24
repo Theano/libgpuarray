@@ -41,9 +41,13 @@ GPUARRAY_LOCAL extern const gpuarray_type vector_types[];
  * from planar index 'i' using the dimensions and strides provided.
  */
 GPUARRAY_LOCAL void gpuarray_elem_perdim(strb *sb, unsigned int nd,
-					 const size_t *dims,
-					 const ssize_t *str,
-					 const char *id);
+                                         const size_t *dims,
+                                         const ssize_t *str,
+                                         const char *id);
+
+GPUARRAY_LOCAL void gpukernel_source_with_line_numbers(unsigned int count, const char **news, size_t *newl,
+                                                       strb *src);
+
 #ifdef __cplusplus
 }
 #endif

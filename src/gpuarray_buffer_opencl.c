@@ -669,31 +669,6 @@ static int cl_check_extensions(const char **preamble, unsigned int *count,
   return GA_NO_ERROR;
 }
 
-static void gpukernel_source_with_line_numbers(unsigned int count, const char **news, size_t *newl, 
-                                              strb *src) {
-  assert(src != NULL);
-  unsigned int section, line, i, j, len;
-
-  line=1;  // start the line counter at 1
-  for(section=0; section<count; section++) {
-    len = (int)newl[section];
-    if(len<=0)
-      len=strlen(news[section]);
-
-    i=0; // position of line-starts within news[section]
-    while(i<len) {
-      strb_appendf(src, "%04d\t", line);
-
-      for(j=i; j<len && news[section][j] != '\n'; j++); // look for next line-end
-      strb_appendn(src, news[section]+i, (j-i));
-      strb_appendc(src, '\n');
-
-      i = j+1;  // Character after the newline
-      line++;
-    }
-  }
-}
-
 static gpukernel *cl_newkernel(void *c, unsigned int count,
                                const char **strings, const size_t *lengths,
                                const char *fname, unsigned int argcount,
@@ -793,7 +768,7 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
       }
 
       strb_append0(&debug_msg); // Make sure a final '\0' is present
-      
+
       if(!strb_error(&debug_msg)) { // Make sure the strb is in a valid state
         *err_str = strndup(debug_msg.s, debug_msg.l);
         if(*err_str == NULL) {

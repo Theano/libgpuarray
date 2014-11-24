@@ -56,8 +56,8 @@ static inline ssize_t ssabs(ssize_t v) {
 }
 
 void gpuarray_elem_perdim(strb *sb, unsigned int nd,
-			  const size_t *dims, const ssize_t *str,
-			  const char *id) {
+                          const size_t *dims, const ssize_t *str,
+                          const char *id) {
   int i;
 
   if (nd > 0) {
@@ -66,10 +66,35 @@ void gpuarray_elem_perdim(strb *sb, unsigned int nd,
     for (i = nd-1; i > 0; i--) {
       strb_appendf(sb, "%s %c= ((%si %% %" SPREFIX "u) * "
                    "%" SPREFIX "d);%si = %si / %" SPREFIX "u;", id,
-		   (str[i] < 0 ? '-' : '+'), id, dims[i],
-		   ssabs(str[i]), id, id, dims[i]);
+                   (str[i] < 0 ? '-' : '+'), id, dims[i],
+                   ssabs(str[i]), id, id, dims[i]);
     }
     strb_appendf(sb, "%s %c= (%si * %" SPREFIX "d);", id,
                  (str[0] < 0 ? '-' : '+'), id, ssabs(str[0]));
+  }
+}
+
+GPUARRAY_LOCAL void gpukernel_source_with_line_numbers(unsigned int count, const char **news, size_t *newl,
+                                                       strb *src) {
+  //assert(src != NULL);
+  unsigned int section, line, i, j, len;
+
+  line=1;  // start the line counter at 1
+  for(section=0; section<count; section++) {
+    len = (int)newl[section];
+    if(len<=0)
+      len=strlen(news[section]);
+
+    i=0; // position of line-starts within news[section]
+    while(i<len) {
+      strb_appendf(src, "%04d\t", line);
+
+      for(j=i; j<len && news[section][j] != '\n'; j++); // look for next line-end
+      strb_appendn(src, news[section]+i, (j-i));
+      strb_appendc(src, '\n');
+
+      i = j+1;  // Character after the newline
+      line++;
+    }
   }
 }

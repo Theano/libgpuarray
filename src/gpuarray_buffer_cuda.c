@@ -1,4 +1,5 @@
 #define _CRT_SECURE_NO_WARNINGS
+
 #include "private.h"
 #include "private_cuda.h"
 
@@ -555,10 +556,10 @@ static int detect_arch(char *ret) {
 }
 
 static const char *TMP_VAR_NAMES[] = {"GPUARRAY_TMPDIR", "TMPDIR", "TMP",
-				      "TEMP", "USERPROFILE"};
+                                      "TEMP", "USERPROFILE"};
 
 static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
-				int *ret) {
+                                int *ret) {
     char namebuf[PATH_MAX];
     char outbuf[PATH_MAX];
     char *tmpdir;
@@ -681,7 +682,7 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
 static void *(*call_compiler)(const char *src, size_t len, size_t *bin_len, int *ret) = call_compiler_impl;
 
 GPUARRAY_LOCAL void cuda_set_compiler(void *(*compiler_f)(const char *, size_t,
-							  size_t *, int *)) {
+                                                          size_t *, int *)) {
   return;
   /* Disable custom compilers
   if (compiler_f == NULL) {
@@ -766,38 +767,57 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
       }
     } else {
       if (flags & GA_USE_CLUDA) {
-	strb_appends(&sb, CUDA_PREAMBLE);
+        strb_appends(&sb, CUDA_PREAMBLE);
       }
 
       if (lengths == NULL) {
         for (i = 0; i < count; i++)
-	  strb_appends(&sb, strings[i]);
+        strb_appends(&sb, strings[i]);
       } else {
         for (i = 0; i < count; i++) {
-	  if (lengths[i] == 0)
-	    strb_appends(&sb, strings[i]);
-	  else
-	    strb_appendn(&sb, strings[i], lengths[i]);
+          if (lengths[i] == 0)
+            strb_appends(&sb, strings[i]);
+          else
+            strb_appendn(&sb, strings[i], lengths[i]);
         }
       }
 
       if (ptx_mode) strb_append0(&sb);
 
       if (strb_error(&sb)) {
-	strb_clear(&sb);
-	cuda_exit(ctx);
-	return NULL;
+        strb_clear(&sb);
+        cuda_exit(ctx);
+        return NULL;
       }
 
       if (ptx_mode) {
         bin = sb.s;
       } else {
         bin = call_compiler(sb.s, sb.l, &bin_len, ret);
-	strb_clear(&sb);
         if (bin == NULL) {
+          if(err_str != NULL) {
+            strb debug_msg = STRB_STATIC_INIT;
+
+            // We're substituting debug_msg for a string with this first line:
+            strb_appends(&debug_msg, "CUDA kernel build failure ::\n"); 
+
+            gpukernel_source_with_line_numbers(1, (const char **)&sb.s, &sb.l, &debug_msg);
+            strb_append0(&debug_msg); // Make sure a final '\0' is present
+
+            if(!strb_error(&debug_msg)) { // Make sure the strb is in a valid state
+              *err_str = strndup(debug_msg.s, debug_msg.l);
+              if(*err_str == NULL) {
+                strb_clear(&sb);
+                cuda_exit(ctx);
+                return NULL;
+              }
+            }
+          }
+          strb_clear(&sb);
           cuda_exit(ctx);
           return NULL;
         }
+        strb_clear(&sb);
       }
     }
 
