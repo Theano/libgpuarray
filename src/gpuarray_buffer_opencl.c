@@ -772,6 +772,7 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
       if(!strb_error(&debug_msg)) { // Make sure the strb is in a valid state
         *err_str = strndup(debug_msg.s, debug_msg.l);
         if(*err_str == NULL) {
+          strb_clear(&debug_msg);
           clReleaseProgram(p);
           if (n != 0) {
             free(news);
@@ -780,6 +781,7 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
           FAIL(NULL, GA_MEMORY_ERROR);
         }
       }
+      strb_clear(&debug_msg);
 
       //free(*err_str);  // *err_str must be free()d by the caller (see docs in kernel.h)
     }

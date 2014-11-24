@@ -74,9 +74,9 @@ void gpuarray_elem_perdim(strb *sb, unsigned int nd,
   }
 }
 
-GPUARRAY_LOCAL void gpukernel_source_with_line_numbers(unsigned int count, const char **news, size_t *newl,
-                                                       strb *src) {
-  //assert(src != NULL);
+void gpukernel_source_with_line_numbers(unsigned int count, const char **news, size_t *newl,
+                                        strb *src) {
+  assert(src != NULL);
   unsigned int section, line, i, j, len;
 
   line=1;  // start the line counter at 1

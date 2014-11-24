@@ -806,12 +806,9 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
 
             if(!strb_error(&debug_msg)) { // Make sure the strb is in a valid state
               *err_str = strndup(debug_msg.s, debug_msg.l);
-              if(*err_str == NULL) {
-                strb_clear(&sb);
-                cuda_exit(ctx);
-                return NULL;
-              }
+              // If there's an error, *err_str state is fine - fall through
             }
+            strb_clear(&debug_msg);
           }
           strb_clear(&sb);
           cuda_exit(ctx);
