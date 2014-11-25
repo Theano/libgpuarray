@@ -809,6 +809,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
               // If there's an error, *err_str state is fine - fall through
             }
             strb_clear(&debug_msg);
+            //free(*err_str);  // *err_str must be free()d by the caller (see docs in kernel.h)
           }
           strb_clear(&sb);
           cuda_exit(ctx);

@@ -77,12 +77,13 @@ void gpuarray_elem_perdim(strb *sb, unsigned int nd,
 void gpukernel_source_with_line_numbers(unsigned int count, const char **news, size_t *newl,
                                         strb *src) {
   assert(src != NULL);
-  unsigned int section, line, i, j, len;
+  unsigned int section, line, i, j;
+  size_t len;
 
   line=1;  // start the line counter at 1
   for(section=0; section<count; section++) {
-    len = (int)newl[section];
-    if(len<=0)
+    len = (newl == NULL)?0:newl[section];
+    if(len<=0) // If either newl==NULL, or has length zero for this section, use strlen() to determine
       len=strlen(news[section]);
 
     i=0; // position of line-starts within news[section]

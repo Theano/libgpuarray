@@ -754,11 +754,10 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
       size_t log_size;
       clGetProgramBuildInfo(p, dev, CL_PROGRAM_BUILD_LOG, 0, NULL, &log_size);
 
-      strb_ensure(&debug_msg, debug_msg.l + log_size);
-      if(!strb_error(&debug_msg) && log_size>=1) { // Make sure the strb is in a valid state
+      if(strb_ensure(&debug_msg, log_size)!=-1 && log_size>=1) { // Checks strb has enough space
         // Get the log directly into the debug_msg
         clGetProgramBuildInfo(p, dev, CL_PROGRAM_BUILD_LOG, log_size, debug_msg.s+debug_msg.l, NULL);
-        debug_msg.l += (log_size-1); 
+        debug_msg.l += (log_size-1); // Back off to before final '\0'
       }
 
       if (flags & GA_USE_BINARY) {
@@ -771,18 +770,9 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
 
       if(!strb_error(&debug_msg)) { // Make sure the strb is in a valid state
         *err_str = strndup(debug_msg.s, debug_msg.l);
-        if(*err_str == NULL) {
-          strb_clear(&debug_msg);
-          clReleaseProgram(p);
-          if (n != 0) {
-            free(news);
-            free(newl);
-          }
-          FAIL(NULL, GA_MEMORY_ERROR);
-        }
+        // If there's a memory alloc error, fall-through : announcing a compile error is more important
       }
       strb_clear(&debug_msg);
-
       //free(*err_str);  // *err_str must be free()d by the caller (see docs in kernel.h)
     }
 
