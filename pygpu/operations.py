@@ -1,4 +1,5 @@
-from .gpuarray import _split, _concatenate
+from .gpuarray import _split, _concatenate, dtype_to_typecode
+from .dtypes import upcast
 from . import array, asarray
 
 def _replace_0_with_empty(aryl, m):
@@ -114,7 +115,9 @@ def concatenate(arys, axis=0, context=None):
     al = [asarray(a, context=context) for a in arys]
     if context is None:
         context = al[0].context
-    return _concatenate(al, axis, al[0].typecode, type(al[0]), context)
+    outtype = upcast(*[a.dtype for a in arys])
+    return _concatenate(al, axis, dtype_to_typecode(outtype), type(al[0]),
+                        context)
 
 
 def vstack(tup, context=None):

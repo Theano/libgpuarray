@@ -205,4 +205,11 @@ def get_common_dtype(obj1, obj2, allow_double):
     return result
 
 
+def upcast(*args):
+    a = np.array([0], dtype=args[0])
+    for t in args[1:]:
+        a = a + np.array([0], dtype=t)
+    return a.dtype
+
+
 # vim: foldmethod=marker
