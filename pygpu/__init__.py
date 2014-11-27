@@ -10,7 +10,7 @@ from .gpuarray import (init, set_default_context, get_default_context,
                        asfortranarray, register_dtype)
 from .operations import (split, array_split, hsplit, vsplit, dsplit,
                          concatenate, hstack, vstack, dstack)
-from ._array import PyGpuArray
+from ._array import ndgpuarray
 
 from .tests import main
 if hasattr(main, "NoseTester"):

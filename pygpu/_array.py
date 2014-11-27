@@ -7,7 +7,7 @@ from .dtypes import dtype_to_ctype, get_np_obj, get_common_dtype
 from .tools import as_argument, ArrayArg
 from . import gpuarray
 
-class PyGpuArray(gpuarray.GpuArray):
+class ndgpuarray(gpuarray.GpuArray):
     """
     Extension class for gpuarray.GpuArray to add numpy mathematical
     operations between arrays.  These operations are all performed on

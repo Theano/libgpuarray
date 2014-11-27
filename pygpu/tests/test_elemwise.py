@@ -1,7 +1,7 @@
 import operator
 import numpy
 
-from pygpu import gpuarray, PyGpuArray as elemary
+from pygpu import gpuarray, ndgpuarray as elemary
 from pygpu.elemwise import ElemwiseKernel
 from pygpu.tools import check_args, ArrayArg, ScalarArg
 
