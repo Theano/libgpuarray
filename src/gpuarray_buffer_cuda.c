@@ -637,7 +637,11 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
         unlink(outbuf);
         FAIL(NULL, GA_SYS_ERROR);
     } else {
-        unlink(namebuf);
+#ifdef DEBUG
+      /* Only cleanup if GPUARRAY_NOCLEANUP is not set */
+      if (getenv("GPUARRAY_NOCLEANUP") == NULL)
+#endif DEBUG
+	unlink(namebuf);
     }
 
     if (WIFSIGNALED(sys_err) || WEXITSTATUS(sys_err) != 0) {
