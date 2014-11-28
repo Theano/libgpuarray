@@ -773,7 +773,7 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
         // If there's a memory alloc error, fall-through : announcing a compile error is more important
       }
       strb_clear(&debug_msg);
-      //free(*err_str);  // *err_str must be free()d by the caller (see docs in kernel.h)
+      // *err_str will be free()d by the caller (see docs in kernel.h)
     }
 
     clReleaseProgram(p);
