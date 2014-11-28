@@ -55,7 +55,7 @@ GPUARRAY_LOCAL void strb_free(strb *);
 #define strb_new() strb_alloc(1024)
 
 /*
- * Resets the lenght to 0.  Also clears error mode.
+ * Resets the length to 0.  Also clears error mode.
  */
 static inline void strb_reset(strb *sb) {
   sb->l = 0;

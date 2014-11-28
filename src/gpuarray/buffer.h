@@ -286,6 +286,11 @@ typedef struct _gpuarray_buffer_ops {
    * \param fname name of the kernel function (as defined in the code)
    * \param flags flags for compilation (see #ga_usefl)
    * \param ret error return pointer
+   * \param err_str returns pointer to debug message from GPU backend 
+   *        (if provided a non-NULL err_str)
+   *
+   * If `*err_str` is not NULL on return, the caller must call 
+   * `free(*err_str)` after use.
    *
    * \returns Allocated kernel structure or NULL if an error occured.
    * `ret` will be updated with the error code if not NULL.
@@ -293,7 +298,7 @@ typedef struct _gpuarray_buffer_ops {
   gpukernel *(*kernel_alloc)(void *ctx, unsigned int count,
                              const char **strings, const size_t *lengths,
                              const char *fname, unsigned int numargs,
-                             const int *typecodes, int flags, int *ret);
+                             const int *typecodes, int flags, int *ret, char **err_str);
 
   /**
    * Retain a kernel.

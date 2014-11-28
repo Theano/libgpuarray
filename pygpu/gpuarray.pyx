@@ -421,9 +421,16 @@ cdef int kernel_init(GpuKernel k, const gpuarray_buffer_ops *ops, void *ctx,
                      const char *name, unsigned int argcount, const int *types,
                      int flags) except -1:
     cdef int err
+    cdef char *err_str = NULL
     err = GpuKernel_init(&k.k, ops, ctx, count, strs, len, name, argcount,
-                          types, flags)
+                          types, flags, &err_str)
     if err != GA_NO_ERROR:
+        if err_str != NULL:
+            try:
+                py_err_str = err_str.decode('UTF-8')
+            finally:
+                free(err_str)
+            raise get_exc(err), py_err_str
         raise get_exc(err), Gpu_error(ops, ctx, err)
 
 cdef int kernel_clear(GpuKernel k) except -1:

@@ -98,7 +98,7 @@ cdef extern from "gpuarray/kernel.h":
     int GpuKernel_init(_GpuKernel *k, const gpuarray_buffer_ops *ops, void *ctx,
                        unsigned int count, const char **strs,
                        const size_t *lens, const char *name,
-                       unsigned int argcount, const int *types, int flags)
+                       unsigned int argcount, const int *types, int flags, char **err_str)
     void GpuKernel_clear(_GpuKernel *k)
     void *GpuKernel_context(_GpuKernel *k)
     int GpuKernel_call(_GpuKernel *, size_t n, size_t ls, size_t gs,

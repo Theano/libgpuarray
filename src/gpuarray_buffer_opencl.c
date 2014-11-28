@@ -163,15 +163,15 @@ cl_mem cl_get_buf(gpudata *g) { ASSERT_BUF(g); return g->buf; }
 #define CL_HALF "cl_khr_fp16"
 
 static gpukernel *cl_newkernel(void *ctx, unsigned int count,
-			       const char **strings, const size_t *lengths,
-			       const char *fname, unsigned int argcount,
-                               const int *types, int flags, int *ret);
+                               const char **strings, const size_t *lengths,
+                               const char *fname, unsigned int argcount,
+                               const int *types, int flags, int *ret, char **err_str);
 static void cl_releasekernel(gpukernel *k);
 static int cl_callkernel(gpukernel *k, size_t bs[2], size_t gs[2], void **args);
 
 static const char CL_PREAMBLE[] =
   "#define local_barrier() barrier(CLK_LOCAL_MEM_FENCE)\n"
-  "#define WHITHIN_KERNEL /* empty */\n"
+  "#define WITHIN_KERNEL /* empty */\n"
   "#define KERNEL __kernel\n"
   "#define GLOBAL_MEM __global\n"
   "#define LOCAL_MEM __local\n"
@@ -585,7 +585,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
                  "unsigned int i; __global char *tmp = (__global char *)mem;"
                  "tmp += %" SPREFIX "u; mem = (__global uint4 *)tmp;"
                  "for (i = get_global_id(0); i < %" SPREFIX "u; "
-		 "i += get_global_size(0)) {mem[i] = (uint4)(%u,%u,%u,%u); }}",
+                 "i += get_global_size(0)) {mem[i] = (uint4)(%u,%u,%u,%u); }}",
                  offset, n, pattern, pattern, pattern, pattern);
   } else if ((bytes % 8) == 0) {
     n = bytes/8;
@@ -594,7 +594,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
                  "unsigned int i; __global char *tmp = (__global char *)mem;"
                  "tmp += %" SPREFIX "u; mem = (__global uint2 *)tmp;"
                  "for (i = get_global_id(0); i < %" SPREFIX "u;"
-		 "i += get_global_size(0)) {mem[i] = (uint2)(%u,%u); }}",
+                 "i += get_global_size(0)) {mem[i] = (uint2)(%u,%u); }}",
                  offset, n, pattern, pattern);
   } else if ((bytes % 4) == 0) {
     n = bytes/4;
@@ -603,7 +603,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
                  "unsigned int i; __global char *tmp = (__global char *)mem;"
                  "tmp += %" SPREFIX "u; mem = (__global unsigned int *)tmp;"
                  "for (i = get_global_id(0); i < %" SPREFIX "u;"
-		 "i += get_global_size(0)) {mem[i] = %u; }}",
+                 "i += get_global_size(0)) {mem[i] = %u; }}",
                  offset, n, pattern);
   } else {
     if (check_ext(ctx, CL_SMALL))
@@ -613,7 +613,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
                  "__kernel void kmemset(__global unsigned char *mem) {"
                  "unsigned int i; mem += %" SPREFIX "u;"
                  "for (i = get_global_id(0); i < %" SPREFIX "u;"
-		 "i += get_global_size(0)) {mem[i] = %u; }}",
+                 "i += get_global_size(0)) {mem[i] = %u; }}",
                  offset, n, val);
   }
   /* If this assert fires, increase the size of local_kern above. */
@@ -623,7 +623,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
   rlk[0] = local_kern;
   type = GA_BUFFER;
 
-  m = cl_newkernel(ctx, 1, rlk, &sz, "kmemset", 1, &type, 0, &res);
+  m = cl_newkernel(ctx, 1, rlk, &sz, "kmemset", 1, &type, 0, &res, NULL);
   if (m == NULL) return res;
 
   /* Cheap kernel scheduling */
@@ -670,9 +670,9 @@ static int cl_check_extensions(const char **preamble, unsigned int *count,
 }
 
 static gpukernel *cl_newkernel(void *c, unsigned int count,
-			       const char **strings, const size_t *lengths,
-			       const char *fname, unsigned int argcount,
-                               const int *types, int flags, int *ret) {
+                               const char **strings, const size_t *lengths,
+                               const char *fname, unsigned int argcount,
+                               const int *types, int flags, int *ret, char **err_str) {
   cl_ctx *ctx = (cl_ctx *)c;
   gpukernel *res;
   cl_device_id dev;
@@ -680,8 +680,8 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
   // Sync this table size with the number of flags that can add stuff
   // at the beginning
   const char *preamble[4];
-  size_t *newl;
-  const char **news;
+  size_t *newl = NULL;
+  const char **news = NULL;
   unsigned int n = 0;
   int error;
 
@@ -732,19 +732,61 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
     }
 
     p = clCreateProgramWithSource(ctx->ctx, count+n, news, newl, &ctx->err);
-    if (n != 0) {
-      free(news);
-      free(newl);
-    }
     if (ctx->err != CL_SUCCESS) {
+      if (n != 0) {
+        free(news);
+        free(newl);
+      }
       FAIL(NULL, GA_IMPL_ERROR);
     }
   }
 
   ctx->err = clBuildProgram(p, 0, NULL, NULL, NULL, NULL);
   if (ctx->err != CL_SUCCESS) {
+    if (ctx->err == CL_BUILD_PROGRAM_FAILURE && err_str!=NULL) {
+      *err_str = NULL;  // Fallback, in case there's an error
+
+      strb debug_msg = STRB_STATIC_INIT;
+      // We're substituting debug_msg for a string with this first line:
+      strb_appends(&debug_msg, "Program build failure ::\n"); 
+
+      // Determine the size of the log
+      size_t log_size;
+      clGetProgramBuildInfo(p, dev, CL_PROGRAM_BUILD_LOG, 0, NULL, &log_size);
+
+      if(strb_ensure(&debug_msg, log_size)!=-1 && log_size>=1) { // Checks strb has enough space
+        // Get the log directly into the debug_msg
+        clGetProgramBuildInfo(p, dev, CL_PROGRAM_BUILD_LOG, log_size, debug_msg.s+debug_msg.l, NULL);
+        debug_msg.l += (log_size-1); // Back off to before final '\0'
+      }
+
+      if (flags & GA_USE_BINARY) {
+        // Not clear what to do with binary 'source' - the log will have to suffice
+      } else {
+        gpukernel_source_with_line_numbers(count+n, news, newl, &debug_msg);
+      }
+
+      strb_append0(&debug_msg); // Make sure a final '\0' is present
+
+      if(!strb_error(&debug_msg)) { // Make sure the strb is in a valid state
+        *err_str = strndup(debug_msg.s, debug_msg.l);
+        // If there's a memory alloc error, fall-through : announcing a compile error is more important
+      }
+      strb_clear(&debug_msg);
+      // *err_str will be free()d by the caller (see docs in kernel.h)
+    }
+
     clReleaseProgram(p);
+    if (n != 0) {
+      free(news);
+      free(newl);
+    }
     FAIL(NULL, GA_IMPL_ERROR);
+  }
+
+  if (n != 0) {
+    free(news);
+    free(newl);
   }
 
   res = malloc(sizeof(*res));
@@ -1013,7 +1055,7 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
 
   types[0] = types[1] = GA_BUFFER;
   k = cl_newkernel(ctx, 1, (const char **)&sb.s, &sb.l, "elemk",
-                   2, types, flags, &res);
+                   2, types, flags, &res, NULL);
   if (k == NULL) goto fail;
   /* Cheap kernel scheduling */
   res = cl_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, &ls[0]);
