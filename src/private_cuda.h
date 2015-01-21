@@ -52,7 +52,7 @@ typedef struct _cuda_context {
   void *blas_handle;
   gpudata *errbuf;
   cache *extcopy_cache;
-  char bin_id[8];
+  char bin_id[13];
   unsigned int refcnt;
   int flags;
 } cuda_context;
