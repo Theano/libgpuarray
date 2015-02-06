@@ -641,7 +641,7 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
 #ifdef DEBUG
       /* Only cleanup if GPUARRAY_NOCLEANUP is not set */
       if (getenv("GPUARRAY_NOCLEANUP") == NULL)
-#endif DEBUG
+#endif
 	unlink(namebuf);
     }
 

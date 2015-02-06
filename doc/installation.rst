@@ -4,10 +4,9 @@ Installation
 The library is routinely tested on OS X and linux and, less
 frequently, on Windows.  The OS most frequently tested are:
 
- - Mac OS X 10.7
+ - Mac OS X 10.10
  - Fedora Core 14
  - Ubuntu 12.04
- - Mac OS X 10.9
  - Windows 7
 
 It should also work on any decently recent OS not listed here. If you
@@ -17,7 +16,7 @@ and we will attempt to fix it.
 Requirements
 ------------
 
- - cmake >= 2.8 (cmake_).
+ - cmake >= 2.8 (cmake >= 3.0 on OS X 10.9 and up) (cmake_).
  - a c99-compliant compiler (or MSVC if on windows).
  - (optional) CUDA >= 4.0 (cuda_).
  - (optional) OpenCL runtime.
