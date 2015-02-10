@@ -313,7 +313,6 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
   ssize_t *strs;
   int simple_move = 1;
 
-
   if (a->nd < v->nd)
     return GA_VALUE_ERROR;
 
@@ -618,10 +617,15 @@ int GpuArray_move(GpuArray *dst, const GpuArray *src) {
     return GA_VALUE_ERROR;
   if (!GpuArray_ISALIGNED(src) || !GpuArray_ISALIGNED(dst))
     return GA_UNALIGNED_ERROR;
+  if (src->nd != dst->nd)
+    return GA_VALUE_ERROR;
+  for (i = 0; i < src->nd; i++) {
+    if (src->dimensions[i] != dst->dimensions[i])
+      return GA_VALUE_ERROR;
+  }
   if (!GpuArray_ISONESEGMENT(dst) || !GpuArray_ISONESEGMENT(src) ||
       GpuArray_ISFORTRAN(dst) != GpuArray_ISFORTRAN(src) ||
-      dst->typecode != src->typecode ||
-      dst->nd != src->nd) {
+      dst->typecode != src->typecode) {
     return dst->ops->buffer_extcopy(src->data, src->offset, dst->data,
                                     dst->offset, src->typecode, dst->typecode,
                                     src->nd, src->dimensions, src->strides,
