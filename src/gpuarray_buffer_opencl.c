@@ -49,7 +49,7 @@ cl_ctx *cl_make_ctx(cl_context ctx) {
   cl_device_id id;
   cl_command_queue_properties qprop;
   char vendor[32];
-  char driver_version[16];
+  char driver_version[64];
   cl_uint vendor_id;
   size_t len;
 
@@ -748,7 +748,7 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
 
       strb debug_msg = STRB_STATIC_INIT;
       // We're substituting debug_msg for a string with this first line:
-      strb_appends(&debug_msg, "Program build failure ::\n"); 
+      strb_appends(&debug_msg, "Program build failure ::\n");
 
       // Determine the size of the log
       size_t log_size;
@@ -857,7 +857,7 @@ static int cl_callkernel(gpukernel *k, size_t ls[2], size_t gs[2],
   if (evw == NULL) {
     return GA_MEMORY_ERROR;
   }
-  
+
   for (i = 0; i < k->argcount; i++) {
     if (k->types[i] == GA_BUFFER) {
       btmp = (gpudata *)args[i];
