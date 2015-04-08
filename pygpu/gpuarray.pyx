@@ -156,6 +156,7 @@ cdef dict NP_TO_TYPE = {
     np.dtype('float64'): GA_DOUBLE,
     np.dtype('complex64'): GA_CFLOAT,
     np.dtype('complex128'): GA_CDOUBLE,
+    np.dtype('float16'): GA_HALF,
 }
 
 cdef dict TYPE_TO_NP = dict((v, k) for k, v in NP_TO_TYPE.iteritems())

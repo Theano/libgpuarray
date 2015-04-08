@@ -639,7 +639,7 @@ typedef enum _ga_usefl {
    */
   GA_USE_CUDA =     0x2000,
   /**
-   * The kernel is make of OpenCL code.
+   * The kernel is made of OpenCL code.
    */
   GA_USE_OPENCL =   0x4000,
 } ga_usefl;

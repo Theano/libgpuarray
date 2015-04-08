@@ -700,7 +700,8 @@ GPUARRAY_LOCAL void cuda_set_compiler(void *(*compiler_f)(const char *, size_t,
 static gpukernel *cuda_newkernel(void *c, unsigned int count,
                                  const char **strings, const size_t *lengths,
                                  const char *fname, unsigned int argcount,
-                                 const int *types, int flags, int *ret, char **err_str) {
+                                 const int *types, int flags, int *ret,
+                                 char **err_str) {
     cuda_context *ctx = (cuda_context *)c;
     strb sb = STRB_STATIC_INIT;
     char *bin;
@@ -1156,11 +1157,11 @@ static inline int gen_extcopy_kernel(const cache_key_t *a,
 
 #include <time.h>
 
-static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output, size_t ooff,
-                        int intype, int outtype, unsigned int a_nd,
-                        const size_t *a_dims, const ssize_t *a_str,
-                        unsigned int b_nd, const size_t *b_dims,
-                        const ssize_t *b_str) {
+static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output,
+                        size_t ooff, int intype, int outtype,
+                        unsigned int a_nd, const size_t *a_dims,
+                        const ssize_t *a_str, unsigned int b_nd,
+                        const size_t *b_dims, const ssize_t *b_str) {
   cuda_context *ctx = input->ctx;
   void *args[2];
   int res = GA_SYS_ERROR;
