@@ -8,6 +8,8 @@ include_directories(${CHECK_INCLUDE_DIRS})
 
 set(LIBS ${LIBS} ${CHECK_LIBRARIES})
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CHECK_CFLAGS}")
+
 include_directories(. ../src)
 
 add_executable(check_types main.c check_types.c)
