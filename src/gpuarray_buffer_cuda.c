@@ -1092,6 +1092,8 @@ static inline int gen_extcopy_kernel(const cache_key_t *a,
 
   in_t = map_t(a->itype);
   out_t = map_t(a->otype);
+  /* Since float16 ('f16') is not a fully-supported type we need to use
+     it as b16 (basically uint16) for read and write operations. */
   if (a->itype == GA_HALF)
     in_ld_t = "b16";
   else
