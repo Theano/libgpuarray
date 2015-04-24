@@ -1085,13 +1085,23 @@ static inline int gen_extcopy_kernel(const cache_key_t *a,
   int flags = GA_USE_PTX;
   unsigned int bits = sizeof(void *)*8;
   int types[2];
-  const char *in_t;
-  const char *out_t;
+  const char *in_t, *in_ld_t;
+  const char *out_t, *out_ld_t;
   const char *rmod;
   char arch[6]; /* Must be at least 6, see detect_arch() */
 
   in_t = map_t(a->itype);
   out_t = map_t(a->otype);
+  /* Since float16 ('f16') is not a fully-supported type we need to use
+     it as b16 (basically uint16) for read and write operations. */
+  if (a->itype == GA_HALF)
+    in_ld_t = "b16";
+  else
+    in_ld_t = in_t;
+  if (a->otype == GA_HALF)
+    out_ld_t = "b16";
+  else
+    out_ld_t = out_t;
   rmod = get_rmod(a->itype, a->otype);
   if (in_t == NULL || out_t == NULL) return GA_DEVSUP_ERROR;
   res = detect_arch(arch);
@@ -1115,12 +1125,12 @@ static inline int gen_extcopy_kernel(const cache_key_t *a,
 	       "st.global.%s [rp1+%" SPREFIX "u], tmpb;\n", bits,
 	       bits, bits,
 	       bits,
-	       in_t, a->ioff,
+	       in_ld_t, a->ioff,
 	       rmod, out_t, in_t,
 	       bits,
 	       bits, bits,
 	       bits,
-	       out_t, a->ooff);
+	       out_ld_t, a->ooff);
 
   strb_appendf(&sb, ELEM_FOOTER_PTX, bits, bits, nEls);
 
