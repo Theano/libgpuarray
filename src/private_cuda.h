@@ -63,15 +63,15 @@ GPUARRAY_LOCAL void cuda_enter(cuda_context *ctx);
 GPUARRAY_LOCAL void cuda_exit(cuda_context *ctx);
 
 struct _gpudata {
-#ifdef DEBUG
-  char tag[8];
-#endif
   CUdeviceptr ptr;
   CUevent ev;
   size_t sz;
   cuda_context *ctx;
   int flags;
   unsigned int refcnt;
+#ifdef DEBUG
+  char tag[8];
+#endif
 };
 
 GPUARRAY_LOCAL gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz);

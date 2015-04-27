@@ -800,7 +800,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
       } else {
         bin = call_compiler(sb.s, sb.l, &bin_len, ret);
         if (bin == NULL) {
-          if(err_str != NULL) {
+          if (err_str != NULL) {
             strb debug_msg = STRB_STATIC_INIT;
 
             // We're substituting debug_msg for a string with this first line:
