@@ -1735,7 +1735,8 @@ cdef class GpuArray:
     property gpudata:
         "Return a pointer to the raw gpudata object."
         def __get__(self):
-            return <size_t>self.ga.data
+            return <size_t>((<void **>self.ga.data)[0])
+
 
 cdef class GpuKernel:
     """
