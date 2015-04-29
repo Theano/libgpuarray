@@ -1733,9 +1733,13 @@ cdef class GpuArray:
             return self.ga.offset
 
     property gpudata:
-        "Return a pointer to the raw gpudata object."
+        "Return a pointer to the raw backend object."
         def __get__(self):
-            return <size_t>self.ga.data
+            # This wizadry grabs the actual backend pointer since it's
+            # guarenteed to be the first element of the gpudata
+            # structure.
+            return <size_t>((<void **>self.ga.data)[0])
+
 
 cdef class GpuKernel:
     """

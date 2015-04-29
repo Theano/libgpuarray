@@ -48,13 +48,13 @@ typedef struct _cl_ctx {
 } cl_ctx;
 
 struct _gpudata {
-#ifdef DEBUG
-  char tag[8];
-#endif
   cl_mem buf;
   cl_event ev;
   cl_ctx *ctx;
   unsigned int refcnt;
+#ifdef DEBUG
+  char tag[8];
+#endif
 };
 
 struct _gpukernel {
