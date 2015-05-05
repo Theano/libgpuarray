@@ -215,6 +215,7 @@ cdef np.dtype dtype_to_npdtype(dtype):
         return np.dtype(dtype)
     if isinstance(dtype, np.dtype):
         return dtype
+    raise ValueError("data type not understood", dtype)
 
 # This is a stupid wrapper to avoid the extra argument introduced by having
 # dtype_to_typecode declared 'cpdef'.
