@@ -206,6 +206,17 @@ cdef np.dtype typecode_to_dtype(int typecode):
     else:
         raise NotImplementedError, "TODO"
 
+# This function takes a flexible dtype as accepted by the functions of
+# this module and ensures it becomes a numpy dtype.
+cdef np.dtype dtype_to_npdtype(dtype):
+    if isinstance(dtype, int):
+        return typecode_to_dtype(dtype)
+    if isinstance(dtype, str):
+        return np.dtype(dtype)
+    if isinstance(dtype, np.dtype):
+        return dtype
+    raise ValueError("data type not understood", dtype)
+
 # This is a stupid wrapper to avoid the extra argument introduced by having
 # dtype_to_typecode declared 'cpdef'.
 cdef int get_typecode(dtype) except -1:
@@ -922,7 +933,8 @@ def array(proto, dtype=None, copy=True, order=None, int ndmin=0,
 
     context = ensure_context(context)
 
-    a = numpy.array(proto, dtype=dtype, order=order, ndmin=ndmin, copy=False)
+    a = numpy.array(proto, dtype=dtype_to_npdtype(dtype), order=order,
+                    ndmin=ndmin, copy=False)
 
     return pygpu_fromhostdata(np.PyArray_DATA(a), dtype_to_typecode(a.dtype),
                               np.PyArray_NDIM(a), <size_t *>np.PyArray_DIMS(a),

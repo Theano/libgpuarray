@@ -181,6 +181,7 @@ cdef extern from "gpuarray/extension.h":
     void *gpuarray_get_extension(const char *) nogil
     cdef int GPUARRAY_CUDA_CTX_NOFREE
 
+cdef np.dtype dtype_to_npdtype(dtype)
 # If you change the api interface, you MUST increment either the minor
 # (if you add a function) or the major version (if you change
 # arguments or remove a function) in the gpuarray.pyx file.
