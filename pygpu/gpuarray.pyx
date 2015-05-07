@@ -209,6 +209,8 @@ cdef np.dtype typecode_to_dtype(int typecode):
 # This function takes a flexible dtype as accepted by the functions of
 # this module and ensures it becomes a numpy dtype.
 cdef np.dtype dtype_to_npdtype(dtype):
+    if dtype is None:
+        return None
     if isinstance(dtype, int):
         return typecode_to_dtype(dtype)
     if isinstance(dtype, str):
