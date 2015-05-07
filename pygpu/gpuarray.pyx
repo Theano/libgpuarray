@@ -1313,7 +1313,7 @@ def _split(GpuArray a, ind, unsigned int axis):
         raise MemoryError()
     try:
         for i in range(len(r)):
-            r[i] = new_GpuArray(type(a), a.context, a)
+            r[i] = new_GpuArray(type(a), a.context, a.base)
             rs[i] = &(<GpuArray>r[i]).ga
         for i in range(len(ind)):
             v = ind[i]
