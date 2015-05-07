@@ -209,6 +209,8 @@ cdef np.dtype typecode_to_dtype(int typecode):
 # This function takes a flexible dtype as accepted by the functions of
 # this module and ensures it becomes a numpy dtype.
 cdef np.dtype dtype_to_npdtype(dtype):
+    if dtype is None:
+        return None
     if isinstance(dtype, int):
         return typecode_to_dtype(dtype)
     if isinstance(dtype, str):
@@ -1313,7 +1315,7 @@ def _split(GpuArray a, ind, unsigned int axis):
         raise MemoryError()
     try:
         for i in range(len(r)):
-            r[i] = new_GpuArray(type(a), a.context, a)
+            r[i] = new_GpuArray(type(a), a.context, a.base)
             rs[i] = &(<GpuArray>r[i]).ga
         for i in range(len(ind)):
             v = ind[i]
