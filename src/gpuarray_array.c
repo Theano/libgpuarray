@@ -744,6 +744,9 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
   unsigned int p;
   int err = GA_NO_ERROR;
 
+  if (axis >= as[0]->nd)
+    return GA_VALUE_ERROR;
+
   dims = calloc(as[0]->nd, sizeof(size_t));
   if (dims == NULL)
     return GA_MEMORY_ERROR;
@@ -756,6 +759,7 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
     err = GA_UNALIGNED_ERROR;
     goto afterloop;
   }
+
   for (i = 1; i < n; i++) {
     if (!GpuArray_ISALIGNED(as[i])) {
       err = GA_UNALIGNED_ERROR;
