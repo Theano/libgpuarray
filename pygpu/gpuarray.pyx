@@ -457,17 +457,16 @@ cdef void *kernel_context(GpuKernel k) except NULL:
         raise GpuArrayException, "Invalid kernel or destroyed context"
     return res
 
-cdef int kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs,
-                     void **args) except -1:
-    cdef int err
-    err = GpuKernel_call(&k.k, n, ls, gs, args)
+cdef int kernel_sched(GpuKernel k, size_t n, size_t *ls, size_t *gs) except -1:
+    cdef int err;
+    err = GpuKernel_sched(&k.k, n, ls, gs)
     if err != GA_NO_ERROR:
         raise get_exc(err), kernel_error(k, err)
 
-cdef int kernel_call2(GpuKernel k, size_t n[2], size_t ls[2], size_t gs[2],
-                     void **args) except -1:
+cdef int kernel_call(GpuKernel k, unsigned int n, const size_t *ls,
+                     const size_t *gs, size_t shared, void **args) except -1:
     cdef int err
-    err = GpuKernel_call2(&k.k, n, ls, gs, args)
+    err = GpuKernel_call(&k.k, n, ls, gs, shared, args)
     if err != GA_NO_ERROR:
         raise get_exc(err), kernel_error(k, err)
 
@@ -1889,67 +1888,72 @@ cdef class GpuKernel:
         finally:
             free(_types)
 
-    def __call__(self, *args, n=None, ls=None, gs=None):
+    def __call__(self, *args, n=None, ls=None, gs=None, shared=0):
         if n == None and (ls == None or gs == None):
             raise ValueError, "Must specify size (n) or both gs and ls"
-        self.do_call(n, ls, gs, args)
+        self.do_call(n, ls, gs, args, shared)
 
-    cdef do_call(self, py_n, py_ls, py_gs, py_args):
-        cdef size_t _n[2]
-        cdef size_t _gs[2]
-        cdef size_t _ls[2]
-        cdef size_t *n
-        cdef size_t *gs
-        cdef size_t *ls
+    cdef do_call(self, py_n, py_ls, py_gs, py_args, size_t shared):
+        cdef size_t n
+        cdef size_t gs[3]
+        cdef size_t ls[3]
         cdef size_t tmp
+        cdef unsigned int nd;
         cdef const int *types
         cdef unsigned int numargs
         cdef unsigned int i
 
-        if py_n is None:
-            n = NULL
-        else:
-            if isinstance(py_n, int):
-                _n[0] = py_n
-                _n[1] = 1
-            elif isinstance(py_n, (list, tuple)):
-                if len(py_n) != 2:
-                    raise ValueError, "n is not a len() 2 list"
-                _n[0] = py_n[0]
-                _n[1] = py_n[1]
-            else:
-                raise TypeError, "n is not int or list"
-            n = _n
+        nd = 0
+
+        if py_n is not None:
+            n = py_n
+            nd = 1
 
         if py_ls is None:
-            ls = NULL
+            ls[0] = 0
         else:
             if isinstance(py_ls, int):
-                _ls[0] = py_ls
-                _ls[1] = 1
+                ls[0] = py_ls
+                nd = 1
             elif isinstance(py_ls, (list, tuple)):
-                if len(py_ls) != 2:
-                    raise ValueError, "ls is not a len() 2 list"
-                _ls[0] = py_ls[0]
-                _ls[1] = py_ls[1]
+                if len(py_ls) > 3:
+                    raise ValueError, "ls is not of length 3 or less"
+                if nd == 0:
+                    nd = len(py_ls)
+                elif len(py_ls) != nd:
+                    raise ValueError, "nd mismatch for ls"
+
+                if nd >= 3:
+                    ls[2] = py_ls[2]
+                if nd >= 2:
+                    ls[1] = py_ls[1]
+                if nd >= 1:
+                    ls[0] = py_ls[0]
             else:
                 raise TypeError, "ls is not int or list"
-            ls = _ls
 
         if py_gs is None:
-            gs = NULL
+            gs[0] = 0
         else:
             if isinstance(py_gs, int):
-                _gs[0] = py_gs
-                _gs[1] = 1
+                if nd != 1:
+                    raise ValueError, "nd mismatch for gs"
+                gs[0] = py_gs
             elif isinstance(py_gs, (list, tuple)):
-                if len(py_gs) != 2:
-                    raise ValueError, "gs is not a len() 2 list"
-                _gs[0] = py_gs[0]
-                _gs[1] = py_gs[1]
+                if len(py_gs) < 3:
+                    raise ValueError, "gs is not of length 3 or less"
+                # nd can't be 0 here
+                if len(py_ls) != nd:
+                    raise ValueError, "nd mismatch for gs"
+
+                if nd >= 3:
+                    gs[2] = py_gs[2]
+                if nd >= 2:
+                    gs[1] = py_gs[1]
+                if nd >= 1:
+                    gs[0] = py_gs[0]
             else:
                 raise TypeError, "gs is not int or list"
-            gs = _gs
 
         numargs = self.numargs
         if len(py_args) != numargs:
@@ -1957,7 +1961,9 @@ cdef class GpuKernel:
         kernel_property(self, GA_KERNEL_PROP_TYPES, &types)
         for i in range(numargs):
             self._setarg(i, types[i], py_args[i])
-        kernel_call2(self, n, ls, gs, self.callbuf)
+        if py_n is not None:
+            kernel_sched(self, n, &ls[0], &gs[0])
+        kernel_call(self, nd, ls, gs, shared, self.callbuf)
 
     cdef _setarg(self, unsigned int index, int typecode, object o):
         if typecode == GA_BUFFER:

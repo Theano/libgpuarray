@@ -102,10 +102,10 @@ cdef extern from "gpuarray/kernel.h":
                        unsigned int argcount, const int *types, int flags, char **err_str)
     void GpuKernel_clear(_GpuKernel *k)
     void *GpuKernel_context(_GpuKernel *k)
-    int GpuKernel_call(_GpuKernel *, size_t n, size_t ls, size_t gs,
-                       void **args)
-    int GpuKernel_call2(_GpuKernel *, size_t n[2], size_t ls[2], size_t gs[2],
-                        void **args)
+    int GpuKernel_sched(_GpuKernel *k, size_t n, size_t *ls, size_t *gs)
+    int GpuKernel_call(_GpuKernel *k, unsigned int n,
+                       const size_t *ls, const size_t *gs,
+                       size_t shared, void **args)
     int GpuKernel_binary(_GpuKernel *, size_t *, void **)
 
 cdef extern from "gpuarray/array.h":
@@ -234,10 +234,10 @@ cdef int kernel_init(GpuKernel k, const gpuarray_buffer_ops *ops, void *ctx,
                      int flags) except -1
 cdef int kernel_clear(GpuKernel k) except -1
 cdef void *kernel_context(GpuKernel k) except NULL
-cdef int kernel_call(GpuKernel k, size_t n, size_t ls, size_t gs,
-                     void **args) except -1
-cdef int kernel_call2(GpuKernel k, size_t n[2], size_t ls[2], size_t gs[2],
-                     void **args) except -1
+cdef int kernel_sched(GpuKernel k, size_t n, size_t *ls, size_t *gs) except -1
+cdef int kernel_call(GpuKernel k, unsigned int n,
+                     const size_t *ls, const size_t *gs,
+                     size_t shared, void **args) except -1
 cdef int kernel_binary(GpuKernel k, size_t *, void **) except -1
 cdef int kernel_property(GpuKernel k, int prop_id, void *res) except -1
 
@@ -315,5 +315,5 @@ cdef api class GpuKernel [type PyGpuKernelType, object PyGpuKernelObject]:
     cdef void **callbuf
     cdef object __weakref__
 
-    cdef do_call(self, py_n, py_ls, py_gs, py_args)
+    cdef do_call(self, py_n, py_ls, py_gs, py_args, size_t shared)
     cdef _setarg(self, unsigned int index, int typecode, object o)
