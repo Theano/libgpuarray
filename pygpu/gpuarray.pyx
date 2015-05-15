@@ -458,7 +458,7 @@ cdef void *kernel_context(GpuKernel k) except NULL:
     return res
 
 cdef int kernel_sched(GpuKernel k, size_t n, size_t *ls, size_t *gs) except -1:
-    cdef int err;
+    cdef int err
     err = GpuKernel_sched(&k.k, n, ls, gs)
     if err != GA_NO_ERROR:
         raise get_exc(err), kernel_error(k, err)
@@ -1905,12 +1905,9 @@ cdef class GpuKernel:
 
         nd = 0
 
-        if py_n is not None:
-            n = py_n
-            nd = 1
-
         if py_ls is None:
             ls[0] = 0
+            nd = 1
         else:
             if isinstance(py_ls, int):
                 ls[0] = py_ls
@@ -1918,10 +1915,7 @@ cdef class GpuKernel:
             elif isinstance(py_ls, (list, tuple)):
                 if len(py_ls) > 3:
                     raise ValueError, "ls is not of length 3 or less"
-                if nd == 0:
-                    nd = len(py_ls)
-                elif len(py_ls) != nd:
-                    raise ValueError, "nd mismatch for ls"
+                nd = len(py_ls)
 
                 if nd >= 3:
                     ls[2] = py_ls[2]
@@ -1933,18 +1927,19 @@ cdef class GpuKernel:
                 raise TypeError, "ls is not int or list"
 
         if py_gs is None:
+            if nd != 1:
+                raise ValueError, "nd mismatch for gs (None)"
             gs[0] = 0
         else:
             if isinstance(py_gs, int):
                 if nd != 1:
-                    raise ValueError, "nd mismatch for gs"
+                    raise ValueError, "nd mismatch for gs (int)"
                 gs[0] = py_gs
             elif isinstance(py_gs, (list, tuple)):
                 if len(py_gs) < 3:
                     raise ValueError, "gs is not of length 3 or less"
-                # nd can't be 0 here
                 if len(py_ls) != nd:
-                    raise ValueError, "nd mismatch for gs"
+                    raise ValueError, "nd mismatch for gs (tuple)"
 
                 if nd >= 3:
                     gs[2] = py_gs[2]
@@ -1962,6 +1957,9 @@ cdef class GpuKernel:
         for i in range(numargs):
             self._setarg(i, types[i], py_args[i])
         if py_n is not None:
+            if nd != 1:
+                raise ValueError, "n is specified and nd != 1"
+            n = py_n
             kernel_sched(self, n, &ls[0], &gs[0])
         kernel_call(self, nd, ls, gs, shared, self.callbuf)
 
@@ -1969,7 +1967,7 @@ cdef class GpuKernel:
         if typecode == GA_BUFFER:
             if not isinstance(o, GpuArray):
                 raise TypeError, "expected a GpuArray"
-            self.callbuf[index] = <void *>&(<GpuArray>o).ga
+            self.callbuf[index] = <void *>((<GpuArray>o).ga.data)
         elif typecode == GA_SIZE:
             (<size_t *>self.callbuf[index])[0] = o
         elif typecode == GA_FLOAT:
