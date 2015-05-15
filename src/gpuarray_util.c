@@ -5,6 +5,14 @@
 #include "gpuarray/error.h"
 #include "util/strb.h"
 
+/*
+ * API version is negative since we are still in the development
+ * phase. Once we go stable, this will move to 0 and go up from
+ * there.
+ */
+const int gpuarray_api_major = -10000;
+const int gpuarray_api_minor = 0;
+
 static gpuarray_type **custom_types = NULL;
 static int n_types = 0;
 static gpuarray_type no_type = {NULL, 0, 0, -1};
