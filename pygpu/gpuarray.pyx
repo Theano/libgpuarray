@@ -10,7 +10,7 @@ from cpython.object cimport Py_EQ, Py_NE
 
 def api_version():
     # major, minor
-    return (1, 0)
+    return (gpuarray_api_major, gpuarray_api_minor)
 
 np.import_array()
 
