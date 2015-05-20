@@ -14,6 +14,9 @@ extern "C" {
 #include <gpuarray/config.h>
 #include <gpuarray/types.h>
 
+extern GPUARRAY_PUBLIC const int gpuarray_api_major;
+extern GPUARRAY_PUBLIC const int gpuarray_api_minor;
+
 /**
  * Registers a type with the kernel machinery.
  *

@@ -324,12 +324,17 @@ typedef struct _gpuarray_buffer_ops {
    * Call a kernel.
    *
    * \param k kernel
-   * \param bs block size for this call (also known as local size)
-   * \param gs grid size for this call (also known as global size)
+   * \param n number of dimensions of grid/block
+   * \param bs block sizes for this call (also known as local size)
+   * \param gs grid sizes for this call (also known as global size)
+   * \param shared amount of dynamic shared memory to reserve
+   * \param args table of pointers to each argument.
    *
    * \returns GA_NO_ERROR or an error code if an error occurred.
    */
-  int (*kernel_call)(gpukernel *k, size_t bs[2], size_t gs[2], void **args);
+  int (*kernel_call)(gpukernel *k, unsigned int n,
+                     const size_t *bs, const size_t *gs,
+                     size_t shared, void **args);
 
   /**
    * Get the kernel binary.

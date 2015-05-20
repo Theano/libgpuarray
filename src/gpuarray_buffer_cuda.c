@@ -892,33 +892,41 @@ static void cuda_freekernel(gpukernel *k) {
   }
 }
 
-static int cuda_callkernel(gpukernel *k, size_t bs[2], size_t gs[2],
-                           void **args) {
+static int cuda_callkernel(gpukernel *k, unsigned int n,
+                           const size_t *bs, const size_t *gs,
+                           size_t shared, void **args) {
     cuda_context *ctx = k->ctx;
     unsigned int i;
+    int res = GA_NO_ERROR;
 
     ASSERT_KER(k);
     cuda_enter(ctx);
     if (ctx->err != CUDA_SUCCESS)
       return GA_IMPL_ERROR;
 
-    for (i = 0; i < k->argcount; i++) {
-      if (k->types[i] == GA_BUFFER) {
-        k->args[i] = &((gpudata *)args[i])->ptr;
-      } else {
-        k->args[i] = args[i];
-      }
-    }
-
-    ctx->err = cuLaunchKernel(k->k, gs[0], gs[1], 1, bs[0], bs[1], 1, 0,
-			      ctx->s, k->args, NULL);
-    if (ctx->err != CUDA_SUCCESS) {
+    switch (n) {
+    case 1:
+      ctx->err = cuLaunchKernel(k->k, gs[0], 1, 1, bs[0], 1, 1, shared,
+                                ctx->s, args, NULL);
+      break;
+    case 2:
+      ctx->err = cuLaunchKernel(k->k, gs[0], gs[1], 1, bs[0], bs[1], 1, shared,
+                                ctx->s, args, NULL);
+      break;
+    case 3:
+      ctx->err = cuLaunchKernel(k->k, gs[0], gs[1], gs[2], bs[0], bs[1], bs[2],
+                                shared, ctx->s, args, NULL);
+      break;
+    default:
       cuda_exit(ctx);
-      return GA_IMPL_ERROR;
+      return GA_VALUE_ERROR;
+    }
+    if (ctx->err != CUDA_SUCCESS) {
+      res = GA_IMPL_ERROR;
     }
 
     cuda_exit(ctx);
-    return GA_NO_ERROR;
+    return res;
 }
 
 static int cuda_kernelbin(gpukernel *k, size_t *sz, void **obj) {
@@ -1177,7 +1185,7 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output,
   int res = GA_SYS_ERROR;
   int in_cache = 1;
   unsigned int i;
-  size_t nEls = 1, ls[2], gs[2];
+  size_t nEls = 1, ls, gs;
   gpukernel *k;
   cache_val_t *v;
   cache_key_t a;
@@ -1230,14 +1238,13 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output,
   }
 
   /* Cheap kernel scheduling */
-  res = cuda_property(NULL, NULL, *v, GA_KERNEL_PROP_MAXLSIZE, ls);
+  res = cuda_property(NULL, NULL, *v, GA_KERNEL_PROP_MAXLSIZE, &ls);
   if (res != GA_NO_ERROR) goto fail;
 
-  gs[0] = ((nEls-1) / ls[0]) + 1;
-  gs[1] = ls[1] = 1;
+  gs = ((nEls-1) / ls) + 1;
   args[0] = input;
   args[1] = output;
-  res = cuda_callkernel(*v, ls, gs, args);
+  res = cuda_callkernel(*v, 1, &ls, &gs, 0, args);
 
 fail:
   if (!in_cache)

@@ -165,9 +165,12 @@ cl_mem cl_get_buf(gpudata *g) { ASSERT_BUF(g); return g->buf; }
 static gpukernel *cl_newkernel(void *ctx, unsigned int count,
                                const char **strings, const size_t *lengths,
                                const char *fname, unsigned int argcount,
-                               const int *types, int flags, int *ret, char **err_str);
+                               const int *types, int flags, int *ret,
+                               char **err_str);
 static void cl_releasekernel(gpukernel *k);
-static int cl_callkernel(gpukernel *k, size_t bs[2], size_t gs[2], void **args);
+static int cl_callkernel(gpukernel *k, unsigned int n,
+                         const size_t *bs, const size_t *gs,
+                         size_t shared, void **args);
 
 static const char CL_PREAMBLE[] =
   "#define local_barrier() barrier(CLK_LOCAL_MEM_FENCE)\n"
@@ -552,7 +555,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
   cl_ctx *ctx = dst->ctx;
   const char *rlk[1];
   void *args[1];
-  size_t sz, bytes, n, ls[2], gs[2];
+  size_t sz, bytes, n, ls, gs;
   gpukernel *m;
   cl_mem_flags fl;
   int type;
@@ -627,12 +630,11 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
   if (m == NULL) return res;
 
   /* Cheap kernel scheduling */
-  res = cl_property(NULL, NULL, m, GA_KERNEL_PROP_MAXLSIZE, &ls[0]);
+  res = cl_property(NULL, NULL, m, GA_KERNEL_PROP_MAXLSIZE, &ls);
   if (res != GA_NO_ERROR) goto fail;
-  gs[0] = ((n-1) / ls[0]) + 1;
-  gs[1] = ls[1] = 1;
+  gs = ((n-1) / ls) + 1;
   args[0] = dst;
-  res = cl_callkernel(m, ls, gs, args);
+  res = cl_callkernel(m, 1, &ls, &gs, 0, args);
 
  fail:
   cl_releasekernel(m);
@@ -833,10 +835,11 @@ static void cl_releasekernel(gpukernel *k) {
   }
 }
 
-static int cl_callkernel(gpukernel *k, size_t ls[2], size_t gs[2],
-                         void **args) {
+static int cl_callkernel(gpukernel *k, unsigned int n,
+                         const size_t *ls, const size_t *gs,
+                         size_t shared, void **args) {
   cl_ctx *ctx = k->ctx;
-  size_t _gs[2];
+  size_t _gs[3];
   cl_event ev;
   cl_event *evw;
   gpudata *btmp;
@@ -849,6 +852,12 @@ static int cl_callkernel(gpukernel *k, size_t ls[2], size_t gs[2],
   ASSERT_KER(k);
   ASSERT_CTX(ctx);
 
+  if (n > 3)
+    return GA_VALUE_ERROR;
+
+  if (shared != 0)
+    return GA_UNSUPPORTED_ERROR;
+
   dev = get_dev(ctx->ctx, &res);
   if (dev == NULL) return res;
 
@@ -859,16 +868,22 @@ static int cl_callkernel(gpukernel *k, size_t ls[2], size_t gs[2],
   }
 
   for (i = 0; i < k->argcount; i++) {
-    if (k->types[i] == GA_BUFFER) {
+    switch (k->types[i]) {
+    case GA_POINTER:
+      free(evw);
+      return GA_DEVSUP_ERROR;
+    case GA_BUFFER:
       btmp = (gpudata *)args[i];
       if (btmp->ev != NULL)
         evw[num_ev++] = btmp->ev;
       ctx->err = clSetKernelArg(k->k, i, sizeof(cl_mem), &btmp->buf);
-    } else if (k->types[i] == GA_SIZE) {
+      break;
+    case GA_SIZE:
       temp = *((size_t *)args[i]);
       ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(k->types[i]),
                                 &temp);
-    } else {
+      break;
+    default:
       ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(k->types[i]),
                                 args[i]);
     }
@@ -883,9 +898,15 @@ static int cl_callkernel(gpukernel *k, size_t ls[2], size_t gs[2],
     evw = NULL;
   }
 
-  _gs[0] = gs[0] * ls[0];
-  _gs[1] = gs[1] * ls[1];
-  ctx->err = clEnqueueNDRangeKernel(ctx->q, k->k, 2, NULL, _gs, ls,
+  switch (n) {
+  case 3:
+    _gs[2] = gs[2] * ls[2];
+  case 2:
+    _gs[1] = gs[1] * ls[1];
+  case 1:
+    _gs[0] = gs[0] * ls[0];
+  }
+  ctx->err = clEnqueueNDRangeKernel(ctx->q, k->k, n, NULL, _gs, ls,
 				    num_ev, evw, &ev);
   free(evw);
   if (ctx->err != CL_SUCCESS) return GA_IMPL_ERROR;
@@ -989,7 +1010,7 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
                       const ssize_t *b_str) {
   cl_ctx *ctx = input->ctx;
   strb sb = STRB_STATIC_INIT;
-  size_t nEls, ls[2], gs[2];
+  size_t nEls, ls, gs;
   gpukernel *k;
   void *args[2];
   cl_mem_flags fl;
@@ -1058,14 +1079,13 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
                    2, types, flags, &res, NULL);
   if (k == NULL) goto fail;
   /* Cheap kernel scheduling */
-  res = cl_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, &ls[0]);
+  res = cl_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, &ls);
   if (res != GA_NO_ERROR) goto kfail;
 
-  gs[0] = ((nEls-1) / ls[0]) + 1;
-  gs[1] = ls[1] = 1;
+  gs = ((nEls-1) / ls) + 1;
   args[0] = input;
   args[1] = output;
-  res = cl_callkernel(k, ls, gs, args);
+  res = cl_callkernel(k, 1, &ls, &gs, 0, args);
 
  kfail:
   cl_releasekernel(k);
