@@ -38,9 +38,9 @@ class NoseTester(NoseTester):
         nose = import_nose()
 
         import pygpu
-        #print "pygpu version %s" % pygpu.__version__
+        #print ("pygpu version %s" % pygpu.__version__)
         pygpu_dir = os.path.dirname(pygpu.__file__)
-        print "pygpu is installed in %s" % pygpu_dir
+        print ("pygpu is installed in %s" % pygpu_dir)
 
         super(NoseTester, self)._show_system_info()
 
@@ -143,4 +143,4 @@ def main(modulename):
         tests = unittest.TestLoader().loadTestsFromModule(module)
         unittest.TextTestRunner(verbosity=2).run(tests)
     else:
-        print "options: [--debug]"
+        print ("options: [--debug]")

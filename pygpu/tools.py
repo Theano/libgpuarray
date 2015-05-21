@@ -1,6 +1,10 @@
 import collections
 import functools
-from itertools import ifilterfalse
+try:
+    from itertools import ifilterfalse
+except ImportError:
+    # python 3
+    from itertools import filterfalse as ifilterfalse
 from heapq import nsmallest
 from operator import itemgetter, mul
 
