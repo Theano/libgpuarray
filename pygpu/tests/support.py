@@ -51,13 +51,22 @@ def rand(shape, dtype):
 
 def check_flags(x, y):
     assert isinstance(x, gpuarray.GpuArray)
-    assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
-    if not (skip_single_f and x.shape == ()):
-        # Numpy below 1.6.0 does not have a consistent handling of
-        # f-contiguous for 0-d arrays
-        assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
+    if y.size == 0 and y.flags["C_CONTIGUOUS"] and y.flags["F_CONTIGUOUS"]:
+        # Different numpy version have different value for
+        # C_CONTIGUOUS in that case.
+        pass
+    elif x.flags["C_CONTIGUOUS"] != y.flags["C_CONTIGUOUS"]:
+        assert x.flags["C_CONTIGUOUS"] is True
+        assert x.flags["F_CONTIGUOUS"] is False
+        assert y.flags["C_CONTIGUOUS"] is False
+        assert y.flags["F_CONTIGUOUS"] is True
     else:
-        assert x.flags["F_CONTIGUOUS"]
+        if not (skip_single_f and x.shape == ()):
+            # Numpy below 1.6.0 does not have a consistent handling of
+            # f-contiguous for 0-d arrays
+            assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
+        else:
+            assert x.flags["F_CONTIGUOUS"]
     assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"]
     # Don't check for OWNDATA since it is always true for a GpuArray
     assert x.flags["ALIGNED"] == y.flags["ALIGNED"]

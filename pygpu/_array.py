@@ -131,7 +131,7 @@ class ndgpuarray(gpuarray.GpuArray):
 
     ### divmod
     def __divmod__(self, other):
-        if not isinstance(other, array.GpuArray):
+        if not isinstance(other, gpuarray.GpuArray):
             other = np.asarray(other)
         odtype = get_common_dtype(self, other, True)
 
@@ -157,7 +157,7 @@ class ndgpuarray(gpuarray.GpuArray):
         return (div, mod)
 
     def __rdivmod__(self, other):
-        if not isinstance(other, array.GpuArray):
+        if not isinstance(other, gpuarray.GpuArray):
             other = np.asarray(other)
         odtype = get_common_dtype(other, self, True)
 
