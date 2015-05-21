@@ -8,7 +8,11 @@ include_directories(${CHECK_INCLUDE_DIRS})
 
 set(LIBS ${LIBS} ${CHECK_LIBRARIES})
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CHECK_CFLAGS}")
+# This is a workaround because cmake is stupid when dealing with
+# pkg-config output
+STRING(REPLACE ";" " " CHK_FLAGS "${CHECK_CFLAGS}")
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CHK_FLAGS}")
 
 include_directories(. ../src)
 
