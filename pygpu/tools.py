@@ -5,8 +5,9 @@ from heapq import nsmallest
 from operator import itemgetter, mul
 
 import numpy
-from dtypes import dtype_to_ctype, _fill_dtype_registry
-from gpuarray import GpuArray
+
+from .dtypes import dtype_to_ctype, _fill_dtype_registry
+from .gpuarray import GpuArray
 
 _fill_dtype_registry(respect_windows=False)
 
