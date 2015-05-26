@@ -1897,7 +1897,7 @@ cdef class GpuKernel:
         cdef size_t gs[3]
         cdef size_t ls[3]
         cdef size_t tmp
-        cdef unsigned int nd;
+        cdef unsigned int nd
         cdef const int *types
         cdef unsigned int numargs
         cdef unsigned int i
