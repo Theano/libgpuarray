@@ -209,7 +209,9 @@ void * halloc(void * ptr, size_t len) {
   }
 
   p = structof(ptr, hblock_t, data);
+#ifdef DEBUG
   assert(p->magic == HH_MAGIC);
+#endif
 
   /* realloc */
   if (len) {
@@ -240,7 +242,9 @@ void hattach(void * block, void * parent)
 
 	/* detach */
 	b = structof(block, hblock_t, data);
+#ifdef DEBUG
 	assert(b->magic == HH_MAGIC);
+#endif
 
 	hlist_del(&b->siblings);
 
@@ -249,7 +253,9 @@ void hattach(void * block, void * parent)
 
 	/* attach */
 	p = structof(parent, hblock_t, data);
+#ifdef DEBUG
 	assert(p->magic == HH_MAGIC);
+#endif
 
 	/* sanity checks */
 	assert(b != p);          /* trivial */
@@ -369,4 +375,3 @@ static void _free_children(hblock_t * p)
 		allocator(q, 0);
 	}
 }
-
