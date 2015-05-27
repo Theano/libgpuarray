@@ -896,7 +896,6 @@ static int cuda_callkernel(gpukernel *k, unsigned int n,
                            const size_t *bs, const size_t *gs,
                            size_t shared, void **args) {
     cuda_context *ctx = k->ctx;
-    unsigned int i;
     int res = GA_NO_ERROR;
 
     ASSERT_KER(k);
@@ -953,7 +952,7 @@ static int cuda_sync(gpudata *b) {
   return GA_NO_ERROR;
 }
 
-static const char ELEM_HEADER_PTX[] = ".version 4.0\n.target %s\n\n"
+static const char ELEM_HEADER_PTX[] = ".version 4.2\n.target %s\n\n"
     ".entry extcpy (\n"
     ".param .u%u a_data,\n"
     ".param .u%u b_data ) {\n"
