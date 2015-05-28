@@ -1,11 +1,11 @@
 from mako.template import Template
 
-from tools import ScalarArg, ArrayArg, as_argument, check_args, lfu_cache
-from dtypes import parse_c_arg_backend
-from dtypes import dtype_to_ctype, get_np_obj, get_common_dtype
-
 import numpy
-import gpuarray
+
+from .tools import ScalarArg, ArrayArg, as_argument, check_args, lfu_cache
+from .dtypes import (parse_c_arg_backend, dtype_to_ctype, get_np_obj,
+                     get_common_dtype)
+from . import gpuarray
 
 __all__ = ['ElemwiseKernel', 'elemwise1', 'elemwise2', 'ielemwise2', 'compare']
 

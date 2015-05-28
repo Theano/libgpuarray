@@ -1,12 +1,17 @@
 import collections
 import functools
-from itertools import ifilterfalse
+try:
+    from itertools import ifilterfalse
+except ImportError:
+    # python 3
+    from itertools import filterfalse as ifilterfalse
 from heapq import nsmallest
 from operator import itemgetter, mul
 
 import numpy
-from dtypes import dtype_to_ctype, _fill_dtype_registry
-from gpuarray import GpuArray
+
+from .dtypes import dtype_to_ctype, _fill_dtype_registry
+from .gpuarray import GpuArray
 
 _fill_dtype_registry(respect_windows=False)
 

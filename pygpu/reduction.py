@@ -2,11 +2,11 @@ import math
 
 from mako.template import Template
 
-from tools import ArrayArg, check_args, prod, lfu_cache
-from elemwise import parse_c_args, massage_op
-
 import numpy
-import gpuarray
+
+from . import gpuarray
+from .tools import ArrayArg, check_args, prod, lfu_cache
+from .elemwise import parse_c_args, massage_op
 
 
 basic_kernel = Template("""

@@ -65,8 +65,8 @@ def split(ary, indices_or_sections, axis=0):
     try: len(indices_or_sections)
     except TypeError:
         if ary.shape[axis] % indices_or_sections != 0:
-            raise ValueError, ("array split does not result in an "
-                               "equal division")
+            raise ValueError("array split does not result in an "
+                             "equal division")
     return array_split(ary, indices_or_sections, axis)
 
 def array_split(ary, indices_or_sections, axis=0):
@@ -76,7 +76,7 @@ def array_split(ary, indices_or_sections, axis=0):
     except TypeError:
         nsec = int(indices_or_sections)
         if nsec <= 0:
-            raise ValueError, 'number of sections must be larger than 0.'
+            raise ValueError('number of sections must be larger than 0.')
         neach, extra = divmod(ary.shape[axis], nsec)
         # this madness is to support the numpy interface
         # it is supported by tests, but little else
@@ -88,7 +88,7 @@ def array_split(ary, indices_or_sections, axis=0):
 
 def hsplit(ary, indices_or_sections):
     if len(ary.shape) == 0:
-        raise ValueError, 'hsplit only works on arrays of 1 or more dimensions'
+        raise ValueError('hsplit only works on arrays of 1 or more dimensions')
     if len(ary.shape) > 1:
         axis = 1
     else:
@@ -98,20 +98,20 @@ def hsplit(ary, indices_or_sections):
 
 def vsplit(ary, indices_or_sections):
     if len(ary.shape) < 2:
-        raise ValueError, 'vsplit only works on arrays of 2 or more dimensions'
+        raise ValueError('vsplit only works on arrays of 2 or more dimensions')
     return split(ary, indices_or_sections, axis=0)
 
 
 def dsplit(ary, indices_or_sections):
     if len(ary.shape) < 3:
-        raise ValueError, 'vsplit only works on arrays of 3 or more dimensions'
+        raise ValueError('vsplit only works on arrays of 3 or more dimensions')
     return split(ary, indices_or_sections, axis=2)
 
 
 def concatenate(arys, axis=0, context=None):
     if len(arys) == 0:
-        raise ValueError, ("concatenation of zero-length sequences is "
-                           "impossible")
+        raise ValueError("concatenation of zero-length sequences is "
+                         "impossible")
     al = [asarray(a, context=context) for a in arys]
     if context is None:
         context = al[0].context
