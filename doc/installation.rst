@@ -31,6 +31,10 @@ Requirements
    If you have neither an OpenCL runtime or a CUDA runtime, the
    library might still build, but will be rather useless.
 
+.. note::
+   We support CUDA GPUs with `compute capability 2.0(Fermi)
+   <https://developer.nvidia.com/cuda-gpus>`_ and up.
+
 Download
 --------
 
