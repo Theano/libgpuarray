@@ -48,6 +48,7 @@
 
 #define structof(p,t,f) ((t*)(- offsetof(t,f) + (void*)(p)))
 
+#ifndef _GCC_MAX_ALIGN_T
 union max_align
 {
   char   c;
@@ -61,6 +62,7 @@ union max_align
 };
 
 typedef union max_align max_align_t;
+#endif
 
 /*
  *      weak double-linked list w/ tail sentinel

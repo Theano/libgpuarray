@@ -594,7 +594,7 @@ def init(dev):
     For opencl the device id is the platform number, a colon (:) and
     the device number.  There are no widespread and/or easy way to
     list available platforms and devices.  You can experiement with
-    the values, unavaiable ones will just raise an error, and there
+    the values, unavailable ones will just raise an error, and there
     are no gaps in the valid numbers.
     """
     return pygpu_init(dev)
