@@ -621,6 +621,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
   }
   /* If this assert fires, increase the size of local_kern above. */
   assert(r <= sizeof(local_kern));
+  (void)r; // Remove 'unused' variable warning, no run-time penalty
 
   sz = strlen(local_kern);
   rlk[0] = local_kern;
