@@ -227,7 +227,7 @@ static const char *get_error_string(CUresult err) {
     case CUDA_ERROR_OUT_OF_MEMORY:     return "Out of host memory";
     case CUDA_ERROR_NOT_INITIALIZED:   return "API not initialized";
     case CUDA_ERROR_DEINITIALIZED:     return "Driver is shutting down";
-    case CUDA_ERROR_NO_DEVICE:         return "No CUDA devices avaiable";
+    case CUDA_ERROR_NO_DEVICE:         return "No CUDA devices available";
     case CUDA_ERROR_INVALID_DEVICE:    return "Invalid device ordinal";
     case CUDA_ERROR_INVALID_IMAGE:     return "Invalid module image";
     case CUDA_ERROR_INVALID_CONTEXT:   return "No context bound to current thread or invalid context parameter";
