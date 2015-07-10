@@ -213,8 +213,10 @@ cdef np.dtype dtype_to_npdtype(dtype):
         return None
     if isinstance(dtype, int):
         return typecode_to_dtype(dtype)
-    if isinstance(dtype, str):
+    try:
         return np.dtype(dtype)
+    except TypeError:
+        pass
     if isinstance(dtype, np.dtype):
         return dtype
     raise ValueError("data type not understood", dtype)
@@ -236,8 +238,10 @@ cpdef int dtype_to_typecode(dtype) except -1:
     """
     if isinstance(dtype, int):
         return dtype
-    if isinstance(dtype, str):
+    try:
         dtype = np.dtype(dtype)
+    except TypeError:
+        pass
     if isinstance(dtype, np.dtype):
         res = NP_TO_TYPE.get(dtype, None)
         if res is not None:
