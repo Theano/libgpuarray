@@ -95,9 +95,9 @@ def check_args(args, collapse=False, broadcast=False):
             strs.append(None)
             offsets.append(None)
 
-        if len(arrays) < 1:
-            raise TypeError("No arrays in kernel arguments, "
-                            "something is wrong")
+    if len(arrays) < 1:
+        raise TypeError("No arrays in kernel arguments, "
+                        "something is wrong")
     n = arrays[0].size
     nd = arrays[0].ndim
     dims = arrays[0].shape
