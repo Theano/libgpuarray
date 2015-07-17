@@ -58,6 +58,23 @@ GPUARRAY_PUBLIC const gpuarray_type *gpuarray_get_type(int typecode);
  */
 GPUARRAY_PUBLIC size_t gpuarray_get_elsize(int typecode);
 
+/**
+ * Return the type use flags for the specified typecodes.
+ *
+ * The flags for each type passed in are OR-ed together.
+ *
+ * To check for a single typecode, you have to pass the final -1 also.
+ *
+ * Passing a -1 as the sole argument is allowed and returns 0, however
+ * useful that is.
+ *
+ * \param init a typecode
+ * \param ... list of typecodes terminated by -1
+ *
+ * \returns flags for all passed-in types.
+ */
+GPUARRAY_PUBLIC int gpuarray_type_flags(int init, ...);
+
 #ifdef __cplusplus
 }
 #endif
