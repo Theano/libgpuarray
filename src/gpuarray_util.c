@@ -3,6 +3,7 @@
 #include "private.h"
 #include "gpuarray/util.h"
 #include "gpuarray/error.h"
+#include "gpuarray/kernel.h"
 #include "util/strb.h"
 
 /*
@@ -106,4 +107,26 @@ void gpukernel_source_with_line_numbers(unsigned int count,
       line++;
     }
   }
+}
+
+/* List of typecodes terminated by -1 */
+int gpuarray_type_flags(int init, ...) {
+  va_list ap;
+  int typecode = init;
+  int flags = 0;
+
+  va_start(ap, init);
+  while (typecode != -1) {
+    if (typecode == GA_DOUBLE || typecode == GA_CDOUBLE)
+      flags |= GA_USE_DOUBLE;
+    if (typecode == GA_HALF)
+      flags |= GA_USE_HALF;
+    if (typecode == GA_CFLOAT || typecode == GA_CDOUBLE)
+      flags |= GA_USE_COMPLEX;
+    if (gpuarray_get_elsize(typecode) < 4)
+      flags |= GA_USE_SMALL;
+    typecode = va_arg(ap, int);
+  }
+  va_end(ap);
+  return flags;
 }
