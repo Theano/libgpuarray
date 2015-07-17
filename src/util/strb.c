@@ -1,13 +1,11 @@
 
 #include <stdarg.h>
 #include "util/strb.h"
-#include "util/halloc.h"
 
 strb *strb_alloc(size_t i) {
-  strb *res = h_malloc(sizeof(strb));
+  strb *res = malloc(sizeof(strb));
   if (res == NULL) return NULL;
-  res->s = h_malloc(i);
-  hattach(res->s, res);
+  res->s = malloc(i);
   if (res->s == NULL) { free(res); return NULL; }
   res->a = i;
   res->l = 0;
@@ -15,8 +13,8 @@ strb *strb_alloc(size_t i) {
 }
 
 void strb_free(strb *sb) {
-  h_free(sb->s);
-  h_free(sb);
+  free(sb->s);
+  free(sb);
 }
 
 int strb_grow(strb *sb, size_t n) {
@@ -26,7 +24,7 @@ int strb_grow(strb *sb, size_t n) {
   if (sb->a > n) n = sb->a;
   /* overflow */
   if (SIZE_MAX - sb->a < n) { strb_seterror(sb); return -1; }
-  s = h_realloc(sb->s, sb->a + n);
+  s = realloc(sb->s, sb->a + n);
   if (s == NULL) {
     strb_seterror(sb);
     return -1;
