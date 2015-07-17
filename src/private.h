@@ -13,7 +13,6 @@
 #include "gpuarray/array.h"
 #include "gpuarray/types.h"
 #include "util/strb.h"
-#include "util/halloc.h"
 
 #ifdef __cplusplus
 extern "C" {

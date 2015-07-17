@@ -2,7 +2,6 @@
 #define STRB_H
 
 #include "private_config.h"
-#include "util/halloc.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -84,7 +83,7 @@ static inline int strb_error(strb *sb) {
  * this call.
  */
 static inline void strb_clear(strb *sb) {
-  h_free(sb->s);
+  free(sb->s);
   sb->s = NULL;
   sb->a = 0;
   sb->l = 0;
@@ -166,7 +165,7 @@ GPUARRAY_LOCAL void strb_appendf(strb *, const char *f, ...);
  *
  * Returns the `s` member of the strb after ensuring that a
  * terminating nul is appended.  This value must be freed with
- * h_free().
+ * free().
  *
  * If the strb is in error mode, this function will clear it and
  * return NULL.
