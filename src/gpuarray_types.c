@@ -101,6 +101,8 @@ typedef struct {char c; half_t x; } st_half;
 #define HALF_ALIGN (sizeof(st_half) - sizeof(half_t))
 typedef struct {char c; size_t x; } st_size;
 #define SIZE_ALIGN (sizeof(st_size) - sizeof(size_t))
+typedef struct {char c; ssize_t x; } st_ssize;
+#define SSIZE_ALIGN (sizeof(st_ssize) - sizeof(ssize_t))
 
 const gpuarray_type scalar_types[] = {
   {"ga_bool", 1, BOOL_ALIGN, GA_BOOL},
@@ -128,6 +130,7 @@ const gpuarray_type scalar_types[] = {
   {NULL, 0, 0, -1},
   {"ga_half", 2, HALF_ALIGN, GA_HALF},
   {"ga_size", sizeof(size_t), SIZE_ALIGN, GA_SIZE},
+  {"ga_ssize", sizeof(ssize_t), SSIZE_ALIGN, GA_SSIZE},
 };
 
 const gpuarray_type vector_types[] = {
