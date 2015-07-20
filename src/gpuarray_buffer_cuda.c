@@ -218,7 +218,9 @@ static const char CUDA_PREAMBLE[] =
     "#define ga_float float\n"
     "#define ga_double double\n"
     "#define ga_half uint16_t\n"
-    "#define ga_size size_t\n";
+    "#define ga_size size_t\n"
+    "#define ga_ssize ssize_t\n";
+
 /* XXX: add complex, quads, longlong */
 /* XXX: add vector types */
 

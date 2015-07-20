@@ -204,7 +204,8 @@ static const char CL_PREAMBLE[] =
   "#define ga_float float\n"
   "#define ga_double double\n"
   "#define ga_half half\n"
-  "#define ga_size ulong\n";
+  "#define ga_size ulong\n"
+  "#define ga_ssize long\n";
 /* XXX: add complex types, quad types, and longlong */
 /* XXX: add vector types */
 
@@ -674,7 +675,8 @@ static int cl_check_extensions(const char **preamble, unsigned int *count,
 static gpukernel *cl_newkernel(void *c, unsigned int count,
                                const char **strings, const size_t *lengths,
                                const char *fname, unsigned int argcount,
-                               const int *types, int flags, int *ret, char **err_str) {
+                               const int *types, int flags, int *ret,
+                               char **err_str) {
   cl_ctx *ctx = (cl_ctx *)c;
   gpukernel *res;
   cl_device_id dev;
@@ -845,6 +847,7 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
   gpudata *btmp;
   cl_device_id dev;
   cl_ulong temp;
+  cl_long stemp;
   cl_uint num_ev;
   cl_uint i;
   int res = 0;
@@ -880,8 +883,11 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
       break;
     case GA_SIZE:
       temp = *((size_t *)args[i]);
-      ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(k->types[i]),
-                                &temp);
+      ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(GA_ULONG), &temp);
+      break;
+    case GA_SSIZE:
+      stemp = *((ssize_t *)args[i]);
+      ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(GA_LONG), &temp);
       break;
     default:
       ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(k->types[i]),
