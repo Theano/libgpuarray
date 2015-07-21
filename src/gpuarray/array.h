@@ -336,6 +336,28 @@ GPUARRAY_PUBLIC int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
                                           const ssize_t *steps);
 
 /**
+ * Take a portion of an array along axis 0.
+ *
+ * This operation allows arbitrary indexing of an array along its
+ * first axis. The indexed array `v` can be of any dimension or
+ * strides. The result and index array (`a` and `i` respectively) need
+ * to be C contiguous.
+ *
+ * The dimension 0 of `a` has to match dimension 0 of `i` and the
+ * others have to match their equivalent on `v`. `i` has to have a
+ * single dimension.
+ *
+ * \param a the result array (nd)
+ * \param v the source array (nd)
+ * \param i the index array (1d)
+ *
+ * \return GA_NO_ERROR if the operation was succesful.
+ * \return an error code otherwise
+ */
+GPUARRAY_PUBLIC int GpuArray_take1(GpuArray *a, const GpuArray *v,
+                                   const GpuArray *i);
+
+/**
  * Sets the content of an array to the content of another array.
  *
  * The value array must be smaller or equal in number of dimensions to
