@@ -40,6 +40,7 @@ typedef struct _strb {
  * Returns NULL on error.
  */
 GPUARRAY_LOCAL strb *strb_alloc(size_t s);
+
 /*
  * Frees an strb that was dynamically allocated.
  *
@@ -185,6 +186,18 @@ static inline char *strb_cstr(strb *sb) {
   sb->l--;
   return sb->s;
 }
+
+#ifdef DEBUG
+/*
+ * Use this for debugging.  It prints the content of the strb to the C
+ * stream fd.  May give strange results if the string contains binary
+ * data.
+ */
+static inline void strb_dump(strb *sb, FILE *fd) {
+  if (!strb_error(sb))
+    fwrite(sb->s, sb->l, 1, fd);
+}
+#endif
 
 #ifdef __cplusplus
 }
