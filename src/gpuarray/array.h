@@ -347,15 +347,22 @@ GPUARRAY_PUBLIC int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
  * others have to match their equivalent on `v`. `i` has to have a
  * single dimension.
  *
+ * If `check_error` is not 0, the function will check for indexing
+ * errors in the kernel and will return GA_VALUE_ERROR in that
+ * case. No other error will produce that error code. This is not
+ * always done because it introduces a synchronization point which may
+ * affect performance.
+ *
  * \param a the result array (nd)
  * \param v the source array (nd)
  * \param i the index array (1d)
+ * \param check_error whether to check for index errors or not
  *
  * \return GA_NO_ERROR if the operation was succesful.
  * \return an error code otherwise
  */
 GPUARRAY_PUBLIC int GpuArray_take1(GpuArray *a, const GpuArray *v,
-                                   const GpuArray *i);
+                                   const GpuArray *i, int check_error);
 
 /**
  * Sets the content of an array to the content of another array.
