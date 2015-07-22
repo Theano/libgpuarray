@@ -319,7 +319,7 @@ static int gen_take1_kernel(GpuKernel *k, const gpuarray_buffer_ops *ops,
   int flags = GA_USE_CLUDA;
   int res;
 
-  nargs = 6 + 2 * v->nd;
+  nargs = 7 + 2 * v->nd;
 
   atypes = calloc(nargs, sizeof(int));
   if (atypes == NULL)
@@ -340,8 +340,9 @@ static int gen_take1_kernel(GpuKernel *k, const gpuarray_buffer_ops *ops,
   atypes[apos++] = GA_BUFFER;
   atypes[apos++] = GA_SIZE;
   atypes[apos++] = GA_SIZE;
+  atypes[apos++] = GA_BUFFER;
   assert(apos == nargs);
-  strb_appends(&sb, " const ga_size *ind, ga_size n0, ga_size n1) {\n"
+  strb_appends(&sb, " const ga_size *ind, ga_size n0, ga_size n1, int* err) {\n"
                "  const ga_size idx0 = LDIM_0 * GID_0 + LID_0;\n"
                "  const ga_size numThreads0 = LDIM_0 * GDIM_0;\n"
                "  const ga_size idx1 = LDIM_1 * GID_1 + LID_1;\n"
@@ -352,6 +353,10 @@ static int gen_take1_kernel(GpuKernel *k, const gpuarray_buffer_ops *ops,
                "    ga_ssize ii0 = ind[i0];\n"
                "    ga_size pos0 = off;\n"
                "    if (ii0 < 0) ii0 += d0;\n"
+               "    if ((ii0 < 0) || (ii0 >= d0)) {\n"
+               "      *err = -1;\n"
+               "      continue;"
+               "    }\n"
                "    pos0 += ii0 * s0;\n"
                "    for (i1 = idx1; i1 < n1; i1 += numThreads1) {\n"
                "      ga_size pos, ii = i1;\n"
@@ -384,8 +389,10 @@ bail:
   return res;
 }
 
-int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i) {
+int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
+                   int check_error) {
   size_t n[2], ls[2] = {0, 0}, gs[2] = {0, 0};
+  gpudata *errbuf;
 #if DEBUG
   char *errstr = NULL;
 #endif
@@ -393,13 +400,13 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i) {
   size_t argp;
   GpuKernel k;
   unsigned int j;
-  int err;
+  int err, kerr;
 
   if (a->ops != v->ops || a->ops != i->ops)
     return GA_INVALID_ERROR;
 
   if (!GpuArray_ISWRITEABLE(a))
-    return GA_VALUE_ERROR;
+    return GA_INVALID_ERROR;
 
   if (!GpuArray_ISALIGNED(a) || !GpuArray_ISALIGNED(v) ||
       !GpuArray_ISALIGNED(i))
@@ -407,20 +414,31 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i) {
 
   /* a and i have to be C contiguous */
   if (!GpuArray_IS_C_CONTIGUOUS(a) || !GpuArray_IS_C_CONTIGUOUS(i))
-    return GA_VALUE_ERROR;
+    return GA_INVALID_ERROR;
 
   /* Check that the dimensions match namely a[0] == i[0] and a[>0] == v[>0] */
   if (v->nd == 0 || a->nd == 0 || i->nd != 1 || a->nd != v->nd ||
       a->dimensions[0] != i->dimensions[0])
-    return GA_VALUE_ERROR;
+    return GA_INVALID_ERROR;
 
   n[0] = i->dimensions[0];
   n[1] = 1;
 
   for (j = 1; j < v->nd; j++) {
     if (a->dimensions[j] != v->dimensions[j])
-      return GA_VALUE_ERROR;
+      return GA_INVALID_ERROR;
     n[1] *= v->dimensions[j];
+  }
+
+  err = v->ops->property(NULL, v->data, NULL, GA_CTX_PROP_ERRBUF, &errbuf);
+  if (err != GA_NO_ERROR)
+    return err;
+
+  if (check_error) {
+    kerr = 0;
+    err = v->ops->buffer_write(errbuf, 0, &kerr, sizeof(int));
+    if (err != GA_NO_ERROR)
+      return err;
   }
 
   err = gen_take1_kernel(&k, a->ops, GpuArray_context(a),
@@ -448,7 +466,7 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i) {
   ls[1] = 32;
   gs[0] = 1;
 
-  args = calloc(6 + 2 * v->nd, sizeof(void *));
+  args = calloc(7 + 2 * v->nd, sizeof(void *));
   if (args == NULL) {
     err = GA_MEMORY_ERROR;
     goto out;
@@ -465,9 +483,17 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i) {
   args[argp++] = i->data;
   args[argp++] = &n[0];
   args[argp++] = &n[1];
+  args[argp++] = errbuf;
 
   err = GpuKernel_call(&k, 2, ls, gs, 0, args);
   free(args);
+  if (err == GA_NO_ERROR && check_error) {
+    err = v->ops->buffer_read(&kerr, errbuf, 0, sizeof(int));
+    if (err == GA_NO_ERROR) {
+      if (kerr != 0) err = GA_VALUE_ERROR;
+    }
+  }
+
 out:
   GpuKernel_clear(&k);
   return err;
