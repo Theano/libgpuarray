@@ -527,6 +527,17 @@ typedef struct _gpuarray_buffer_ops {
  */
 #define GA_CTX_PROP_BIN_ID    7
 
+/**
+ * Get a pre-allocated 8 byte buffer for kernel ops.
+ *
+ * This only to avoid the overhead of an allocation when calling a
+ * kernel that may error out. It does not preclude the need for
+ * synchronization and transfers.
+ *
+ * Type: `gpudata *`
+ */
+#define GA_CTX_PROP_ERRBUF    8
+
 /* Start at 512 for GA_BUFFER_PROP_ */
 /**
  * Get the context in which this buffer was allocated.

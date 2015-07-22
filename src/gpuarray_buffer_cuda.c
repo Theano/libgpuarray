@@ -50,6 +50,8 @@ typedef struct {char c; CUdeviceptr x; } st_devptr;
 
 static CUresult err;
 
+static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
+                           int *ret);
 static void cuda_free(gpudata *);
 static void cuda_freekernel(gpukernel *);
 static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
@@ -61,6 +63,8 @@ static int detect_arch(char *ret);
 
 void *cuda_make_ctx(CUcontext ctx, int flags) {
   cuda_context *res;
+  int e;
+
   res = malloc(sizeof(*res));
   if (res == NULL)
     return NULL;
@@ -84,7 +88,16 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
     free(res);
     return NULL;
   }
-  TAG_CTX(res);
+  TAG_CTX(res); /* Need to tag before cuda_alloc */
+  res->errbuf = cuda_alloc(res, 8, NULL, 0, &e);
+  if (e != GA_NO_ERROR) {
+    err = res->err;
+    cache_free(res->extcopy_cache);
+    cuStreamDestroy(res->s);
+    free(res);
+    return NULL;
+  }
+  res->refcnt--; /* Don't want to create a reference loop with the errbuf */
   return res;
 }
 
@@ -98,6 +111,8 @@ static void cuda_free_ctx(cuda_context *ctx) {
       ctx->err = cuda_property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas_ops);
       blas_ops->teardown(ctx);
     }
+    ctx->refcnt = 2; /* Prevent recursive calls */
+    cuda_free(ctx->errbuf);
     cuStreamDestroy(ctx->s);
     if (!(ctx->flags & DONTFREE))
       cuCtxDestroy(ctx->ctx);
@@ -1459,6 +1474,10 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
   case GA_CTX_PROP_BIN_ID:
     *((const char **)res) = ctx->bin_id;
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_ERRBUF:
+    *((gpudata **)res) = ctx->errbuf;
     return GA_NO_ERROR;
 
   case GA_BUFFER_PROP_REFCNT:

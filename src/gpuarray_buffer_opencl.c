@@ -1237,6 +1237,10 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((const char **)res) = ctx->bin_id;
     return GA_NO_ERROR;
 
+  case GA_CTX_PROP_ERRBUF:
+    *((void **)res) = NULL;
+    return GA_UNSUPPORTED_ERROR;
+
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;
     return GA_NO_ERROR;
