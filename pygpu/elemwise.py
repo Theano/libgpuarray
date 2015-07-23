@@ -42,8 +42,10 @@ KERNEL void ${name}(const unsigned int n
 % endfor
 
   for (i = idx; i < n; i += numThreads) {
+% if nd > 0:
     int ii = i;
     int pos;
+% endif
 % for arg in arguments:
     % if arg.isarray():
         GLOBAL_MEM char *${arg.name}_p = (GLOBAL_MEM char *)${arg.name}_data;
@@ -102,8 +104,10 @@ KERNEL void ${name}(
 % endfor
 
   for (i = idx; i < ${n}; i += numThreads) {
+% if nd > 0:
     int ii = i;
     int pos;
+% endif
 % for arg in arguments:
     % if arg.isarray():
         GLOBAL_MEM char *${arg.name}_p = (GLOBAL_MEM char *)${arg.name}_data;
@@ -194,8 +198,10 @@ KERNEL void ${name}(
 % endfor
 
   for (i = idx; i < ${n}; i += numThreads) {
+% if nd > 0:
     int ii = i;
     int pos;
+% endif
 % for arg in arguments:
     % if arg.isarray():
         GLOBAL_MEM char *${arg.name}_p = (GLOBAL_MEM char *)${arg.name}_data;
