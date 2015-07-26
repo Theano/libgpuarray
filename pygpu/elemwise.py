@@ -182,7 +182,9 @@ KERNEL void ${name}(
   const unsigned int idx = LDIM_0 * GID_0 + LID_0;
   const unsigned int numThreads = LDIM_0 * GDIM_0;
   unsigned int i;
+% if any(arg.isarray() and offsets[i] != 0 for i, arg in enumerate(arguments)):
   GLOBAL_MEM char *tmp;
+% endif
 
 % for i, arg in enumerate(arguments):
   % if arg.isarray() and offsets[i] != 0:
