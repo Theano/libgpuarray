@@ -156,7 +156,7 @@ def check_args(args, collapse=False, broadcast=False):
             strs = [list(str) if str is not None else str for str in strs]
         collapse = True
 
-    if nd > 1 and collapse:
+    if collapse:
         # remove dimensions that are of size 1
         for i in range(nd-1, -1, -1):
             if dims[i] == 1:
@@ -176,6 +176,7 @@ def check_args(args, collapse=False, broadcast=False):
                         str[i-1] = str[i]
                         del str[i]
                 nd -= 1
+
     if broadcast or collapse:
         # re-wrap dims and tuples
         dims = tuple(dims)
