@@ -83,24 +83,24 @@ def check_args(args, collapse=False, broadcast=False):
     others will be repeated to match the size of the other arrays.
     If `broadcast` is False no broadcasting takes place.
     """
-    arrays = []
     strs = []
     offsets = []
+    array0 = None
     for arg in args:
         if isinstance(arg, GpuArray):
             strs.append(arg.strides)
             offsets.append(arg.offset)
-            arrays.append(arg)
+            if array0 is None: array0 = arg
         else:
             strs.append(None)
             offsets.append(None)
 
-    if len(arrays) < 1:
+    if array0 is None:
         raise TypeError("No arrays in kernel arguments, "
                         "something is wrong")
-    n = arrays[0].size
-    nd = arrays[0].ndim
-    dims = arrays[0].shape
+    n = array0.size
+    nd = array0.ndim
+    dims = array0.shape
     tdims = dims
     c_contig = True
     f_contig = True
@@ -112,7 +112,9 @@ def check_args(args, collapse=False, broadcast=False):
 
     if broadcast and 1 in dims:
         # Get the full shape in dims (no ones unless all arrays have it).
-        for ary in arrays:
+        for i, ary in enumerate(args):
+            if strs[i] is None:
+                continue
             shp = ary.shape
             if len(dims) != len(shp):
                 raise ValueError("Array order differs")
@@ -122,7 +124,9 @@ def check_args(args, collapse=False, broadcast=False):
                     n *= d
         tdims = tuple(dims)
 
-    for i, ary in enumerate(arrays):
+    for i, ary in enumerate(args):
+        if strs[i] is None:
+            continue
         fl = ary.flags
         shp = ary.shape
         c_contig = c_contig and fl['C_CONTIGUOUS']
