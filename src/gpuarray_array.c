@@ -348,7 +348,6 @@ static int gen_take1_kernel(GpuKernel *k, const gpuarray_buffer_ops *ops,
                "  const ga_size idx1 = LDIM_1 * GID_1 + LID_1;\n"
                "  const ga_size numThreads1 = LDIM_1 * GDIM_1;\n"
                "  ga_size i0, i1;\n"
-               "  s0 /= sizeof(*v);\n"
                "  for (i0 = idx0; i0 < n0; i0 += numThreads0) {\n"
                "    ga_ssize ii0 = ind[i0];\n"
                "    ga_size pos0 = off;\n"
