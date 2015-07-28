@@ -87,7 +87,7 @@ def check_contig(args):
         f_contig = f_contig and fl['F_CONTIGUOUS']
     if not (c_contig or f_contig):
         return None, None, False
-    return n, offsets, True
+    return n, tuple(offsets), True
 
 def check_args(args, collapse=False, broadcast=False):
     """
@@ -177,10 +177,10 @@ def check_args(args, collapse=False, broadcast=False):
             strs = [list(str) if str is not None else str for str in strs]
         collapse = True
 
-    if collapse:
+    if nd > 1 and collapse:
         # remove dimensions that are of size 1
         for i in range(nd-1, -1, -1):
-            if dims[i] == 1:
+            if nd > 1 and dims[i] == 1:
                 del dims[i]
                 for str in strs:
                     if str is not None:
