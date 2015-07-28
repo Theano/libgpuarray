@@ -67,6 +67,27 @@ class ScalarArg(Argument):
     def spec(self):
         return self.dtype
 
+def check_contig(args):
+    dims = None
+    c_contig = f_contig = True
+    offsets = []
+    for arg in args:
+        if not isinstance(arg, GpuArray):
+            offsets.append(None)
+            continue
+
+        if dims is None:
+            dims = arg.shape
+            n = arg.size
+        elif arg.shape != dims:
+            return None, None, False
+        offsets.append(arg.offset)
+        fl = arg.flags
+        c_contig = c_contig and fl['C_CONTIGUOUS']
+        f_contig = f_contig and fl['F_CONTIGUOUS']
+    if not (c_contig or f_contig):
+        return None, None, False
+    return n, tuple(offsets), True
 
 def check_args(args, collapse=False, broadcast=False):
     """
@@ -83,24 +104,24 @@ def check_args(args, collapse=False, broadcast=False):
     others will be repeated to match the size of the other arrays.
     If `broadcast` is False no broadcasting takes place.
     """
-    arrays = []
     strs = []
     offsets = []
+    array0 = None
     for arg in args:
         if isinstance(arg, GpuArray):
             strs.append(arg.strides)
             offsets.append(arg.offset)
-            arrays.append(arg)
+            if array0 is None: array0 = arg
         else:
             strs.append(None)
             offsets.append(None)
 
-    if len(arrays) < 1:
+    if array0 is None:
         raise TypeError("No arrays in kernel arguments, "
                         "something is wrong")
-    n = arrays[0].size
-    nd = arrays[0].ndim
-    dims = arrays[0].shape
+    n = array0.size
+    nd = array0.ndim
+    dims = array0.shape
     tdims = dims
     c_contig = True
     f_contig = True
@@ -112,7 +133,9 @@ def check_args(args, collapse=False, broadcast=False):
 
     if broadcast and 1 in dims:
         # Get the full shape in dims (no ones unless all arrays have it).
-        for ary in arrays:
+        for i, ary in enumerate(args):
+            if strs[i] is None:
+                continue
             shp = ary.shape
             if len(dims) != len(shp):
                 raise ValueError("Array order differs")
@@ -122,7 +145,9 @@ def check_args(args, collapse=False, broadcast=False):
                     n *= d
         tdims = tuple(dims)
 
-    for i, ary in enumerate(arrays):
+    for i, ary in enumerate(args):
+        if strs[i] is None:
+            continue
         fl = ary.flags
         shp = ary.shape
         c_contig = c_contig and fl['C_CONTIGUOUS']
@@ -155,7 +180,7 @@ def check_args(args, collapse=False, broadcast=False):
     if nd > 1 and collapse:
         # remove dimensions that are of size 1
         for i in range(nd-1, -1, -1):
-            if dims[i] == 1:
+            if nd > 1 and dims[i] == 1:
                 del dims[i]
                 for str in strs:
                     if str is not None:
@@ -172,6 +197,7 @@ def check_args(args, collapse=False, broadcast=False):
                         str[i-1] = str[i]
                         del str[i]
                 nd -= 1
+
     if broadcast or collapse:
         # re-wrap dims and tuples
         dims = tuple(dims)
