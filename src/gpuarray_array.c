@@ -354,21 +354,23 @@ static int gen_take1_kernel(GpuKernel *k, const gpuarray_buffer_ops *ops,
                "    if (ii0 < 0) ii0 += d0;\n"
                "    if ((ii0 < 0) || (ii0 >= d0)) {\n"
                "      *err = -1;\n"
-               "      continue;"
+               "      continue;\n"
                "    }\n"
                "    pos0 += ii0 * s0;\n"
                "    for (i1 = idx1; i1 < n1; i1 += numThreads1) {\n"
-               "      ga_size pos, ii = i1;\n"
                "      GLOBAL_MEM ga_byte *p = (GLOBAL_MEM ga_byte *)v;\n"
                "      p += pos0;\n");
-  for (i2 = v->nd; i2 > 1; i2--) {
-    i = i2 - 1;
-    if (i > 1)
-      strb_appendf(&sb, "      pos = ii % d%u;\n"
-                   "      ii / d%u;\n", i, i);
-    else
-      strb_appends(&sb, "      pos = ii;\n");
-    strb_appendf(&sb, "      p += pos * s%u;\n", i);
+  if (v->nd > 1) {
+    strb_appends(&sb, "      ga_size pos, ii = i1;\n");
+    for (i2 = v->nd; i2 > 1; i2--) {
+      i = i2 - 1;
+      if (i > 1)
+        strb_appendf(&sb, "      pos = ii %% d%u;\n"
+                     "      ii / d%u;\n", i, i);
+      else
+        strb_appends(&sb, "      pos = ii;\n");
+      strb_appendf(&sb, "      p += pos * s%u;\n", i);
+    }
   }
   strb_appendf(&sb, "      r[i0*n1 + i1] = ((GLOBAL_MEM %s *)p)[0];\n",
                gpuarray_get_type(v->typecode)->cluda_name);
