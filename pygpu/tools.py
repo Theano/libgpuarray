@@ -95,8 +95,6 @@ def check_args(args, collapse=False, broadcast=False):
     (are all the same shape)
 
     If `collapse` is True dimension collapsing will be performed.
-    If `collapse` is None dimension collapsing will be performed if
-    some arguments are non-contiguous.
     If `collapse` is False dimension collapsing will not be performed.
 
     If `broadcast` is True array broadcasting will be performed which
@@ -104,6 +102,11 @@ def check_args(args, collapse=False, broadcast=False):
     others will be repeated to match the size of the other arrays.
     If `broadcast` is False no broadcasting takes place.
     """
+
+    # For compatibility with old collapse=None option
+    if collapse is None:
+        collapse = True
+
     strs = []
     offsets = []
     array0 = None
@@ -123,8 +126,6 @@ def check_args(args, collapse=False, broadcast=False):
     nd = array0.ndim
     dims = array0.shape
     tdims = dims
-    c_contig = True
-    f_contig = True
 
     if broadcast or collapse:
         # make the strides and dims editable
@@ -150,8 +151,6 @@ def check_args(args, collapse=False, broadcast=False):
             continue
         fl = ary.flags
         shp = ary.shape
-        c_contig = c_contig and fl['C_CONTIGUOUS']
-        f_contig = f_contig and fl['F_CONTIGUOUS']
         if tdims != shp:
             if broadcast:
                 if len(shp) != len(dims):
@@ -161,23 +160,13 @@ def check_args(args, collapse=False, broadcast=False):
                         # Might want to add a per-dimension enable mechanism
                         if d == 1:
                             strs[i][j] = 0
-                            c_contig = False
-                            f_contig = False
                         else:
                             raise ValueError("Array shape differs")
             else:
                 raise ValueError("Array shape differs")
 
-    contig = c_contig or f_contig
 
-    if not contig and collapse is None:
-        # make the strides and dims editable if needed
-        if type(dims) is not list:
-            dims = list(dims)
-            strs = [list(str) if str is not None else str for str in strs]
-        collapse = True
-
-    if nd > 1 and collapse:
+    if collapse and nd > 1:
         # remove dimensions that are of size 1
         for i in range(nd-1, -1, -1):
             if nd > 1 and dims[i] == 1:
@@ -203,7 +192,7 @@ def check_args(args, collapse=False, broadcast=False):
         dims = tuple(dims)
         strs = [tuple(str) if str is not None else None for str in strs]
 
-    return n, nd, dims, tuple(strs), tuple(offsets), contig
+    return n, nd, dims, tuple(strs), tuple(offsets)
 
 class Counter(dict):
     'Mapping where default values are zero'
