@@ -364,9 +364,9 @@ def elemwise_collapse(dtype1, dtype2, shape1, shape2, expected):
 
     o = gpuarray.empty(o_shape, dtype=(a_cpu + b_cpu).dtype, context=context)
 
-    n, nd, dims, strs, offsets, contig = check_args((a_gpu, b_gpu),
-                                                    collapse=True,
-                                                    broadcast=True)
+    n, nd, dims, strs, offsets = check_args((a_gpu, b_gpu),
+                                            collapse=True,
+                                            broadcast=True)
 
     assert nd == expected, (shape1, shape2, dims, nd, expected)
 
@@ -385,9 +385,9 @@ def elemwise_collapse(dtype1, dtype2, shape1, shape2, expected):
     broadcast = any([True for i in shape1 + shape2
                      if i == 1])
 
-    n, nd, dims, strs, offsets, contig = check_args((a_gpu, b_gpu, scalar),
-                                                    collapse=True,
-                                                    broadcast=True)
+    n, nd, dims, strs, offsets = check_args((a_gpu, b_gpu, scalar),
+                                            collapse=True,
+                                            broadcast=True)
     assert nd == expected
 
     k = ElemwiseKernel(context, [ArrayArg(numpy.dtype(dtype1), 'a'),
@@ -414,9 +414,9 @@ def elemwise_collapse(dtype1, dtype2, shape1, shape2, expected):
 
     if shape1[0] != 1:
         c_cpu, c_gpu = gen_gpuarray(shape1, dtype=dtype1, sliced=2, ctx=context)
-        n, nd, dims, strs, offsets,contig = check_args((c_gpu, b_gpu),
-                                                       collapse=True,
-                                                       broadcast=True)
+        n, nd, dims, strs, offsets = check_args((c_gpu, b_gpu),
+                                                collapse=True,
+                                                broadcast=True)
         if broadcast:
             assert nd >= expected
         else:

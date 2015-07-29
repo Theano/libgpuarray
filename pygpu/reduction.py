@@ -219,8 +219,8 @@ class ReductionKernel(object):
         return self._find_kernel_ls(self._gen_basic, maxls, nd)
 
     def __call__(self, *args, **kwargs):
-        _, nd, dims, strs, offsets, contig = check_args(args, collapse=False,
-                                                        broadcast=False)
+        _, nd, dims, strs, offsets = check_args(args, collapse=False,
+                                                broadcast=False)
         out = kwargs.pop('out', None)
         if len(kwargs) != 0:
             raise TypeError('Unexpected keyword argument: %s' %

@@ -427,14 +427,14 @@ class ElemwiseKernel(object):
         args = self.prepare_args_specialized(args)
         return k, args
 
-    def select_kernel(self, args, collapse=None, broadcast=False):
+    def select_kernel(self, args, collapse=True, broadcast=False):
         n, offsets, contig = check_contig(args)
         if contig:
             return (self.contig_k, self.prepare_args_contig(args, n, offsets)), n
 
-        n, nd, dims, strs, offsets, contig = check_args(args,
-                                                        collapse=collapse,
-                                                        broadcast=broadcast)
+        n, nd, dims, strs, offsets = check_args(args,
+                                                collapse=collapse,
+                                                broadcast=broadcast)
 
         try:
             return self.try_specialized(args, n, nd, dims, strs, offsets), n
@@ -462,11 +462,12 @@ class ElemwiseKernel(object):
         return self.get_basic(args, n, nd, dims, strs, offsets), n
 
     def prepare(self, *args, **kwargs):
-        n, nd, dims, strs, offsets, contig = check_args(args, **kwargs)
+        n, offsets, contig = check_contig(args, **kwargs)
         if contig:
             args = self.prepare_args_contig(args, n, offsets)
             self._prepare_k = self.contig_k
         else:
+            n, nd, dims, strs, offsets = check_args(args, **kwargs)
             args = self.prepare_args_specialized(args)
             self._prepare_k = self.get_specialized(args, n, nd, dims, strs, offsets)
 
@@ -489,19 +490,19 @@ class ElemwiseKernel(object):
             self.contig_k(*self.prepare_args_contig(args, n, offsets), n=n)
 
     def call_basic(self, *args, **kwargs):
-        n, nd, dims, strs, offsets, _ = check_args(args, **kwargs)
+        n, nd, dims, strs, offsets = check_args(args, **kwargs)
         if n != 0:
             k, args = self.get_basic(args, n, nd, dims, strs, offsets)
             k(*args, n=n)
 
     def call_dimspec(self, *args, **kwargs):
-        n, nd, dims, strs, offsets, _ = check_args(args, **kwargs)
+        n, nd, dims, strs, offsets = check_args(args, **kwargs)
         if n != 0:
             k, args = self.get_dimspec(args, n, nd, dims, strs, offsets)
             k(*args, n=n)
 
     def call_specialized(self, *args, **kwargs):
-        n, nd, dims, strs, offsets, _ = check_args(args, **kwargs)
+        n, nd, dims, strs, offsets = check_args(args, **kwargs)
         if n != 0:
             k, args = self.get_specialized(args, n, nd, dims, strs, offsets)
             k(*args, n=n)
