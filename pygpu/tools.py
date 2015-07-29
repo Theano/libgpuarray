@@ -151,7 +151,6 @@ def check_args(args, collapse=False, broadcast=False):
         for i, ary in enumerate(args):
             if strs[i] is None:
                 continue
-            fl = ary.flags
             shp = ary.shape
             if tdims != shp:
                 for j, d in enumerate(shp):
