@@ -427,7 +427,7 @@ class ElemwiseKernel(object):
         args = self.prepare_args_specialized(args)
         return k, args
 
-    def select_kernel(self, args, collapse=None, broadcast=False):
+    def select_kernel(self, args, collapse=True, broadcast=False):
         n, offsets, contig = check_contig(args)
         if contig:
             return (self.contig_k, self.prepare_args_contig(args, n, offsets)), n

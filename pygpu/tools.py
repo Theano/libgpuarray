@@ -109,22 +109,25 @@ def check_args(args, collapse=False, broadcast=False):
 
     strs = []
     offsets = []
-    array0 = None
+    dims = None
     for arg in args:
         if isinstance(arg, GpuArray):
             strs.append(arg.strides)
             offsets.append(arg.offset)
-            if array0 is None: array0 = arg
+            if dims is None:
+                n, nd, dims = arg.size, arg.ndim, arg.shape
+            else:
+                if arg.ndim != nd:
+                    raise ValueError("Array order differs")
+                if not broadcast and arg.shape != dims:
+                    raise ValueError("Array shape differs")
         else:
             strs.append(None)
             offsets.append(None)
 
-    if array0 is None:
+    if dims is None:
         raise TypeError("No arrays in kernel arguments, "
                         "something is wrong")
-    n = array0.size
-    nd = array0.ndim
-    dims = array0.shape
     tdims = dims
 
     if broadcast or collapse:
@@ -132,29 +135,25 @@ def check_args(args, collapse=False, broadcast=False):
         dims = list(dims)
         strs = [list(str) if str is not None else str for str in strs]
 
-    if broadcast and 1 in dims:
+    if broadcast:
         # Get the full shape in dims (no ones unless all arrays have it).
+        if 1 in dims:
+            for i, ary in enumerate(args):
+                if strs[i] is None:
+                    continue
+                shp = ary.shape
+                for i, d in enumerate(shp):
+                    if dims[i] != d and dims[i] == 1:
+                        dims[i] = d
+                        n *= d
+            tdims = tuple(dims)
+
         for i, ary in enumerate(args):
             if strs[i] is None:
                 continue
+            fl = ary.flags
             shp = ary.shape
-            if len(dims) != len(shp):
-                raise ValueError("Array order differs")
-            for i, d in enumerate(shp):
-                if dims[i] != d and dims[i] == 1:
-                    dims[i] = d
-                    n *= d
-        tdims = tuple(dims)
-
-    for i, ary in enumerate(args):
-        if strs[i] is None:
-            continue
-        fl = ary.flags
-        shp = ary.shape
-        if tdims != shp:
-            if broadcast:
-                if len(shp) != len(dims):
-                    raise ValueError("Array order differs")
+            if tdims != shp:
                 for j, d in enumerate(shp):
                     if dims[j] != d:
                         # Might want to add a per-dimension enable mechanism
@@ -162,9 +161,6 @@ def check_args(args, collapse=False, broadcast=False):
                             strs[i][j] = 0
                         else:
                             raise ValueError("Array shape differs")
-            else:
-                raise ValueError("Array shape differs")
-
 
     if collapse and nd > 1:
         # remove dimensions that are of size 1
