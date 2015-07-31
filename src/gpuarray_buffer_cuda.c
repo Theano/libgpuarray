@@ -328,11 +328,11 @@ static void *cuda_init(int ord, int flags, int *ret) {
     err = cuCtxCreate(&ctx, fl, dev);
     CHKFAIL(NULL);
     res = cuda_make_ctx(ctx, 0);
-    res->flags |= flags;
     if (res == NULL) {
       cuCtxDestroy(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
+    res->flags |= flags;
     /* Don't leave the context on the thread stack */
     cuCtxPopCurrent(NULL);
     return res;
