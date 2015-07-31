@@ -64,7 +64,7 @@ static int detect_arch(char *ret);
 void *cuda_make_ctx(CUcontext ctx, int flags) {
   int64_t v = 0;
   cuda_context *res;
-  int e;
+  int e = 0;
 
   res = malloc(sizeof(*res));
   if (res == NULL)
