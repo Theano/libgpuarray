@@ -62,6 +62,7 @@ static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
 static int detect_arch(char *ret);
 
 void *cuda_make_ctx(CUcontext ctx, int flags) {
+  int64_t v = 0;
   cuda_context *res;
   int e;
 
@@ -89,7 +90,7 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
     return NULL;
   }
   TAG_CTX(res); /* Need to tag before cuda_alloc */
-  res->errbuf = cuda_alloc(res, 8, NULL, 0, &e);
+  res->errbuf = cuda_alloc(res, 8, &v, GA_BUFFER_INIT, &e);
   if (e != GA_NO_ERROR) {
     err = res->err;
     cache_free(res->extcopy_cache);
