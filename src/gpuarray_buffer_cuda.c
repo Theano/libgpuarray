@@ -180,6 +180,8 @@ static const char CUDA_PREAMBLE[] =
     "#define LOCAL_MEM __shared__\n"
     "#define LOCAL_MEM_ARG /* empty */\n"
     "#define REQD_WG_SIZE(X,Y,Z) __launch_bounds__(X*Y, Z)\n"
+    "#include <math_constants.h>\n"
+    "#define NAN CUDART_NAN_F\n"
     "#define LID_0 threadIdx.x\n"
     "#define LID_1 threadIdx.y\n"
     "#define LID_2 threadIdx.z\n"
