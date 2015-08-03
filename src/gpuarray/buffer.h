@@ -530,6 +530,9 @@ typedef struct _gpuarray_buffer_ops {
 /**
  * Get a pre-allocated 8 byte buffer for kernel ops.
  *
+ * This buffer is initialized to 0 on allocation and must always be
+ * returned to that state after using it.
+ *
  * This only to avoid the overhead of an allocation when calling a
  * kernel that may error out. It does not preclude the need for
  * synchronization and transfers.

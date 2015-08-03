@@ -435,13 +435,6 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
   if (err != GA_NO_ERROR)
     return err;
 
-  if (check_error) {
-    kerr = 0;
-    err = v->ops->buffer_write(errbuf, 0, &kerr, sizeof(int));
-    if (err != GA_NO_ERROR)
-      return err;
-  }
-
   err = gen_take1_kernel(&k, a->ops, GpuArray_context(a),
 #if DEBUG
                          &errstr,
@@ -492,6 +485,9 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
     err = v->ops->buffer_read(&kerr, errbuf, 0, sizeof(int));
     if (err == GA_NO_ERROR) {
       if (kerr != 0) err = GA_VALUE_ERROR;
+      kerr = 0;
+      /* We suppose this will succeed. */
+      v->ops->buffer_write(errbuf, 0, &kerr, sizeof(int));
     }
   }
 
