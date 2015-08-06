@@ -904,7 +904,7 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
       break;
     case GA_SSIZE:
       stemp = *((ssize_t *)args[i]);
-      ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(GA_LONG), &temp);
+      ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(GA_LONG), &stemp);
       break;
     default:
       ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(k->types[i]),
@@ -1293,7 +1293,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
                                 &id, NULL);
     if (ctx->err != GA_NO_ERROR)
       return GA_IMPL_ERROR;
-#ifdef OPENCL_1_1
+#ifdef CL_VERSION_1_1
     ctx->err = clGetKernelWorkGroupInfo(k->k, id,
                                 CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE,
                                         sizeof(sz), &sz, NULL);
@@ -1312,7 +1312,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
       Also OpenCL 1.0 kind of sucks and this is only used for that.
     */
-    sz = (64 < sz) ? 64 : sz;
+    sz = (sz < 64) ? sz : 64;
 #endif
     *((size_t *)res) = sz;
     return GA_NO_ERROR;
