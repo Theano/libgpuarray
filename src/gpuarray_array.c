@@ -1044,6 +1044,50 @@ void GpuArray_fprintf(FILE *fd, const GpuArray *a) {
   fputc('\n', fd);
 }
 
+int GpuArray_fdump(FILE *fd, const GpuArray *a) {
+  char *buf, *p;
+  size_t s = GpuArray_ITEMSIZE(a);
+  size_t k;
+  unsigned int i;
+  int err;
+
+  for (i = 0; i < a->nd; i++)
+    s *= a->dimensions[i];
+
+  buf = malloc(s);
+  if (buf == NULL)
+    return GA_MEMORY_ERROR;
+
+  err = GpuArray_read(buf, s, a);
+  if (err != GA_NO_ERROR) {
+    free(buf);
+    return err;
+  }
+
+  p = buf;
+  k = 0;
+  while (s) {
+    fprintf(fd, "[%" SPREFIX "u] = ", k);
+    switch (a->typecode) {
+    case GA_UINT:
+      fprintf(fd, "%u", *(unsigned int *)p);
+      break;
+    case GA_SSIZE:
+      fprintf(fd, "%" SPREFIX "d", *(ssize_t *)p);
+      break;
+    default:
+      free(buf);
+      return GA_UNSUPPORTED_ERROR;
+    }
+    s -= gpuarray_get_elsize(a->typecode);
+    p += gpuarray_get_elsize(a->typecode);
+    k++;
+    fprintf(fd, "\n");
+  }
+  free(buf);
+  return GA_NO_ERROR;
+}
+
 int GpuArray_is_c_contiguous(const GpuArray *a) {
   size_t size = GpuArray_ITEMSIZE(a);
   int i;
