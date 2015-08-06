@@ -24,6 +24,10 @@ static cl_int err;
 #define CHKFAIL(v) if (err != CL_SUCCESS) FAIL(v, GA_IMPL_ERROR)
 
 static int cl_property(void *c, gpudata *b, gpukernel *k, int p, void *r);
+static gpudata *cl_alloc(void *c, size_t size, void *data, int flags,
+                         int *ret);
+static void cl_release(gpudata *b);
+static void cl_free_ctx(cl_ctx *ctx);
 
 static cl_device_id get_dev(cl_context ctx, int *ret) {
   size_t sz;
@@ -52,6 +56,8 @@ cl_ctx *cl_make_ctx(cl_context ctx) {
   char driver_version[64];
   cl_uint vendor_id;
   size_t len;
+  int64_t v = 0;
+  int e = 0;
 
   id = get_dev(ctx, NULL);
   if (id == NULL) return NULL;
@@ -94,6 +100,13 @@ cl_ctx *cl_make_ctx(cl_context ctx) {
 
   clRetainContext(res->ctx);
   TAG_CTX(res);
+  res->errbuf = cl_alloc(res, 8, &v, GA_BUFFER_INIT, &e);
+  if (e != GA_NO_ERROR) {
+    err = res->err;
+    cl_free_ctx(res);
+    return NULL;
+  }
+  res->refcnt--; /* Prevent ref loop */
   return res;
 }
 
@@ -114,13 +127,17 @@ static void cl_free_ctx(cl_ctx *ctx) {
   assert(ctx->refcnt != 0);
   ctx->refcnt--;
   if (ctx->refcnt == 0) {
-    CLEAR(ctx);
     if (ctx->blas_handle != NULL) {
       ctx->err = cl_property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas_ops);
       blas_ops->teardown(ctx);
     }
+    if (ctx->errbuf != NULL) {
+      ctx->refcnt = 2; /* Avoid recursive release */
+      cl_release(ctx->errbuf);
+    }
     clReleaseCommandQueue(ctx->q);
     clReleaseContext(ctx->ctx);
+    CLEAR(ctx);
     free(ctx);
   }
 }
@@ -1238,8 +1255,8 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_ERRBUF:
-    *((void **)res) = NULL;
-    return GA_UNSUPPORTED_ERROR;
+    *((gpudata **)res) = ctx->errbuf;
+    return GA_NO_ERROR;
 
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;
