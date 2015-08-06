@@ -401,12 +401,12 @@ GPUARRAY_PUBLIC int GpuArray_setarray(GpuArray *a, const GpuArray *v);
  * \return an error code otherwise
  */
 GPUARRAY_PUBLIC int GpuArray_reshape(GpuArray *res, const GpuArray *a,
-                                    unsigned int nd, const size_t *newdims,
-                                    ga_order ord, int nocopy);
+                                     unsigned int nd, const size_t *newdims,
+                                     ga_order ord, int nocopy);
 
 GPUARRAY_PUBLIC int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
-                                            const size_t *newdims,
-                                            ga_order ord);
+                                             const size_t *newdims,
+                                             ga_order ord);
 
 /**
  * Rearrange the axes of an array.
@@ -493,7 +493,7 @@ GPUARRAY_PUBLIC int GpuArray_write(GpuArray *dst, const void *src,
 /**
  * Copy data from the device memory to the host memory.
  *
- * \param dst dstination host memory (contiguous block)
+ * \param dst destination host memory (contiguous block)
  * \param dst_sz size of data to copy (in bytes)
  * \param src source array (must be contiguous)
  *
@@ -501,7 +501,7 @@ GPUARRAY_PUBLIC int GpuArray_write(GpuArray *dst, const void *src,
  * \return an error code otherwise
  */
 GPUARRAY_PUBLIC int GpuArray_read(void *dst, size_t dst_sz,
-                                 const GpuArray *src);
+                                  const GpuArray *src);
 
 /**
  * Set all of an array's data to a byte pattern.
