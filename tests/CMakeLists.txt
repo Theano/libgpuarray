@@ -20,6 +20,14 @@ add_executable(check_types main.c check_types.c)
 target_link_libraries(check_types ${LIBS} gpuarray)
 add_test(test_types ${CMAKE_CURRENT_BINARY_DIR}/check_types)
 
+add_executable(check_util main.c check_util.c)
+target_link_libraries(check_util ${LIBS} gpuarray)
+add_test(test_util ${CMAKE_CURRENT_BINARY_DIR}/check_util)
+
+add_executable(check_array main.c check_array.c)
+target_link_libraries(check_array ${LIBS} gpuarray)
+add_test(test_array ${CMAKE_CURRENT_BINARY_DIR}/check_array)
+
 add_executable(check_error main.c check_error.c)
 target_link_libraries(check_error ${LIBS} gpuarray)
 add_test(test_error ${CMAKE_CURRENT_BINARY_DIR}/check_error)
