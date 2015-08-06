@@ -395,6 +395,7 @@ bail:
 int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
                    int check_error) {
   size_t n[2], ls[2] = {0, 0}, gs[2] = {0, 0};
+  size_t pl;
   gpudata *errbuf;
 #if DEBUG
   char *errstr = NULL;
@@ -457,9 +458,15 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
   if (err != GA_NO_ERROR)
     goto out;
 
-  /* This may not be the best scheduling, but it'll do for now */
-  ls[0] = ls[1] / 32;
-  ls[1] = 32;
+  /* This may not be the best scheduling, but it's good enough */
+  err = k.ops->property(NULL, NULL, k.k, GA_KERNEL_PROP_PREFLSIZE, &pl);
+  ls[0] = ls[1] / pl;
+  ls[1] = pl;
+  if (n[1] > n[0]) {
+    pl = ls[0];
+    ls[0] = ls[1];
+    ls[1] = pl;
+  }
   gs[0] = 1;
 
   args = calloc(7 + 2 * v->nd, sizeof(void *));
