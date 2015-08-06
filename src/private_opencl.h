@@ -42,6 +42,7 @@ typedef struct _cl_ctx {
   cl_command_queue q;
   char *exts;
   void *blas_handle;
+  gpudata *errbuf;
   cl_int err;
   unsigned int refcnt;
   char bin_id[64];
