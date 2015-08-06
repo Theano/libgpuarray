@@ -326,7 +326,8 @@ static int gen_take1_kernel(GpuKernel *k, const gpuarray_buffer_ops *ops,
     return GA_MEMORY_ERROR;
 
   apos = 0;
-  strb_appendf(&sb, "KERNEL void take1(%s *r, const %s *v, ga_size off,",
+  strb_appendf(&sb, "KERNEL void take1(GLOBAL_MEM %s *r, "
+               "GLOBAL_MEM const %s *v, ga_size off,",
                gpuarray_get_type(a->typecode)->cluda_name,
                gpuarray_get_type(v->typecode)->cluda_name);
   atypes[apos++] = GA_BUFFER;
@@ -342,7 +343,8 @@ static int gen_take1_kernel(GpuKernel *k, const gpuarray_buffer_ops *ops,
   atypes[apos++] = GA_SIZE;
   atypes[apos++] = GA_BUFFER;
   assert(apos == nargs);
-  strb_appends(&sb, " const ga_size *ind, ga_size n0, ga_size n1, int* err) {\n"
+  strb_appends(&sb, " GLOBAL_MEM const ga_size *ind, ga_size n0, ga_size n1,"
+               " GLOBAL_MEM int* err) {\n"
                "  const ga_size idx0 = LDIM_0 * GID_0 + LID_0;\n"
                "  const ga_size numThreads0 = LDIM_0 * GDIM_0;\n"
                "  const ga_size idx1 = LDIM_1 * GID_1 + LID_1;\n"
@@ -352,7 +354,7 @@ static int gen_take1_kernel(GpuKernel *k, const gpuarray_buffer_ops *ops,
                "    ga_ssize ii0 = ind[i0];\n"
                "    ga_size pos0 = off;\n"
                "    if (ii0 < 0) ii0 += d0;\n"
-               "    if ((ii0 < 0) || (ii0 >= d0)) {\n"
+               "    if ((ii0 < 0) || ((ga_size)ii0 >= d0)) {\n"
                "      *err = -1;\n"
                "      continue;\n"
                "    }\n"
@@ -366,7 +368,7 @@ static int gen_take1_kernel(GpuKernel *k, const gpuarray_buffer_ops *ops,
       i = i2 - 1;
       if (i > 1)
         strb_appendf(&sb, "      pos = ii %% d%u;\n"
-                     "      ii / d%u;\n", i, i);
+                     "      ii /= d%u;\n", i, i);
       else
         strb_appends(&sb, "      pos = ii;\n");
       strb_appendf(&sb, "      p += pos * s%u;\n", i);
