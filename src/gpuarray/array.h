@@ -617,6 +617,8 @@ GPUARRAY_PUBLIC const char *GpuArray_error(const GpuArray *a, int err);
  */
 GPUARRAY_PUBLIC void GpuArray_fprintf(FILE *fd, const GpuArray *a);
 
+GPUARRAY_PUBLIC int GpuArray_fdump(FILE *fd, const GpuArray *a);
+
 #ifdef __cplusplus
 }
 #endif
