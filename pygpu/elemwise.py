@@ -2,7 +2,7 @@ from mako.template import Template
 
 import numpy
 
-from .tools import ScalarArg, ArrayArg, as_argument, check_contig, check_args, lfu_cache
+from .tools import ScalarArg, ArrayArg, as_argument, check_contig, check_args, lru_cache
 from .dtypes import (parse_c_arg_backend, dtype_to_ctype, get_np_obj,
                      get_common_dtype)
 from . import gpuarray
@@ -324,7 +324,7 @@ class ElemwiseKernel(object):
                                    nd=nd, arguments=self.arguments,
                                    expression=self.expression)
 
-    @lfu_cache()
+    @lru_cache()
     def _make_basic(self, nd):
         name = "elem_" + str(nd)
         src = self.render_basic(nd, name=name)
@@ -362,7 +362,7 @@ class ElemwiseKernel(object):
         args = self.prepare_args_basic(args, n, dims, strs, offsets)
         return k, args
 
-    @lfu_cache()
+    @lru_cache()
     def _make_dimspec(self, n, nd, dims):
         src = dimspec_kernel.render(preamble=self.preamble, name="elemk",
                                     n=n, nd=nd, dims=dims,
@@ -406,7 +406,7 @@ class ElemwiseKernel(object):
     def argspec_specialized(self):
         return [arg.spec() for arg in self.arguments]
 
-    @lfu_cache()
+    @lru_cache()
     def _make_specialized(self, n, nd, dims, strs, offsets):
         src = specialized_kernel.render(preamble=self.preamble,
                                         name="elemk", n=n, nd=nd,

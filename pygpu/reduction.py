@@ -5,7 +5,7 @@ from mako.template import Template
 import numpy
 
 from . import gpuarray
-from .tools import ArrayArg, check_args, prod, lfu_cache
+from .tools import ArrayArg, check_args, prod, lru_cache
 from .elemwise import parse_c_args, massage_op
 
 def _ceil_log2(x):
@@ -216,7 +216,7 @@ class ReductionKernel(object):
                                cluda=True, **self.flags)
         return k, src, spec
 
-    @lfu_cache()
+    @lru_cache()
     def _get_basic_kernel(self, maxls, nd):
         return self._find_kernel_ls(self._gen_basic, maxls, nd)
 
