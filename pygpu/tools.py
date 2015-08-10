@@ -213,7 +213,7 @@ def lfu_cache(maxsize=20):
 
                 # purge least frequently used cache entry
                 if len(cache) > wrapper.maxsize:
-                    for key, _ in nsmallest(maxsize // 10,
+                    for key, _ in nsmallest(wrapper.maxsize // 10,
                                             use_count.iteritems(),
                                             key=itemgetter(1)):
                         del cache[key], use_count[key]
@@ -229,6 +229,55 @@ def lfu_cache(maxsize=20):
         def get(*key):
             result = cache[key]
             use_count[key] += 1
+            wrapper.hits += 1
+            return result
+
+        wrapper.hits = wrapper.misses = 0
+        wrapper.maxsize = maxsize
+        wrapper.clear = clear
+        wrapper.get = get
+        return wrapper
+    return decorating_function
+
+def lru_cache(maxsize=20):
+    def decorating_function(user_function):
+        cache = {}
+        last_use = {}
+        time = [0] # workaround for Python 2, which doesn't have nonlocal
+
+        @functools.wraps(user_function)
+        def wrapper(*key):
+            time[0] += 1
+            last_use[key] = time[0]
+
+            try:
+                result = cache[key]
+                wrapper.hits += 1
+            except KeyError:
+                result = user_function(*key)
+                cache[key] = result
+                wrapper.misses += 1
+
+                # purge least recently used cache entries
+                if len(cache) > wrapper.maxsize:
+                    for key, _ in nsmallest(wrapper.maxsize // 10,
+                                            last_use.iteritems(),
+                                            key=itemgetter(1)):
+                        del cache[key], last_use[key]
+
+            return result
+
+        def clear():
+            cache.clear()
+            last_use.clear()
+            wrapper.hits = wrapper.misses = 0
+            time[0] = 0
+
+        @functools.wraps(user_function)
+        def get(*key):
+            result = cache[key]
+            time[0] += 1
+            last_use[key] = time[0]
             wrapper.hits += 1
             return result
 
