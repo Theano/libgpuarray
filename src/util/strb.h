@@ -2,7 +2,6 @@
 #define STRB_H
 
 #include "private_config.h"
-#include "util/halloc.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,6 +40,7 @@ typedef struct _strb {
  * Returns NULL on error.
  */
 GPUARRAY_LOCAL strb *strb_alloc(size_t s);
+
 /*
  * Frees an strb that was dynamically allocated.
  *
@@ -84,7 +84,7 @@ static inline int strb_error(strb *sb) {
  * this call.
  */
 static inline void strb_clear(strb *sb) {
-  h_free(sb->s);
+  free(sb->s);
   sb->s = NULL;
   sb->a = 0;
   sb->l = 0;
@@ -166,7 +166,7 @@ GPUARRAY_LOCAL void strb_appendf(strb *, const char *f, ...);
  *
  * Returns the `s` member of the strb after ensuring that a
  * terminating nul is appended.  This value must be freed with
- * h_free().
+ * free().
  *
  * If the strb is in error mode, this function will clear it and
  * return NULL.
@@ -186,6 +186,18 @@ static inline char *strb_cstr(strb *sb) {
   sb->l--;
   return sb->s;
 }
+
+#ifdef DEBUG
+/*
+ * Use this for debugging.  It prints the content of the strb to the C
+ * stream fd.  May give strange results if the string contains binary
+ * data.
+ */
+static inline void strb_dump(strb *sb, FILE *fd) {
+  if (!strb_error(sb))
+    fwrite(sb->s, sb->l, 1, fd);
+}
+#endif
 
 #ifdef __cplusplus
 }

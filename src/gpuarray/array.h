@@ -336,6 +336,35 @@ GPUARRAY_PUBLIC int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
                                           const ssize_t *steps);
 
 /**
+ * Take a portion of an array along axis 0.
+ *
+ * This operation allows arbitrary indexing of an array along its
+ * first axis. The indexed array `v` can be of any dimension or
+ * strides. The result and index array (`a` and `i` respectively) need
+ * to be C contiguous.
+ *
+ * The dimension 0 of `a` has to match dimension 0 of `i` and the
+ * others have to match their equivalent on `v`. `i` has to have a
+ * single dimension.
+ *
+ * If `check_error` is not 0, the function will check for indexing
+ * errors in the kernel and will return GA_VALUE_ERROR in that
+ * case. No other error will produce that error code. This is not
+ * always done because it introduces a synchronization point which may
+ * affect performance.
+ *
+ * \param a the result array (nd)
+ * \param v the source array (nd)
+ * \param i the index array (1d)
+ * \param check_error whether to check for index errors or not
+ *
+ * \return GA_NO_ERROR if the operation was succesful.
+ * \return an error code otherwise
+ */
+GPUARRAY_PUBLIC int GpuArray_take1(GpuArray *a, const GpuArray *v,
+                                   const GpuArray *i, int check_error);
+
+/**
  * Sets the content of an array to the content of another array.
  *
  * The value array must be smaller or equal in number of dimensions to
@@ -372,12 +401,12 @@ GPUARRAY_PUBLIC int GpuArray_setarray(GpuArray *a, const GpuArray *v);
  * \return an error code otherwise
  */
 GPUARRAY_PUBLIC int GpuArray_reshape(GpuArray *res, const GpuArray *a,
-                                    unsigned int nd, const size_t *newdims,
-                                    ga_order ord, int nocopy);
+                                     unsigned int nd, const size_t *newdims,
+                                     ga_order ord, int nocopy);
 
 GPUARRAY_PUBLIC int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
-                                            const size_t *newdims,
-                                            ga_order ord);
+                                             const size_t *newdims,
+                                             ga_order ord);
 
 /**
  * Rearrange the axes of an array.
@@ -464,7 +493,7 @@ GPUARRAY_PUBLIC int GpuArray_write(GpuArray *dst, const void *src,
 /**
  * Copy data from the device memory to the host memory.
  *
- * \param dst dstination host memory (contiguous block)
+ * \param dst destination host memory (contiguous block)
  * \param dst_sz size of data to copy (in bytes)
  * \param src source array (must be contiguous)
  *
@@ -472,7 +501,7 @@ GPUARRAY_PUBLIC int GpuArray_write(GpuArray *dst, const void *src,
  * \return an error code otherwise
  */
 GPUARRAY_PUBLIC int GpuArray_read(void *dst, size_t dst_sz,
-                                 const GpuArray *src);
+                                  const GpuArray *src);
 
 /**
  * Set all of an array's data to a byte pattern.
@@ -587,6 +616,8 @@ GPUARRAY_PUBLIC const char *GpuArray_error(const GpuArray *a, int err);
  * \param a an array
  */
 GPUARRAY_PUBLIC void GpuArray_fprintf(FILE *fd, const GpuArray *a);
+
+GPUARRAY_PUBLIC int GpuArray_fdump(FILE *fd, const GpuArray *a);
 
 #ifdef __cplusplus
 }

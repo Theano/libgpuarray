@@ -24,6 +24,10 @@ static cl_int err;
 #define CHKFAIL(v) if (err != CL_SUCCESS) FAIL(v, GA_IMPL_ERROR)
 
 static int cl_property(void *c, gpudata *b, gpukernel *k, int p, void *r);
+static gpudata *cl_alloc(void *c, size_t size, void *data, int flags,
+                         int *ret);
+static void cl_release(gpudata *b);
+static void cl_free_ctx(cl_ctx *ctx);
 
 static cl_device_id get_dev(cl_context ctx, int *ret) {
   size_t sz;
@@ -52,6 +56,8 @@ cl_ctx *cl_make_ctx(cl_context ctx) {
   char driver_version[64];
   cl_uint vendor_id;
   size_t len;
+  int64_t v = 0;
+  int e = 0;
 
   id = get_dev(ctx, NULL);
   if (id == NULL) return NULL;
@@ -94,6 +100,13 @@ cl_ctx *cl_make_ctx(cl_context ctx) {
 
   clRetainContext(res->ctx);
   TAG_CTX(res);
+  res->errbuf = cl_alloc(res, 8, &v, GA_BUFFER_INIT, &e);
+  if (e != GA_NO_ERROR) {
+    err = res->err;
+    cl_free_ctx(res);
+    return NULL;
+  }
+  res->refcnt--; /* Prevent ref loop */
   return res;
 }
 
@@ -114,13 +127,17 @@ static void cl_free_ctx(cl_ctx *ctx) {
   assert(ctx->refcnt != 0);
   ctx->refcnt--;
   if (ctx->refcnt == 0) {
-    CLEAR(ctx);
     if (ctx->blas_handle != NULL) {
       ctx->err = cl_property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas_ops);
       blas_ops->teardown(ctx);
     }
+    if (ctx->errbuf != NULL) {
+      ctx->refcnt = 2; /* Avoid recursive release */
+      cl_release(ctx->errbuf);
+    }
     clReleaseCommandQueue(ctx->q);
     clReleaseContext(ctx->ctx);
+    CLEAR(ctx);
     free(ctx);
   }
 }
@@ -204,7 +221,8 @@ static const char CL_PREAMBLE[] =
   "#define ga_float float\n"
   "#define ga_double double\n"
   "#define ga_half half\n"
-  "#define ga_size ulong\n";
+  "#define ga_size ulong\n"
+  "#define ga_ssize long\n";
 /* XXX: add complex types, quad types, and longlong */
 /* XXX: add vector types */
 
@@ -674,7 +692,8 @@ static int cl_check_extensions(const char **preamble, unsigned int *count,
 static gpukernel *cl_newkernel(void *c, unsigned int count,
                                const char **strings, const size_t *lengths,
                                const char *fname, unsigned int argcount,
-                               const int *types, int flags, int *ret, char **err_str) {
+                               const int *types, int flags, int *ret,
+                               char **err_str) {
   cl_ctx *ctx = (cl_ctx *)c;
   gpukernel *res;
   cl_device_id dev;
@@ -845,6 +864,7 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
   gpudata *btmp;
   cl_device_id dev;
   cl_ulong temp;
+  cl_long stemp;
   cl_uint num_ev;
   cl_uint i;
   int res = 0;
@@ -880,8 +900,11 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
       break;
     case GA_SIZE:
       temp = *((size_t *)args[i]);
-      ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(k->types[i]),
-                                &temp);
+      ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(GA_ULONG), &temp);
+      break;
+    case GA_SSIZE:
+      stemp = *((ssize_t *)args[i]);
+      ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(GA_LONG), &stemp);
       break;
     default:
       ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(k->types[i]),
@@ -1231,6 +1254,10 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((const char **)res) = ctx->bin_id;
     return GA_NO_ERROR;
 
+  case GA_CTX_PROP_ERRBUF:
+    *((gpudata **)res) = ctx->errbuf;
+    return GA_NO_ERROR;
+
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;
     return GA_NO_ERROR;
@@ -1266,7 +1293,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
                                 &id, NULL);
     if (ctx->err != GA_NO_ERROR)
       return GA_IMPL_ERROR;
-#ifdef OPENCL_1_1
+#ifdef CL_VERSION_1_1
     ctx->err = clGetKernelWorkGroupInfo(k->k, id,
                                 CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE,
                                         sizeof(sz), &sz, NULL);
@@ -1285,7 +1312,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
       Also OpenCL 1.0 kind of sucks and this is only used for that.
     */
-    sz = (64 < sz) ? 64 : sz;
+    sz = (sz < 64) ? sz : 64;
 #endif
     *((size_t *)res) = sz;
     return GA_NO_ERROR;

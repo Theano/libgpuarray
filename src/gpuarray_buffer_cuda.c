@@ -50,6 +50,8 @@ typedef struct {char c; CUdeviceptr x; } st_devptr;
 
 static CUresult err;
 
+static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
+                           int *ret);
 static void cuda_free(gpudata *);
 static void cuda_freekernel(gpukernel *);
 static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
@@ -60,7 +62,10 @@ static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
 static int detect_arch(char *ret);
 
 void *cuda_make_ctx(CUcontext ctx, int flags) {
+  int64_t v = 0;
   cuda_context *res;
+  int e = 0;
+
   res = malloc(sizeof(*res));
   if (res == NULL)
     return NULL;
@@ -84,7 +89,16 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
     free(res);
     return NULL;
   }
-  TAG_CTX(res);
+  TAG_CTX(res); /* Need to tag before cuda_alloc */
+  res->errbuf = cuda_alloc(res, 8, &v, GA_BUFFER_INIT, &e);
+  if (e != GA_NO_ERROR) {
+    err = res->err;
+    cache_free(res->extcopy_cache);
+    cuStreamDestroy(res->s);
+    free(res);
+    return NULL;
+  }
+  res->refcnt--; /* Don't want to create a reference loop with the errbuf */
   return res;
 }
 
@@ -98,6 +112,8 @@ static void cuda_free_ctx(cuda_context *ctx) {
       ctx->err = cuda_property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas_ops);
       blas_ops->teardown(ctx);
     }
+    ctx->refcnt = 2; /* Prevent recursive calls */
+    cuda_free(ctx->errbuf);
     cuStreamDestroy(ctx->s);
     if (!(ctx->flags & DONTFREE))
       cuCtxDestroy(ctx->ctx);
@@ -218,7 +234,9 @@ static const char CUDA_PREAMBLE[] =
     "#define ga_float float\n"
     "#define ga_double double\n"
     "#define ga_half uint16_t\n"
-    "#define ga_size size_t\n";
+    "#define ga_size size_t\n"
+    "#define ga_ssize ssize_t\n";
+
 /* XXX: add complex, quads, longlong */
 /* XXX: add vector types */
 
@@ -310,11 +328,11 @@ static void *cuda_init(int ord, int flags, int *ret) {
     err = cuCtxCreate(&ctx, fl, dev);
     CHKFAIL(NULL);
     res = cuda_make_ctx(ctx, 0);
-    res->flags |= flags;
     if (res == NULL) {
       cuCtxDestroy(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
+    res->flags |= flags;
     /* Don't leave the context on the thread stack */
     cuCtxPopCurrent(NULL);
     return res;
@@ -665,7 +683,7 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
         FAIL(NULL, GA_SYS_ERROR);
     }
 
-    buf = h_malloc((size_t)st.st_size);
+    buf = malloc((size_t)st.st_size);
     if (buf == NULL) {
         close(fd);
         unlink(outbuf);
@@ -677,8 +695,8 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
     unlink(outbuf);
     /* fd is blocking; should have complete read */
     if (s == -1) {
-        h_free(buf);
-        FAIL(NULL, GA_SYS_ERROR);
+      free(buf);
+      FAIL(NULL, GA_SYS_ERROR);
     }
 
     *bin_len = (size_t)st.st_size;
@@ -766,7 +784,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     }
 
     if (binary_mode) {
-      bin = h_memdup(strings[0], lengths[0]);
+      bin = memdup(strings[0], lengths[0]);
       bin_len = lengths[0];
       if (bin == NULL) {
         cuda_exit(ctx);
@@ -808,14 +826,9 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
             // We're substituting debug_msg for a string with this first line:
             strb_appends(&debug_msg, "CUDA kernel build failure ::\n"); 
 
-            gpukernel_source_with_line_numbers(1, (const char **)&sb.s, &sb.l, &debug_msg);
-            strb_append0(&debug_msg); // Make sure a final '\0' is present
-
-            if(!strb_error(&debug_msg)) { // Make sure the strb is in a valid state
-              *err_str = strndup(debug_msg.s, debug_msg.l);
-              // If there's an error, *err_str state is fine - fall through
-            }
-            strb_clear(&debug_msg);
+            gpukernel_source_with_line_numbers(1, (const char **)&sb.s,
+                                               &sb.l, &debug_msg);
+            *err_str = strb_cstr(&debug_msg);
             // *err_str will be free()d by the caller (see docs in kernel.h)
           }
           strb_clear(&sb);
@@ -826,47 +839,46 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
       }
     }
 
-    res = h_calloc(1, sizeof(*res));
+    res = calloc(1, sizeof(*res));
     if (res == NULL) {
-      h_free(bin);
+      free(bin);
       cuda_exit(ctx);
       FAIL(NULL, GA_SYS_ERROR);
     }
 
     res->bin_sz = bin_len;
     res->bin = bin;
-    hattach(res->bin, res);
 
     res->refcnt = 1;
     res->argcount = argcount;
-    res->types = h_calloc(argcount, sizeof(int));
-    hattach(res->types, res);
+    res->types = calloc(argcount, sizeof(int));
     if (res->types == NULL) {
-      h_free(res);
+      cuda_freekernel(res);
+      cuda_exit(ctx);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
     memcpy(res->types, types, argcount*sizeof(int));
-    res->args = h_calloc(argcount, sizeof(void *));
-    hattach(res->args, res);
+    res->args = calloc(argcount, sizeof(void *));
     if (res->args == NULL) {
-      h_free(res);
+      cuda_freekernel(res);
+      cuda_exit(ctx);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
 
     ctx->err = cuModuleLoadData(&res->m, bin);
 
     if (ctx->err != CUDA_SUCCESS) {
-      h_free(res);
+      cuda_freekernel(res);
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
 
     ctx->err = cuModuleGetFunction(&res->k, res->m, fname);
     if (ctx->err != CUDA_SUCCESS) {
-        cuModuleUnload(res->m);
-        h_free(res);
-        cuda_exit(ctx);
-        FAIL(NULL, GA_IMPL_ERROR);
+      cuModuleUnload(res->m);
+      cuda_freekernel(res);
+      cuda_exit(ctx);
+      FAIL(NULL, GA_IMPL_ERROR);
     }
 
     res->ctx = ctx;
@@ -885,12 +897,17 @@ static void cuda_freekernel(gpukernel *k) {
   ASSERT_KER(k);
   k->refcnt--;
   if (k->refcnt == 0) {
-    cuda_enter(k->ctx);
-    cuModuleUnload(k->m);
-    cuda_exit(k->ctx);
-    cuda_free_ctx(k->ctx);
+    if (k->ctx != NULL) {
+      cuda_enter(k->ctx);
+      cuModuleUnload(k->m);
+      cuda_exit(k->ctx);
+      cuda_free_ctx(k->ctx);
+    }
     CLEAR(k);
-    h_free(k);
+    free(k->args);
+    free(k->bin);
+    free(k->types);
+    free(k);
   }
 }
 
@@ -1460,6 +1477,10 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
   case GA_CTX_PROP_BIN_ID:
     *((const char **)res) = ctx->bin_id;
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_ERRBUF:
+    *((gpudata **)res) = ctx->errbuf;
     return GA_NO_ERROR;
 
   case GA_BUFFER_PROP_REFCNT:

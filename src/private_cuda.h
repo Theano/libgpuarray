@@ -50,10 +50,11 @@ typedef struct _cuda_context {
   CUresult err;
   CUstream s;
   void *blas_handle;
-  unsigned int refcnt;
-  int flags;
+  gpudata *errbuf;
   cache *extcopy_cache;
   char bin_id[8];
+  unsigned int refcnt;
+  int flags;
 } cuda_context;
 
 GPUARRAY_LOCAL void *cuda_make_ctx(CUcontext ctx, int flags);
