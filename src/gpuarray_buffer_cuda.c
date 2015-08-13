@@ -199,7 +199,9 @@ static const char CUDA_PREAMBLE[] =
     "#define LOCAL_MEM __shared__\n"
     "#define LOCAL_MEM_ARG /* empty */\n"
     "#define REQD_WG_SIZE(X,Y,Z) __launch_bounds__(X*Y, Z)\n"
+    "#ifndef __CUDACC_RTC__\n"
     "#include <math_constants.h>\n"
+    "#endif\n"
     "#ifdef NAN\n"
     "#undef NAN\n"
     "#endif\n"
@@ -225,11 +227,6 @@ static const char CUDA_PREAMBLE[] =
     "typedef unsigned int uint32_t;\n"
     "typedef signed long long int64_t;\n"
     "typedef unsigned long long uint64_t;\n"
-    "#ifndef __intptr_t_defined\n"
-    "typedef long int                intptr_t;\n"
-    "#define __intptr_t_defined\n"
-    "#endif\n"
-    "typedef unsigned long int uintptr_t;\n"
     "#else\n"
     "#ifdef _MSC_VER\n"
     "#define signed __int8 int8_t\n"
@@ -257,7 +254,11 @@ static const char CUDA_PREAMBLE[] =
     "#define ga_double double\n"
     "#define ga_half uint16_t\n"
     "#define ga_size size_t\n"
-    "#define ga_ssize ssize_t\n";
+    "#ifdef __CUDACC_RTC__\n"
+    "#define ga_ssize int64_t\n"
+    "#else\n"
+    "#define ga_ssize ssize_t\n"
+    "#endif\n";
 
 /* XXX: add complex, quads, longlong */
 /* XXX: add vector types */
