@@ -45,6 +45,7 @@ cdef extern from "gpuarray/types.h":
         GA_CDOUBLE,
         GA_HALF,
         GA_SIZE,
+        GA_SSIZE,
         GA_NBASE
 
 cdef extern from "gpuarray/util.h":

@@ -15,14 +15,14 @@ ${preamble}
 
 KERNEL void ${name}(const unsigned int n
 % for d in range(nd):
-                    , const unsigned int dim${d}
+                    , const ga_size dim${d}
 % endfor
 % for arg in arguments:
     % if arg.isarray():
                     , ${arg.decltype()} ${arg.name}_data
-                    , const unsigned int ${arg.name}_offset
+                    , const ga_size ${arg.name}_offset
         % for d in range(nd):
-                    , const int ${arg.name}_str_${d}
+                    , const ga_ssize ${arg.name}_str_${d}
         % endfor
     % else:
                     , ${arg.decltype()} ${arg.name}
@@ -80,9 +80,9 @@ KERNEL void ${name}(
 % for arg in arguments:
     % if arg.isarray():
                     ${arg.decltype()} ${arg.name}_data,
-                    const unsigned int ${arg.name}_offset${'' if nd == 0 and loop.last else ','}
+                    const ga_size ${arg.name}_offset${'' if nd == 0 and loop.last else ','}
         % for d in range(nd):
-                    const int ${arg.name}_str_${d}${'' if (loop.last and loop.parent.last) else ','}
+                    const ga_ssize ${arg.name}_str_${d}${'' if (loop.last and loop.parent.last) else ','}
         % endfor
     % else:
                     ${arg.decltype()} ${arg.name}${',' if not loop.last else ''}
@@ -136,11 +136,11 @@ KERNEL void ${name}(
 contiguous_kernel = Template("""
 ${preamble}
 
-KERNEL void ${name}(const unsigned int n
+KERNEL void ${name}(const ga_size n
 % for arg in arguments:
                     , ${arg.decltype()} ${arg.name}
   % if arg.isarray():
-                    , const unsigned int ${arg.name}_offset
+                    , const ga_size ${arg.name}_offset
   % endif
 % endfor
 ) {
@@ -312,11 +312,11 @@ class ElemwiseKernel(object):
 
     def argspec_contig(self):
         spec = []
-        spec.append('uint32')
+        spec.append(gpuarray.SIZE)
         for i, arg in enumerate(self.arguments):
             spec.append(arg.spec())
             if arg.isarray():
-                spec.append('uint32')
+                spec.append(gpuarray.SIZE)
         return spec
 
     def render_basic(self, nd, name="elemk"):
@@ -345,12 +345,12 @@ class ElemwiseKernel(object):
     def argspec_basic(self, nd):
         spec = []
         spec.append('uint32')
-        spec.extend('uint32' for _ in range(nd))
+        spec.extend(gpuarray.SIZE for _ in range(nd))
         for i, arg in enumerate(self.arguments):
             spec.append(arg.spec())
             if arg.isarray():
-                spec.append('uint32')
-                spec.extend('int32' for _ in range(nd))
+                spec.append(gpuarray.SIZE)
+                spec.extend(gpuarray.SSIZE for _ in range(nd))
         return spec
 
     def get_basic(self, args, n, nd, dims, strs, offsets):
@@ -387,8 +387,8 @@ class ElemwiseKernel(object):
         for i, arg in enumerate(self.arguments):
             spec.append(arg.spec())
             if arg.isarray():
-                spec.append('uint32')
-                spec.extend('int32' for _ in range(nd))
+                spec.append(gpuarray.SIZE)
+                spec.extend(gpuarray.SSIZE for _ in range(nd))
         return spec
 
     def get_dimspec(self, args, n, nd, dims, strs, offsets):
