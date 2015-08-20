@@ -7,11 +7,11 @@
 #include <cuda.h>
 #endif
 
+#include <cache.h>
+
 #include "private.h"
 
 #include "gpuarray/buffer.h"
-
-#include "cache_decls.h"
 
 #ifdef DEBUG
 #include <assert.h>

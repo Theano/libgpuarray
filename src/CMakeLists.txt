@@ -132,6 +132,9 @@ endif()
 
 add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
 
+target_link_libraries(gpuarray cache)
+target_link_libraries(gpuarray-static cache-static)
+
 if(CUDA_FOUND)
   target_link_libraries(gpuarray ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
   target_link_libraries(gpuarray-static ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARY})

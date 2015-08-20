@@ -7,6 +7,8 @@
 
 #include <stdlib.h>
 
+#include <cache.h>
+
 #include "util/strb.h"
 #include "util/xxhash.h"
 
@@ -16,9 +18,6 @@
 #include "gpuarray/extension.h"
 #include "gpuarray/buffer_blas.h"
 
-typedef struct {char c; CUdeviceptr x; } st_devptr;
-#define DEVPTR_ALIGN (sizeof(st_devptr) - sizeof(CUdeviceptr))
-
 static CUresult err;
 
 static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
@@ -27,7 +26,6 @@ static void cuda_free(gpudata *);
 static void cuda_freekernel(gpukernel *);
 static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
 
-#define val_free(v) cuda_freekernel(*v);
 #include "cache_extcopy.h"
 
 static int detect_arch(const char *prefix, char *ret, CUresult *err);
@@ -50,14 +48,17 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
     free(res);
     return NULL;
   }
-  res->extcopy_cache = cache_alloc(64, 32);
+  res->extcopy_cache = cache_lru(64, 32, (cache_eq_fn)extcopy_eq,
+                                 (cache_hash_fn)extcopy_hash,
+                                 (cache_freek_fn)extcopy_free,
+                                 (cache_freev_fn)cuda_freekernel);
   if (res->extcopy_cache == NULL) {
     free(res);
     return NULL;
   }
   err = cuStreamCreate(&res->s, 0);
   if (err != CUDA_SUCCESS) {
-    cache_free(res->extcopy_cache);
+    cache_destroy(res->extcopy_cache);
     free(res);
     return NULL;
   }
@@ -65,7 +66,7 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
   res->errbuf = cuda_alloc(res, 8, &v, GA_BUFFER_INIT, &e);
   if (e != GA_NO_ERROR) {
     err = res->err;
-    cache_free(res->extcopy_cache);
+    cache_destroy(res->extcopy_cache);
     cuStreamDestroy(res->s);
     free(res);
     return NULL;
@@ -91,7 +92,7 @@ static void cuda_free_ctx(cuda_context *ctx) {
     cuStreamDestroy(ctx->s);
     if (!(ctx->flags & DONTFREE))
       cuCtxDestroy(ctx->ctx);
-    cache_free(ctx->extcopy_cache);
+    cache_destroy(ctx->extcopy_cache);
     CLEAR(ctx);
     free(ctx);
   }
@@ -549,23 +550,23 @@ static int detect_arch(const char *prefix, char *ret, CUresult *err) {
 static cache *compile_cache = NULL;
 
 typedef struct _srckey {
-  char *src;
+  const char *src;
   size_t len;
   char arch[BIN_ID_LEN];
 } srckey;
 
 static void free_src(srckey *k) {
-  free(k->src);
+  free((void *)k->src);
   free(k);
 }
 
-static int src_eq(srckey *k1, srckey *v2) {
+static int src_eq(srckey *k1, srckey *k2) {
   return (k1->len == k2->len &&
           strcmp(k1->arch, k2->arch) == 0 &&
           memcmp(k1->src, k2->src, k1->len) == 0);
 }
 
-static uint32_t src_hash(srckey *k1) {
+static uint32_t src_hash(srckey *k) {
   XXH32_state_t h;
   /* seed is an arbitrary, but fixed value */
   XXH32_reset(&h, 42);
@@ -833,8 +834,8 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     cuda_context *ctx = (cuda_context *)c;
     strb sb = STRB_STATIC_INIT;
     char *bin, *log = NULL;
-    srckey k, *pk;
-    binval v, *pv;
+    srckey k, *ak;
+    binval *av;
     gpukernel *res;
     size_t bin_len = 0, log_len = 0;
     CUdevice dev;
@@ -1246,8 +1247,8 @@ static inline unsigned int xmin(unsigned long a, unsigned long b) {
     return (unsigned int)((a < b) ? a : b);
 }
 
-static inline int gen_extcopy_kernel(const cache_key_t *a,
-				     cuda_context *ctx, cache_val_t *v,
+static inline int gen_extcopy_kernel(const extcopy_args *a,
+				     cuda_context *ctx, gpukernel **v,
 				     size_t nEls) {
   strb sb = STRB_STATIC_INIT;
   int res = GA_SYS_ERROR;
@@ -1343,12 +1344,10 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output,
   cuda_context *ctx = input->ctx;
   void *args[2];
   int res = GA_SYS_ERROR;
-  int in_cache = 1;
   unsigned int i;
   size_t nEls = 1, ls, gs;
   gpukernel *k;
-  cache_val_t *v;
-  cache_key_t a;
+  extcopy_args a, *aa;
 
   ASSERT_BUF(input);
   ASSERT_BUF(output);
@@ -1371,44 +1370,40 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output,
   a.istr = a_str;
   a.ostr = b_str;
 
-  do_key_hash(&a);
-
-  v = cache_get(ctx->extcopy_cache, &a);
-  if (v == NULL) {
-    v = &k;
-    res = gen_extcopy_kernel(&a, input->ctx, v, nEls);
+  k = cache_get(ctx->extcopy_cache, &a);
+  if (k == NULL) {
+    res = gen_extcopy_kernel(&a, input->ctx, &k, nEls);
     if (res != GA_NO_ERROR)
       return res;
 
     /* Cache the kernel */
-    a.idims = memdup(a_dims, a_nd*sizeof(size_t));
-    a.odims = memdup(b_dims, b_nd*sizeof(size_t));
-    a.istr = memdup(a_str, a_nd*sizeof(ssize_t));
-    a.ostr = memdup(b_str, b_nd*sizeof(ssize_t));
-    if (a.idims == NULL || a.odims == NULL ||
-	a.istr == NULL || a.ostr == NULL ||
-	cache_insert(ctx->extcopy_cache, &a, v)) {
-      /* Cache insert or memdup failed */
-      free((void *)a.idims);
-      free((void *)a.odims);
-      free((void *)a.istr);
-      free((void *)a.ostr);
-      in_cache = 0;
+    aa = memdup(&a, sizeof(a));
+    if (aa == NULL) goto done;
+    aa->idims = memdup(a_dims, a_nd*sizeof(size_t));
+    aa->odims = memdup(b_dims, b_nd*sizeof(size_t));
+    aa->istr = memdup(a_str, a_nd*sizeof(ssize_t));
+    aa->ostr = memdup(b_str, b_nd*sizeof(ssize_t));
+    if (aa->idims == NULL || aa->odims == NULL ||
+        aa->istr == NULL || aa->ostr == NULL) {
+      extcopy_free(aa);
+      goto done;
     }
+    cuda_retainkernel(k);
+    cache_add(ctx->extcopy_cache, aa, k);
   }
+done:
 
   /* Cheap kernel scheduling */
-  res = cuda_property(NULL, NULL, *v, GA_KERNEL_PROP_MAXLSIZE, &ls);
+  res = cuda_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, &ls);
   if (res != GA_NO_ERROR) goto fail;
 
   gs = ((nEls-1) / ls) + 1;
   args[0] = input;
   args[1] = output;
-  res = cuda_callkernel(*v, 1, &ls, &gs, 0, args);
+  res = cuda_callkernel(k, 1, &ls, &gs, 0, args);
 
 fail:
-  if (!in_cache)
-    cuda_freekernel(*v);
+  cuda_freekernel(k);
   return res;
 }
 
