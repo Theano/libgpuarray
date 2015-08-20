@@ -8,6 +8,7 @@
 #include <stdlib.h>
 
 #include "util/strb.h"
+#include "util/xxhash.h"
 
 #include "gpuarray/buffer.h"
 #include "gpuarray/util.h"
@@ -545,6 +546,44 @@ static int detect_arch(const char *prefix, char *ret, CUresult *err) {
   return GA_NO_ERROR;
 }
 
+static cache *compile_cache = NULL;
+
+typedef struct _srckey {
+  char *src;
+  size_t len;
+  char arch[BIN_ID_LEN];
+} srckey;
+
+static void free_src(srckey *k) {
+  free(k->src);
+  free(k);
+}
+
+static int src_eq(srckey *k1, srckey *v2) {
+  return (k1->len == k2->len &&
+          strcmp(k1->arch, k2->arch) == 0 &&
+          memcmp(k1->src, k2->src, k1->len) == 0);
+}
+
+static uint32_t src_hash(srckey *k1) {
+  XXH32_state_t h;
+  /* seed is an arbitrary, but fixed value */
+  XXH32_reset(&h, 42);
+  XXH32_update(&h, (void *)k->src, k->len);
+  XXH32_update(&h, (void *)k->arch, sizeof(k->arch));
+  return XXH32_digest(&h);
+}
+
+typedef struct _binval {
+  void *bin;
+  size_t len;
+} binval;
+
+static void free_bin(binval *v) {
+  free(v->bin);
+  free(v);
+}
+
 #ifdef WITH_NVRTC
 
 #include <nvrtc.h>
@@ -643,6 +682,7 @@ end:
 
 static const char *TMP_VAR_NAMES[] = {"GPUARRAY_TMPDIR", "TMPDIR", "TMP",
                                       "TEMP", "USERPROFILE"};
+
 
 static void *call_compiler(const char *src, size_t len, const char *arch_arg,
                            size_t *bin_len, char **log, size_t *log_len,
@@ -793,6 +833,8 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     cuda_context *ctx = (cuda_context *)c;
     strb sb = STRB_STATIC_INIT;
     char *bin, *log = NULL;
+    srckey k, *pk;
+    binval v, *pv;
     gpukernel *res;
     size_t bin_len = 0, log_len = 0;
     CUdevice dev;
@@ -883,9 +925,23 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
 
       if (ptx_mode) {
         bin = sb.s;
+        bin_len = sb.l;
       } else {
-        bin = call_compiler(sb.s, sb.l, ctx->bin_id, &bin_len,
-                            &log, &log_len, ret);
+        bin = NULL;
+        if (compile_cache != NULL) {
+          k.src = src;
+          k.len = len;
+          memmove(k.arch, ctx->bin_id, BIN_ID_LEN);
+          av = cache_get(compile_cache, &k);
+          if (av != NULL) {
+            buf = memdup(ab->bin, av->len);
+            bin_len = av->len;
+          }
+        }
+        if (bin == NULL) {
+          bin = call_compiler(sb.s, sb.l, ctx->bin_id, &bin_len,
+                              &log, &log_len, ret);
+        }
         if (bin == NULL) {
           if (err_str != NULL) {
             strb debug_msg = STRB_STATIC_INIT;
@@ -910,6 +966,36 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
           cuda_exit(ctx);
           return NULL;
         }
+        if (compile_cache == NULL)
+          compile_cache = cache_twoq(16, 16, 16, 8, src_eq, src_hash, src_free,
+                                     bin_free);
+
+        if (compile_cache != NULL) {
+          ak = malloc(sizeof(*ak));
+          av = malloc(sizeof(*av));
+          if (ak == NULL || av == NULL) {
+            free(ak);
+            free(av);
+            goto done;
+          }
+          ak->src = memdup(sb.s, sb.l);
+          if (ak->src == NULL) {
+            free(ak);
+            free(av);
+            goto done;
+          }
+          ak->len = sb.l;
+          memmove(ak->arch, ctx->bin_id, BIN_ID_LEN);
+          av->len = bin_len;
+          av->bin = memdup(bin, bin_len);
+          if (av->bin == NULL) {
+            src_free(ak);
+            free(av);
+            goto done;
+          }
+          cache_add(compile_cache, ak, av);
+        }
+      done:
         strb_clear(&sb);
       }
     }
