@@ -16,6 +16,7 @@ np.import_array()
 
 # to export the numeric value
 SIZE = GA_SIZE
+SSIZE = GA_SSIZE
 
 # Numpy API steals dtype references and this breaks cython
 cdef object PyArray_Empty(int a, np.npy_intp *b, np.dtype c, int d):
