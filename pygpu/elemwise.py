@@ -136,7 +136,7 @@ KERNEL void ${name}(
 contiguous_kernel = Template("""
 ${preamble}
 
-KERNEL void ${name}(const ga_size n
+KERNEL void ${name}(const unsigned int n
 % for arg in arguments:
                     , ${arg.decltype()} ${arg.name}
   % if arg.isarray():
@@ -312,7 +312,7 @@ class ElemwiseKernel(object):
 
     def argspec_contig(self):
         spec = []
-        spec.append(gpuarray.SIZE)
+        spec.append('uint32')
         for i, arg in enumerate(self.arguments):
             spec.append(arg.spec())
             if arg.isarray():
