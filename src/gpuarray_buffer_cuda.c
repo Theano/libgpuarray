@@ -3,6 +3,9 @@
 #include "private.h"
 #include "private_cuda.h"
 
+#ifdef WITH_NVRTC
+#include <nvrtc.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -59,7 +62,7 @@ static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
 #define val_free(v) cuda_freekernel(*v);
 #include "cache_extcopy.h"
 
-static int detect_arch(char *ret);
+static int detect_arch(const char *prefix, char *ret);
 
 void *cuda_make_ctx(CUcontext ctx, int flags) {
   int64_t v = 0;
@@ -74,7 +77,7 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
   res->blas_handle = NULL;
   res->refcnt = 1;
   res->flags = flags;
-  if (detect_arch(res->bin_id)) {
+  if (detect_arch("sm_", res->bin_id)) {
     free(res);
     return NULL;
   }
@@ -196,7 +199,9 @@ static const char CUDA_PREAMBLE[] =
     "#define LOCAL_MEM __shared__\n"
     "#define LOCAL_MEM_ARG /* empty */\n"
     "#define REQD_WG_SIZE(X,Y,Z) __launch_bounds__(X*Y, Z)\n"
+    "#ifndef __CUDACC_RTC__\n"
     "#include <math_constants.h>\n"
+    "#endif\n"
     "#ifdef NAN\n"
     "#undef NAN\n"
     "#endif\n"
@@ -213,6 +218,16 @@ static const char CUDA_PREAMBLE[] =
     "#define GDIM_0 gridDim.x\n"
     "#define GDIM_1 gridDim.y\n"
     "#define GDIM_2 gridDim.z\n"
+    "#ifdef __CUDACC_RTC__\n"
+    "typedef signed char int8_t;\n"
+    "typedef unsigned char uint8_t;\n"
+    "typedef signed short int16_t;\n"
+    "typedef unsigned short uint16_t;\n"
+    "typedef signed int int32_t;\n"
+    "typedef unsigned int uint32_t;\n"
+    "typedef signed long long int64_t;\n"
+    "typedef unsigned long long uint64_t;\n"
+    "#else\n"
     "#ifdef _MSC_VER\n"
     "#define signed __int8 int8_t\n"
     "#define unsigned __int8 uint8_t\n"
@@ -224,6 +239,7 @@ static const char CUDA_PREAMBLE[] =
     "#define unsigned __int64 uint64_t\n"
     "#else\n"
     "#include <stdint.h>\n"
+    "#endif\n"
     "#endif\n"
     "#define ga_bool uint8_t\n"
     "#define ga_byte int8_t\n"
@@ -238,7 +254,11 @@ static const char CUDA_PREAMBLE[] =
     "#define ga_double double\n"
     "#define ga_half uint16_t\n"
     "#define ga_size size_t\n"
-    "#define ga_ssize ssize_t\n";
+    "#ifdef __CUDACC_RTC__\n"
+    "#define ga_ssize int64_t\n"
+    "#else\n"
+    "#define ga_ssize ssize_t\n"
+    "#endif\n";
 
 /* XXX: add complex, quads, longlong */
 /* XXX: add vector types */
@@ -564,17 +584,18 @@ static CUresult get_cc(CUdevice dev, int *maj, int *min) {
 #endif
 }
 
-static int detect_arch(char *ret) {
+static int detect_arch(const char *prefix, char *ret) {
     CUdevice dev;
     int major, minor;
     int res;
+    size_t sz = strlen(prefix) + 3;
     CUresult err;
     err = cuCtxGetDevice(&dev);
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
     err = get_cc(dev, &major, &minor);
     if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-    res = snprintf(ret, 6, "sm_%d%d", major, minor);
-    if (res == -1 || res > 6) return GA_UNSUPPORTED_ERROR;
+    res = snprintf(ret, sz, "%s%d%d", prefix, major, minor);
+    if (res == -1 || res > sz) return GA_UNSUPPORTED_ERROR;
     return GA_NO_ERROR;
 }
 
@@ -598,7 +619,7 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
     char *buf;
     int res;
 
-    res = detect_arch(arch_arg);
+    res = detect_arch("sm_", arch_arg);
     if (res != GA_NO_ERROR) FAIL(NULL, res);
 
     for (i = 0; i < sizeof(TMP_VAR_NAMES)/sizeof(TMP_VAR_NAMES[0]); i++) {
@@ -622,7 +643,59 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
     strlcpy(outbuf, namebuf, sizeof(outbuf));
     strlcat(outbuf, ".cubin", sizeof(outbuf));
 
+    /* Get the PTX using nvrtc, which is faster than using nvcc. */
+#ifdef WITH_NVRTC
+    {
+      char compute_arch_arg[11]; /* Must be at least 11, see detect_arch() */
+#ifdef DEBUG
+      const char *nvrtc_args[] = {"-G", "-arch", compute_arch_arg};
+      const size_t nvrtc_num_args = 3;
+#else
+      const char *nvrtc_args[] = {"-arch", compute_arch_arg};
+      const size_t nvrtc_num_args = 2;
+#endif
+      char *ptx;
+      size_t ptx_len;
+      char cubuf[PATH_MAX];
+      res = detect_arch("compute_", compute_arch_arg);
+      if (res != GA_NO_ERROR) FAIL(NULL, res);
+      strlcpy(cubuf, namebuf, sizeof(cubuf));
+      strlcat(cubuf, ".cu", sizeof(cubuf));
+      nvrtcProgram prog;
+      if (nvrtcCreateProgram(&prog, src, cubuf, 0, NULL, NULL) != NVRTC_SUCCESS) {
+        FAIL(NULL, GA_IMPL_ERROR);
+      }
+      if (nvrtcCompileProgram(prog, nvrtc_num_args, nvrtc_args) != NVRTC_SUCCESS) {
+        char *log;
+        size_t log_len;
+        nvrtcGetProgramLogSize(prog, &log_len);
+        log = (char *)malloc(log_len);
+        if (log == NULL) FAIL(NULL, GA_MEMORY_ERROR);
+        nvrtcGetProgramLog(prog, log);
+        printf("%s\n", log);
+        free(log);
+        nvrtcDestroyProgram(&prog);
+        FAIL(NULL, GA_IMPL_ERROR);
+      }
+      if (nvrtcGetPTXSize(prog, &ptx_len) != NVRTC_SUCCESS) {
+        nvrtcDestroyProgram(&prog);
+        FAIL(NULL, GA_IMPL_ERROR);
+      }
+      ptx = (char *)malloc(ptx_len);
+      if (ptx == NULL) FAIL(NULL, GA_MEMORY_ERROR);
+      if (nvrtcGetPTX(prog, ptx) != NVRTC_SUCCESS) {
+        free(ptx);
+        nvrtcDestroyProgram(&prog);
+        FAIL(NULL, GA_IMPL_ERROR);
+      }
+      nvrtcDestroyProgram(&prog);
+
+      s = write(fd, ptx, ptx_len);
+      free(ptx);
+    }
+#else
     s = write(fd, src, len);
+#endif
     close(fd);
     /* fd is not non-blocking; should have complete write */
     if (s == -1) {
@@ -630,6 +703,16 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
         FAIL(NULL, GA_SYS_ERROR);
     }
 
+#ifdef WITH_NVRTC
+    /* This block executes ptxas on the written-out file */
+#ifdef DEBUG
+#define PTXAS_ARGS PTXAS_BIN, "--device-debug", "-arch", arch_arg, \
+      namebuf, "-o", outbuf
+#else
+#define PTXAS_ARGS PTXAS_BIN, "-arch", arch_arg, \
+      namebuf, "-o", outbuf
+#endif
+#else
     /* This block executes nvcc on the written-out file */
 #ifdef DEBUG
 #define NVCC_ARGS NVCC_BIN, "-g", "-G", "-arch", arch_arg, "-x", "cu", \
@@ -638,15 +721,24 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
 #define NVCC_ARGS NVCC_BIN, "-arch", arch_arg, "-x", "cu", \
       "--cubin", namebuf, "-o", outbuf
 #endif
+#endif
 #ifdef _WIN32
+#ifdef WITH_NVRTC
+    sys_err = _spawnl(_P_WAIT, PTXAS_BIN, PTXAS_ARGS, NULL);
+#else
     sys_err = _spawnl(_P_WAIT, NVCC_BIN, NVCC_ARGS, NULL);
+#endif
     unlink(namebuf);
     if (sys_err == -1) FAIL(NULL, GA_SYS_ERROR);
     if (sys_err != 0) FAIL(NULL, GA_RUN_ERROR);
 #else
     p = fork();
     if (p == 0) {
+#ifdef WITH_NVRTC
+        execl(PTXAS_BIN, PTXAS_ARGS, NULL);
+#else
         execl(NVCC_BIN, NVCC_ARGS, NULL);
+#endif
         exit(1);
     }
     if (p == -1) {
@@ -655,7 +747,8 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
     }
 
     /* We need to wait until after the waitpid for the unlink because otherwise
-       we might delete the input file before nvcc is finished with it. */
+       we might delete the input file before ptxas or nvcc is finished with
+       it. */
     if (waitpid(p, &sys_err, 0) == -1) {
         unlink(namebuf);
         unlink(outbuf);
@@ -800,7 +893,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
 
       if (lengths == NULL) {
         for (i = 0; i < count; i++)
-        strb_appends(&sb, strings[i]);
+          strb_appends(&sb, strings[i]);
       } else {
         for (i = 0; i < count; i++) {
           if (lengths[i] == 0)
@@ -810,7 +903,11 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
         }
       }
 
+#ifdef WITH_NVRTC
+      if (!binary_mode) strb_append0(&sb);
+#else
       if (ptx_mode) strb_append0(&sb);
+#endif
 
       if (strb_error(&sb)) {
         strb_clear(&sb);
@@ -1133,7 +1230,7 @@ static inline int gen_extcopy_kernel(const cache_key_t *a,
     out_ld_t = out_t;
   rmod = get_rmod(a->itype, a->otype);
   if (in_t == NULL || out_t == NULL) return GA_DEVSUP_ERROR;
-  res = detect_arch(arch);
+  res = detect_arch("sm_", arch);
   if (res != GA_NO_ERROR) return res;
 
   strb_appendf(&sb, ELEM_HEADER_PTX, arch, bits, bits, bits,

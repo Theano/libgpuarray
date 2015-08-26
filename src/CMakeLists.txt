@@ -77,6 +77,24 @@ if (CUDA_FOUND)
     SET(CUDADRV_LIBRARY ${CUDA_CUDA_LIBRARY})
     SET(CUDADRV_INCLUDE ${CUDA_TOOLKIT_INCLUDE})
   endif()
+  find_library(CUDA_NVRTC_LIBRARY
+    NAMES nvrtc
+    PATHS "${CUDA_TOOLKIT_ROOT_DIR}"
+    PATH_SUFFIXES lib lib64
+    NO_DEFAULT_PATH
+    )
+  if(CUDA_NVRTC_LIBRARY)
+    add_definitions(-DWITH_NVRTC)
+    find_program(CUDA_PTXAS_EXECUTABLE
+      NAMES ptxas
+      PATHS "${CUDA_TOOLKIT_ROOT_DIR}"
+      PATH_SUFFIXES bin bin64
+      NO_DEFAULT_PATH
+      )
+    if (CUDA_PTXAS_EXECUTABLE)
+      add_definitions(-DPTXAS_BIN="${CUDA_PTXAS_EXECUTABLE}")
+    endif()
+  endif()
 
   set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_buffer_cuda.c)
   add_definitions(-DNVCC_BIN="${CUDA_NVCC_EXECUTABLE}" -DWITH_CUDA)
@@ -119,8 +137,13 @@ endif()
 add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
 
 if(CUDA_FOUND)
-  target_link_libraries(gpuarray ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
-  target_link_libraries(gpuarray-static ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARY})
+  if(CUDA_NVRTC_LIBRARY)
+    target_link_libraries(gpuarray ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARIES} ${CUDA_NVRTC_LIBRARY})
+    target_link_libraries(gpuarray-static ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARY} ${CUDA_NVRTC_LIBRARY})
+  else()
+    target_link_libraries(gpuarray ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
+    target_link_libraries(gpuarray-static ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARY})
+  endif()
 endif()
 
 if(OPENCL_FOUND)
