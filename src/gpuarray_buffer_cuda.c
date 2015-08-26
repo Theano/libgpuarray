@@ -29,7 +29,7 @@ static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
 #define val_free(v) cuda_freekernel(*v);
 #include "cache_extcopy.h"
 
-static int detect_arch(char *ret, CUresult *err);
+static int detect_arch(const char *prefix, char *ret, CUresult *err);
 
 void *cuda_make_ctx(CUcontext ctx, int flags) {
   int64_t v = 0;
@@ -45,7 +45,7 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
   res->refcnt = 1;
   res->flags = flags;
   res->enter = 0;
-  if (detect_arch(res->bin_id, &err)) {
+  if (detect_arch(ARCH_PREFIX, res->bin_id, &err)) {
     free(res);
     return NULL;
   }
@@ -531,34 +531,21 @@ static CUresult get_cc(CUdevice dev, int *maj, int *min) {
 #endif
 }
 
-static int detect_arch(char *ret, CUresult *err) {
+static int detect_arch(const char *prefix, char *ret, CUresult *err) {
   CUdevice dev;
   int major, minor;
   int res;
+  size_t sz = strlen(prefix) + 3;
   *err = cuCtxGetDevice(&dev);
   if (*err != CUDA_SUCCESS) return GA_IMPL_ERROR;
   *err = get_cc(dev, &major, &minor);
   if (*err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-  res = snprintf(ret, 6, "sm_%d%d", major, minor);
-  if (res == -1 || res > 6) return GA_UNSUPPORTED_ERROR;
+  res = snprintf(ret, sz, "%s%d%d", prefix, major, minor);
+  if (res == -1 || res > sz) return GA_UNSUPPORTED_ERROR;
   return GA_NO_ERROR;
 }
 
 #ifdef WITH_NVRTC
-
-static int detect_compute(char *ret) {
-  CUdevice dev;
-  int major, minor;
-  int res;
-  CUresult err;
-  err = cuCtxGetDevice(&dev);
-  if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-  err = get_cc(dev, &major, &minor);
-  if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-  res = snprintf(ret, 12, "compute_%d%d", major, minor);
-  if (res == -1 || res > 12) return GA_UNSUPPORTED_ERROR;
-  return GA_NO_ERROR;
-}
 
 #include <nvrtc.h>
 
@@ -568,7 +555,6 @@ static void *call_compiler(const char *src, size_t len, const char *arch_arg,
   nvrtcProgram prog;
   void *buf = NULL;
   size_t buflen;
-  char compute_arg[12]; /* Must be 12. See detect_compute() */
   const char *opts[4] = {
     "-arch", ""
     , "-G", "-lineinfo"
@@ -576,10 +562,7 @@ static void *call_compiler(const char *src, size_t len, const char *arch_arg,
   nvrtcResult err, err2;
   int res;
 
-  res = detect_compute(compute_arg);
-  if (res != GA_NO_ERROR) FAIL(NULL, res);
-
-  opts[1] = compute_arg;
+  opts[1] = arch_arg;
 
   err = nvrtcCreateProgram(&prog, src, NULL, 0, NULL, NULL);
   if (err != NVRTC_SUCCESS) FAIL(NULL, GA_SYS_ERROR);

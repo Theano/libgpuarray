@@ -51,11 +51,17 @@ typedef struct _cuda_context {
   void *blas_handle;
   gpudata *errbuf;
   cache *extcopy_cache;
-  char bin_id[8];
+  char bin_id[12];
   unsigned int refcnt;
   int flags;
   unsigned int enter;
 } cuda_context;
+
+#ifdef WITH_NVRTC
+#define ARCH_ARG "compute_"
+#else
+#define ARCH_ARG "sm_"
+#endif
 
 GPUARRAY_LOCAL void *cuda_make_ctx(CUcontext ctx, int flags);
 GPUARRAY_LOCAL CUcontext cuda_get_ctx(void *ctx);
