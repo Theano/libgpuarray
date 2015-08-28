@@ -1388,8 +1388,12 @@ static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output,
       extcopy_free(aa);
       goto done;
     }
+    /* One ref is given to the cache, we manage the other */
     cuda_retainkernel(k);
     cache_add(ctx->extcopy_cache, aa, k);
+  } else {
+    /* This is our reference */
+    cuda_retainkernel(k);
   }
 done:
 
@@ -1403,6 +1407,7 @@ done:
   res = cuda_callkernel(k, 1, &ls, &gs, 0, args);
 
 fail:
+  /* We free our reference here */
   cuda_freekernel(k);
   return res;
 }
