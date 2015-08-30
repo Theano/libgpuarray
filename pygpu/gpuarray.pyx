@@ -1974,6 +1974,8 @@ cdef class GpuKernel:
             self.callbuf[index] = <void *>((<GpuArray>o).ga.data)
         elif typecode == GA_SIZE:
             (<size_t *>self.callbuf[index])[0] = o
+        elif typecode == GA_SSIZE:
+            (<ssize_t *>self.callbuf[index])[0] = o
         elif typecode == GA_FLOAT:
             (<float *>self.callbuf[index])[0] = o
         elif typecode == GA_DOUBLE:
@@ -1995,7 +1997,8 @@ cdef class GpuKernel:
         elif typecode == GA_ULONG:
             (<unsigned long *>self.callbuf[index])[0] = o
         else:
-            raise ValueError, "Bad typecode in _setarg (please report this, it is a bug)"
+            raise ValueError("Bad typecode in _setarg: %d "
+                             "(please report this, it is a bug)" % (typecode,))
 
     property maxlsize:
         "Maximum local size for this kernel"
