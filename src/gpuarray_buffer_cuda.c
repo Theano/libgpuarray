@@ -74,6 +74,7 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
   res->blas_handle = NULL;
   res->refcnt = 1;
   res->flags = flags;
+  res->enter = 0;
   if (detect_arch(res->bin_id)) {
     free(res);
     return NULL;
@@ -108,8 +109,10 @@ static void cuda_free_ctx(cuda_context *ctx) {
   ASSERT_CTX(ctx);
   ctx->refcnt--;
   if (ctx->refcnt == 0) {
+    assert(ctx->enter == 0 && "Context was active when freed!");
     if (ctx->blas_handle != NULL) {
-      ctx->err = cuda_property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas_ops);
+      ctx->err = cuda_property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS,
+                               &blas_ops);
       blas_ops->teardown(ctx);
     }
     ctx->refcnt = 2; /* Prevent recursive calls */
@@ -135,17 +138,17 @@ CUstream cuda_get_stream(void *ctx) {
 
 void cuda_enter(cuda_context *ctx) {
   ASSERT_CTX(ctx);
-  cuCtxGetCurrent(&ctx->old);
-  if (ctx->old != ctx->ctx)
-    ctx->err = cuCtxSetCurrent(ctx->ctx);
-  /* If no context was there in the first place, then we take over
-     to avoid the set dance on the thread */
-  if (ctx->old == NULL) ctx->old = ctx->ctx;
+  if (!ctx->enter)
+    ctx->err = cuCtxPushCurrent(ctx->ctx);
+  ctx->enter++;
 }
 
 void cuda_exit(cuda_context *ctx) {
-  if (ctx->old != ctx->ctx)
-    cuCtxSetCurrent(ctx->old);
+  ASSERT_CTX(ctx);
+  assert(ctx->enter > 0);
+  ctx->enter--;
+  if (!ctx->enter)
+    cuCtxPopCurrent(NULL);
 }
 
 gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {

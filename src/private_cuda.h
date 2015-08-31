@@ -46,7 +46,6 @@ typedef struct _cuda_context {
   char tag[8];
 #endif
   CUcontext ctx;
-  CUcontext old;
   CUresult err;
   CUstream s;
   void *blas_handle;
@@ -55,6 +54,7 @@ typedef struct _cuda_context {
   char bin_id[8];
   unsigned int refcnt;
   int flags;
+  unsigned int enter;
 } cuda_context;
 
 GPUARRAY_LOCAL void *cuda_make_ctx(CUcontext ctx, int flags);
