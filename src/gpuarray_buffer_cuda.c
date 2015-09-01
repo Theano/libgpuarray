@@ -449,7 +449,7 @@ int cuda_wait(gpudata *a, int flags) {
   return GA_NO_ERROR;
 }
 
-int cuda_mark(gpudata *a, int flags) {
+int cuda_record(gpudata *a, int flags) {
   ASSERT_BUF(a);
   cuda_enter(a->ctx);
   a->ctx->err = cuEventRecord(a->ev, a->ctx->s);

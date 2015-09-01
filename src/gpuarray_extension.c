@@ -17,7 +17,7 @@ extern void *cuda_make_buf(void);
 extern void *cuda_get_ptr(void);
 extern void *cuda_get_sz(void);
 extern void *cuda_wait(void);
-extern void *cuda_mark(void);
+extern void *cuda_record(void);
 extern void *cuda_set_compiler(void);
 #endif
 #ifdef WITH_OPENCL
@@ -39,7 +39,7 @@ static ext ext_list[] = {
   {"cuda_get_ptr", cuda_get_ptr},
   {"cuda_get_sz", cuda_get_sz},
   {"cuda_wait", cuda_wait},
-  {"cuda_mark", cuda_mark},
+  {"cuda_record", cuda_record},
   {"cuda_set_compiler", cuda_set_compiler},
 #endif
 #ifdef WITH_OPENCL

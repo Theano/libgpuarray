@@ -79,7 +79,7 @@ GPUARRAY_LOCAL gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz);
 GPUARRAY_LOCAL CUdeviceptr cuda_get_ptr(gpudata *g);
 GPUARRAY_LOCAL size_t cuda_get_sz(gpudata *g);
 GPUARRAY_LOCAL int cuda_wait(gpudata *, int);
-GPUARRAY_LOCAL int cuda_mark(gpudata *, int);
+GPUARRAY_LOCAL int cuda_record(gpudata *, int);
 
 /* private flags are in the upper 16 bits */
 #define CUDA_WAIT_READ  0x10000
