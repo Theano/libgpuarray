@@ -1,5 +1,4 @@
 include(CheckFunctionExists)
-include(${CMAKE_SOURCE_DIR}/gen_blas.cmake)
 
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
 
