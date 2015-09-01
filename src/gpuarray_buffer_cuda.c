@@ -444,6 +444,29 @@ static int cuda_share(gpudata *a, gpudata *b, int *ret) {
            (b->ptr <= a->ptr && b->ptr + b->sz > a->ptr)));
 }
 
+int cuda_wait(gpudata *a, int flags) {
+  ASSERT_BUF(a);
+  /* If others are only reads, no need to wait */
+  if (flags & CUDA_WAIT_READ && !(a->flags & CUDA_WAIT_WRITE))
+    return GA_NO_ERROR;
+  cuda_enter(a->ctx);
+  a->ctx->err = cuStreamWaitEvent(a->ctx->s, a->ev, 0);
+  if (a->ctx->err != CUDA_SUCCESS)
+    return GA_IMPL_ERROR;
+  cuda_exit(a->ctx);
+  return GA_NO_ERROR;
+}
+
+int cuda_mark(gpudata *a, int flags) {
+  ASSERT_BUF(a);
+  cuda_enter(a->ctx);
+  a->ctx->err = cuEventRecord(a->ev, a->ctx->s);
+  a->flags &= ~(CUDA_WAIT_MASK);
+  a->flags &= (flags & CUDA_WAIT_MASK);
+  cuda_exit(a->ctx);
+  return GA_NO_ERROR;
+}
+
 static int cuda_move(gpudata *dst, size_t dstoff, gpudata *src,
                      size_t srcoff, size_t sz) {
     cuda_context *ctx = dst->ctx;
@@ -1556,22 +1579,22 @@ static const char *cuda_error(void *c) {
 
 GPUARRAY_LOCAL
 const gpuarray_buffer_ops cuda_ops = {cuda_init,
-                                     cuda_deinit,
-                                     cuda_alloc,
-                                     cuda_retain,
-                                     cuda_free,
-                                     cuda_share,
-                                     cuda_move,
-                                     cuda_read,
-                                     cuda_write,
-                                     cuda_memset,
-                                     cuda_newkernel,
-                                     cuda_retainkernel,
-                                     cuda_freekernel,
-                                     cuda_callkernel,
-                                     cuda_kernelbin,
-                                     cuda_sync,
-                                     cuda_extcopy,
-                                     cuda_transfer,
-                                     cuda_property,
-                                     cuda_error};
+                                      cuda_deinit,
+                                      cuda_alloc,
+                                      cuda_retain,
+                                      cuda_free,
+                                      cuda_share,
+                                      cuda_move,
+                                      cuda_read,
+                                      cuda_write,
+                                      cuda_memset,
+                                      cuda_newkernel,
+                                      cuda_retainkernel,
+                                      cuda_freekernel,
+                                      cuda_callkernel,
+                                      cuda_kernelbin,
+                                      cuda_sync,
+                                      cuda_extcopy,
+                                      cuda_transfer,
+                                      cuda_property,
+                                      cuda_error};
