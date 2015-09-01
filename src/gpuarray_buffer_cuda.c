@@ -59,7 +59,7 @@ static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
 #define val_free(v) cuda_freekernel(*v);
 #include "cache_extcopy.h"
 
-static int detect_arch(char *ret);
+static int detect_arch(char *ret, CUresult *err);
 
 void *cuda_make_ctx(CUcontext ctx, int flags) {
   int64_t v = 0;
@@ -75,7 +75,7 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
   res->refcnt = 1;
   res->flags = flags;
   res->enter = 0;
-  if (detect_arch(res->bin_id)) {
+  if (detect_arch(res->bin_id, &err)) {
     free(res);
     return NULL;
   }
@@ -574,15 +574,14 @@ static CUresult get_cc(CUdevice dev, int *maj, int *min) {
 #endif
 }
 
-static int detect_arch(char *ret) {
+static int detect_arch(char *ret, CUresult *err) {
     CUdevice dev;
     int major, minor;
     int res;
-    CUresult err;
-    err = cuCtxGetDevice(&dev);
-    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-    err = get_cc(dev, &major, &minor);
-    if (err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+    *err = cuCtxGetDevice(&dev);
+    if (*err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+    *err = get_cc(dev, &major, &minor);
+    if (*err != CUDA_SUCCESS) return GA_IMPL_ERROR;
     res = snprintf(ret, 6, "sm_%d%d", major, minor);
     if (res == -1 || res > 6) return GA_UNSUPPORTED_ERROR;
     return GA_NO_ERROR;
@@ -591,12 +590,12 @@ static int detect_arch(char *ret) {
 static const char *TMP_VAR_NAMES[] = {"GPUARRAY_TMPDIR", "TMPDIR", "TMP",
                                       "TEMP", "USERPROFILE"};
 
-static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
+static void *call_compiler_impl(const char *src, size_t len,
+                                const char *arch_arg, size_t *bin_len,
                                 int *ret) {
     char namebuf[PATH_MAX];
     char outbuf[PATH_MAX];
     char *tmpdir;
-    char arch_arg[6]; /* Must be at least 6, see detect_arch() */
     struct stat st;
     ssize_t s;
 #ifndef _WIN32
@@ -606,10 +605,6 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
     int sys_err;
     int fd;
     char *buf;
-    int res;
-
-    res = detect_arch(arch_arg);
-    if (res != GA_NO_ERROR) FAIL(NULL, res);
 
     for (i = 0; i < sizeof(TMP_VAR_NAMES)/sizeof(TMP_VAR_NAMES[0]); i++) {
         tmpdir = getenv(TMP_VAR_NAMES[i]);
@@ -716,9 +711,12 @@ static void *call_compiler_impl(const char *src, size_t len, size_t *bin_len,
     return buf;
 }
 
-static void *(*call_compiler)(const char *src, size_t len, size_t *bin_len, int *ret) = call_compiler_impl;
+static void *(*call_compiler)(const char *src, size_t len,
+                              const char *arch_arg, size_t *bin_len,
+                              int *ret) = call_compiler_impl;
 
 GPUARRAY_LOCAL void cuda_set_compiler(void *(*compiler_f)(const char *, size_t,
+                                                          const char *,
                                                           size_t *, int *)) {
   return;
   /* Disable custom compilers
@@ -829,7 +827,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
       if (ptx_mode) {
         bin = sb.s;
       } else {
-        bin = call_compiler(sb.s, sb.l, &bin_len, ret);
+        bin = call_compiler(sb.s, sb.l, ctx->bin_id, &bin_len, ret);
         if (bin == NULL) {
           if (err_str != NULL) {
             strb debug_msg = STRB_STATIC_INIT;
@@ -1121,7 +1119,6 @@ static inline int gen_extcopy_kernel(const cache_key_t *a,
   const char *in_t, *in_ld_t;
   const char *out_t, *out_ld_t;
   const char *rmod;
-  char arch[6]; /* Must be at least 6, see detect_arch() */
 
   in_t = map_t(a->itype);
   out_t = map_t(a->otype);
@@ -1137,10 +1134,8 @@ static inline int gen_extcopy_kernel(const cache_key_t *a,
     out_ld_t = out_t;
   rmod = get_rmod(a->itype, a->otype);
   if (in_t == NULL || out_t == NULL) return GA_DEVSUP_ERROR;
-  res = detect_arch(arch);
-  if (res != GA_NO_ERROR) return res;
 
-  strb_appendf(&sb, ELEM_HEADER_PTX, arch, bits, bits, bits,
+  strb_appendf(&sb, ELEM_HEADER_PTX, ctx->bin_id, bits, bits, bits,
 	       bits, in_t, out_t, bits, bits, bits, bits, bits, nEls,
 	       bits, bits);
 
