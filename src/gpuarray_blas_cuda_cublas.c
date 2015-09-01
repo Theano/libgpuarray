@@ -28,8 +28,6 @@ static int setup(void *c) {
     return GA_NO_ERROR;
 
   cuda_enter(ctx);
-  if (ctx->err != CUDA_SUCCESS)
-    return GA_IMPL_ERROR;
   err = cublasCreate(&handle);
   cuda_exit(ctx);
 
@@ -93,8 +91,6 @@ static int sgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   }
 
   cuda_enter(ctx);
-  if (ctx->err != CUDA_SUCCESS)
-    return GA_IMPL_ERROR;
 
   cuda_wait(A, CUDA_WAIT_READ);
   cuda_wait(B, CUDA_WAIT_READ);
@@ -150,8 +146,6 @@ static int dgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   }
 
   cuda_enter(ctx);
-  if (ctx->err != CUDA_SUCCESS)
-    return GA_IMPL_ERROR;
 
   cuda_wait(A, CUDA_WAIT_READ);
   cuda_wait(B, CUDA_WAIT_READ);
@@ -208,8 +202,6 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   }
 
   cuda_enter(ctx);
-  if (ctx->err != CUDA_SUCCESS)
-    return GA_IMPL_ERROR;
 
   cuda_wait(A, CUDA_WAIT_READ);
   cuda_wait(B, CUDA_WAIT_READ);
@@ -284,8 +276,6 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   }
 
   cuda_enter(ctx);
-  if (ctx->err != CUDA_SUCCESS)
-    return GA_IMPL_ERROR;
 
   for (i = 0; i < batchCount; i++) {
     cuda_wait(A[i], CUDA_WAIT_READ);
@@ -371,8 +361,6 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   }
 
   cuda_enter(ctx);
-  if (ctx->err != CUDA_SUCCESS)
-    return GA_IMPL_ERROR;
 
   for (i = 0; i < batchCount; i++) {
     cuda_wait(A[i], CUDA_WAIT_READ);
@@ -437,8 +425,6 @@ static int sgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
   }
 
   cuda_enter(ctx);
-  if (ctx->err != CUDA_SUCCESS)
-    return GA_IMPL_ERROR;
 
   cuda_wait(A, CUDA_WAIT_READ);
   cuda_wait(X, CUDA_WAIT_READ);
@@ -489,8 +475,6 @@ static int dgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
   }
 
   cuda_enter(ctx);
-  if (ctx->err != CUDA_SUCCESS)
-    return GA_IMPL_ERROR;
 
   cuda_wait(A, CUDA_WAIT_READ);
   cuda_wait(X, CUDA_WAIT_READ);
@@ -540,8 +524,6 @@ static int sger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
   }
 
   cuda_enter(ctx);
-  if (ctx->err != CUDA_SUCCESS)
-    return GA_IMPL_ERROR;
 
   cuda_wait(X, CUDA_WAIT_READ);
   cuda_wait(Y, CUDA_WAIT_READ);
@@ -591,8 +573,6 @@ static int dger(cb_order order, size_t M, size_t N, double alpha, gpudata *X,
   }
 
   cuda_enter(ctx);
-  if (ctx->err != CUDA_SUCCESS)
-    return GA_IMPL_ERROR;
 
   cuda_wait(X, CUDA_WAIT_READ);
   cuda_wait(Y, CUDA_WAIT_READ);

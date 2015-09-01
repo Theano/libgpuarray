@@ -139,7 +139,7 @@ CUstream cuda_get_stream(void *ctx) {
 void cuda_enter(cuda_context *ctx) {
   ASSERT_CTX(ctx);
   if (!ctx->enter)
-    ctx->err = cuCtxPushCurrent(ctx->ctx);
+    cuCtxPushCurrent(ctx->ctx);
   ctx->enter++;
 }
 
@@ -161,10 +161,6 @@ gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
     res->refcnt = 1;
 
     cuda_enter(ctx);
-    if (ctx->err != CUDA_SUCCESS) {
-      free(res);
-      return NULL;
-    }
 
     res->ptr = p;
     if (ctx->flags & GA_CTX_MULTI_THREAD)
@@ -369,10 +365,6 @@ static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
     res->flags = flags & (GA_BUFFER_READ_ONLY|GA_BUFFER_WRITE_ONLY);
 
     cuda_enter(ctx);
-    if (ctx->err != CUDA_SUCCESS) {
-      free(res);
-      FAIL(NULL, GA_IMPL_ERROR);
-    }
 
     if (ctx->flags & GA_CTX_MULTI_THREAD)
       fl |= CU_EVENT_BLOCKING_SYNC;
@@ -481,8 +473,6 @@ static int cuda_move(gpudata *dst, size_t dstoff, gpudata *src,
         return GA_VALUE_ERROR;
 
     cuda_enter(ctx);
-    if (ctx->err != CUDA_SUCCESS)
-      return GA_IMPL_ERROR;
 
     ctx->err = cuMemcpyDtoDAsync(dst->ptr + dstoff, src->ptr + srcoff, sz,
                                  ctx->s);
@@ -505,8 +495,6 @@ static int cuda_read(void *dst, gpudata *src, size_t srcoff, size_t sz) {
         return GA_VALUE_ERROR;
 
     cuda_enter(ctx);
-    if (ctx->err != CUDA_SUCCESS)
-      return GA_IMPL_ERROR;
 
     ctx->err = cuEventSynchronize(src->ev);
     if (ctx->err != CUDA_SUCCESS) {
@@ -535,8 +523,6 @@ static int cuda_write(gpudata *dst, size_t dstoff, const void *src,
         return GA_VALUE_ERROR;
 
     cuda_enter(ctx);
-    if (ctx->err != CUDA_SUCCESS)
-      return GA_IMPL_ERROR;
 
     ctx->err = cuEventSynchronize(dst->ev);
     if (ctx->err != CUDA_SUCCESS) {
@@ -561,8 +547,6 @@ static int cuda_memset(gpudata *dst, size_t dstoff, int data) {
     if ((dst->sz - dstoff) == 0) return GA_NO_ERROR;
 
     cuda_enter(ctx);
-    if (ctx->err != CUDA_SUCCESS)
-      return GA_IMPL_ERROR;
 
     ctx->err = cuMemsetD8Async(dst->ptr + dstoff, data, dst->sz - dstoff,
                                ctx->s);
@@ -777,8 +761,6 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     }
 
     cuda_enter(ctx);
-    if (ctx->err != CUDA_SUCCESS)
-      FAIL(NULL, GA_IMPL_ERROR);
 
     ctx->err = cuCtxGetDevice(&dev);
     if (ctx->err != CUDA_SUCCESS) {
@@ -948,8 +930,6 @@ static int cuda_callkernel(gpukernel *k, unsigned int n,
 
     ASSERT_KER(k);
     cuda_enter(ctx);
-    if (ctx->err != CUDA_SUCCESS)
-      return GA_IMPL_ERROR;
 
     switch (n) {
     case 1:
@@ -991,8 +971,6 @@ static int cuda_sync(gpudata *b) {
 
   ASSERT_BUF(b);
   cuda_enter(ctx);
-  if (ctx->err != CUDA_SUCCESS)
-    return GA_IMPL_ERROR;
   ctx->err = cuEventSynchronize(b->ev);
   cuda_exit(ctx);
   if (ctx->err != CUDA_SUCCESS)
@@ -1318,10 +1296,7 @@ static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
                                                   GA_BUFFER_WRITE_ONLY), NULL);
     if (dst == NULL) return NULL;
     cuda_enter(ctx);
-    if (ctx->err != CUDA_SUCCESS) {
-      cuda_free(dst);
-      return NULL;
-    }
+
     ctx->err = cuMemcpyDtoDAsync(dst->ptr, src->ptr+offset, sz, ctx->s);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
@@ -1338,10 +1313,6 @@ static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
   if (dst == NULL)
     return NULL;
   cuda_enter(ctx);
-  if (ctx->err != CUDA_SUCCESS) {
-    cuda_free(dst);
-    return NULL;
-  }
   ctx->err = cuMemcpyPeerAsync(dst->ptr, dst->ctx->ctx, src->ptr+offset,
 			       src->ctx->ctx, sz, dst_ctx->s);
   cuEventRecord(dst->ev, dst_ctx->s);
@@ -1396,8 +1367,6 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
   case GA_CTX_PROP_DEVNAME:
     cuda_enter(ctx);
-    if (ctx->err != CUDA_SUCCESS)
-      return GA_IMPL_ERROR;
     ctx->err = cuCtxGetDevice(&id);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
@@ -1420,8 +1389,6 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
   case GA_CTX_PROP_MAXLSIZE:
     cuda_enter(ctx);
-    if (ctx->err != CUDA_SUCCESS)
-      return GA_IMPL_ERROR;
     ctx->err = cuCtxGetDevice(&id);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
@@ -1439,8 +1406,6 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
   case GA_CTX_PROP_LMEMSIZE:
     cuda_enter(ctx);
-    if (ctx->err != CUDA_SUCCESS)
-      return GA_IMPL_ERROR;
     ctx->err = cuCtxGetDevice(&id);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
@@ -1458,8 +1423,6 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
   case GA_CTX_PROP_NUMPROCS:
     cuda_enter(ctx);
-    if (ctx->err != CUDA_SUCCESS)
-      return GA_IMPL_ERROR;
     ctx->err = cuCtxGetDevice(&id);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
@@ -1478,8 +1441,6 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
   case GA_CTX_PROP_MAXGSIZE:
     cuda_enter(ctx);
-    if (ctx->err != CUDA_SUCCESS)
-      return GA_IMPL_ERROR;
     ctx->err = cuCtxGetDevice(&id);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
@@ -1527,8 +1488,6 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
   case GA_KERNEL_PROP_MAXLSIZE:
     cuda_enter(ctx);
-    if (ctx->err != CUDA_SUCCESS)
-      return GA_IMPL_ERROR;
     ctx->err = cuFuncGetAttribute(&i,
                                   CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK,
                                   k->k);
@@ -1540,8 +1499,6 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
   case GA_KERNEL_PROP_PREFLSIZE:
     cuda_enter(ctx);
-    if (ctx->err != CUDA_SUCCESS)
-      return GA_IMPL_ERROR;
     ctx->err = cuCtxGetDevice(&id);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
