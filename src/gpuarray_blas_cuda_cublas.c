@@ -176,6 +176,9 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
                  gpudata *B, size_t offB, size_t ldb,
                  float beta, gpudata *C, size_t offC, size_t ldc) {
 #ifdef HAVE_CUBLAS_SGEMMEX
+  /* This will use float32 for computation as it's the best we can
+   * have right now. In the future when native float16 support will be
+   * there we will switch to that. */
   cuda_context *ctx = A->ctx;
   gpudata *T;
   size_t t;
