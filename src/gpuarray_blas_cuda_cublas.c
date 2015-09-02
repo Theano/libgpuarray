@@ -71,6 +71,10 @@ static int sgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   cublasStatus_t err;
   cb_transpose transT;
 
+  ASSERT_BUF(A);
+  ASSERT_BUF(B);
+  ASSERT_BUF(C);
+
   if (order == cb_c) {
     /* swap A and B */
     t = N;
@@ -125,6 +129,10 @@ static int dgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   size_t t;
   cublasStatus_t err;
   cb_transpose transT;
+
+  ASSERT_BUF(A);
+  ASSERT_BUF(B);
+  ASSERT_BUF(C);
 
   if (order == cb_c) {
     /* swap A and B */
@@ -184,6 +192,10 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   size_t t;
   cublasStatus_t err;
   cb_transpose transT;
+
+  ASSERT_BUF(A);
+  ASSERT_BUF(B);
+  ASSERT_BUF(C);
 
   if (order == cb_c) {
     /* swap A and B */
@@ -249,6 +261,8 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
 
   if (batchCount == 0) return GA_NO_ERROR;
 
+  ASSERT_BUF(A[0]);
+
   ctx = A[0]->ctx;
 
   /* Possibly optimize this to make multiple dispatch of sgemm for
@@ -281,6 +295,9 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   cuda_enter(ctx);
 
   for (i = 0; i < batchCount; i++) {
+    ASSERT_BUF(A[i]);
+    ASSERT_BUF(B[i]);
+    ASSERT_BUF(C[i]);
     cuda_wait(A[i], CUDA_WAIT_READ);
     cuda_wait(B[i], CUDA_WAIT_READ);
     cuda_wait(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
@@ -334,6 +351,8 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
 
   if (batchCount == 0) return GA_NO_ERROR;
 
+  ASSERT_BUF(A[0]);
+
   ctx = A[0]->ctx;
 
   /* Possibly optimize this to make multiple dispatch of sgemm for
@@ -366,6 +385,9 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   cuda_enter(ctx);
 
   for (i = 0; i < batchCount; i++) {
+    ASSERT_BUF(A[i]);
+    ASSERT_BUF(B[i]);
+    ASSERT_BUF(C[i]);
     cuda_wait(A[i], CUDA_WAIT_READ);
     cuda_wait(B[i], CUDA_WAIT_READ);
     cuda_wait(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
@@ -511,6 +533,10 @@ static int sger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
   size_t t;
   cublasStatus_t err;
 
+  ASSERT_BUF(X);
+  ASSERT_BUF(Y);
+  ASSERT_BUF(A);
+
   if (order == cb_c) {
     t = M;
     M = N;
@@ -559,6 +585,10 @@ static int dger(cb_order order, size_t M, size_t N, double alpha, gpudata *X,
   gpudata *td;
   size_t t;
   cublasStatus_t err;
+
+  ASSERT_BUF(X);
+  ASSERT_BUF(Y);
+  ASSERT_BUF(A);
 
   if (order == cb_c) {
     t = M;
