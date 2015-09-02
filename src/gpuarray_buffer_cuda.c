@@ -950,7 +950,6 @@ static void cuda_retainkernel(gpukernel *k) {
 }
 
 static void cuda_freekernel(gpukernel *k) {
-  ASSERT_KER(k);
   k->refcnt--;
   if (k->refcnt == 0) {
     if (k->ctx != NULL) {
@@ -965,6 +964,11 @@ static void cuda_freekernel(gpukernel *k) {
     free(k->types);
     free(k);
   }
+}
+
+static void cuda_freekernel_pub(gpukernel *k) {
+  ASSERT_KER(k);
+  cuda_freekernel(k);
 }
 
 static int cuda_callkernel(gpukernel *k, unsigned int n,
@@ -1589,7 +1593,7 @@ const gpuarray_buffer_ops cuda_ops = {cuda_init,
                                       cuda_memset,
                                       cuda_newkernel,
                                       cuda_retainkernel,
-                                      cuda_freekernel,
+                                      cuda_freekernel_pub,
                                       cuda_callkernel,
                                       cuda_kernelbin,
                                       cuda_sync,
