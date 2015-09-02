@@ -681,7 +681,8 @@ static void *call_compiler(const char *src, size_t len, size_t *bin_len,
     strlcpy(outbuf, namebuf, sizeof(outbuf));
     strlcat(outbuf, ".cubin", sizeof(outbuf));
 
-    s = write(fd, src, len);
+    /* Don't want to write the final NUL */
+    s = write(fd, src, len-1);
     close(fd);
     /* fd is not non-blocking; should have complete write */
     if (s == -1) {
@@ -855,7 +856,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
         }
       }
 
-      if (ptx_mode) strb_append0(&sb);
+      strb_append0(&sb);
 
       if (strb_error(&sb)) {
         strb_clear(&sb);
