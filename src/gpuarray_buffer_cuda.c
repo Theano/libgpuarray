@@ -644,8 +644,9 @@ end:
 static const char *TMP_VAR_NAMES[] = {"GPUARRAY_TMPDIR", "TMPDIR", "TMP",
                                       "TEMP", "USERPROFILE"};
 
-static void *call_compiler(const char *src, size_t len, size_t *bin_len,
-                           char **log, size_t *log_len, int *ret) {
+static void *call_compiler(const char *src, size_t len, const char *arch_arg,
+                           size_t *bin_len, char **log, size_t *log_len,
+                           int *ret) {
     char namebuf[PATH_MAX];
     char outbuf[PATH_MAX];
     char *tmpdir;
