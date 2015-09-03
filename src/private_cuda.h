@@ -58,9 +58,9 @@ typedef struct _cuda_context {
 } cuda_context;
 
 #ifdef WITH_NVRTC
-#define ARCH_ARG "compute_"
+#define ARCH_PREFIX "compute_"
 #else
-#define ARCH_ARG "sm_"
+#define ARCH_PREFIX "sm_"
 #endif
 
 GPUARRAY_LOCAL void *cuda_make_ctx(CUcontext ctx, int flags);

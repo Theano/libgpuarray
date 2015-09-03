@@ -560,7 +560,6 @@ static void *call_compiler(const char *src, size_t len, const char *arch_arg,
     , "-G", "-lineinfo"
   };
   nvrtcResult err, err2;
-  int res;
 
   opts[1] = arch_arg;
 
