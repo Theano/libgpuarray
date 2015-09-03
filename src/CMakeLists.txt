@@ -1,5 +1,4 @@
 include(CheckFunctionExists)
-include(${CMAKE_SOURCE_DIR}/gen_blas.cmake)
 
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
 
@@ -83,6 +82,11 @@ if (CUDA_FOUND)
   include_directories("${CUDADRV_INCLUDE}")
   set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_blas_cuda_cublas.c)
   add_definitions(-DWITH_CUDA_CUBLAS)
+  set(CMAKE_REQUIRED_LIBRARIES ${CUDA_CUBLAS_LIBRARIES})
+  check_function_exists(cublasSgemmEx CUBLAS_SGEMMEX)
+  if (CUBLAS_SGEMMEX)
+    add_definitions(-DHAVE_CUBLAS_SGEMMEX)
+  endif()
 endif()
 
 if(OPENCL_FOUND)

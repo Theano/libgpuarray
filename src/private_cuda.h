@@ -38,7 +38,7 @@
 #define CLEAR(o)
 #endif
 
-
+/* Keep in sync with the copy in gpuarray/extension.h */
 #define DONTFREE 0x10000000
 
 typedef struct _cuda_context {
@@ -46,7 +46,6 @@ typedef struct _cuda_context {
   char tag[8];
 #endif
   CUcontext ctx;
-  CUcontext old;
   CUresult err;
   CUstream s;
   void *blas_handle;
@@ -55,6 +54,7 @@ typedef struct _cuda_context {
   char bin_id[8];
   unsigned int refcnt;
   int flags;
+  unsigned int enter;
 } cuda_context;
 
 GPUARRAY_LOCAL void *cuda_make_ctx(CUcontext ctx, int flags);
@@ -78,6 +78,13 @@ struct _gpudata {
 GPUARRAY_LOCAL gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz);
 GPUARRAY_LOCAL CUdeviceptr cuda_get_ptr(gpudata *g);
 GPUARRAY_LOCAL size_t cuda_get_sz(gpudata *g);
+GPUARRAY_LOCAL int cuda_wait(gpudata *, int);
+GPUARRAY_LOCAL int cuda_record(gpudata *, int);
+
+/* private flags are in the upper 16 bits */
+#define CUDA_WAIT_READ  0x10000
+#define CUDA_WAIT_WRITE 0x20000
+#define CUDA_WAIT_MASK  0xf0000
 
 struct _gpukernel {
 #ifdef DEBUG

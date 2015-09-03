@@ -176,6 +176,10 @@ typedef struct _gpuarray_buffer_ops {
 
 /*#define GA_BUFFER_USE_DATA   0x10*/
 
+/* The upper 16 bits are private flags */
+#define GA_BUFFER_MASK       0xffff
+
+
 /**
  * @}
  */
