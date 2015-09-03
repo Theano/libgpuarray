@@ -768,6 +768,23 @@ static void *call_compiler(const char *src, size_t len, size_t *bin_len,
 
 #endif /* WITH_NVRTC */
 
+static void _cuda_freekernel(gpukernel *k) {
+  k->refcnt--;
+  if (k->refcnt == 0) {
+    if (k->ctx != NULL) {
+      cuda_enter(k->ctx);
+      cuModuleUnload(k->m);
+      cuda_exit(k->ctx);
+      cuda_free_ctx(k->ctx);
+    }
+    CLEAR(k);
+    free(k->args);
+    free(k->bin);
+    free(k->types);
+    free(k);
+  }
+}
+
 static gpukernel *cuda_newkernel(void *c, unsigned int count,
                                  const char **strings, const size_t *lengths,
                                  const char *fname, unsigned int argcount,
@@ -909,14 +926,14 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     res->argcount = argcount;
     res->types = calloc(argcount, sizeof(int));
     if (res->types == NULL) {
-      cuda_freekernel(res);
+      _cuda_freekernel(res);
       cuda_exit(ctx);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
     memcpy(res->types, types, argcount*sizeof(int));
     res->args = calloc(argcount, sizeof(void *));
     if (res->args == NULL) {
-      cuda_freekernel(res);
+      _cuda_freekernel(res);
       cuda_exit(ctx);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
@@ -924,15 +941,14 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     ctx->err = cuModuleLoadData(&res->m, bin);
 
     if (ctx->err != CUDA_SUCCESS) {
-      cuda_freekernel(res);
+      _cuda_freekernel(res);
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
 
     ctx->err = cuModuleGetFunction(&res->k, res->m, fname);
     if (ctx->err != CUDA_SUCCESS) {
-      cuModuleUnload(res->m);
-      cuda_freekernel(res);
+      _cuda_freekernel(res);
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
@@ -950,25 +966,8 @@ static void cuda_retainkernel(gpukernel *k) {
 }
 
 static void cuda_freekernel(gpukernel *k) {
-  k->refcnt--;
-  if (k->refcnt == 0) {
-    if (k->ctx != NULL) {
-      cuda_enter(k->ctx);
-      cuModuleUnload(k->m);
-      cuda_exit(k->ctx);
-      cuda_free_ctx(k->ctx);
-    }
-    CLEAR(k);
-    free(k->args);
-    free(k->bin);
-    free(k->types);
-    free(k);
-  }
-}
-
-static void cuda_freekernel_pub(gpukernel *k) {
   ASSERT_KER(k);
-  cuda_freekernel(k);
+  _cuda_freekernel(k);
 }
 
 static int cuda_callkernel(gpukernel *k, unsigned int n,
@@ -1593,7 +1592,7 @@ const gpuarray_buffer_ops cuda_ops = {cuda_init,
                                       cuda_memset,
                                       cuda_newkernel,
                                       cuda_retainkernel,
-                                      cuda_freekernel_pub,
+                                      cuda_freekernel,
                                       cuda_callkernel,
                                       cuda_kernelbin,
                                       cuda_sync,
