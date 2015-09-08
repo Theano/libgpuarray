@@ -1026,7 +1026,7 @@ static int cuda_sync(gpudata *b) {
   return GA_NO_ERROR;
 }
 
-static const char ELEM_HEADER_PTX[] = ".version 4.2\n.target %s\n\n"
+static const char ELEM_HEADER_PTX[] = ".version %s\n.target %s\n\n"
     ".entry extcpy (\n"
     ".param .u%u a_data,\n"
     ".param .u%u b_data ) {\n"
@@ -1185,9 +1185,11 @@ static inline int gen_extcopy_kernel(const cache_key_t *a,
   rmod = get_rmod(a->itype, a->otype);
   if (in_t == NULL || out_t == NULL) return GA_DEVSUP_ERROR;
 
-  strb_appendf(&sb, ELEM_HEADER_PTX, ctx->bin_id, bits, bits, bits,
-	       bits, in_t, out_t, bits, bits, bits, bits, bits, nEls,
-	       bits, bits);
+  strb_appendf(&sb, ELEM_HEADER_PTX,
+	       /* This is a giant hack to see if we are on CC < 3.0 */
+	       ctx->bin_id[strlen(ARCH_PREFIX)] < '3' ? "3.0" : "4.2",
+	       ctx->bin_id, bits, bits, bits, bits, in_t, out_t, bits,
+	       bits, bits, bits, bits, nEls, bits, bits);
 
   cuda_perdim_ptx(&sb, a->ind, a->idims, a->istr, "a_p", bits);
   cuda_perdim_ptx(&sb, a->ond, a->odims, a->ostr, "b_p", bits);
