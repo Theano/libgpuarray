@@ -29,19 +29,22 @@ static int setup(void *c) {
 
   cuda_enter(ctx);
   err = cublasCreate(&handle);
-  cuda_exit(ctx);
-
-  if (err != CUBLAS_STATUS_SUCCESS)
+  if (err != CUBLAS_STATUS_SUCCESS) {
+    cuda_exit(ctx);
     return GA_BLAS_ERROR;
+  }
 
   err = cublasSetStream(handle, ctx->s);
   if (err != CUBLAS_STATUS_SUCCESS) {
     cublasDestroy(handle);
+    cuda_exit(ctx);
     return GA_BLAS_ERROR;
   }
 
   cublasSetPointerMode(handle, CUBLAS_POINTER_MODE_HOST);
   cublasSetAtomicsMode(handle, CUBLAS_ATOMICS_ALLOWED);
+
+  cuda_exit(ctx);
 
   ctx->blas_handle = handle;
 
