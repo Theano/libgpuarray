@@ -4,38 +4,8 @@
 #include "private_cuda.h"
 
 #include <sys/types.h>
-#include <sys/stat.h>
 
-#include <assert.h>
-#include <fcntl.h>
 #include <stdlib.h>
-#include <limits.h>
-
-#ifdef _WIN32
-#include <process.h>
-/* I am really tired of hunting through online docs
- * to find where the define is.  256 seem to be the
- * consensus for the value so there it is.
- */
-#define PATH_MAX 256
-#else
-#include <sys/param.h>
-#include <sys/wait.h>
-#endif
-
-#ifdef _MSC_VER
-#include <io.h>
-#define read _read
-#define write _write
-#define close _close
-#define unlink _unlink
-#define fstat _fstat
-#define stat _stat
-#define open _open
-#define strdup _strdup
-#else
-#include <unistd.h>
-#endif
 
 #include "util/strb.h"
 
@@ -59,7 +29,7 @@ static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
 #define val_free(v) cuda_freekernel(*v);
 #include "cache_extcopy.h"
 
-static int detect_arch(char *ret, CUresult *err);
+static int detect_arch(const char *prefix, char *ret, CUresult *err);
 
 void *cuda_make_ctx(CUcontext ctx, int flags) {
   int64_t v = 0;
@@ -75,7 +45,7 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
   res->refcnt = 1;
   res->flags = flags;
   res->enter = 0;
-  if (detect_arch(res->bin_id, &err)) {
+  if (detect_arch(ARCH_PREFIX, res->bin_id, &err)) {
     free(res);
     return NULL;
   }
@@ -195,11 +165,10 @@ static const char CUDA_PREAMBLE[] =
     "#define LOCAL_MEM __shared__\n"
     "#define LOCAL_MEM_ARG /* empty */\n"
     "#define REQD_WG_SIZE(X,Y,Z) __launch_bounds__(X*Y, Z)\n"
-    "#include <math_constants.h>\n"
     "#ifdef NAN\n"
     "#undef NAN\n"
     "#endif\n"
-    "#define NAN CUDART_NAN_F\n"
+    "#define NAN __int_as_float(0x7fffffff)\n"
     "#define LID_0 threadIdx.x\n"
     "#define LID_1 threadIdx.y\n"
     "#define LID_2 threadIdx.z\n"
@@ -212,32 +181,20 @@ static const char CUDA_PREAMBLE[] =
     "#define GDIM_0 gridDim.x\n"
     "#define GDIM_1 gridDim.y\n"
     "#define GDIM_2 gridDim.z\n"
-    "#ifdef _MSC_VER\n"
-    "#define signed __int8 int8_t\n"
-    "#define unsigned __int8 uint8_t\n"
-    "#define signed __int16 int16_t\n"
-    "#define unsigned __int16 uint16_t\n"
-    "#define signed __int32 int32_t\n"
-    "#define unsigned __int32 uint32_t\n"
-    "#define signed __int64 int64_t\n"
-    "#define unsigned __int64 uint64_t\n"
-    "#else\n"
-    "#include <stdint.h>\n"
-    "#endif\n"
-    "#define ga_bool uint8_t\n"
-    "#define ga_byte int8_t\n"
-    "#define ga_ubyte uint8_t\n"
-    "#define ga_short int16_t\n"
-    "#define ga_ushort uint16_t\n"
-    "#define ga_int int32_t\n"
-    "#define ga_uint uint32_t\n"
-    "#define ga_long int64_t\n"
-    "#define ga_ulong uint64_t\n"
+    "#define ga_bool unsigned char\n"
+    "#define ga_byte signed char\n"
+    "#define ga_ubyte unsigned char\n"
+    "#define ga_short short\n"
+    "#define ga_ushort unsigned short\n"
+    "#define ga_int int\n"
+    "#define ga_uint unsigned int\n"
+    "#define ga_long long long\n"
+    "#define ga_ulong unsigned long long\n"
     "#define ga_float float\n"
     "#define ga_double double\n"
-    "#define ga_half uint16_t\n"
+    "#define ga_half ga_ushort\n"
     "#define ga_size size_t\n"
-    "#define ga_ssize ssize_t\n";
+    "#define ga_ssize ptrdiff_t\n";
 
 /* XXX: add complex, quads, longlong */
 /* XXX: add vector types */
@@ -574,25 +531,122 @@ static CUresult get_cc(CUdevice dev, int *maj, int *min) {
 #endif
 }
 
-static int detect_arch(char *ret, CUresult *err) {
-    CUdevice dev;
-    int major, minor;
-    int res;
-    *err = cuCtxGetDevice(&dev);
-    if (*err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-    *err = get_cc(dev, &major, &minor);
-    if (*err != CUDA_SUCCESS) return GA_IMPL_ERROR;
-    res = snprintf(ret, 6, "sm_%d%d", major, minor);
-    if (res == -1 || res > 6) return GA_UNSUPPORTED_ERROR;
-    return GA_NO_ERROR;
+static int detect_arch(const char *prefix, char *ret, CUresult *err) {
+  CUdevice dev;
+  int major, minor;
+  int res;
+  size_t sz = strlen(prefix) + 3;
+  *err = cuCtxGetDevice(&dev);
+  if (*err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+  *err = get_cc(dev, &major, &minor);
+  if (*err != CUDA_SUCCESS) return GA_IMPL_ERROR;
+  res = snprintf(ret, sz, "%s%d%d", prefix, major, minor);
+  if (res == -1 || res > sz) return GA_UNSUPPORTED_ERROR;
+  return GA_NO_ERROR;
 }
+
+#ifdef WITH_NVRTC
+
+#include <nvrtc.h>
+
+static void *call_compiler(const char *src, size_t len, const char *arch_arg,
+                           size_t *bin_len, char **log, size_t *log_len,
+                           int *ret) {
+  nvrtcProgram prog;
+  void *buf = NULL;
+  size_t buflen;
+  const char *opts[4] = {
+    "-arch", ""
+    , "-G", "-lineinfo"
+  };
+  nvrtcResult err, err2;
+
+  opts[1] = arch_arg;
+
+  err = nvrtcCreateProgram(&prog, src, NULL, 0, NULL, NULL);
+  if (err != NVRTC_SUCCESS) FAIL(NULL, GA_SYS_ERROR);
+
+  err = nvrtcCompileProgram(prog,
+#ifdef DEBUG
+                            4,
+#else
+                            2,
+#endif
+                            opts);
+  if (log != NULL) {
+    err2 = nvrtcGetProgramLogSize(prog, &buflen);
+    if (err2 != NVRTC_SUCCESS) goto end2;
+    buf = malloc(buflen);
+    if (buf == NULL) goto end2;
+    err2 = nvrtcGetProgramLog(prog, (char *)buf);
+    if (err2 != NVRTC_SUCCESS) goto end2;
+    if (log_len != NULL) *log_len = buflen;
+    *log = (char *)buf;
+    buf = NULL;
+  }
+end2:
+  if (err != NVRTC_SUCCESS) goto end;
+
+  err = nvrtcGetPTXSize(prog, &buflen);
+  if (err != NVRTC_SUCCESS) goto end;
+
+  buf = malloc(buflen);
+  if (buf == NULL) {
+    nvrtcDestroyProgram(&prog);
+    FAIL(NULL, GA_MEMORY_ERROR);
+  }
+
+  err = nvrtcGetPTX(prog, (char *)buf);
+  if (err != NVRTC_SUCCESS) goto end;
+
+  *bin_len = buflen;
+
+end:
+  nvrtcDestroyProgram(&prog);
+  if (err != NVRTC_SUCCESS) {
+    free(buf);
+    FAIL(NULL, GA_SYS_ERROR);
+  }
+  return buf;
+}
+
+#else /* WITH_NVRTC */
+
+#include <sys/stat.h>
+
+#include <fcntl.h>
+#include <limits.h>
+
+#ifdef _WIN32
+#include <process.h>
+/* I am really tired of hunting through online docs
+ * to find where the define is.  256 seem to be the
+ * consensus for the value so there it is.
+ */
+#define PATH_MAX 256
+#else
+#include <sys/param.h>
+#include <sys/wait.h>
+#endif
+
+#ifdef _MSC_VER
+#include <io.h>
+#define read _read
+#define write _write
+#define close _close
+#define unlink _unlink
+#define fstat _fstat
+#define open _open
+#else
+#include <unistd.h>
+#endif
 
 static const char *TMP_VAR_NAMES[] = {"GPUARRAY_TMPDIR", "TMPDIR", "TMP",
                                       "TEMP", "USERPROFILE"};
 
-static void *call_compiler_impl(const char *src, size_t len,
-                                const char *arch_arg, size_t *bin_len,
-                                int *ret) {
+static void *call_compiler(const char *src, size_t len, const char *arch_arg,
+                           size_t *bin_len, char **log, size_t *log_len,
+                           int *ret) {
     char namebuf[PATH_MAX];
     char outbuf[PATH_MAX];
     char *tmpdir;
@@ -627,7 +681,8 @@ static void *call_compiler_impl(const char *src, size_t len,
     strlcpy(outbuf, namebuf, sizeof(outbuf));
     strlcat(outbuf, ".cubin", sizeof(outbuf));
 
-    s = write(fd, src, len);
+    /* Don't want to write the final NUL */
+    s = write(fd, src, len-1);
     close(fd);
     /* fd is not non-blocking; should have complete write */
     if (s == -1) {
@@ -711,21 +766,23 @@ static void *call_compiler_impl(const char *src, size_t len,
     return buf;
 }
 
-static void *(*call_compiler)(const char *src, size_t len,
-                              const char *arch_arg, size_t *bin_len,
-                              int *ret) = call_compiler_impl;
+#endif /* WITH_NVRTC */
 
-GPUARRAY_LOCAL void cuda_set_compiler(void *(*compiler_f)(const char *, size_t,
-                                                          const char *,
-                                                          size_t *, int *)) {
-  return;
-  /* Disable custom compilers
-  if (compiler_f == NULL) {
-    call_compiler = call_compiler_impl;
-  } else {
-    call_compiler = compiler_f;
+static void _cuda_freekernel(gpukernel *k) {
+  k->refcnt--;
+  if (k->refcnt == 0) {
+    if (k->ctx != NULL) {
+      cuda_enter(k->ctx);
+      cuModuleUnload(k->m);
+      cuda_exit(k->ctx);
+      cuda_free_ctx(k->ctx);
+    }
+    CLEAR(k);
+    free(k->args);
+    free(k->bin);
+    free(k->types);
+    free(k);
   }
-  */
 }
 
 static gpukernel *cuda_newkernel(void *c, unsigned int count,
@@ -735,9 +792,9 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
                                  char **err_str) {
     cuda_context *ctx = (cuda_context *)c;
     strb sb = STRB_STATIC_INIT;
-    char *bin;
+    char *bin, *log = NULL;
     gpukernel *res;
-    size_t bin_len = 0;
+    size_t bin_len = 0, log_len = 0;
     CUdevice dev;
     unsigned int i;
     int ptx_mode = 0;
@@ -816,7 +873,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
         }
       }
 
-      if (ptx_mode) strb_append0(&sb);
+      strb_append0(&sb);
 
       if (strb_error(&sb)) {
         strb_clear(&sb);
@@ -827,16 +884,23 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
       if (ptx_mode) {
         bin = sb.s;
       } else {
-        bin = call_compiler(sb.s, sb.l, ctx->bin_id, &bin_len, ret);
+        bin = call_compiler(sb.s, sb.l, ctx->bin_id, &bin_len,
+                            &log, &log_len, ret);
         if (bin == NULL) {
           if (err_str != NULL) {
             strb debug_msg = STRB_STATIC_INIT;
 
             // We're substituting debug_msg for a string with this first line:
-            strb_appends(&debug_msg, "CUDA kernel build failure ::\n"); 
+            strb_appends(&debug_msg, "CUDA kernel build failure ::\n");
 
             gpukernel_source_with_line_numbers(1, (const char **)&sb.s,
                                                &sb.l, &debug_msg);
+
+            if (log != NULL) {
+              strb_appends(&debug_msg, "\nCompiler log:\n");
+              strb_appendn(&debug_msg, log, log_len);
+              free(log);
+            }
             *err_str = strb_cstr(&debug_msg);
             // *err_str will be free()d by the caller (see docs in kernel.h)
           }
@@ -862,14 +926,14 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     res->argcount = argcount;
     res->types = calloc(argcount, sizeof(int));
     if (res->types == NULL) {
-      cuda_freekernel(res);
+      _cuda_freekernel(res);
       cuda_exit(ctx);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
     memcpy(res->types, types, argcount*sizeof(int));
     res->args = calloc(argcount, sizeof(void *));
     if (res->args == NULL) {
-      cuda_freekernel(res);
+      _cuda_freekernel(res);
       cuda_exit(ctx);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
@@ -877,15 +941,14 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
     ctx->err = cuModuleLoadData(&res->m, bin);
 
     if (ctx->err != CUDA_SUCCESS) {
-      cuda_freekernel(res);
+      _cuda_freekernel(res);
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
 
     ctx->err = cuModuleGetFunction(&res->k, res->m, fname);
     if (ctx->err != CUDA_SUCCESS) {
-      cuModuleUnload(res->m);
-      cuda_freekernel(res);
+      _cuda_freekernel(res);
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
@@ -904,20 +967,7 @@ static void cuda_retainkernel(gpukernel *k) {
 
 static void cuda_freekernel(gpukernel *k) {
   ASSERT_KER(k);
-  k->refcnt--;
-  if (k->refcnt == 0) {
-    if (k->ctx != NULL) {
-      cuda_enter(k->ctx);
-      cuModuleUnload(k->m);
-      cuda_exit(k->ctx);
-      cuda_free_ctx(k->ctx);
-    }
-    CLEAR(k);
-    free(k->args);
-    free(k->bin);
-    free(k->types);
-    free(k);
-  }
+  _cuda_freekernel(k);
 }
 
 static int cuda_callkernel(gpukernel *k, unsigned int n,
@@ -976,7 +1026,7 @@ static int cuda_sync(gpudata *b) {
   return GA_NO_ERROR;
 }
 
-static const char ELEM_HEADER_PTX[] = ".version 4.2\n.target %s\n\n"
+static const char ELEM_HEADER_PTX[] = ".version %s\n.target %s\n\n"
     ".entry extcpy (\n"
     ".param .u%u a_data,\n"
     ".param .u%u b_data ) {\n"
@@ -1135,9 +1185,11 @@ static inline int gen_extcopy_kernel(const cache_key_t *a,
   rmod = get_rmod(a->itype, a->otype);
   if (in_t == NULL || out_t == NULL) return GA_DEVSUP_ERROR;
 
-  strb_appendf(&sb, ELEM_HEADER_PTX, ctx->bin_id, bits, bits, bits,
-	       bits, in_t, out_t, bits, bits, bits, bits, bits, nEls,
-	       bits, bits);
+  strb_appendf(&sb, ELEM_HEADER_PTX,
+	       /* This is a giant hack to see if we are on CC < 3.0 */
+	       ctx->bin_id[strlen(ARCH_PREFIX)] < '3' ? "3.0" : "4.2",
+	       ctx->bin_id, bits, bits, bits, bits, in_t, out_t, bits,
+	       bits, bits, bits, bits, nEls, bits, bits);
 
   cuda_perdim_ptx(&sb, a->ind, a->idims, a->istr, "a_p", bits);
   cuda_perdim_ptx(&sb, a->ond, a->odims, a->ostr, "b_p", bits);
