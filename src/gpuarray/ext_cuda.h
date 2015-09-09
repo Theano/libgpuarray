@@ -15,7 +15,6 @@ static CUstream (*cuda_get_stream)(void *);
 static gpudata *(*cuda_make_buf)(void *, CUdeviceptr, size_t);
 static CUdeviceptr (*cuda_get_ptr)(gpudata *);
 static size_t (*cuda_get_sz)(gpudata *);
-static void (*cuda_set_compiler)(void *(*)(const char *, size_t, size_t *, int *));
 
 static void setup_ext_cuda(void) {
   // The casts are necessary to reassure C++ compilers
@@ -27,7 +26,6 @@ static void setup_ext_cuda(void) {
   cuda_make_buf = (gpudata *(*)(void *, CUdeviceptr, size_t))gpuarray_get_extension("cuda_make_buf");
   cuda_get_ptr = (CUdeviceptr (*)(gpudata *))gpuarray_get_extension("cuda_get_ptr");
   cuda_get_sz = (size_t (*)(gpudata *))gpuarray_get_extension("cuda_get_sz");
-  cuda_set_compiler = (void (*)(void *(*)(const char *, size_t, size_t *, int *)))gpuarray_get_extension("cuda_set_compiler");
 }
 
 #endif
