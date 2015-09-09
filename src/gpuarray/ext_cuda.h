@@ -7,6 +7,10 @@
 #include <gpuarray/buffer.h>
 #include <gpuarray/extension.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 static void (*cuda_enter)(void *);
 static void (*cuda_exit)(void *);
 static void *(*cuda_make_ctx)(CUcontext, int);
@@ -28,8 +32,12 @@ static void setup_ext_cuda(void) {
   cuda_make_buf = (gpudata *(*)(void *, CUdeviceptr, size_t))gpuarray_get_extension("cuda_make_buf");
   cuda_get_ptr = (CUdeviceptr (*)(gpudata *))gpuarray_get_extension("cuda_get_ptr");
   cuda_get_sz = (size_t (*)(gpudata *))gpuarray_get_extension("cuda_get_sz");
-  cuda_wait = (int (*)(gpuarray *, int))gpuarray_get_extension("cuda_wait");
-  cuda_record = (int (*)(gpuarray *, int))gpuarray_get_extension("cuda_record");
+  cuda_wait = (int (*)(gpudata *, int))gpuarray_get_extension("cuda_wait");
+  cuda_record = (int (*)(gpudata *, int))gpuarray_get_extension("cuda_record");
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
