@@ -16,6 +16,7 @@
 #define strdup _strdup
 #endif
 
+#define _unused(x) ((void)x)
 #define SSIZE_MIN (-(SSIZE_MAX-1))
 
 static cl_int err;
@@ -639,6 +640,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
   }
   /* If this assert fires, increase the size of local_kern above. */
   assert(r <= sizeof(local_kern));
+  _unused(r);
 
   sz = strlen(local_kern);
   rlk[0] = local_kern;
