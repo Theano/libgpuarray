@@ -78,18 +78,18 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   cl_event evl[3];
   cl_event ev;
   size_t i;
-  cl_uint num_ev;
+  cl_uint num_ev = 0;
   clblasStatus err;
 
   for (i = 0; i < batchCount; i++) {
     ARRAY_INIT(A[i]);
     ARRAY_INIT(B[i]);
     ARRAY_INIT(C[i]);
-    err = clblasSgemm(convO(order) convT(transA), convT(transB), M, N, K,
+    err = clblasSgemm(convO(order), convT(transA), convT(transB), M, N, K,
                       alpha, A[i]->buf, offA[i], lda, B[i]->buf, offB[i], ldb,
-                      beta, C[i]->buf, offB[i], ldc, 1, &ctx-q,
+                      beta, C[i]->buf, offB[i], ldc, 1, &ctx->q,
                       num_ev, num_ev == 0 ? NULL : evl, &ev);
-    if (err = clblasSuccess)
+    if (err != clblasSuccess)
       return GA_BLAS_ERROR;
     ARRAY_FINI(A[i]);
     ARRAY_FINI(B[i]);
@@ -110,18 +110,18 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   cl_event evl[3];
   cl_event ev;
   size_t i;
-  cl_uint num_ev;
+  cl_uint num_ev = 0;
   clblasStatus err;
 
   for (i = 0; i < batchCount; i++) {
     ARRAY_INIT(A[i]);
     ARRAY_INIT(B[i]);
     ARRAY_INIT(C[i]);
-    err = clblasDgemm(convO(order) convT(transA), convT(transB), M, N, K,
+    err = clblasDgemm(convO(order), convT(transA), convT(transB), M, N, K,
                       alpha, A[i]->buf, offA[i], lda, B[i]->buf, offB[i], ldb,
-                      beta, C[i]->buf, offB[i], ldc, 1, &ctx-q,
+                      beta, C[i]->buf, offB[i], ldc, 1, &ctx->q,
                       num_ev, num_ev == 0 ? NULL : evl, &ev);
-    if (err = clblasSuccess)
+    if (err != clblasSuccess)
       return GA_BLAS_ERROR;
     ARRAY_FINI(A[i]);
     ARRAY_FINI(B[i]);
@@ -271,7 +271,36 @@ static int sger(cb_order order, size_t M, size_t N, float alpha,
   err = clblasSger(convO(order), M, N, alpha, X->buf, offX, incX,
                    Y->buf, offY, incY, A->buf, offA, lda, 1, &ctx->q,
                    num_ev, num_ev == 0 ? NULL : evl, &ev);
-  if (err = clblasSuccess)
+  if (err != clblasSuccess)
+    return GA_BLAS_ERROR;
+
+  ARRAY_FINI(X);
+  ARRAY_FINI(Y);
+  ARRAY_FINI(A);
+
+  clReleaseEvent(ev);
+
+  return GA_NO_ERROR;
+}
+
+static int dger(cb_order order, size_t M, size_t N, double alpha,
+                gpudata *X, size_t offX, int incX,
+                gpudata *Y, size_t offY, int incY,
+                gpudata *A, size_t offA, size_t lda) {
+  cl_ctx *ctx = X->ctx;
+  cl_event evl[3];
+  cl_event ev;
+  cl_uint num_ev = 0;
+  clblasStatus err;
+
+  ARRAY_INIT(X);
+  ARRAY_INIT(Y);
+  ARRAY_INIT(A);
+
+  err = clblasDger(convO(order), M, N, alpha, X->buf, offX, incX,
+                   Y->buf, offY, incY, A->buf, offA, lda, 1, &ctx->q,
+                   num_ev, num_ev == 0 ? NULL : evl, &ev);
+  if (err != clblasSuccess)
     return GA_BLAS_ERROR;
 
   ARRAY_FINI(X);
