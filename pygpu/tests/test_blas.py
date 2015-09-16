@@ -1,4 +1,5 @@
 import numpy
+from nose.plugins.skip import SkipTest
 
 from .support import (guard_devsup, gen_gpuarray, context)
 
