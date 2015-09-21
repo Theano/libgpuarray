@@ -893,6 +893,8 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
             // We're substituting debug_msg for a string with this first line:
             strb_appends(&debug_msg, "CUDA kernel build failure ::\n");
 
+            /* Delete the final NUL */
+            sb.l--;
             gpukernel_source_with_line_numbers(1, (const char **)&sb.s,
                                                &sb.l, &debug_msg);
 
