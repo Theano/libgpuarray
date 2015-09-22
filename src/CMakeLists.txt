@@ -131,8 +131,8 @@ set_target_properties(gpuarray PROPERTIES
 
 add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
 
-target_link_libraries(gpuarray cache)
-target_link_libraries(gpuarray-static cache-static)
+target_link_libraries(gpuarray)
+target_link_libraries(gpuarray-static)
 
 if(CUDA_FOUND)
   target_link_libraries(gpuarray ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
