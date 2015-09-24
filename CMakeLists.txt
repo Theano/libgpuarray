@@ -14,6 +14,8 @@ set(LIBRARY_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/lib)
 set(CMAKE_OSX_ARCHITECTURES x86_64)
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
+
+# Make recent cmake not spam about stuff
 if(POLICY CMP0063)
     cmake_policy(SET CMP0063 OLD)
 endif()
