@@ -1,4 +1,4 @@
-import numpy
+﻿import numpy
 from nose.plugins.skip import SkipTest
 
 from .support import (guard_devsup, gen_gpuarray, context)
@@ -9,7 +9,7 @@ try:
         fblas = scipy.linalg.blas.fblas
     except AttributeError:
         fblas = scipy.linalg.blas
-except ImportError, e:
+except ImportError as e:
     raise SkipTest("no scipy blas to compare against")
 
 import pygpu.blas as gblas
