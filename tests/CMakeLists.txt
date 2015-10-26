@@ -36,10 +36,6 @@ add_executable(check_buffer main.c check_buffer.c)
 target_link_libraries(check_buffer ${LIBS} gpuarray)
 add_test(test_buffer ${CMAKE_CURRENT_BINARY_DIR}/check_buffer)
 
-add_executable(check_strndup main.c util/check_strndup.c)
-target_link_libraries(check_strndup ${LIBS})
-add_test(test_strndup ${CMAKE_CURRENT_BINARY_DIR}/check_strndup)
-
 ELSE(CHECK_FOUND)
 
 MESSAGE("Tests disabled because Check was not found")
