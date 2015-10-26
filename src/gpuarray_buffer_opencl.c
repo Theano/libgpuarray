@@ -792,7 +792,7 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
       strb_append0(&debug_msg); // Make sure a final '\0' is present
 
       if(!strb_error(&debug_msg)) { // Make sure the strb is in a valid state
-        *err_str = strndup(debug_msg.s, debug_msg.l);
+        *err_str = memdup(debug_msg.s, debug_msg.l);
         // If there's a memory alloc error, fall-through : announcing a compile error is more important
       }
       strb_clear(&debug_msg);
