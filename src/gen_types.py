@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 
 from mako import exceptions
 from mako.template import Template
@@ -226,7 +226,7 @@ try:
     header = head_tmpl.render(TYPEMAP=TYPEMAP, VECTORMAP=VECTORMAP, ntypes=ntypes)
     impl = impl_tmpl.render(TYPEMAP=TYPEMAP, VECTORMAP=VECTORMAP, ntypes=ntypes, decls=decls)
 except Exception:
-    print exceptions.text_error_template().render()
+    print(exceptions.text_error_template().render())
     sys.exit(1)
 
 with open("gpuarray/types.h", "w") as f:
