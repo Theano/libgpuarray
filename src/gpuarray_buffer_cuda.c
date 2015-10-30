@@ -202,61 +202,6 @@ static const char CUDA_PREAMBLE[] =
 /* XXX: add complex, quads, longlong */
 /* XXX: add vector types */
 
-static const char *get_error_string(CUresult err) {
-    switch (err) {
-    case CUDA_SUCCESS:                 return "Success!";
-    case CUDA_ERROR_INVALID_VALUE:     return "Invalid cuda value";
-    case CUDA_ERROR_OUT_OF_MEMORY:     return "Out of host memory";
-    case CUDA_ERROR_NOT_INITIALIZED:   return "API not initialized";
-    case CUDA_ERROR_DEINITIALIZED:     return "Driver is shutting down";
-    case CUDA_ERROR_NO_DEVICE:         return "No CUDA devices avaiable";
-    case CUDA_ERROR_INVALID_DEVICE:    return "Invalid device ordinal";
-    case CUDA_ERROR_INVALID_IMAGE:     return "Invalid module image";
-    case CUDA_ERROR_INVALID_CONTEXT:   return "No context bound to current thread or invalid context parameter";
-    case CUDA_ERROR_CONTEXT_ALREADY_CURRENT: return "(deprecated) Context is already current";
-    case CUDA_ERROR_MAP_FAILED:        return "Map or register operation failed";
-    case CUDA_ERROR_UNMAP_FAILED:      return "Unmap of unregister operation failed";
-    case CUDA_ERROR_ARRAY_IS_MAPPED:   return "Array is currently mapped";
-    case CUDA_ERROR_ALREADY_MAPPED:    return "Resource is already mapped";
-    case CUDA_ERROR_NO_BINARY_FOR_GPU: return "No kernel image suitable for device";
-    case CUDA_ERROR_ALREADY_ACQUIRED:  return "Resource has already been acquired";
-    case CUDA_ERROR_NOT_MAPPED:        return "Resource is not mapped";
-    case CUDA_ERROR_NOT_MAPPED_AS_ARRAY: return "Resource cannot be accessed as array";
-    case CUDA_ERROR_NOT_MAPPED_AS_POINTER: return "Resource cannot be accessed as pointer";
-    case CUDA_ERROR_ECC_UNCORRECTABLE: return "Uncorrectable ECC error";
-    case CUDA_ERROR_UNSUPPORTED_LIMIT: return "Limit not supported by device";
-    case CUDA_ERROR_INVALID_SOURCE:    return "Invalid kernel source";
-    case CUDA_ERROR_FILE_NOT_FOUND:    return "File was not found";
-    case CUDA_ERROR_SHARED_OBJECT_SYMBOL_NOT_FOUND: return "Could not resolve link to shared object";
-    case CUDA_ERROR_SHARED_OBJECT_INIT_FAILED: return "Initialization of shared object failed";
-    case CUDA_ERROR_OPERATING_SYSTEM:  return "OS call failed";
-    case CUDA_ERROR_INVALID_HANDLE:    return "Invalid resource handle";
-    case CUDA_ERROR_NOT_FOUND:         return "Symbol not found";
-    case CUDA_ERROR_NOT_READY:         return "Previous asynchronous operation is still running";
-    case CUDA_ERROR_LAUNCH_FAILED:     return "Kernel code raised an exception and destroyed the context";
-    case CUDA_ERROR_LAUNCH_OUT_OF_RESOURCES: return "Not enough resource to launch kernel (or passed wrong arguments)";
-    case CUDA_ERROR_LAUNCH_TIMEOUT:    return "Kernel took too long to execute";
-    case CUDA_ERROR_LAUNCH_INCOMPATIBLE_TEXTURING: return "Kernel launch uses incompatible texture mode";
-    case CUDA_ERROR_PROFILER_DISABLED: return "Profiler is disabled";
-    case CUDA_ERROR_PROFILER_NOT_INITIALIZED: return "Profiler is not initialized";
-    case CUDA_ERROR_PROFILER_ALREADY_STARTED: return "Profiler has already started";
-    case CUDA_ERROR_PROFILER_ALREADY_STOPPED: return "Profiler has already stopped";
-    case CUDA_ERROR_CONTEXT_ALREADY_IN_USE: return "Context is already bound to another thread";
-    case CUDA_ERROR_PEER_ACCESS_ALREADY_ENABLED: return "Peer access already enabled";
-    case CUDA_ERROR_PEER_ACCESS_NOT_ENABLED: return "Peer access not enabled";
-    case CUDA_ERROR_PRIMARY_CONTEXT_ACTIVE: return "Primary context already initialized";
-    case CUDA_ERROR_CONTEXT_IS_DESTROYED: return "Context has been destroyed (or not yet initialized)";
-#if CUDA_VERSION >= 4020
-    case CUDA_ERROR_ASSERT:            return "Kernel trigged an assert and destroyed the context";
-    case CUDA_ERROR_TOO_MANY_PEERS:    return "Not enough ressoures to enable peer access";
-    case CUDA_ERROR_HOST_MEMORY_ALREADY_REGISTERED: return "Memory range already registered";
-    case CUDA_ERROR_HOST_MEMORY_NOT_REGISTERED: return "Memory range is not registered";
-#endif
-    case CUDA_ERROR_UNKNOWN:           return "Unknown internal error";
-    default: return "Unknown error code";
-    }
-}
-
 static void *cuda_init(int ord, int flags, int *ret) {
     CUdevice dev;
     CUcontext ctx;
@@ -1669,10 +1614,12 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
 static const char *cuda_error(void *c) {
   cuda_context *ctx = (cuda_context *)c;
+  char *errstr = NULL;
   if (ctx == NULL)
-    return get_error_string(err);
+    cuGetErrorString(err, &errstr);
   else
-    return get_error_string(ctx->err);
+    cuGetErrorString(ctx->err, &errstr);
+  return errstr;
 }
 
 GPUARRAY_LOCAL
