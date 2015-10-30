@@ -19,11 +19,14 @@
 #include "gpuarray/extension.h"
 #include "gpuarray/buffer_blas.h"
 
+/* Allocations will be made in blocks of at least this size */
+#define BLOCK_SIZE (4 * 1024 * 1024)
+
+/* No returned allocations will be smaller than this size */
+#define FRAG_SIZE (16)
+
 static CUresult err;
 
-static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
-                           int *ret);
-static void cuda_free(gpudata *);
 static void cuda_freekernel(gpukernel *);
 static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
 
@@ -32,9 +35,7 @@ static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
 static int detect_arch(const char *prefix, char *ret, CUresult *err);
 
 void *cuda_make_ctx(CUcontext ctx, int flags) {
-  int64_t v = 0;
   cuda_context *res;
-  int e = 0;
 
   res = malloc(sizeof(*res));
   if (res == NULL)
@@ -63,7 +64,7 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
     free(res);
     return NULL;
   }
-  TAG_CTX(res); /* Need to tag before cuda_alloc */
+  /*
   res->errbuf = cuda_alloc(res, 8, &v, GA_BUFFER_INIT, &e);
   if (e != GA_NO_ERROR) {
     err = res->err;
@@ -72,12 +73,17 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
     free(res);
     return NULL;
   }
-  res->refcnt--; /* Don't want to create a reference loop with the errbuf */
+  */
+  res->freeblocks = NULL;
+  TAG_CTX(res);
   return res;
 }
 
+static void deallocate(gpudata *);
+
 static void cuda_free_ctx(cuda_context *ctx) {
   gpuarray_blas_ops *blas_ops;
+  gpudata *next, *curr;
 
   ASSERT_CTX(ctx);
   ctx->refcnt--;
@@ -91,6 +97,14 @@ static void cuda_free_ctx(cuda_context *ctx) {
     ctx->refcnt = 2; /* Prevent recursive calls */
     cuda_free(ctx->errbuf);
     cuStreamDestroy(ctx->s);
+
+    /* Clear out the freelist */
+    for (curr = ctx->freeblocks; curr != NULL; curr = next) {
+      next = curr->next;
+      cuMemFree(curr->ptr);
+      deallocate(curr);
+    }
+
     if (!(ctx->flags & DONTFREE))
       cuCtxDestroy(ctx->ctx);
     cache_destroy(ctx->extcopy_cache);
@@ -124,37 +138,52 @@ void cuda_exit(cuda_context *ctx) {
     cuCtxPopCurrent(NULL);
 }
 
-gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
-    cuda_context *ctx = (cuda_context *)c;
-    gpudata *res;
-    int flags = CU_EVENT_DISABLE_TIMING;
+static gpudata *new_gpudata(cuda_context *ctx, CUdeviceptr ptr, size_t size) {
+  gpudata *res;
+  int fl = CU_EVENT_DISABLE_TIMING;
 
-    res = malloc(sizeof(*res));
-    if (res == NULL) return NULL;
-    res->refcnt = 1;
+  res = malloc(sizeof(*res));
+  if (res == NULL) return NULL;
 
-    cuda_enter(ctx);
+  res->refcnt = 0;
+  res->sz = size;
 
-    res->ptr = p;
-    if (ctx->flags & GA_CTX_MULTI_THREAD)
-      flags |= CU_EVENT_BLOCKING_SYNC;
-    ctx->err = cuEventCreate(&res->ev, flags);
-    if (ctx->err != CUDA_SUCCESS) {
-      free(res);
-      cuda_exit(ctx);
-      return NULL;
-    }
-    res->sz = sz;
-    res->flags = DONTFREE;
-    res->ctx = ctx;
-    ctx->refcnt++;
+  res->flags = 0;
 
-    cuda_exit(ctx);
-    TAG_BUF(res);
-    return res;
+  cuda_enter(ctx);
+
+  if (ctx->flags & GA_CTX_MULTI_THREAD)
+    fl |= CU_EVENT_BLOCKING_SYNC;
+  ctx->err = cuEventCreate(&res->ev, fl);
+
+  cuda_exit(ctx);
+
+  if (ctx->err != CUDA_SUCCESS) {
+    free(res);
+    return NULL;
+  }
+
+  res->ptr = ptr;
+  res->next = NULL;
+  res->ctx = ctx;
+  TAG_BUF(res);
+
+  return res;
 }
 
-CUdeviceptr cuda_get_ptr(gpudata *g) { ASSERT_BUF(g); return g->ptr; }
+gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
+  cuda_context *ctx = (cuda_context *)c;
+  gpudata *res = new_gpudata(ctx, p, sz);
+
+  if (res == NULL) return NULL;
+
+  res->refcnt = 1;
+  res->flags = DONTFREE;
+  res->ctx->refcnt++;
+
+  return res;
+}
+
 size_t cuda_get_sz(gpudata *g) { ASSERT_BUF(g); return g->sz; }
 
 #define FAIL(v, e) { if (ret) *ret = e; return v; }
@@ -242,6 +271,7 @@ static void *cuda_init(int ord, int flags, int *ret) {
     res->flags |= flags;
     /* Don't leave the context on the thread stack */
     cuCtxPopCurrent(NULL);
+
     return res;
 }
 
@@ -249,61 +279,135 @@ static void cuda_deinit(void *c) {
   cuda_free_ctx((cuda_context *)c);
 }
 
+static void find_best(cuda_context *ctx, gpudata **best, gpudata **prev,
+                     size_t size) {
+  gpudata *temp, *tempPrev = NULL;
+  *best = NULL;
+
+  for (temp = ctx->freeblocks; temp; temp = temp->next) {
+    if (temp->sz >= size && (!*best || temp->sz < (*best)->sz)) {
+      *best = temp;
+      *prev = tempPrev;
+    }
+    tempPrev = temp;
+  }
+}
+
+static int allocate(cuda_context *ctx, gpudata **res, gpudata **prev,
+                    size_t size) {
+  CUdeviceptr ptr;
+  gpudata *next;
+  *prev = NULL;
+
+  if (size < BLOCK_SIZE) size = BLOCK_SIZE;
+
+  cuda_enter(ctx);
+
+  ctx->err = cuMemAlloc(&ptr, size);
+  if (ctx->err != CUDA_SUCCESS) {
+    cuda_exit(ctx);
+    return GA_IMPL_ERROR;
+  }
+
+  *res = new_gpudata(ctx, ptr, size);
+
+  cuda_exit(ctx);
+
+  if (*res == NULL) {
+    cuMemFree(ptr);
+    return GA_MEMORY_ERROR;
+  }
+
+  (*res)->flags = CUDA_HEAD_ALLOC;
+
+  /* Now that the block is allocated, enter it in the freelist */
+  next = ctx->freeblocks;
+  for (; next && next->ptr < (*res)->ptr; next = next->next) {
+    *prev = next;
+  }
+  (*res)->next = next;
+  if (*prev)
+    (*prev)->next = *res;
+  else
+    ctx->freeblocks = *res;
+
+  return GA_NO_ERROR;
+}
+
+static int extract(gpudata *curr, gpudata *prev, size_t size) {
+  gpudata *next, *split;
+  size_t remaining = curr->sz - size;
+
+  /* If the size difference is small then ignore it */
+  if (remaining <= FRAG_SIZE) {
+    next = curr->next;
+  } else {
+    split = new_gpudata(curr->ctx, curr->ptr + size, remaining);
+    if (split == NULL)
+      return GA_MEMORY_ERROR;
+    /* Make sure we don't start using the split buffer too soon */
+    cuda_record(split, CUDA_WAIT_ALL);
+    /* Remember the split */
+    next = split;
+    curr->next = split;
+    curr->sz = size;
+  }
+
+  if (prev != NULL)
+    prev->next = next;
+  else
+    curr->ctx->freeblocks = next;
+
+  return GA_NO_ERROR;
+}
+
+static void cuda_free(gpudata *);
+
 static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
 			   int *ret) {
-    gpudata *res;
-    cuda_context *ctx = (cuda_context *)c;
-    int fl = CU_EVENT_DISABLE_TIMING;
+  gpudata *res, *prev;
+  cuda_context *ctx = (cuda_context *)c;
+  int err;
 
-    if ((flags & GA_BUFFER_INIT) && data == NULL) FAIL(NULL, GA_VALUE_ERROR);
-    if ((flags & (GA_BUFFER_READ_ONLY|GA_BUFFER_WRITE_ONLY)) ==
-	(GA_BUFFER_READ_ONLY|GA_BUFFER_WRITE_ONLY)) FAIL(NULL, GA_VALUE_ERROR);
+  if ((flags & GA_BUFFER_INIT) && data == NULL) FAIL(NULL, GA_VALUE_ERROR);
+  if ((flags & (GA_BUFFER_READ_ONLY|GA_BUFFER_WRITE_ONLY)) ==
+      (GA_BUFFER_READ_ONLY|GA_BUFFER_WRITE_ONLY)) FAIL(NULL, GA_VALUE_ERROR);
 
-    /* TODO: figure out how to make this work */
-    if (flags & GA_BUFFER_HOST) FAIL(NULL, GA_DEVSUP_ERROR);
+  /* TODO: figure out how to make this work */
+  if (flags & GA_BUFFER_HOST) FAIL(NULL, GA_DEVSUP_ERROR);
 
-    res = malloc(sizeof(*res));
-    if (res == NULL) FAIL(NULL, GA_SYS_ERROR);
-    res->refcnt = 1;
+  find_best(ctx, &res, &prev, size);
 
-    res->sz = size;
-    res->flags = flags & (GA_BUFFER_READ_ONLY|GA_BUFFER_WRITE_ONLY);
+  if (res == NULL) {
+    err = allocate(ctx, &res, &prev, size);
+    if (err != GA_NO_ERROR)
+      FAIL(NULL, err);
+  }
 
+  err = extract(res, prev, size);
+  if (err != GA_NO_ERROR)
+    FAIL(NULL, err);
+  /* It's out of the freelist, so add a ref */
+  res->ctx->refcnt++;
+  /* We consider this buffer allocated and ready to go */
+  res->refcnt = 1;
+
+  /* This copies the initial data, properly waiting for previous uses */
+  cuda_wait(res, CUDA_WAIT_WRITE);
+
+  if (flags & GA_BUFFER_INIT) {
     cuda_enter(ctx);
-
-    if (ctx->flags & GA_CTX_MULTI_THREAD)
-      fl |= CU_EVENT_BLOCKING_SYNC;
-    ctx->err = cuEventCreate(&res->ev, fl);
-
+    ctx->err = cuMemcpyHtoDAsync(res->ptr, data, size, ctx->s);
+    cuda_exit(ctx);
     if (ctx->err != CUDA_SUCCESS) {
-      free(res);
-      cuda_exit(ctx);
+      cuda_free(res);
       FAIL(NULL, GA_IMPL_ERROR);
     }
+  }
 
-    if (size == 0) size = 1;
+  cuda_record(res, CUDA_WAIT_WRITE);
 
-    ctx->err = cuMemAlloc(&res->ptr, size);
-    if (ctx->err != CUDA_SUCCESS) {
-        cuEventDestroy(res->ev);
-        free(res);
-        cuda_exit(ctx);
-        FAIL(NULL, GA_IMPL_ERROR);
-    }
-    res->ctx = ctx;
-    ctx->refcnt++;
-
-    if (flags & GA_BUFFER_INIT) {
-      ctx->err = cuMemcpyHtoD(res->ptr, data, size);
-      if (ctx->err != CUDA_SUCCESS) {
-	cuda_free(res);
-	FAIL(NULL, GA_IMPL_ERROR)
-      }
-    }
-
-    cuda_exit(ctx);
-    TAG_BUF(res);
-    return res;
+  return res;
 }
 
 static void cuda_retain(gpudata *d) {
@@ -311,25 +415,62 @@ static void cuda_retain(gpudata *d) {
   d->refcnt++;
 }
 
+static void deallocate(gpudata *d) {
+  cuda_enter(d->ctx);
+  cuEventDestroy(d->ev);
+  cuda_exit(d->ctx);
+  CLEAR(d);
+  free(d);
+}
+
 static void cuda_free(gpudata *d) {
   /* We ignore errors on free */
   ASSERT_BUF(d);
   d->refcnt--;
   if (d->refcnt == 0) {
-    cuda_enter(d->ctx);
-    /*
-     * From testing, I have discovered that cuMemFree() will just
-     * block until nothing uses the region on the GPU.  Since this is
-     * not documented behavior, we will emulate that here.
-     */
-    cuEventSynchronize(d->ev);
-    if (!(d->flags & DONTFREE))
-      cuMemFree(d->ptr);
-    cuEventDestroy(d->ev);
-    cuda_exit(d->ctx);
-    cuda_free_ctx(d->ctx);
-    CLEAR(d);
-    free(d);
+    /* Keep a reference to the context since we deallocate the gpudata
+     * object */
+    cuda_context *ctx = d->ctx;
+    if (d->flags & DONTFREE) {
+      /* This is the path for "external" buffers */
+      deallocate(d);
+      cuda_free_ctx(ctx);
+    } else {
+      /* Find the position in the freelist */
+      gpudata *next = d->ctx->freeblocks, *prev = NULL;
+      for (; next && next->ptr < d->ptr; next = next->next) {
+        prev = next;
+      }
+      next = prev != NULL ? prev->next : d->ctx->freeblocks;
+
+      /* See if we can merge the block with the previous one */
+      if (!(d->flags & CUDA_HEAD_ALLOC) &&
+            prev != NULL && prev->ptr + prev->sz == d->ptr) {
+        prev->sz = prev->sz + d->sz;
+        cuda_record(prev, CUDA_WAIT_ALL);
+        deallocate(d);
+        d = prev;
+      } else if (prev != NULL) {
+        prev->next = d;
+      } else {
+        d->ctx->freeblocks = d;
+      }
+
+      /* See if we can merge with next */
+      if (next && !(next->flags & CUDA_HEAD_ALLOC) &&
+          d->ptr + d->sz == next->ptr) {
+        d->sz = d->sz + next->sz;
+        d->next = next->next;
+        deallocate(next);
+      } else {
+        d->next = next;
+      }
+      /* We keep this at the end since the freed buffer could be the
+       * last reference to the context and therefore clearing the
+       * reference could trigger the freeing if the whole context
+       * including the freelist, which we manipulate. */
+      cuda_free_ctx(ctx);
+    }
   }
 }
 
@@ -1614,7 +1755,7 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
 static const char *cuda_error(void *c) {
   cuda_context *ctx = (cuda_context *)c;
-  char *errstr = NULL;
+  const char *errstr = NULL;
   if (ctx == NULL)
     cuGetErrorString(err, &errstr);
   else

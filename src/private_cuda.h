@@ -57,6 +57,7 @@ typedef struct _cuda_context {
   unsigned int refcnt;
   int flags;
   unsigned int enter;
+  gpudata *freeblocks;
 } cuda_context;
 
 #ifdef WITH_NVRTC
@@ -78,6 +79,7 @@ struct _gpudata {
   cuda_context *ctx;
   int flags;
   unsigned int refcnt;
+  gpudata *next;
 #ifdef DEBUG
   char tag[8];
 #endif
@@ -92,7 +94,11 @@ GPUARRAY_LOCAL int cuda_record(gpudata *, int);
 /* private flags are in the upper 16 bits */
 #define CUDA_WAIT_READ  0x10000
 #define CUDA_WAIT_WRITE 0x20000
-#define CUDA_WAIT_MASK  0xf0000
+#define CUDA_WAIT_MASK  0x30000
+
+#define CUDA_WAIT_ALL   (CUDA_WAIT_READ|CUDA_WAIT_WRITE)
+
+#define CUDA_HEAD_ALLOC 0x40000
 
 struct _gpukernel {
 #ifdef DEBUG
