@@ -699,11 +699,14 @@ GPUARRAY_PUBLIC const gpuarray_buffer_ops *gpuarray_get_ops(const char *name);
  * can be done.
  */
 GPUARRAY_PUBLIC gpudata *gpuarray_buffer_transfer(gpudata *buf, size_t offset,
-                                             size_t sz, void *src_ctx,
-                                             const gpuarray_buffer_ops *src_ops,
-                                             void *dst_ctx,
-                                             const gpuarray_buffer_ops *dst_ops,
-                                             int may_share, int *ret);
+                                                  size_t sz, void *src_ctx,
+                                                  const gpuarray_buffer_ops *src_ops,
+                                                  void *dst_ctx,
+                                                  const gpuarray_buffer_ops *dst_ops,
+                                                  int may_share, int *ret);
+
+GPUARRAY_PUBLIC void *gpuarray_buffer_context(const gpuarray_buffer_ops *ops,
+                                              gpudata *b);
 
 #ifdef __cplusplus
 }
