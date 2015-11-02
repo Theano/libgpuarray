@@ -22,7 +22,8 @@
 /* Allocations will be made in blocks of at least this size */
 #define BLOCK_SIZE (4 * 1024 * 1024)
 
-/* No returned allocations will be smaller than this size */
+/* No returned allocations will be smaller than this size.
+   Also, they will be aligned to this size. */
 #define FRAG_SIZE (16)
 
 static CUresult err;
@@ -338,8 +339,8 @@ static int extract(gpudata *curr, gpudata *prev, size_t size) {
   gpudata *next, *split;
   size_t remaining = curr->sz - size;
 
-  /* If the size difference is small then ignore it */
-  if (remaining <= FRAG_SIZE) {
+  if (remaining < FRAG_SIZE) {
+    /* No need to split, the remaining block would be too small */
     next = curr->next;
   } else {
     split = new_gpudata(curr->ctx, curr->ptr + size, remaining);
@@ -347,9 +348,7 @@ static int extract(gpudata *curr, gpudata *prev, size_t size) {
       return GA_MEMORY_ERROR;
     /* Make sure we don't start using the split buffer too soon */
     cuda_record(split, CUDA_WAIT_ALL);
-    /* Remember the split */
     next = split;
-    curr->next = split;
     curr->sz = size;
   }
 
@@ -362,6 +361,10 @@ static int extract(gpudata *curr, gpudata *prev, size_t size) {
 }
 
 static void cuda_free(gpudata *);
+
+static inline size_t roundup(size_t s, size_t m) {
+  return ((s + (m - 1)) / m) * m;
+}
 
 static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
 			   int *ret) {
@@ -376,6 +379,11 @@ static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
   /* TODO: figure out how to make this work */
   if (flags & GA_BUFFER_HOST) FAIL(NULL, GA_DEVSUP_ERROR);
 
+  /* We don't want to manage really small allocations so we round up
+   * to a multiple of FRAG_SIZE.  This also ensures that if we split a
+   * block, the next block starts properly aligned for any data type.
+   */
+  size = roundup(size, FRAG_SIZE);
   find_best(ctx, &res, &prev, size);
 
   if (res == NULL) {
