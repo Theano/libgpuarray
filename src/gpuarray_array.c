@@ -435,9 +435,8 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
   }
 
   if (check_error) {
-    void *ctx;
-    v->ops->property(NULL, v->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
-    errbuf = v->ops->buffer_alloc(ctx, 4, &kerr, GA_BUFFER_INIT, &err);
+    errbuf = v->ops->buffer_alloc(gpuarray_buffer_context(v->ops, v->data), 4,
+                                  &kerr, GA_BUFFER_INIT, &err);
     if (errbuf != NULL)
       return err;
   }

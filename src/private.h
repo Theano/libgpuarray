@@ -44,7 +44,9 @@ GPUARRAY_LOCAL void gpuarray_elem_perdim(strb *sb, unsigned int nd,
                                          const ssize_t *str,
                                          const char *id);
 
-GPUARRAY_LOCAL void gpukernel_source_with_line_numbers(unsigned int count, const char **news, size_t *newl,
+GPUARRAY_LOCAL void gpukernel_source_with_line_numbers(unsigned int count,
+                                                       const char **news,
+                                                       size_t *newl,
                                                        strb *src);
 
 #ifdef __cplusplus
