@@ -68,8 +68,6 @@ struct _cache {
   /* Extra data goes here depending on cache type */
 };
 
-static void nofree(void *v) {}
-
 cache *cache_lru(size_t max_size, size_t elasticity,
                  cache_eq_fn keq, cache_hash_fn khash,
                  cache_freek_fn kfree, cache_freev_fn vfree);

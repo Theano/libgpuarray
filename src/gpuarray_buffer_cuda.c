@@ -555,18 +555,22 @@ typedef struct _srckey {
   char arch[BIN_ID_LEN];
 } srckey;
 
-static void free_src(srckey *k) {
+static void src_free(void *_k) {
+  srckey *k = (srckey *)_k;
   free((void *)k->src);
   free(k);
 }
 
-static int src_eq(srckey *k1, srckey *k2) {
+static int src_eq(void *_k1, void *_k2) {
+  srckey *k1 = (srckey *)_k1;
+  srckey *k2 = (srckey *)_k2;
   return (k1->len == k2->len &&
           strcmp(k1->arch, k2->arch) == 0 &&
           memcmp(k1->src, k2->src, k1->len) == 0);
 }
 
-static uint32_t src_hash(srckey *k) {
+static uint32_t src_hash(void *_k) {
+  srckey *k = (srckey *)_k;
   XXH32_state_t h;
   /* seed is an arbitrary, but fixed value */
   XXH32_reset(&h, 42);
@@ -580,7 +584,8 @@ typedef struct _binval {
   size_t len;
 } binval;
 
-static void free_bin(binval *v) {
+static void bin_free(void *_v) {
+  binval *v = (binval *)_v;
   free(v->bin);
   free(v);
 }
@@ -930,12 +935,12 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
       } else {
         bin = NULL;
         if (compile_cache != NULL) {
-          k.src = src;
-          k.len = len;
-          memmove(k.arch, ctx->bin_id, BIN_ID_LEN);
+          k.src = sb.s;
+          k.len = sb.l;
+          memcpy(k.arch, ctx->bin_id, BIN_ID_LEN);
           av = cache_get(compile_cache, &k);
           if (av != NULL) {
-            buf = memdup(ab->bin, av->len);
+            bin = memdup(av->bin, av->len);
             bin_len = av->len;
           }
         }
