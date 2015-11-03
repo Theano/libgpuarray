@@ -5,6 +5,7 @@
 
 #include <sys/types.h>
 
+#include <assert.h>
 #include <stdlib.h>
 
 #include <cache.h>
