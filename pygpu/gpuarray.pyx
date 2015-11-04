@@ -629,14 +629,14 @@ def zeros(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
     return res
 
 cdef GpuArray pygpu_zeros(unsigned int nd, const size_t *dims, int typecode,
-                          ga_order order, GpuContext context, type cls):
+                          ga_order order, GpuContext context, object cls):
     cdef GpuArray res
     res = pygpu_empty(nd, dims, typecode, order, context, cls)
     array_memset(res, 0)
     return res
 
 cdef GpuArray pygpu_empty(unsigned int nd, const size_t *dims, int typecode,
-                          ga_order order, GpuContext context, type cls):
+                          ga_order order, GpuContext context, object cls):
     cdef GpuArray res
 
     context = ensure_context(context)
@@ -647,7 +647,7 @@ cdef GpuArray pygpu_empty(unsigned int nd, const size_t *dims, int typecode,
 
 cdef GpuArray pygpu_fromhostdata(void *buf, int typecode, unsigned int nd,
                                  const size_t *dims, const ssize_t *strides,
-                                 GpuContext context, type cls):
+                                 GpuContext context, object cls):
     cdef GpuArray res
     context = ensure_context(context)
 
@@ -659,7 +659,7 @@ cdef GpuArray pygpu_fromhostdata(void *buf, int typecode, unsigned int nd,
 cdef GpuArray pygpu_fromgpudata(gpudata *buf, size_t offset, int typecode,
                                 unsigned int nd, const size_t *dims,
                                 const ssize_t *strides, GpuContext context,
-                                bint writable, object base, type cls):
+                                bint writable, object base, object cls):
     cdef GpuArray res
 
     res = new_GpuArray(cls, context, base)
@@ -1195,7 +1195,7 @@ cdef class flags(object):
         def __get__(self):
             return self.fl
 
-cdef GpuArray new_GpuArray(type cls, GpuContext ctx, object base):
+cdef GpuArray new_GpuArray(object cls, GpuContext ctx, object base):
     cdef GpuArray res
     if ctx is None:
         raise RuntimeError, "ctx is None in new_GpuArray"
@@ -1207,7 +1207,7 @@ cdef GpuArray new_GpuArray(type cls, GpuContext ctx, object base):
     res.context = ctx
     return res
 
-cdef GpuArray pygpu_view(GpuArray a, type cls):
+cdef GpuArray pygpu_view(GpuArray a, object cls):
     cdef GpuArray res = new_GpuArray(cls, a.context, a.base)
     array_view(res, a)
     return res
@@ -1332,12 +1332,12 @@ def _split(GpuArray a, ind, unsigned int axis):
 
 cdef GpuArray pygpu_concatenate(const _GpuArray **a, size_t n,
                                 unsigned int axis, int restype,
-                                type cls, GpuContext context):
+                                object cls, GpuContext context):
     cdef res = new_GpuArray(cls, context, None)
     array_concatenate(res, a, n, axis, restype)
     return res
 
-def _concatenate(list al, unsigned int axis, int restype, type cls,
+def _concatenate(list al, unsigned int axis, int restype, object cls,
                  GpuContext context):
     cdef Py_ssize_t i
     context = ensure_context(context)
@@ -1473,7 +1473,7 @@ cdef class GpuArray:
         """
         pygpu_sync(self)
 
-    def view(self, type cls=GpuArray):
+    def view(self, object cls=GpuArray):
         """
         view(cls=GpuArray)
 

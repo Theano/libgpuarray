@@ -257,25 +257,25 @@ cdef api GpuContext pygpu_init(object dev)
 
 cdef api GpuArray pygpu_zeros(unsigned int nd, const size_t *dims,
                               int typecode, ga_order order,
-                              GpuContext context, type cls)
+                              GpuContext context, object cls)
 cdef api GpuArray pygpu_empty(unsigned int nd, const size_t *dims,
                               int typecode, ga_order order,
-                              GpuContext context, type cls)
+                              GpuContext context, object cls)
 cdef api GpuArray pygpu_fromhostdata(void *buf, int typecode, unsigned int nd,
                                      const size_t *dims,
                                      const ssize_t *strides,
-                                     GpuContext context, type cls)
+                                     GpuContext context, object cls)
 
 cdef api GpuArray pygpu_fromgpudata(gpudata *buf, size_t offset, int typecode,
                                     unsigned int nd, const size_t *dims,
                                     const ssize_t *strides, GpuContext context,
-                                    bint writable, object base, type cls)
+                                    bint writable, object base, object cls)
 
 cdef api GpuArray pygpu_copy(GpuArray a, ga_order ord)
 
 cdef api int pygpu_move(GpuArray a, GpuArray src) except -1
 
-cdef api GpuArray pygpu_view(GpuArray a, type cls)
+cdef api GpuArray pygpu_view(GpuArray a, object cls)
 
 cdef api int pygpu_sync(GpuArray a) except -1
 
@@ -295,13 +295,13 @@ cdef api GpuArray pygpu_transfer(GpuArray a, GpuContext new_ctx,
                                  bint may_share)
 cdef api GpuArray pygpu_concatenate(const _GpuArray **a, size_t n,
                                     unsigned int axis, int restype,
-                                    type cls, GpuContext context)
+                                    object cls, GpuContext context)
 
 cdef api class GpuContext [type PyGpuContextType, object PyGpuContextObject]:
     cdef const gpuarray_buffer_ops *ops
     cdef void* ctx
 
-cdef GpuArray new_GpuArray(type cls, GpuContext ctx, object base)
+cdef GpuArray new_GpuArray(object cls, GpuContext ctx, object base)
 
 cdef api class GpuArray [type PyGpuArrayType, object PyGpuArrayObject]:
     cdef _GpuArray ga
