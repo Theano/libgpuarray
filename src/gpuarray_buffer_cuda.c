@@ -34,9 +34,11 @@ static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
 #include "cache_extcopy.h"
 
 static int detect_arch(const char *prefix, char *ret, CUresult *err);
+static gpudata *new_gpudata(cuda_context *ctx, CUdeviceptr ptr, size_t size);
 
 void *cuda_make_ctx(CUcontext ctx, int flags) {
   cuda_context *res;
+  void *p;
 
   res = malloc(sizeof(*res));
   if (res == NULL)
@@ -47,6 +49,7 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
   res->refcnt = 1;
   res->flags = flags;
   res->enter = 0;
+  res->freeblocks = NULL;
   if (detect_arch(ARCH_PREFIX, res->bin_id, &err)) {
     free(res);
     return NULL;
@@ -65,18 +68,25 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
     free(res);
     return NULL;
   }
-  /*
-  res->errbuf = cuda_alloc(res, 8, &v, GA_BUFFER_INIT, &e);
-  if (e != GA_NO_ERROR) {
+  err = cuMemAllocHost(&p, 16);
+  if (err != CUDA_SUCCESS) {
+    cache_destroy(res->extcopy_cache);
+    free(res);
+    return NULL;
+  }
+  memset(p, 0, 16);
+  /* Need to tag for new_gpudata */
+  TAG_CTX(res);
+  res->errbuf = new_gpudata(res, (CUdeviceptr)p, 16);
+  if (res->errbuf == NULL) {
     err = res->err;
+    cuMemFreeHost(p);
     cache_destroy(res->extcopy_cache);
     cuStreamDestroy(res->s);
     free(res);
     return NULL;
   }
-  */
-  res->freeblocks = NULL;
-  TAG_CTX(res);
+  res->errbuf->flags |= CUDA_MAPPED_PTR;
   return res;
 }
 
@@ -95,8 +105,9 @@ static void cuda_free_ctx(cuda_context *ctx) {
                                &blas_ops);
       blas_ops->teardown(ctx);
     }
-    ctx->refcnt = 2; /* Prevent recursive calls */
-    cuda_free(ctx->errbuf);
+    cuMemFreeHost((void *)ctx->errbuf->ptr);
+    deallocate(ctx->errbuf);
+
     cuStreamDestroy(ctx->s);
 
     /* Clear out the freelist */
