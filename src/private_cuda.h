@@ -7,11 +7,11 @@
 #include <cuda.h>
 #endif
 
+#include <cache.h>
+
 #include "private.h"
 
 #include "gpuarray/buffer.h"
-
-#include "cache_decls.h"
 
 #ifdef DEBUG
 #include <assert.h>
@@ -41,6 +41,8 @@
 /* Keep in sync with the copy in gpuarray/extension.h */
 #define DONTFREE 0x10000000
 
+#define BIN_ID_LEN 12
+
 typedef struct _cuda_context {
 #ifdef DEBUG
   char tag[8];
@@ -51,7 +53,7 @@ typedef struct _cuda_context {
   void *blas_handle;
   gpudata *errbuf;
   cache *extcopy_cache;
-  char bin_id[12];
+  char bin_id[BIN_ID_LEN];
   unsigned int refcnt;
   int flags;
   unsigned int enter;

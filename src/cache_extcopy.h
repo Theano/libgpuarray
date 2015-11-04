@@ -1,6 +1,5 @@
-/*
- * This whole cache business is ugly, but fast.
- */
+#include <cache.h>
+
 typedef struct _extcopy_args {
   unsigned int ind;
   unsigned int ond;
@@ -13,13 +12,9 @@ typedef struct _extcopy_args {
   const ssize_t *istr;
   const ssize_t *ostr;
   size_t hash;
-} cache_key_t;
+} extcopy_args;
 
-typedef gpukernel *cache_val_t;
-
-#define key_hash(k) (k)->hash
-
-static inline int key_eq(const cache_key_t *k1, const cache_key_t *k2) {
+static int extcopy_eq(extcopy_args *k1, extcopy_args *k2) {
   return (k1->ind == k2->ind && k1->ond == k2->ond &&
 	  k1->ioff == k2->ioff && k1->ooff == k2->ooff &&
 	  k1->itype == k2->itype && k1->otype == k2->otype &&
@@ -29,17 +24,13 @@ static inline int key_eq(const cache_key_t *k1, const cache_key_t *k2) {
 	  memcmp(k1->ostr, k2->ostr, k1->ond * sizeof(ssize_t)) == 0);
 }
 
-static inline void key_free(const cache_key_t *k) {
+static void extcopy_free(extcopy_args *k) {
   free((void *)k->idims);
   free((void *)k->odims);
   free((void *)k->istr);
   free((void *)k->ostr);
+  free(k);
 }
-
-#include <assert.h>
-#include <stdlib.h>
-
-#include "cache_impl.h"
 
 #define rot(x,k) (((x)<<(k)) | ((x)>>(32-(k))))
 
@@ -91,17 +82,20 @@ static inline void hashword2(const uint32_t *k, size_t l,
   *pb = b; *pc = c;
 }
 
-static inline void do_key_hash(cache_key_t *k) {
-  uint32_t b = k->ind, c = k->ond;
-  hashword2((uint32_t *)(((char *)k) + offsetof(cache_key_t, ioff)),
-	    (offsetof(cache_key_t, idims) - offsetof(cache_key_t, ioff))/4, &b, &c);
-  hashword2((uint32_t *)k->idims, k->ind*(sizeof(size_t)/4), &b, &c);
-  hashword2((uint32_t *)k->odims, k->ond*(sizeof(size_t)/4), &b, &c);
-  hashword2((uint32_t *)k->istr, k->ind*(sizeof(size_t)/4), &b, &c);
-  hashword2((uint32_t *)k->ostr, k->ond*(sizeof(size_t)/4), &b, &c);
-  if (sizeof(size_t) == 4)
-    k->hash = c;
-  else
-    k->hash = ((size_t)b) << 32 | c;
+static uint32_t extcopy_hash(extcopy_args *k) {
+  if (k->hash == 0) {
+    uint32_t b = k->ind, c = k->ond;
+    hashword2((uint32_t *)(((char *)k) + offsetof(extcopy_args, ioff)),
+              (offsetof(extcopy_args, idims) - offsetof(extcopy_args, ioff))/4, &b, &c);
+    hashword2((uint32_t *)k->idims, k->ind*(sizeof(size_t)/4), &b, &c);
+    hashword2((uint32_t *)k->odims, k->ond*(sizeof(size_t)/4), &b, &c);
+    hashword2((uint32_t *)k->istr, k->ind*(sizeof(size_t)/4), &b, &c);
+    hashword2((uint32_t *)k->ostr, k->ond*(sizeof(size_t)/4), &b, &c);
+    if (sizeof(size_t) == 4)
+      k->hash = c;
+    else
+      k->hash = ((size_t)b) << 32 | c;
+  }
+  return (uint32_t)k->hash;
 }
 

@@ -33,6 +33,8 @@ macro (set_rel var)
 endmacro()
 
 set_rel(GPUARRAY_SRC
+cache/lru.c
+cache/twoq.c
 gpuarray_types.c
 gpuarray_error.c
 gpuarray_util.c
@@ -124,11 +126,8 @@ add_library(gpuarray SHARED ${GPUARRAY_SRC})
 set_target_properties(gpuarray PROPERTIES
   COMPILE_FLAGS "-DGPUARRAY_BUILDING_DLL -DGPUARRAY_SHARED"
   INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/lib
+  MACOSX_RPATH OFF
   )
-
-if (CMAKE_MAJOR_VERSION GREATER 2)
-  set_target_properties(gpuarray PROPERTIES MACOSX_RPATH OFF)
-endif()
 
 add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
 
