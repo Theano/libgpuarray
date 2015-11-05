@@ -372,6 +372,8 @@ static int extract(gpudata *curr, gpudata *prev, size_t size) {
 }
 
 static void cuda_free(gpudata *);
+static int cuda_write(gpudata *dst, size_t dstoff, const void *src,
+                      size_t sz);
 
 static inline size_t roundup(size_t s, size_t m) {
   return ((s + (m - 1)) / m) * m;
@@ -381,6 +383,7 @@ static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
 			   int *ret) {
   gpudata *res, *prev;
   cuda_context *ctx = (cuda_context *)c;
+  size_t asize;
   int err;
 
   if ((flags & GA_BUFFER_INIT) && data == NULL) FAIL(NULL, GA_VALUE_ERROR);
@@ -394,16 +397,16 @@ static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
    * to a multiple of FRAG_SIZE.  This also ensures that if we split a
    * block, the next block starts properly aligned for any data type.
    */
-  size = roundup(size, FRAG_SIZE);
-  find_best(ctx, &res, &prev, size);
+  asize = roundup(size, FRAG_SIZE);
+  find_best(ctx, &res, &prev, asize);
 
   if (res == NULL) {
-    err = allocate(ctx, &res, &prev, size);
+    err = allocate(ctx, &res, &prev, asize);
     if (err != GA_NO_ERROR)
       FAIL(NULL, err);
   }
 
-  err = extract(res, prev, size);
+  err = extract(res, prev, asize);
   if (err != GA_NO_ERROR)
     FAIL(NULL, err);
   /* It's out of the freelist, so add a ref */
@@ -411,16 +414,11 @@ static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
   /* We consider this buffer allocated and ready to go */
   res->refcnt = 1;
 
-  /* This copies the initial data, properly waiting for previous uses */
-  cuda_wait(res, CUDA_WAIT_WRITE);
-
   if (flags & GA_BUFFER_INIT) {
-    cuda_enter(ctx);
-    ctx->err = cuMemcpyHtoDAsync(res->ptr, data, size, ctx->s);
-    cuda_exit(ctx);
-    if (ctx->err != CUDA_SUCCESS) {
+    err = cuda_write(res, 0, data, size);
+    if (err != GA_NO_ERROR) {
       cuda_free(res);
-      FAIL(NULL, GA_IMPL_ERROR);
+      FAIL(NULL, err);
     }
   }
 
