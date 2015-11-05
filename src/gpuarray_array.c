@@ -435,9 +435,8 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
   }
 
   if (check_error) {
-    errbuf = v->ops->buffer_alloc(gpuarray_buffer_context(v->ops, v->data), 4,
-                                  &kerr, GA_BUFFER_INIT, &err);
-    if (errbuf != NULL)
+    err = v->ops->property(NULL, v->data, NULL, GA_CTX_PROP_ERRBUF, &errbuf);
+    if (err != GA_NO_ERROR)
       return err;
   }
 
@@ -493,14 +492,14 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
 
   err = GpuKernel_call(&k, 2, ls, gs, 0, args);
   free(args);
-  if (check_error) {
-    if (err == GA_NO_ERROR) {
-      err = v->ops->buffer_read(&kerr, errbuf, 0, sizeof(int));
-      if (err == GA_NO_ERROR && kerr != 0) {
-        err = GA_VALUE_ERROR;
-      }
+  if (check_error && err == GA_NO_ERROR) {
+    err = v->ops->buffer_read(&kerr, errbuf, 0, sizeof(int));
+    if (err == GA_NO_ERROR && kerr != 0) {
+      err = GA_VALUE_ERROR;
+      kerr = 0;
+      /* We suppose this will not fail */
+      v->ops->buffer_write(errbuf, 0, &kerr, sizeof(int));
     }
-    v->ops->buffer_release(errbuf);
   }
 
 out:
