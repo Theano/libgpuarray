@@ -363,6 +363,7 @@ static int extract(gpudata *curr, gpudata *prev, size_t size) {
     if (split == NULL)
       return GA_MEMORY_ERROR;
     /* Make sure we don't start using the split buffer too soon */
+    cuda_wait(curr, CUDA_WAIT_ALL);
     cuda_record(split, CUDA_WAIT_ALL);
     next = split;
     curr->sz = size;
@@ -1566,8 +1567,7 @@ static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
         cuda_retain(src);
         return src;
     }
-    dst = cuda_alloc(ctx, sz, NULL, src->flags & (GA_BUFFER_READ_ONLY|
-                                                  GA_BUFFER_WRITE_ONLY), NULL);
+    dst = cuda_alloc(ctx, sz, NULL, 0, NULL);
     if (dst == NULL) return NULL;
     cuda_enter(ctx);
 
@@ -1587,13 +1587,11 @@ static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
     return dst;
   }
 
-  dst = cuda_alloc(dst_ctx, sz, NULL, src->flags & (GA_BUFFER_READ_ONLY|
-                                                    GA_BUFFER_WRITE_ONLY),
-                   NULL);
+  dst = cuda_alloc(dst_ctx, sz, NULL, 0, NULL);
   if (dst == NULL)
     return NULL;
   cuda_enter(ctx);
-  cuda_wait(src, CUDA_WAIT_READ);
+  cuStreamWaitEvent(dst_ctx->s, src->ev, 0);
   cuda_wait(dst, CUDA_WAIT_WRITE);
   ctx->err = cuMemcpyPeerAsync(dst->ptr, dst->ctx->ctx, src->ptr+offset,
 			       src->ctx->ctx, sz, dst_ctx->s);
