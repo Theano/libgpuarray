@@ -249,6 +249,7 @@ static void *cuda_init(int ord, int flags, int *ret) {
     cuda_context *res;
     static int init_done = 0;
     unsigned int fl = CU_CTX_SCHED_AUTO;
+    int i;
 
     if (ord == -1) {
       /* Grab the ambient context */
@@ -273,6 +274,10 @@ static void *cuda_init(int ord, int flags, int *ret) {
       fl = CU_CTX_SCHED_SPIN;
     if (flags & GA_CTX_MULTI_THREAD)
       fl = CU_CTX_SCHED_YIELD;
+    err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_UNIFIED_ADDRESSING, dev);
+    CHKFAIL(NULL);
+    if (i != 1)
+      FAIL(NULL, GA_UNSUPPORTED_ERROR);
     err = cuCtxCreate(&ctx, fl, dev);
     CHKFAIL(NULL);
     res = cuda_make_ctx(ctx, 0);
