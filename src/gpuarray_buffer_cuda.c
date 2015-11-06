@@ -190,7 +190,7 @@ gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
   if (res == NULL) return NULL;
 
   res->refcnt = 1;
-  res->flags = DONTFREE;
+  res->flags |= DONTFREE;
   res->ctx->refcnt++;
 
   return res;
@@ -335,7 +335,7 @@ static int allocate(cuda_context *ctx, gpudata **res, gpudata **prev,
     return GA_MEMORY_ERROR;
   }
 
-  (*res)->flags = CUDA_HEAD_ALLOC;
+  (*res)->flags |= CUDA_HEAD_ALLOC;
 
   /* Now that the block is allocated, enter it in the freelist */
   next = ctx->freeblocks;
@@ -524,7 +524,7 @@ int cuda_record(gpudata *a, int flags) {
   cuda_enter(a->ctx);
   a->ctx->err = cuEventRecord(a->ev, a->ctx->s);
   a->flags &= ~(CUDA_WAIT_MASK);
-  a->flags &= (flags & CUDA_WAIT_MASK);
+  a->flags |= (flags & CUDA_WAIT_MASK);
   cuda_exit(a->ctx);
   return GA_NO_ERROR;
 }
