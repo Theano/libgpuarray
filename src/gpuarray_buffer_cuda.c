@@ -428,8 +428,6 @@ static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
     }
   }
 
-  cuda_record(res, CUDA_WAIT_WRITE);
-
   return res;
 }
 
@@ -470,6 +468,7 @@ static void cuda_free(gpudata *d) {
       if (!(d->flags & CUDA_HEAD_ALLOC) &&
             prev != NULL && prev->ptr + prev->sz == d->ptr) {
         prev->sz = prev->sz + d->sz;
+        cuda_wait(d, CUDA_WAIT_ALL);
         cuda_record(prev, CUDA_WAIT_ALL);
         deallocate(d);
         d = prev;
@@ -484,6 +483,8 @@ static void cuda_free(gpudata *d) {
           d->ptr + d->sz == next->ptr) {
         d->sz = d->sz + next->sz;
         d->next = next->next;
+        cuda_wait(next, CUDA_WAIT_ALL);
+        cuda_record(d, CUDA_WAIT_ALL);
         deallocate(next);
       } else {
         d->next = next;
