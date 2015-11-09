@@ -51,28 +51,22 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
   res->enter = 0;
   res->freeblocks = NULL;
   if (detect_arch(ARCH_PREFIX, res->bin_id, &err)) {
-    free(res);
-    return NULL;
+    goto fail_cache;
   }
   res->extcopy_cache = cache_lru(64, 32, (cache_eq_fn)extcopy_eq,
                                  (cache_hash_fn)extcopy_hash,
                                  (cache_freek_fn)extcopy_free,
                                  (cache_freev_fn)cuda_freekernel);
   if (res->extcopy_cache == NULL) {
-    free(res);
-    return NULL;
+    goto fail_cache;
   }
   err = cuStreamCreate(&res->s, 0);
   if (err != CUDA_SUCCESS) {
-    cache_destroy(res->extcopy_cache);
-    free(res);
-    return NULL;
+    goto fail_stream;
   }
   err = cuMemAllocHost(&p, 16);
   if (err != CUDA_SUCCESS) {
-    cache_destroy(res->extcopy_cache);
-    free(res);
-    return NULL;
+    goto fail_errbuf;
   }
   memset(p, 0, 16);
   /* Need to tag for new_gpudata */
@@ -80,14 +74,19 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
   res->errbuf = new_gpudata(res, (CUdeviceptr)p, 16);
   if (res->errbuf == NULL) {
     err = res->err;
-    cuMemFreeHost(p);
-    cache_destroy(res->extcopy_cache);
-    cuStreamDestroy(res->s);
-    free(res);
-    return NULL;
+    goto fail_end;
   }
   res->errbuf->flags |= CUDA_MAPPED_PTR;
   return res;
+ fail_end:
+  cuMemFreeHost(p);
+ fail_errbuf:
+  cuStreamDestroy(res->s);
+ fail_stream:
+  cache_destroy(res->extcopy_cache);
+ fail_cache:
+  free(res);
+  return NULL;
 }
 
 static void deallocate(gpudata *);
