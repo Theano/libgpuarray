@@ -324,7 +324,7 @@ static int allocate(cuda_context *ctx, gpudata **res, gpudata **prev,
   gpudata *next;
   *prev = NULL;
 
-  if (!ctx->flags & GA_CTX_DISABLE_ALLOCATION_CACHE)
+  if (!(ctx->flags & GA_CTX_DISABLE_ALLOCATION_CACHE))
     if (size < BLOCK_SIZE) size = BLOCK_SIZE;
 
   cuda_enter(ctx);
@@ -403,7 +403,7 @@ static inline size_t roundup(size_t s, size_t m) {
 
 static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
 			   int *ret) {
-  gpudata *res, *prev;
+  gpudata *res = NULL, *prev = NULL;
   cuda_context *ctx = (cuda_context *)c;
   size_t asize;
   int err;
@@ -419,7 +419,7 @@ static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
    * to a multiple of FRAG_SIZE.  This also ensures that if we split a
    * block, the next block starts properly aligned for any data type.
    */
-  if (!ctx->flags & GA_CTX_DISABLE_ALLOCATION_CACHE) {
+  if (!(ctx->flags & GA_CTX_DISABLE_ALLOCATION_CACHE)) {
     asize = roundup(size, FRAG_SIZE);
     find_best(ctx, &res, &prev, asize);
   } else {
