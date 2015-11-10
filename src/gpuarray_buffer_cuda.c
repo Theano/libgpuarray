@@ -378,6 +378,9 @@ static int extract(gpudata *curr, gpudata *prev, size_t size) {
     split = new_gpudata(curr->ctx, curr->ptr + size, remaining);
     if (split == NULL)
       return GA_MEMORY_ERROR;
+    /* Make sure the chain keeps going */
+    split->next = curr->next;
+    curr->next = NULL;
     /* Make sure we don't start using the split buffer too soon */
     cuda_wait(curr, CUDA_WAIT_ALL);
     cuda_record(split, CUDA_WAIT_ALL);
