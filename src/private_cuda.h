@@ -60,6 +60,21 @@ typedef struct _cuda_context {
   gpudata *freeblocks;
 } cuda_context;
 
+/*
+ * About freeblocks.
+ *
+ * Freeblocks is a linked list of gpudata instances that are
+ * considrered to be "free".  That is they are not in use anywhere
+ * else in the program.  It is used to cache and reuse allocations so
+ * that we can avoid the heavy cost and synchronization of
+ * cuMemAlloc() and cuMemFree().
+ *
+ * It is ordered by pointer address.  When adding back to it, blocks
+ * will be merged with their neighbours, but not across original
+ * allocation lines (which are kept track of with the CUDA_HEAD_ALLOC
+ * flag.
+ */
+
 #ifdef WITH_NVRTC
 #define ARCH_PREFIX "compute_"
 #else

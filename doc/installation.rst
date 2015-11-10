@@ -16,9 +16,9 @@ and we will attempt to fix it.
 Requirements
 ------------
 
- - cmake >= 2.8 (cmake >= 3.0 on OS X 10.9 and up) (cmake_).
+ - cmake >= 3.0 (cmake_).
  - a c99-compliant compiler (or MSVC if on windows).
- - (optional) CUDA >= 4.0 (cuda_).
+ - (optional) CUDA >= 6.0 (cuda_).
  - (optional) OpenCL runtime.
  - (optional) clBLAS (clblas_).
  - (optional) libcheck (check_) to run the C tests.
@@ -32,7 +32,7 @@ Requirements
    library might still build, but will be rather useless.
 
 .. note::
-   We support CUDA GPUs with `compute capability 2.0(Fermi)
+   We support CUDA GPUs with `compute capability 2.0 (Fermi)
    <https://developer.nvidia.com/cuda-gpus>`_ and up.
 
 Download

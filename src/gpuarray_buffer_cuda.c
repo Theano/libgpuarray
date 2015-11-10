@@ -295,6 +295,10 @@ static void cuda_deinit(void *c) {
   cuda_free_ctx((cuda_context *)c);
 }
 
+/*
+ * Find the block in the free list that is the best fit for the size
+ * we want, which means the smallest that can still fit the size.
+ */
 static void find_best(cuda_context *ctx, gpudata **best, gpudata **prev,
                      size_t size) {
   gpudata *temp, *tempPrev = NULL;
@@ -309,6 +313,11 @@ static void find_best(cuda_context *ctx, gpudata **best, gpudata **prev,
   }
 }
 
+/*
+ * Allocate a new block and place in on the freelist. Will allocate
+ * the bigger of the requested size and BLOCK_SIZE to avoid allocating
+ * multiple small blocks.
+ */
 static int allocate(cuda_context *ctx, gpudata **res, gpudata **prev,
                     size_t size) {
   CUdeviceptr ptr;
@@ -350,6 +359,13 @@ static int allocate(cuda_context *ctx, gpudata **res, gpudata **prev,
   return GA_NO_ERROR;
 }
 
+/*
+ * Extract the `curr` block from the freelist, possibly splitting it
+ * if it's too big for the requested size.  The remaining block will
+ * stay on the freelist if there is a split.  `prev` is only to
+ * facilitate the extraction so we don't have to go through the list
+ * again.
+ */
 static int extract(gpudata *curr, gpudata *prev, size_t size) {
   gpudata *next, *split;
   size_t remaining = curr->sz - size;
@@ -456,7 +472,8 @@ static void cuda_free(gpudata *d) {
       deallocate(d);
       cuda_free_ctx(ctx);
     } else {
-      /* Find the position in the freelist */
+      /* Find the position in the freelist.  Freelist is kept in order
+         of allocation address */
       gpudata *next = d->ctx->freeblocks, *prev = NULL;
       for (; next && next->ptr < d->ptr; next = next->next) {
         prev = next;
