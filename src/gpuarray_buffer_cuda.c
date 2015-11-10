@@ -324,7 +324,8 @@ static int allocate(cuda_context *ctx, gpudata **res, gpudata **prev,
   gpudata *next;
   *prev = NULL;
 
-  if (size < BLOCK_SIZE) size = BLOCK_SIZE;
+  if (!ctx->flags & GA_CTX_DISABLE_ALLOCATION_CACHE)
+    if (size < BLOCK_SIZE) size = BLOCK_SIZE;
 
   cuda_enter(ctx);
 
@@ -418,8 +419,12 @@ static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
    * to a multiple of FRAG_SIZE.  This also ensures that if we split a
    * block, the next block starts properly aligned for any data type.
    */
-  asize = roundup(size, FRAG_SIZE);
-  find_best(ctx, &res, &prev, asize);
+  if (!ctx->flags & GA_CTX_DISABLE_ALLOCATION_CACHE) {
+    asize = roundup(size, FRAG_SIZE);
+    find_best(ctx, &res, &prev, asize);
+  } else {
+    asize = size;
+  }
 
   if (res == NULL) {
     err = allocate(ctx, &res, &prev, asize);
@@ -470,7 +475,10 @@ static void cuda_free(gpudata *d) {
     if (d->flags & DONTFREE) {
       /* This is the path for "external" buffers */
       deallocate(d);
-      cuda_free_ctx(ctx);
+    } else if (ctx->flags & GA_CTX_DISABLE_ALLOCATION_CACHE) {
+      /* Just free the pointer */
+      cuMemFree(d->ptr);
+      deallocate(d);
     } else {
       /* Find the position in the freelist.  Freelist is kept in order
          of allocation address */
@@ -505,12 +513,12 @@ static void cuda_free(gpudata *d) {
       } else {
         d->next = next;
       }
-      /* We keep this at the end since the freed buffer could be the
-       * last reference to the context and therefore clearing the
-       * reference could trigger the freeing if the whole context
-       * including the freelist, which we manipulate. */
-      cuda_free_ctx(ctx);
     }
+    /* We keep this at the end since the freed buffer could be the
+     * last reference to the context and therefore clearing the
+     * reference could trigger the freeing if the whole context
+     * including the freelist, which we manipulate. */
+    cuda_free_ctx(ctx);
   }
 }
 

@@ -68,21 +68,30 @@ typedef struct _gpuarray_buffer_ops {
  *
  * This is the default (0) value.
  */
-#define GA_CTX_DEFAULT       0x0
+#define GA_CTX_DEFAULT       0x00
 
 /**
  * Optimize parameters for multi-thread performance.
  *
  * May decrease overall performance in single-thread scenarios.
  */
-#define GA_CTX_MULTI_THREAD  0x1
+#define GA_CTX_MULTI_THREAD  0x01
 
 /**
  * Optimize parameters for single-thread performance.
  *
  * May decrease overall performace in multithread scenarios.
  */
-#define GA_CTX_SINGLE_THREAD 0x2
+#define GA_CTX_SINGLE_THREAD 0x02
+
+/**
+ * Disable allocations cache (if any).
+ *
+ * This will usually decrease performance by quite a bit, but will
+ * enable better debugging of kernels that perform out of bounds
+ * access.
+ */
+#define GA_CTX_DISABLE_ALLOCATION_CACHE 0x10
 
 /**
  * @}
