@@ -60,3 +60,11 @@ gpudata *gpuarray_buffer_transfer(gpudata *buf, size_t offset, size_t sz,
   free(tmp);
   return res;
 }
+
+void *gpuarray_buffer_context(const gpuarray_buffer_ops *ops, gpudata *b) {
+  void *ctx;
+  int err = ops->property(NULL, b, NULL, GA_BUFFER_PROP_CTX, &ctx);
+  if (err != GA_NO_ERROR)
+    return NULL;
+  return ctx;
+}

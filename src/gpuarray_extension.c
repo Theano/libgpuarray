@@ -14,7 +14,6 @@ extern void *cuda_make_ctx(void);
 extern void *cuda_get_ctx(void);
 extern void *cuda_get_stream(void);
 extern void *cuda_make_buf(void);
-extern void *cuda_get_ptr(void);
 extern void *cuda_get_sz(void);
 extern void *cuda_wait(void);
 extern void *cuda_record(void);
@@ -35,7 +34,6 @@ static ext ext_list[] = {
   {"cuda_get_ctx", cuda_get_ctx},
   {"cuda_get_stream", cuda_get_stream},
   {"cuda_make_buf", cuda_make_buf},
-  {"cuda_get_ptr", cuda_get_ptr},
   {"cuda_get_sz", cuda_get_sz},
   {"cuda_wait", cuda_wait},
   {"cuda_record", cuda_record},

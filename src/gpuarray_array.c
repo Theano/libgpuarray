@@ -404,7 +404,7 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
   size_t argp;
   GpuKernel k;
   unsigned int j;
-  int err, kerr;
+  int err, kerr = 0;
 
   if (a->ops != v->ops || a->ops != i->ops)
     return GA_INVALID_ERROR;
@@ -434,9 +434,11 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
     n[1] *= v->dimensions[j];
   }
 
-  err = v->ops->property(NULL, v->data, NULL, GA_CTX_PROP_ERRBUF, &errbuf);
-  if (err != GA_NO_ERROR)
-    return err;
+  if (check_error) {
+    err = v->ops->property(NULL, v->data, NULL, GA_CTX_PROP_ERRBUF, &errbuf);
+    if (err != GA_NO_ERROR)
+      return err;
+  }
 
   err = gen_take1_kernel(&k, a->ops, GpuArray_context(a),
 #if DEBUG
@@ -490,12 +492,12 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
 
   err = GpuKernel_call(&k, 2, ls, gs, 0, args);
   free(args);
-  if (err == GA_NO_ERROR && check_error) {
+  if (check_error && err == GA_NO_ERROR) {
     err = v->ops->buffer_read(&kerr, errbuf, 0, sizeof(int));
     if (err == GA_NO_ERROR && kerr != 0) {
       err = GA_VALUE_ERROR;
       kerr = 0;
-      /* We suppose this will succeed. */
+      /* We suppose this will not fail */
       v->ops->buffer_write(errbuf, 0, &kerr, sizeof(int));
     }
   }
