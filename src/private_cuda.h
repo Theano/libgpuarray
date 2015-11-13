@@ -50,6 +50,7 @@ typedef struct _cuda_context {
   CUcontext ctx;
   CUresult err;
   CUstream s;
+  CUstream mem_s;
   void *blas_handle;
   gpudata *errbuf;
   cache *extcopy_cache;
