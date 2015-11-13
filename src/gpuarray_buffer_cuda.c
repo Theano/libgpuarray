@@ -242,32 +242,12 @@ static const char CUDA_PREAMBLE[] =
 /* XXX: add complex, quads, longlong */
 /* XXX: add vector types */
 
-static void *cuda_init(int ord, int flags, int *ret) {
-    CUdevice dev;
-    CUcontext ctx;
+static void *do_init(CUdevice dev, int flags, int *ret) {
     cuda_context *res;
-    static int init_done = 0;
+    CUcontext ctx;
     unsigned int fl = CU_CTX_SCHED_AUTO;
     int i;
 
-    if (ord == -1) {
-      /* Grab the ambient context */
-      err = cuCtxGetCurrent(&ctx);
-      CHKFAIL(NULL);
-      res = cuda_make_ctx(ctx, DONTFREE);
-      if (res == NULL) {
-        FAIL(NULL, GA_IMPL_ERROR);
-      }
-      res->flags |= flags;
-      return res;
-    }
-
-    if (!init_done) {
-      err = cuInit(0);
-      CHKFAIL(NULL);
-      init_done = 1;
-    }
-    err = cuDeviceGet(&dev, ord);
     CHKFAIL(NULL);
     if (flags & GA_CTX_SINGLE_THREAD)
       fl = CU_CTX_SCHED_SPIN;
@@ -290,7 +270,48 @@ static void *cuda_init(int ord, int flags, int *ret) {
 
     return res;
 }
+static void *cuda_init(int ord, int flags, int *ret) {
+    CUdevice dev;
+    cuda_context *res;
+    static int init_done = 0;
 
+    if (ord == -2) {
+      CUcontext ctx;
+      /* Grab the ambient context */
+      err = cuCtxGetCurrent(&ctx);
+      CHKFAIL(NULL);
+      res = cuda_make_ctx(ctx, DONTFREE);
+      if (res == NULL) {
+        FAIL(NULL, GA_IMPL_ERROR);
+      }
+      res->flags |= flags;
+      return res;
+    }
+
+    if (!init_done) {
+      err = cuInit(0);
+      CHKFAIL(NULL);
+      init_done = 1;
+    }
+
+    if (ord == -1) {
+      int i, c;
+      err = cuDeviceGetCount(&c);
+      CHKFAIL(NULL);
+      for (i = 0; i < c; i++) {
+        err = cuDeviceGet(&dev, i);
+        CHKFAIL(NULL);
+        res = do_init(dev, flags, NULL);
+        if (res != NULL)
+          return res;
+      }
+      FAIL(NULL, GA_NODEV_ERROR);
+    } else {
+      err = cuDeviceGet(&dev, ord);
+      CHKFAIL(NULL);
+      return do_init(dev, flags, ret);
+    }
+}
 static void cuda_deinit(void *c) {
   cuda_free_ctx((cuda_context *)c);
 }
