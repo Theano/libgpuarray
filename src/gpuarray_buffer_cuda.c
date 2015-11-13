@@ -599,17 +599,15 @@ static int cuda_read(void *dst, gpudata *src, size_t srcoff, size_t sz) {
 
     cuda_enter(ctx);
 
-    ctx->err = cuEventSynchronize(src->ev);
+    cuda_wait(src, CUDA_WAIT_READ);
+
+    ctx->err = cuMemcpyDtoHAsync(dst, src->ptr + srcoff, sz, ctx->s);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
 
-    ctx->err = cuMemcpyDtoH(dst, src->ptr + srcoff, sz);
-    if (ctx->err != CUDA_SUCCESS) {
-      cuda_exit(ctx);
-      return GA_IMPL_ERROR;
-    }
+    cuda_record(src, CUDA_WAIT_READ);
     cuda_exit(ctx);
     return GA_NO_ERROR;
 }
@@ -627,17 +625,15 @@ static int cuda_write(gpudata *dst, size_t dstoff, const void *src,
 
     cuda_enter(ctx);
 
-    ctx->err = cuEventSynchronize(dst->ev);
+    cuda_wait(dst, CUDA_WAIT_WRITE);
+
+    ctx->err = cuMemcpyHtoDAsync(dst->ptr + dstoff, src, sz, ctx->s);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
 
-    ctx->err = cuMemcpyHtoD(dst->ptr + dstoff, src, sz);
-    if (ctx->err != CUDA_SUCCESS) {
-      cuda_exit(ctx);
-      return GA_IMPL_ERROR;
-    }
+    cuda_record(dst, CUDA_WAIT_WRITE);
     cuda_exit(ctx);
     return GA_NO_ERROR;
 }
