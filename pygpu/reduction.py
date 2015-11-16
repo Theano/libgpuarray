@@ -8,6 +8,7 @@ from . import gpuarray
 from .tools import ArrayArg, check_args, prod, lru_cache
 from .elemwise import parse_c_args, massage_op
 
+
 def _ceil_log2(x):
     # nearest power of 2 (going up)
     if x != 0:
@@ -237,16 +238,16 @@ class ReductionKernel(object):
             raise ValueError("Array to big to be reduced along the "
                              "selected axes")
 
-
         if out is None:
             out = gpuarray.empty(out_shape, context=self.context,
                                  dtype=self.dtype_out)
         else:
             if out.shape != out_shape or out.dtype != self.dtype_out:
-                raise TypeError("Out array is not of expected type "
-                                "(expected %s %s, got %s %s)" % (
-                        out_shape, self.dtype_out, out.shape, out.dtype))
-        #Don't compile and cache for nothing for big size
+                raise TypeError(
+                    "Out array is not of expected type (expected %s %s, "
+                    "got %s %s)" % (out_shape, self.dtype_out, out.shape,
+                                    out.dtype))
+        # Don't compile and cache for nothing for big size
         if self.init_local_size < n:
             k, _, _, ls = self._get_basic_kernel(self.init_local_size, nd)
         else:

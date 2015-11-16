@@ -2,6 +2,9 @@
 
 from __future__ import division
 
+import numpy as np
+from . import gpuarray
+
 __copyright__ = "Copyright (C) 2011 Andreas Kloeckner"
 
 __license__ = """
@@ -27,13 +30,10 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import numpy as np
-from . import gpuarray
-
-
 # {{{ registry
 
 NAME_TO_DTYPE = {}
+
 
 def register_dtype(dtype, c_names):
     """
@@ -65,6 +65,7 @@ def register_dtype(dtype, c_names):
         if nm in NAME_TO_DTYPE and NAME_TO_DTYPE[nm] != dtype:
             raise RuntimeError("name '%s' already registered" % nm)
         NAME_TO_DTYPE[nm] = dtype
+
 
 def _fill_dtype_registry(respect_windows):
     from sys import platform
@@ -109,6 +110,7 @@ def _fill_dtype_registry(respect_windows):
 
 # {{{ dtype -> ctype
 
+
 def dtype_to_ctype(dtype, with_fp_tex_hack=False):
     """
     Return the C type that corresponds to `dtype`.
@@ -130,6 +132,7 @@ def dtype_to_ctype(dtype, with_fp_tex_hack=False):
 # }}}
 
 # {{{ c declarator parsing
+
 
 def parse_c_arg_backend(c_arg, scalar_arg_class, vec_arg_class):
     c_arg = c_arg.replace("const", "").replace("volatile", "")

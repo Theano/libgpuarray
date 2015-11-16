@@ -1,10 +1,9 @@
 from mako.template import Template
-
+import re
 import numpy
 
 from .tools import ScalarArg, ArrayArg, as_argument, check_contig, check_args, lru_cache
-from .dtypes import (parse_c_arg_backend, dtype_to_ctype, get_np_obj,
-                     get_common_dtype)
+from .dtypes import (parse_c_arg_backend, dtype_to_ctype, get_common_dtype)
 from . import gpuarray
 
 __all__ = ['ElemwiseKernel', 'elemwise1', 'elemwise2', 'ielemwise2', 'compare']
@@ -233,10 +232,9 @@ KERNEL void ${name}(
 
 def parse_c_args(arguments):
     return tuple(parse_c_arg_backend(arg, ScalarArg, ArrayArg)
-            for arg in arguments.split(','))
+                 for arg in arguments.split(','))
 
 
-import re
 INDEX_RE = re.compile('([a-zA-Z_][a-zA-Z0-9_]*)\[i\]')
 
 
@@ -552,9 +550,9 @@ def elemwise2(a, op, b, ary, odtype=None, oper=None,
         if a.ndim != b.ndim:
             nd = max(a.ndim, b.ndim)
             if a.ndim < nd:
-                a = a.reshape(((1,) * (nd - a.ndim))+a.shape)
+                a = a.reshape(((1,) * (nd - a.ndim)) + a.shape)
             if b.ndim < nd:
-                b = b.reshape(((1,) * (nd - b.ndim))+b.shape)
+                b = b.reshape(((1,) * (nd - b.ndim)) + b.shape)
         out_shape = tuple(max(sa, sb) for sa, sb in zip(a.shape, b.shape))
         res = gpuarray.empty(out_shape, dtype=odtype, context=ary.context,
                              cls=ary.__class__)
@@ -586,6 +584,7 @@ def ielemwise2(a, op, b, oper=None, op_tmpl="a[i] = a[i] %(op)s %(b)s",
     k = ElemwiseKernel(a.context, args, oper)
     k(a, b, broadcast=broadcast)
     return a
+
 
 def compare(a, op, b, broadcast=False):
     return elemwise2(a, op, b, a, odtype=numpy.dtype('bool'),

@@ -2,10 +2,11 @@ from .gpuarray import _split, _concatenate, dtype_to_typecode
 from .dtypes import upcast
 from . import array, asarray
 
+
 def _replace_0_with_empty(aryl, m):
     for i in range(len(aryl)):
         if (len(aryl[i].shape) == 0 or
-            any(s == 0 for s in aryl[i].shape)):
+                any(s == 0 for s in aryl[i].shape)):
             aryl[i] = array([], dtype=m.dtype, cls=type(m), context=m.context)
     return aryl
 
@@ -14,9 +15,9 @@ def atleast_1d(*arys):
     res = []
     for ary in arys:
         ary = asarray(ary)
-        if len(ary.shape) == 0 :
+        if len(ary.shape) == 0:
             result = ary.reshape((1,))
-        else :
+        else:
             result = ary
         res.append(result)
     if len(res) == 1:
@@ -29,11 +30,11 @@ def atleast_2d(*arys):
     res = []
     for ary in arys:
         ary = asarray(ary)
-        if len(ary.shape) == 0 :
+        if len(ary.shape) == 0:
             result = ary.reshape((1, 1))
-        elif len(ary.shape) == 1 :
+        elif len(ary.shape) == 1:
             result = ary.reshape((1, ary.shape[0]))
-        else :
+        else:
             result = ary
         res.append(result)
     if len(res) == 1:
@@ -62,12 +63,14 @@ def atleast_3d(*arys):
 
 
 def split(ary, indices_or_sections, axis=0):
-    try: len(indices_or_sections)
+    try:
+        len(indices_or_sections)
     except TypeError:
         if ary.shape[axis] % indices_or_sections != 0:
             raise ValueError("array split does not result in an "
                              "equal division")
     return array_split(ary, indices_or_sections, axis)
+
 
 def array_split(ary, indices_or_sections, axis=0):
     try:
