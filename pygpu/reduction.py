@@ -103,7 +103,7 @@ KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} out
 
   <% cur_size = local_size %>
   % while cur_size > 1:
-    <% cur_size = cur_size / 2 %>
+    <% cur_size = cur_size // 2 %>
     local_barrier();
     if (lid < ${cur_size}) {
       ldata[lid] = REDUCE(ldata[lid], ldata[lid+${cur_size}]);
@@ -180,7 +180,7 @@ class ReductionKernel(object):
     def _find_kernel_ls(self, tmpl, max_ls, *tmpl_args):
         local_size = min(self.init_local_size, max_ls)
         count_lim = _ceil_log2(local_size)
-        local_size = 2**count_lim
+        local_size = int(2**count_lim)
         loop_count = 0
         while loop_count <= count_lim:
             k, src, spec = tmpl(local_size, *tmpl_args)
@@ -188,7 +188,7 @@ class ReductionKernel(object):
             if local_size <= k.maxlsize:
                 return k, src, spec, local_size
             else:
-                local_size /= 2
+                local_size //= 2
 
             loop_count += 1
 

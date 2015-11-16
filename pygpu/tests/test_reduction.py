@@ -1,12 +1,11 @@
-import operator
 import numpy
 
 from pygpu import gpuarray, ndgpuarray as elemary
 from pygpu.reduction import ReductionKernel
 
-from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
-                      check_meta_content, context, gen_gpuarray,
+from .support import (guard_devsup, check_meta_content, context, gen_gpuarray,
                       dtypes_no_complex_big, dtypes_no_complex)
+
 
 def test_red_array_basic():
     for dtype in dtypes_no_complex_big:
@@ -28,7 +27,7 @@ def test_red_array_basic():
 @guard_devsup
 def red_array_sum(dtype, shape, redux):
     c, g = gen_gpuarray(shape, dtype, ctx=context)
-    
+
     axes = [i for i in range(len(redux)) if redux[i]]
     axes.reverse()
     out_c = c
@@ -56,9 +55,10 @@ def test_reduction_ops():
     for axis in [None, 0, 1]:
         for op in ['all', 'any']:
             yield reduction_op, op, 'bool', axis
-        for op in ['prod', 'sum']: # 'min', 'max']:
+        for op in ['prod', 'sum']:  # 'min', 'max']:
             for dtype in dtypes_no_complex:
                 yield reduction_op, op, dtype, axis
+
 
 def reduction_op(op, dtype, axis):
     c, g = gen_gpuarray((2, 3), dtype=dtype, ctx=context, cls=elemary)
@@ -76,19 +76,20 @@ def reduction_op(op, dtype, axis):
 
     check_meta_content(outg, outc)
 
+
 def test_reduction_wrong_type():
     c, g = gen_gpuarray((2, 3), dtype='float32', ctx=context, cls=elemary)
     out1 = gpuarray.empty((2, 3), dtype='int32', context=context)
     out2 = gpuarray.empty((3, 2), dtype='float32', context=context)
 
     try:
-        r = g.sum(out=out1)
+        g.sum(out=out1)
         assert False, "Expected a TypeError out of the sum"
     except TypeError:
         pass
 
     try:
-        r = g.sum(out=out2)
+        g.sum(out=out2)
         assert False, "Expected a TypeError out of the sum"
     except TypeError:
         pass

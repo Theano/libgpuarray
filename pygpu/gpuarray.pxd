@@ -245,7 +245,7 @@ cdef int kernel_binary(GpuKernel k, size_t *, void **) except -1
 cdef int kernel_property(GpuKernel k, int prop_id, void *res) except -1
 
 cdef int ctx_property(GpuContext c, int prop_id, void *res) except -1
-cdef const gpuarray_buffer_ops *get_ops(kind) except NULL
+cdef const gpuarray_buffer_ops *get_ops(bytes kind) except NULL
 cdef ops_kind(const gpuarray_buffer_ops *ops)
 cdef GpuContext ensure_context(GpuContext c)
 

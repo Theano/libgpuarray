@@ -1,4 +1,7 @@
+from __future__ import print_function
+
 import copy
+from six.moves import range
 
 import numpy
 
@@ -33,7 +36,7 @@ def test_hash():
     exc = None
     try:
         h = hash(g)
-    except TypeError, e:
+    except TypeError as e:
         exc = e
     assert exc is not None
 
@@ -177,9 +180,6 @@ def asfortranarray(shp, dtype, offseted_outer, offseted_inner, sliced, order):
     if (sliced != 1 or shp == () or (offseted_outer and len(shp) > 1) or
         (order != 'f' and len(shp) > 1)):
         assert b is not gpu
-        if (sliced == 1 and not offseted_outer and order != 'c'):
-            assert ((a.data == cpu.data) ==
-                    (b.gpudata == gpu.gpudata))
     else:
         assert b is gpu
 
@@ -390,7 +390,7 @@ def test_transpose():
             for order in ['c', 'f']:
                 for sliced in [1, 2, -2, -1]:
                     yield transpose, shp, offseted, sliced, order
-                    for perm in permutations(range(len(shp))):
+                    for perm in permutations(list(range(len(shp)))):
                         yield transpose_perm, shp, perm, offseted, sliced, order
 
 
@@ -546,8 +546,8 @@ def _cmp(x,y):
     assert x.dtype == y.dtype
     assert x.strides == y.strides
     if not numpy.all(x == y):
-        print x
-        print y
+        print(x)
+        print(y)
     assert numpy.all(x == y), (x, y)
 
 

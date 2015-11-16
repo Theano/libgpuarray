@@ -1,5 +1,6 @@
 import functools
 import six
+from six.moves import reduce
 
 from heapq import nsmallest
 from operator import itemgetter, mul
@@ -38,10 +39,10 @@ class Argument(object):
 
 class ArrayArg(Argument):
     def decltype(self):
-        return "GLOBAL_MEM %s *" % (self.ctype(),)
+        return "GLOBAL_MEM {} *".format(self.ctype())
 
     def expr(self):
-        return "%s[i]" % (self.name,)
+        return "{}[i]".format(self.name)
 
     def isarray(self):
         return True
@@ -215,7 +216,7 @@ def lfu_cache(maxsize=20):
                 # purge least frequently used cache entry
                 if len(cache) > wrapper.maxsize:
                     for key, _ in nsmallest(wrapper.maxsize // 10,
-                                            use_count.iteritems(),
+                                            six.iteritems(use_count),
                                             key=itemgetter(1)):
                         del cache[key], use_count[key]
 
@@ -263,7 +264,7 @@ def lru_cache(maxsize=20):
                 # purge least recently used cache entries
                 if len(cache) > wrapper.maxsize:
                     for key, _ in nsmallest(wrapper.maxsize // 10,
-                                            last_use.iteritems(),
+                                            six.iteritems(last_use),
                                             key=itemgetter(1)):
                         del cache[key], last_use[key]
 

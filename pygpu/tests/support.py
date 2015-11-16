@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os, sys
 import numpy
 from nose.plugins.skip import SkipTest
@@ -30,7 +32,7 @@ def get_env_dev():
 
 
 context = gpuarray.init(get_env_dev())
-print >>sys.stderr, "*** Testing for", context.devname
+print("*** Testing for", context.devname, file=sys.stderr)
 
 
 def guard_devsup(func):
