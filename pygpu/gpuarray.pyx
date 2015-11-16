@@ -1581,7 +1581,7 @@ cdef class GpuArray:
         cdef unsigned int el
 
         if key is Ellipsis:
-            return self
+            return pygpu_view(self, None)
         elif self.ga.nd == 0:
             if isinstance(key, tuple) and len(key) == 0:
                 return self
