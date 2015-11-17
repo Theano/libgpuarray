@@ -564,7 +564,7 @@ cdef GpuContext ensure_context(GpuContext c):
 cdef bint pygpu_GpuArray_Check(object o):
     return isinstance(o, GpuArray)
 
-cdef GpuContext pygpu_init(dev):
+cdef GpuContext pygpu_init(dev, int flags):
     if dev.startswith('cuda'):
         kind = "cuda"
         if dev[4:] == '':
@@ -582,16 +582,20 @@ cdef GpuContext pygpu_init(dev):
             devnum = int(devspec[0]) << 16 | int(devspec[1])
     else:
         raise ValueError, "Unknown device format:" + dev
-    return GpuContext(kind, devnum)
+    return GpuContext(kind, devnum, flags)
 
-def init(dev):
+def init(dev, opt='default', disable_alloc_cache=False):
     """
-    init(dev)
+    init(dev, opt='default', disable_alloc_cache=False)
 
     Creates a context from a device specifier.
 
     :param dev: device specifier
     :type dev: string
+    :param opt: type of operation to optimize for
+    :type opt: {'default', 'single', 'multi'}
+    :param disable_alloc_cache: disable allocation cache (if any)
+    :type disable_alloc_cache: bool
     :rtype: GpuContext
 
     Device specifiers are composed of the type string and the device
@@ -611,7 +615,16 @@ def init(dev):
     the values, unavaiable ones will just raise an error, and there
     are no gaps in the valid numbers.
     """
-    return pygpu_init(dev)
+    cdef int flags = 0
+    if opt == 'single':
+        flags |= GA_CTX_SINGLE_THREAD
+    elif opt == 'multi':
+        flags |= GA_CTX_MULTI_THREAD
+    elif opt != 'default':
+        raise TypeError('unexpected value for parameter opt: %s' % (opt,))
+    if disable_alloc_cache:
+        flags |= GA_CTX_DISABLE_ALLOCATION_CACHE
+    return pygpu_init(dev, flags)
 
 def zeros(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
           cls=None):
@@ -961,12 +974,14 @@ cdef class GpuContext:
 
     .. code-block:: python
 
-        GpuContext(kind, devno)
+        GpuContext(kind, devno, flags)
 
     :param kind: module name for the context
     :type kind: string
     :param devno: device number
     :type devno: int
+    :param flags: context flags
+    :type flags: int
 
     The currently implemented modules (for the `kind` parameter) are
     "cuda" and "opencl".  Which are available depends on the build
@@ -978,11 +993,11 @@ cdef class GpuContext:
         if self.ctx != NULL:
             self.ops.buffer_deinit(self.ctx)
 
-    def __cinit__(self, kind, devno):
+    def __cinit__(self, kind, devno, int flags):
         cdef int err = GA_NO_ERROR
         cdef void *ctx
         self.ops = get_ops(_s(kind))
-        self.ctx = self.ops.buffer_init(devno, 0, &err)
+        self.ctx = self.ops.buffer_init(devno, flags, &err)
         if (err != GA_NO_ERROR):
             if err == GA_VALUE_ERROR:
                 raise get_exc(err), "No device %d"%(devno,)
