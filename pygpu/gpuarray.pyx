@@ -23,6 +23,13 @@ cdef object PyArray_Empty(int a, np.npy_intp *b, np.dtype c, int d):
     Py_INCREF(c)
     return _PyArray_Empty(a, b, c, d)
 
+cdef bytes _s(s):
+    if isinstance(s, unicode):
+        return (<unicode>s).encode('ascii')
+    if isinstance(s, bytes):
+        return s
+    raise TypeError("Expected a string")
+
 cdef object call_compiler_fn = None
 
 cdef void *call_compiler_python(const char *src, size_t sz,
@@ -107,7 +114,7 @@ def cl_wrap_ctx(size_t ptr):
     if cl_make_ctx == NULL:
         raise RuntimeError, "cl_make_ctx extension is absent"
     res = GpuContext.__new__(GpuContext)
-    res.ops = get_ops('opencl')
+    res.ops = get_ops(b"opencl")
     res.ctx = cl_make_ctx(<void *>ptr)
     if res.ctx == NULL:
         raise RuntimeError, "cl_make_ctx call failed"
@@ -132,7 +139,7 @@ def cuda_wrap_ctx(size_t ptr, bint own):
     if cuda_make_ctx == NULL:
         raise RuntimeError, "cuda_make_ctx extension is absent"
     res = GpuContext.__new__(GpuContext)
-    res.ops = get_ops('cuda')
+    res.ops = get_ops(b"cuda")
     flags = 0
     if not own:
         flags |= GPUARRAY_CUDA_CTX_NOFREE
@@ -261,9 +268,11 @@ def dtype_to_ctype(dtype):
     """
     cdef int typecode = dtype_to_typecode(dtype)
     cdef const gpuarray_type *t = gpuarray_get_type(typecode)
+    cdef bytes res
     if t.cluda_name == NULL:
         raise ValueError, "No mapping for %s"%(dtype,)
-    return t.cluda_name
+    res = t.cluda_name
+    return res.decode('ascii')
 
 cdef ga_order to_ga_order(ord) except <ga_order>-2:
     if ord == "C" or ord == "c":
@@ -498,7 +507,7 @@ cdef int ctx_property(GpuContext c, int prop_id, void *res) except -1:
     if err != GA_NO_ERROR:
         raise get_exc(err), Gpu_error(c.ops, c.ctx, err)
 
-cdef const gpuarray_buffer_ops *get_ops(kind) except NULL:
+cdef const gpuarray_buffer_ops *get_ops(bytes kind) except NULL:
     cdef const gpuarray_buffer_ops *res
     res = gpuarray_get_ops(kind)
     if res == NULL:
@@ -972,7 +981,7 @@ cdef class GpuContext:
     def __cinit__(self, kind, devno):
         cdef int err = GA_NO_ERROR
         cdef void *ctx
-        self.ops = get_ops(kind)
+        self.ops = get_ops(_s(kind))
         self.ctx = self.ops.buffer_init(devno, 0, &err)
         if (err != GA_NO_ERROR):
             if err == GA_VALUE_ERROR:
@@ -1581,7 +1590,7 @@ cdef class GpuArray:
         cdef unsigned int el
 
         if key is Ellipsis:
-            return self
+            return pygpu_view(self, None)
         elif self.ga.nd == 0:
             if isinstance(key, tuple) and len(key) == 0:
                 return self
@@ -1843,10 +1852,8 @@ cdef class GpuKernel:
         cdef const gpuarray_buffer_ops *ops
         cdef int flags = 0
 
-        if not isinstance(source, (str, unicode)):
-            raise TypeError, "Expected a string for the kernel source"
-        if not isinstance(name, (str, unicode)):
-            raise TypeError, "Expected a string for the kernel name"
+        source = _s(source)
+        name = _s(name)
 
         self.context = ensure_context(context)
 

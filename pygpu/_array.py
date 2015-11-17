@@ -2,10 +2,11 @@ from __future__ import division
 import numpy as np
 
 from .elemwise import elemwise1, elemwise2, ielemwise2, compare, ElemwiseKernel
-from .reduction import reduce1, ReductionKernel
+from .reduction import reduce1
 from .dtypes import dtype_to_ctype, get_np_obj, get_common_dtype
 from .tools import as_argument, ArrayArg
 from . import gpuarray
+
 
 class ndgpuarray(gpuarray.GpuArray):
     """
@@ -19,7 +20,7 @@ class ndgpuarray(gpuarray.GpuArray):
     more like a drop-in replacement for numpy.ndarray than the raw
     GpuArray class.
     """
-    ### add
+    # add
     def __add__(self, other):
         return elemwise2(self, '+', other, self, broadcast=True)
 
@@ -29,7 +30,7 @@ class ndgpuarray(gpuarray.GpuArray):
     def __iadd__(self, other):
         return ielemwise2(self, '+', other, broadcast=True)
 
-    ### sub
+    # sub
     def __sub__(self, other):
         return elemwise2(self, '-', other, self, broadcast=True)
 
@@ -39,7 +40,7 @@ class ndgpuarray(gpuarray.GpuArray):
     def __isub__(self, other):
         return ielemwise2(self, '-', other, broadcast=True)
 
-    ### mul
+    # mul
     def __mul__(self, other):
         return elemwise2(self, '*', other, self, broadcast=True)
 
@@ -49,7 +50,7 @@ class ndgpuarray(gpuarray.GpuArray):
     def __imul__(self, other):
         return ielemwise2(self, '*', other, broadcast=True)
 
-    ### div
+    # div
     def __div__(self, other):
         return elemwise2(self, '/', other, self, broadcast=True)
 
@@ -59,7 +60,7 @@ class ndgpuarray(gpuarray.GpuArray):
     def __idiv__(self, other):
         return ielemwise2(self, '/', other, broadcast=True)
 
-    ### truediv
+    # truediv
     def __truediv__(self, other):
         np1 = get_np_obj(self)
         np2 = get_np_obj(other)
@@ -81,7 +82,7 @@ class ndgpuarray(gpuarray.GpuArray):
             kw['op_tmpl'] = "a[i] = (double)a[i] / (double)%(b)s"
         return ielemwise2(self, '/', other, **kw)
 
-    ### floordiv
+    # floordiv
     def __floordiv__(self, other):
         out_dtype = get_common_dtype(self, other, True)
         kw = {'broadcast': True}
@@ -105,7 +106,7 @@ class ndgpuarray(gpuarray.GpuArray):
             kw['op_tmpl'] = "a[i] = floor((double)a[i] / (double)%(b)s)"
         return ielemwise2(self, '/', other, **kw)
 
-    ### mod
+    # mod
     def __mod__(self, other):
         out_dtype = get_common_dtype(self, other, True)
         kw = {'broadcast': True}
@@ -129,7 +130,7 @@ class ndgpuarray(gpuarray.GpuArray):
             kw['op_tmpl'] = "a[i] = fmod((double)a[i], (double)%(b)s)"
         return ielemwise2(self, '%', other, **kw)
 
-    ### divmod
+    # divmod
     def __divmod__(self, other):
         if not isinstance(other, gpuarray.GpuArray):
             other = np.asarray(other)
@@ -200,7 +201,7 @@ class ndgpuarray(gpuarray.GpuArray):
             oper = "res[i] = abs(a[i])"
         return elemwise1(self, None, oper=oper)
 
-    ### richcmp
+    # richcmp
     def __lt__(self, other):
         return compare(self, '<', other, broadcast=True)
 

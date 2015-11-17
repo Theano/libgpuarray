@@ -5,18 +5,26 @@ from pygpu import gpuarray, ndgpuarray as elemary
 from pygpu.elemwise import ElemwiseKernel
 from pygpu.tools import check_args, ArrayArg, ScalarArg
 
+from six import PY2
+
 from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
                       context, gen_gpuarray, dtypes_no_complex,
                       check_meta_content)
 
 
 operators1 = [operator.neg, operator.pos, operator.abs]
-operators2 = [operator.add, operator.sub, operator.div, operator.floordiv,
+operators2 = [operator.add, operator.sub, operator.floordiv,
               operator.mod, operator.mul, operator.truediv,
               operator.eq, operator.ne, operator.lt, operator.le,
               operator.gt, operator.ge]
-ioperators2 = [operator.iadd, operator.isub, operator.idiv, operator.ifloordiv,
+if PY2:
+    operators2.append(operators.div)
+
+ioperators2 = [operator.iadd, operator.isub, operator.ifloordiv,
                operator.imod, operator.imul, operator.itruediv]
+if PY2:
+    ioperators2.append(operators.idiv)
+
 elems = [2, 0.3, numpy.asarray(3, dtype='int8'),
          numpy.asarray(7, dtype='uint32'),
          numpy.asarray(2.45, dtype='float32')]
@@ -276,9 +284,9 @@ def test_elemwise_bool():
     exc = None
     try:
         bool(a)
-    except ValueError, e:
+    except ValueError as e:
         exc = e
-    assert e is not None
+    assert exc is not None
     a = gpuarray.zeros((1,), context=context)
     assert bool(a) == False
     a = gpuarray.zeros((), context=context)
