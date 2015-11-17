@@ -554,6 +554,21 @@ typedef struct _gpuarray_buffer_ops {
  */
 #define GA_CTX_PROP_ERRBUF    8
 
+/**
+ * Get the total size of global memory on the device.
+ *
+ * Type: `size_t`
+ */
+#define GA_CTX_PROP_TOTAL_GMEM 9
+
+/**
+ * Get the size of free global memory on the device.
+ *
+ * Type: `size_t`
+ */
+#define GA_CTX_PROP_FREE_GMEM 10
+
+
 /* Start at 512 for GA_BUFFER_PROP_ */
 /**
  * Get the context in which this buffer was allocated.

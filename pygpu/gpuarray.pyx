@@ -1047,6 +1047,21 @@ cdef class GpuContext:
             ctx_property(self, GA_CTX_PROP_BIN_ID, &res)
             return res;
 
+    property total_gmem:
+        "Total size of global memory on the device"
+        def __get__(self):
+            cdef size_t res
+            ctx_property(self, GA_CTX_PROP_TOTAL_GMEM, &res)
+            return res
+
+    property free_gmem:
+        "Size of free global memory on the device"
+        def __get__(self):
+            cdef size_t res
+            ctx_property(self, GA_CTX_PROP_FREE_GMEM, &res)
+            return res
+
+
 cdef class flags(object):
     cdef int fl
 

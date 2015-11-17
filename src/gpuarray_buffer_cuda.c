@@ -1672,6 +1672,7 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     char *s;
     CUdevice id;
     int i;
+    size_t sz;
 
   case GA_CTX_PROP_DEVNAME:
     cuda_enter(ctx);
@@ -1780,6 +1781,18 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
   case GA_CTX_PROP_ERRBUF:
     *((gpudata **)res) = ctx->errbuf;
     return GA_NO_ERROR;
+
+  case GA_CTX_PROP_TOTAL_GMEM:
+    cuda_enter(ctx);
+    ctx->err = cuMemGetInfo(&sz, (size_t *)res);
+    cuda_exit(ctx);
+    return ctx->err == CUDA_SUCCESS ? GA_NO_ERROR : GA_IMPL_ERROR;
+
+  case GA_CTX_PROP_FREE_GMEM:
+    cuda_enter(ctx);
+    ctx->err = cuMemGetInfo((size_t *)res, &sz);
+    cuda_exit(ctx);
+    return ctx->err == CUDA_SUCCESS ? GA_NO_ERROR : GA_IMPL_ERROR;
 
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;
