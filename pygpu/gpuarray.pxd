@@ -74,12 +74,19 @@ cdef extern from "gpuarray/buffer.h":
         char *ctx_error(void *ctx)
         int property(void *c, gpudata *b, gpukernel *k, int prop_id, void *res)
 
+    int GA_CTX_DEFAULT
+    int GA_CTX_MULTI_THREAD
+    int GA_CTX_SINGLE_THREAD
+    int GA_CTX_DISABLE_ALLOCATION_CACHE
+
     int GA_CTX_PROP_DEVNAME
     int GA_CTX_PROP_MAXLSIZE
     int GA_CTX_PROP_LMEMSIZE
     int GA_CTX_PROP_NUMPROCS
     int GA_CTX_PROP_MAXGSIZE
     int GA_CTX_PROP_BIN_ID
+    int GA_CTX_PROP_TOTAL_GMEM
+    int GA_CTX_PROP_FREE_GMEM
     int GA_BUFFER_PROP_CTX
     int GA_KERNEL_PROP_CTX
     int GA_KERNEL_PROP_MAXLSIZE
@@ -253,7 +260,7 @@ cdef api GpuContext pygpu_default_context()
 
 cdef api bint pygpu_GpuArray_Check(object o)
 
-cdef api GpuContext pygpu_init(object dev)
+cdef api GpuContext pygpu_init(object dev, int flags)
 
 cdef api GpuArray pygpu_zeros(unsigned int nd, const size_t *dims,
                               int typecode, ga_order order,

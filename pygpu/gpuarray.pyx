@@ -564,7 +564,7 @@ cdef GpuContext ensure_context(GpuContext c):
 cdef bint pygpu_GpuArray_Check(object o):
     return isinstance(o, GpuArray)
 
-cdef GpuContext pygpu_init(dev):
+cdef GpuContext pygpu_init(dev, int flags):
     if dev.startswith('cuda'):
         kind = "cuda"
         if dev[4:] == '':
@@ -582,16 +582,20 @@ cdef GpuContext pygpu_init(dev):
             devnum = int(devspec[0]) << 16 | int(devspec[1])
     else:
         raise ValueError, "Unknown device format:" + dev
-    return GpuContext(kind, devnum)
+    return GpuContext(kind, devnum, flags)
 
-def init(dev):
+def init(dev, sched='default', disable_alloc_cache=False):
     """
-    init(dev)
+    init(dev, opt='default', disable_alloc_cache=False)
 
     Creates a context from a device specifier.
 
     :param dev: device specifier
     :type dev: string
+    :param sched: optimize scheduling for which type of operation
+    :type sched: {'default', 'single', 'multi'}
+    :param disable_alloc_cache: disable allocation cache (if any)
+    :type disable_alloc_cache: bool
     :rtype: GpuContext
 
     Device specifiers are composed of the type string and the device
@@ -602,8 +606,11 @@ def init(dev):
 
     For cuda the device id is the numeric identifier.  You can see
     what devices are available by running nvidia-smi on the machine.
-    If you don't specify a number (e.g. 'cuda') the ambient context,
-    which must have been initialized prior to this call, will be used.
+    Be aware that the ordering in nvidia-smi might not correspond to
+    the ordering in this library.  This is due to how cuda enumerate
+    devices.  If you don't specify a number (e.g. 'cuda') this
+    function will grab a pre-existing context which is current to the
+    calling thread.
 
     For opencl the device id is the platform number, a colon (:) and
     the device number.  There are no widespread and/or easy way to
@@ -611,7 +618,16 @@ def init(dev):
     the values, unavaiable ones will just raise an error, and there
     are no gaps in the valid numbers.
     """
-    return pygpu_init(dev)
+    cdef int flags = 0
+    if sched == 'single':
+        flags |= GA_CTX_SINGLE_THREAD
+    elif sched == 'multi':
+        flags |= GA_CTX_MULTI_THREAD
+    elif sched != 'default':
+        raise TypeError('unexpected value for parameter sched: %s' % (sched,))
+    if disable_alloc_cache:
+        flags |= GA_CTX_DISABLE_ALLOCATION_CACHE
+    return pygpu_init(dev, flags)
 
 def zeros(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
           cls=None):
@@ -961,16 +977,22 @@ cdef class GpuContext:
 
     .. code-block:: python
 
-        GpuContext(kind, devno)
+        GpuContext(kind, devno, flags)
 
     :param kind: module name for the context
     :type kind: string
     :param devno: device number
     :type devno: int
+    :param flags: context flags
+    :type flags: int
 
     The currently implemented modules (for the `kind` parameter) are
     "cuda" and "opencl".  Which are available depends on the build
     options for libgpuarray.
+
+    The flag values are defined in the gpuarray/buffer.h header and
+    are in the "Context flags" group.  If you want to use more than
+    one value you must bitwise OR them together.
 
     If you want an alternative interface check :meth:`~pygpu.gpuarray.init`.
     """
@@ -978,11 +1000,11 @@ cdef class GpuContext:
         if self.ctx != NULL:
             self.ops.buffer_deinit(self.ctx)
 
-    def __cinit__(self, kind, devno):
+    def __cinit__(self, kind, devno, int flags):
         cdef int err = GA_NO_ERROR
         cdef void *ctx
         self.ops = get_ops(_s(kind))
-        self.ctx = self.ops.buffer_init(devno, 0, &err)
+        self.ctx = self.ops.buffer_init(devno, flags, &err)
         if (err != GA_NO_ERROR):
             if err == GA_VALUE_ERROR:
                 raise get_exc(err), "No device %d"%(devno,)
@@ -1046,6 +1068,21 @@ cdef class GpuContext:
             cdef const char *res
             ctx_property(self, GA_CTX_PROP_BIN_ID, &res)
             return res;
+
+    property total_gmem:
+        "Total size of global memory on the device"
+        def __get__(self):
+            cdef size_t res
+            ctx_property(self, GA_CTX_PROP_TOTAL_GMEM, &res)
+            return res
+
+    property free_gmem:
+        "Size of free global memory on the device"
+        def __get__(self):
+            cdef size_t res
+            ctx_property(self, GA_CTX_PROP_FREE_GMEM, &res)
+            return res
+
 
 cdef class flags(object):
     cdef int fl
