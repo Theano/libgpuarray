@@ -584,7 +584,7 @@ cdef GpuContext pygpu_init(dev, int flags):
         raise ValueError, "Unknown device format:" + dev
     return GpuContext(kind, devnum, flags)
 
-def init(dev, opt='default', disable_alloc_cache=False):
+def init(dev, sched='default', disable_alloc_cache=False):
     """
     init(dev, opt='default', disable_alloc_cache=False)
 
@@ -592,8 +592,8 @@ def init(dev, opt='default', disable_alloc_cache=False):
 
     :param dev: device specifier
     :type dev: string
-    :param opt: type of operation to optimize for
-    :type opt: {'default', 'single', 'multi'}
+    :param sched: optimize scheduling for which type of operation
+    :type sched: {'default', 'single', 'multi'}
     :param disable_alloc_cache: disable allocation cache (if any)
     :type disable_alloc_cache: bool
     :rtype: GpuContext
@@ -606,8 +606,11 @@ def init(dev, opt='default', disable_alloc_cache=False):
 
     For cuda the device id is the numeric identifier.  You can see
     what devices are available by running nvidia-smi on the machine.
-    If you don't specify a number (e.g. 'cuda') the ambient context,
-    which must have been initialized prior to this call, will be used.
+    Be aware that the ordering in nvidia-smi might not correspond to
+    the ordering in this library.  This is due to how cuda enumerate
+    devices.  If you don't specify a number (e.g. 'cuda') this
+    function will grab a pre-existing context which is current to the
+    calling thread.
 
     For opencl the device id is the platform number, a colon (:) and
     the device number.  There are no widespread and/or easy way to
@@ -616,12 +619,12 @@ def init(dev, opt='default', disable_alloc_cache=False):
     are no gaps in the valid numbers.
     """
     cdef int flags = 0
-    if opt == 'single':
+    if sched == 'single':
         flags |= GA_CTX_SINGLE_THREAD
-    elif opt == 'multi':
+    elif sched == 'multi':
         flags |= GA_CTX_MULTI_THREAD
-    elif opt != 'default':
-        raise TypeError('unexpected value for parameter opt: %s' % (opt,))
+    elif sched != 'default':
+        raise TypeError('unexpected value for parameter sched: %s' % (sched,))
     if disable_alloc_cache:
         flags |= GA_CTX_DISABLE_ALLOCATION_CACHE
     return pygpu_init(dev, flags)
@@ -986,6 +989,10 @@ cdef class GpuContext:
     The currently implemented modules (for the `kind` parameter) are
     "cuda" and "opencl".  Which are available depends on the build
     options for libgpuarray.
+
+    The flag values are defined in the gpuarray/buffer.h header and
+    are in the "Context flags" group.  If you want to use more than
+    one value you must bitwise OR them together.
 
     If you want an alternative interface check :meth:`~pygpu.gpuarray.init`.
     """
