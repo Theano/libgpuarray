@@ -280,6 +280,8 @@ static void *cuda_init(int ord, int flags, int *ret) {
       /* Grab the ambient context */
       err = cuCtxGetCurrent(&ctx);
       CHKFAIL(NULL);
+      /* If somebody made a context, then the api is initialized */
+      init_done = 1;
       res = cuda_make_ctx(ctx, DONTFREE);
       if (res == NULL) {
         FAIL(NULL, GA_IMPL_ERROR);

@@ -607,10 +607,9 @@ def init(dev, sched='default', disable_alloc_cache=False):
     For cuda the device id is the numeric identifier.  You can see
     what devices are available by running nvidia-smi on the machine.
     Be aware that the ordering in nvidia-smi might not correspond to
-    the ordering in this library.  This is due to how cuda enumerate
-    devices.  If you don't specify a number (e.g. 'cuda') this
-    function will grab a pre-existing context which is current to the
-    calling thread.
+    the ordering in this library.  This is due to how cuda enumerates
+    devices.  If you don't specify a number (e.g. 'cuda') the first
+    available device will be selected according to the backend order.
 
     For opencl the device id is the platform number, a colon (:) and
     the device number.  There are no widespread and/or easy way to
