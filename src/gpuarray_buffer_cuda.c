@@ -638,15 +638,23 @@ static int cuda_read(void *dst, gpudata *src, size_t srcoff, size_t sz) {
 
     cuda_enter(ctx);
 
-    cuda_waits(src, CUDA_WAIT_READ, ctx->mem_s);
+    if (src->flags & CUDA_MAPPED_PTR) {
+      ctx->err = cuEventSynchronize(src->ev);
+      if (ctx->err != CUDA_SUCCESS) {
+        cuda_exit(ctx);
+        return GA_IMPL_ERROR;
+      }
+      memcpy(dst, (void *)(src->ptr + srcoff), sz);
+    } else {
+      cuda_waits(src, CUDA_WAIT_READ, ctx->mem_s);
 
-    ctx->err = cuMemcpyDtoHAsync(dst, src->ptr + srcoff, sz, ctx->mem_s);
-    if (ctx->err != CUDA_SUCCESS) {
-      cuda_exit(ctx);
-      return GA_IMPL_ERROR;
+      ctx->err = cuMemcpyDtoHAsync(dst, src->ptr + srcoff, sz, ctx->mem_s);
+      if (ctx->err != CUDA_SUCCESS) {
+        cuda_exit(ctx);
+        return GA_IMPL_ERROR;
+      }
+      cuda_records(src, CUDA_WAIT_READ, ctx->mem_s);
     }
-    cuda_records(src, CUDA_WAIT_READ, ctx->mem_s);
-
     cuda_exit(ctx);
     return GA_NO_ERROR;
 }
@@ -664,15 +672,24 @@ static int cuda_write(gpudata *dst, size_t dstoff, const void *src,
 
     cuda_enter(ctx);
 
-    cuda_waits(dst, CUDA_WAIT_WRITE, ctx->mem_s);
+    if (dst->flags & CUDA_MAPPED_PTR) {
+      ctx->err = cuEventSynchronize(dst->ev);
+      if (ctx->err != CUDA_SUCCESS) {
+        cuda_exit(ctx);
+        return GA_IMPL_ERROR;
+      }
+      memcpy((void *)(dst->ptr + dstoff), src, sz);
+    } else {
+      cuda_waits(dst, CUDA_WAIT_WRITE, ctx->mem_s);
 
-    ctx->err = cuMemcpyHtoDAsync(dst->ptr + dstoff, src, sz, ctx->mem_s);
-    if (ctx->err != CUDA_SUCCESS) {
-      cuda_exit(ctx);
-      return GA_IMPL_ERROR;
+      ctx->err = cuMemcpyHtoDAsync(dst->ptr + dstoff, src, sz, ctx->mem_s);
+      if (ctx->err != CUDA_SUCCESS) {
+        cuda_exit(ctx);
+        return GA_IMPL_ERROR;
+      }
+
+      cuda_records(dst, CUDA_WAIT_WRITE, ctx->mem_s);
     }
-
-    cuda_records(dst, CUDA_WAIT_WRITE, ctx->mem_s);
     cuda_exit(ctx);
     return GA_NO_ERROR;
 }
