@@ -531,7 +531,8 @@ def _cmp(x,y):
     assert x.shape == y.shape
     assert x.dtype == y.dtype
     assert x.strides == y.strides
-    assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"]
+    assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"], (x.flags,
+                                                                y.flags)
     if not (skip_single_f and y.shape == ()):
         assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
     else:
@@ -539,8 +540,9 @@ def _cmp(x,y):
     # GpuArrays always own their data so don't check that flag.
     if x.flags["WRITEABLE"] != y.flags["WRITEABLE"]:
         assert x.ndim == 0
-    assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
-    assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
+    assert x.flags["ALIGNED"] == y.flags["ALIGNED"], (x.flags, y.flags)
+    assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"], (x.flags,
+                                                                y.flags)
     x = numpy.asarray(x)
     assert x.shape == y.shape
     assert x.dtype == y.dtype
