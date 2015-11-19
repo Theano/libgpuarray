@@ -173,14 +173,22 @@ static gpudata *new_gpudata(cuda_context *ctx, CUdeviceptr ptr, size_t size) {
 
   if (ctx->flags & GA_CTX_MULTI_THREAD)
     fl |= CU_EVENT_BLOCKING_SYNC;
-  ctx->err = cuEventCreate(&res->ev, fl);
-
-  cuda_exit(ctx);
-
+  ctx->err = cuEventCreate(&res->rev, fl);
   if (ctx->err != CUDA_SUCCESS) {
+    cuda_exit(ctx);
     free(res);
     return NULL;
   }
+
+  ctx->err = cuEventCreate(&res->wev, fl);
+  if (ctx->err != CUDA_SUCCESS) {
+    cuEventDestroy(&res->rev);
+    cuda_exit(ctx);
+    free(res);
+    return NULL;
+  }
+
+  cuda_exit(ctx);
 
   res->ptr = ptr;
   res->next = NULL;
@@ -492,7 +500,8 @@ static void cuda_retain(gpudata *d) {
 
 static void deallocate(gpudata *d) {
   cuda_enter(d->ctx);
-  cuEventDestroy(d->ev);
+  cuEventDestroy(d->rev);
+  cuEventDestroy(d->wev);
   cuda_exit(d->ctx);
   CLEAR(d);
   free(d);
@@ -567,12 +576,24 @@ static int cuda_share(gpudata *a, gpudata *b, int *ret) {
 static int cuda_waits(gpudata *a, int flags, CUstream s) {
   ASSERT_BUF(a);
   /* If others are only reads, no need to wait */
-  if (flags & CUDA_WAIT_READ && !(a->flags & CUDA_WAIT_WRITE))
-    return GA_NO_ERROR;
   cuda_enter(a->ctx);
-  a->ctx->err = cuStreamWaitEvent(s, a->ev, 0);
-  if (a->ctx->err != CUDA_SUCCESS)
-    return GA_IMPL_ERROR;
+  if (flags & CUDA_WAIT_READ) {
+    /* We wait for writes that happened before since multiple reads at
+     * the same time are fine */
+    a->ctx->err = cuStreamWaitEvent(s, a->wev, 0);
+    if (a->ctx->err != CUDA_SUCCESS) {
+      cuda_exit(a->ctx);
+      return GA_IMPL_ERROR;
+    }
+  }
+  if (flags & CUDA_WAIT_WRITE) {
+    /* Make sure to not disturb previous reads */
+    a->ctx->err = cuStreamWaitEvent(s, a->rev, 0);
+    if (a->ctx->err != CUDA_SUCCESS) {
+      cuda_exit(a->ctx);
+      return GA_IMPL_ERROR;
+    }
+  }
   cuda_exit(a->ctx);
   return GA_NO_ERROR;
 }
@@ -584,9 +605,10 @@ int cuda_wait(gpudata *a, int flags) {
 static int cuda_records(gpudata *a, int flags, CUstream s) {
   ASSERT_BUF(a);
   cuda_enter(a->ctx);
-  a->ctx->err = cuEventRecord(a->ev, s);
-  a->flags &= ~(CUDA_WAIT_MASK);
-  a->flags |= (flags & CUDA_WAIT_MASK);
+  if (flags & CUDA_WAIT_READ)
+    a->ctx->err = cuEventRecord(a->rev, s);
+  if (flags & CUDA_WAIT_WRITE)
+    a->ctx->err = cuEventRecord(a->wev, s);
   cuda_exit(a->ctx);
   return GA_NO_ERROR;
 }
@@ -639,7 +661,7 @@ static int cuda_read(void *dst, gpudata *src, size_t srcoff, size_t sz) {
     cuda_enter(ctx);
 
     if (src->flags & CUDA_MAPPED_PTR) {
-      ctx->err = cuEventSynchronize(src->ev);
+      ctx->err = cuEventSynchronize(src->wev);
       if (ctx->err != CUDA_SUCCESS) {
         cuda_exit(ctx);
         return GA_IMPL_ERROR;
@@ -673,7 +695,7 @@ static int cuda_write(gpudata *dst, size_t dstoff, const void *src,
     cuda_enter(ctx);
 
     if (dst->flags & CUDA_MAPPED_PTR) {
-      ctx->err = cuEventSynchronize(dst->ev);
+      ctx->err = cuEventSynchronize(dst->rev);
       if (ctx->err != CUDA_SUCCESS) {
         cuda_exit(ctx);
         return GA_IMPL_ERROR;
@@ -1325,14 +1347,18 @@ static int cuda_kernelbin(gpukernel *k, size_t *sz, void **obj) {
 
 static int cuda_sync(gpudata *b) {
   cuda_context *ctx = (cuda_context *)b->ctx;
+  int err = GA_NO_ERROR;
 
   ASSERT_BUF(b);
   cuda_enter(ctx);
-  ctx->err = cuEventSynchronize(b->ev);
-  cuda_exit(ctx);
+  ctx->err = cuEventSynchronize(b->wev);
   if (ctx->err != CUDA_SUCCESS)
-    return GA_IMPL_ERROR;
-  return GA_NO_ERROR;
+    err = GA_IMPL_ERROR;
+  ctx->err = cuEventSynchronize(b->rev);
+  if (ctx->err != CUDA_SUCCESS)
+    err = GA_IMPL_ERROR;
+  cuda_exit(ctx);
+  return err;
 }
 
 static const char ELEM_HEADER_PTX[] = ".version %s\n.target %s\n\n"
@@ -1671,20 +1697,18 @@ static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
   if (dst == NULL)
     return NULL;
   cuda_enter(ctx);
-  cuStreamWaitEvent(dst_ctx->s, src->ev, 0);
-  cuda_wait(dst, CUDA_WAIT_WRITE);
+  cuda_waits(src, CUDA_WAIT_READ, dst_ctx->mem_s);
+  cuda_waits(dst, CUDA_WAIT_WRITE, dst_ctx->mem_s);
   ctx->err = cuMemcpyPeerAsync(dst->ptr, dst->ctx->ctx, src->ptr+offset,
-			       src->ctx->ctx, sz, dst_ctx->s);
+			       src->ctx->ctx, sz, dst_ctx->mem_s);
   if (ctx->err != CUDA_SUCCESS) {
     cuda_free(dst);
     cuda_exit(ctx);
     return NULL;
   }
 
-  cuda_record(dst, CUDA_WAIT_WRITE);
-  /* We also need to wait on the other GPU */
-  cuStreamWaitEvent(ctx->s, dst->ev, 0);
-  cuda_record(src, CUDA_WAIT_READ);
+  cuda_records(dst, CUDA_WAIT_WRITE, dst_ctx->mem_s);
+  cuda_record(src, CUDA_WAIT_READ, dst_ctx->mem_s);
 
   cuda_exit(ctx);
   return dst;

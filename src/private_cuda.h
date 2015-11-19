@@ -90,12 +90,13 @@ GPUARRAY_LOCAL void cuda_exit(cuda_context *ctx);
 
 struct _gpudata {
   CUdeviceptr ptr;
-  CUevent ev;
+  CUevent rev;
+  CUevent wev;
   size_t sz;
   cuda_context *ctx;
+  gpudata *next;
   int flags;
   unsigned int refcnt;
-  gpudata *next;
 #ifdef DEBUG
   char tag[8];
 #endif
