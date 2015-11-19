@@ -86,7 +86,12 @@ def ielemwise2_ops_array(op, dtype1, dtype2, shape):
     bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, ctx=context,
                           cls=elemary)
 
-    out_c = op(ac, bc)
+    try:
+        out_c = op(ac, bc)
+    except TypeError:
+        # TODO: currently, we use old Numpy semantic and tolerate more case.
+        # So we can't test that we raise the same error
+        return
     out_g = op(ag, bg)
 
     assert out_g is ag
