@@ -18,12 +18,12 @@ operators2 = [operator.add, operator.sub, operator.floordiv,
               operator.eq, operator.ne, operator.lt, operator.le,
               operator.gt, operator.ge]
 if PY2:
-    operators2.append(operators.div)
+    operators2.append(operator.div)
 
 ioperators2 = [operator.iadd, operator.isub, operator.ifloordiv,
                operator.imod, operator.imul, operator.itruediv]
 if PY2:
-    ioperators2.append(operators.idiv)
+    ioperators2.append(operator.idiv)
 
 elems = [2, 0.3, numpy.asarray(3, dtype='int8'),
          numpy.asarray(7, dtype='uint32'),
