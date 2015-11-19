@@ -182,7 +182,7 @@ static gpudata *new_gpudata(cuda_context *ctx, CUdeviceptr ptr, size_t size) {
 
   ctx->err = cuEventCreate(&res->wev, fl);
   if (ctx->err != CUDA_SUCCESS) {
-    cuEventDestroy(&res->rev);
+    cuEventDestroy(res->rev);
     cuda_exit(ctx);
     free(res);
     return NULL;
@@ -1708,7 +1708,7 @@ static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
   }
 
   cuda_records(dst, CUDA_WAIT_WRITE, dst_ctx->mem_s);
-  cuda_record(src, CUDA_WAIT_READ, dst_ctx->mem_s);
+  cuda_records(src, CUDA_WAIT_READ, dst_ctx->mem_s);
 
   cuda_exit(ctx);
   return dst;
