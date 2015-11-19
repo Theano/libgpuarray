@@ -13,5 +13,5 @@ Python module reference
    .. automodule:: pygpu.reduction
       :members: ReductionKernel
 
-   .. automodule:: pygpu.array
+   .. automodule:: pygpu._array
       :members:

@@ -20,6 +20,7 @@ const char *gpuarray_error_str(int err) {
   case GA_BLAS_ERROR:        return "Error in BLAS call";
   case GA_UNALIGNED_ERROR:   return "Unaligned array";
   case GA_COPY_ERROR:        return "Copy is needed but disallowed by parameters";
+  case GA_NODEV_ERROR:       return "No devices are available";
   default: return "Unknown GA error";
   }
 }
