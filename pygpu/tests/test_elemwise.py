@@ -95,7 +95,10 @@ def ielemwise2_ops_array(op, dtype1, dtype2, shape):
     out_g = op(ag, bg)
 
     assert out_g is ag
-    assert numpy.allclose(out_c, numpy.asarray(out_g))
+    atol = None
+    if dtype1 == "float32" or dtype2 == "float32":
+        atol = 1e-6
+    assert numpy.allclose(out_c, numpy.asarray(out_g), atol=1e-6)
 
 
 def test_elemwise_layouts():
