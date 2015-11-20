@@ -1520,11 +1520,9 @@ static inline int gen_extcopy_kernel(const extcopy_args *a,
   rmod = get_rmod(a->itype, a->otype);
   if (in_t == NULL || out_t == NULL) return GA_DEVSUP_ERROR;
 
-  strb_appendf(&sb, ELEM_HEADER_PTX,
-	       /* This is a giant hack to see if we are on CC < 3.0 */
-	       ctx->bin_id[strlen(ARCH_PREFIX)] < '3' ? "3.0" : "4.2",
-	       ctx->bin_id, bits, bits, bits, bits, in_t, out_t, bits,
-	       bits, bits, bits, bits, nEls, bits, bits);
+  strb_appendf(&sb, ELEM_HEADER_PTX, "4.1", ctx->bin_id,
+               bits, bits, bits, bits, in_t, out_t, bits,
+               bits, bits, bits, bits, nEls, bits, bits);
 
   cuda_perdim_ptx(&sb, a->ind, a->idims, a->istr, "a_p", bits);
   cuda_perdim_ptx(&sb, a->ond, a->odims, a->ostr, "b_p", bits);
