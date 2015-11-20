@@ -26,7 +26,7 @@ def permutations(elements):
     if len(elements) <= 1:
         yield elements
     else:
-        for perm in permutations(elements[1:]):
+        for perm in permutations(list(elements[1:])):
             for i in range(len(elements)):
                 yield perm[:i] + elements[:1] + perm[i:]
 
@@ -177,7 +177,9 @@ def asfortranarray(shp, dtype, offseted_outer, offseted_inner, sliced, order):
     b = gpu_ndarray.asfortranarray(gpu)
 
     # numpy upcast with a view to 1d scalar.
-    if (sliced != 1 or shp == () or (offseted_outer and len(shp) > 1) or
+    if gpu.flags['F_CONTIGUOUS']:
+        assert b.gpudata == gpu.gpudata
+    elif (sliced != 1 or shp == () or (offseted_outer and len(shp) > 1) or
         (order != 'f' and len(shp) > 1)):
         assert b is not gpu
     else:
@@ -186,9 +188,11 @@ def asfortranarray(shp, dtype, offseted_outer, offseted_inner, sliced, order):
     assert a.shape == b.shape
     assert a.dtype == b.dtype
     assert a.flags.f_contiguous
-    if shp != ():
-        assert b.flags['F_CONTIGUOUS']
-    assert a.strides == b.strides
+    assert b.flags['F_CONTIGUOUS']
+    if not any([s == 1 for s in cpu.shape]):
+        # Older version then Numpy 1.10 do not set c/f contiguous more
+        # frequently as we do. This cause extra copy.
+        assert a.strides == b.strides
     assert numpy.allclose(cpu, a)
     assert numpy.allclose(cpu, b)
 
@@ -533,8 +537,13 @@ def _cmp(x,y):
     assert x.strides == y.strides
     assert x.flags["C_CONTIGUOUS"] == y.flags["C_CONTIGUOUS"], (x.flags,
                                                                 y.flags)
-    if not (skip_single_f and y.shape == ()):
-        assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
+    if y.size == 0:
+        # F_CONTIGUOUS flags change definition with different numpy version
+        # TODO: ideally, we should be F_CONTIGUOUS in that case.
+        pass
+    elif not (skip_single_f and y.shape == ()):
+        assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"], (x.flags,
+                                                                    y.flags)
     else:
         assert x.flags["F_CONTIGUOUS"]
     # GpuArrays always own their data so don't check that flag.

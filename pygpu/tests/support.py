@@ -58,14 +58,22 @@ def check_flags(x, y):
         # C_CONTIGUOUS in that case.
         pass
     elif x.flags["C_CONTIGUOUS"] != y.flags["C_CONTIGUOUS"]:
+        # Numpy 1.10 can set c/f contiguous more frequently by
+        # ignoring strides on dimensions of size 1.
         assert x.flags["C_CONTIGUOUS"] is True, (x.flags, y.flags)
         assert x.flags["F_CONTIGUOUS"] is False, (x.flags, y.flags)
         assert y.flags["C_CONTIGUOUS"] is False, (x.flags, y.flags)
-        assert y.flags["F_CONTIGUOUS"] is True, (x.flags, y.flags)
+        # That depend of numpy version.
+        # assert y.flags["F_CONTIGUOUS"] is True, (x.flags, y.flags)
     else:
         if not (skip_single_f and x.shape == ()):
-            assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"], (
-                x.flags, y.flags)
+            # Numpy below 1.6.0 does not have a consistent handling of
+            # f-contiguous for 0-d arrays
+            if not any([s == 1 for s in x.shape]):
+                # Numpy 1.10 can set f contiguous more frequently by
+                # ignoring strides on dimensions of size 1.
+                assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"], (
+                    x.flags, y.flags)
         else:
             assert x.flags["F_CONTIGUOUS"]
     assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"], (x.flags, y.flags)

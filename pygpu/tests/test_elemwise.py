@@ -226,7 +226,12 @@ def ielemwise2_ops_mixed(op, dtype, shape, elem):
     c, g = gen_gpuarray(shape, dtype, incr=incr, ctx=context,
                         cls=elemary)
 
-    out_c = op(c, elem)
+    try:
+        out_c = op(c, elem)
+    except TypeError:
+        # TODO: currently, we use old Numpy semantic and tolerate more case.
+        # So we can't test that we raise the same error
+        return
     out_g = op(g, elem)
 
     assert out_g is g
