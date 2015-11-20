@@ -50,6 +50,7 @@ typedef struct _cuda_context {
   CUcontext ctx;
   CUresult err;
   CUstream s;
+  CUstream mem_s;
   void *blas_handle;
   gpudata *errbuf;
   cache *extcopy_cache;
@@ -89,12 +90,13 @@ GPUARRAY_LOCAL void cuda_exit(cuda_context *ctx);
 
 struct _gpudata {
   CUdeviceptr ptr;
-  CUevent ev;
+  CUevent rev;
+  CUevent wev;
   size_t sz;
   cuda_context *ctx;
+  gpudata *next;
   int flags;
   unsigned int refcnt;
-  gpudata *next;
 #ifdef DEBUG
   char tag[8];
 #endif
