@@ -58,21 +58,29 @@ def check_flags(x, y):
         # C_CONTIGUOUS in that case.
         pass
     elif x.flags["C_CONTIGUOUS"] != y.flags["C_CONTIGUOUS"]:
-        assert x.flags["C_CONTIGUOUS"] is True
-        assert x.flags["F_CONTIGUOUS"] is False
-        assert y.flags["C_CONTIGUOUS"] is False
-        assert y.flags["F_CONTIGUOUS"] is True
+        # Numpy 1.10 can set c/f contiguous more frequently by
+        # ignoring strides on dimensions of size 1.
+        assert x.flags["C_CONTIGUOUS"] is True, (x.flags, y.flags)
+        assert x.flags["F_CONTIGUOUS"] is False, (x.flags, y.flags)
+        assert y.flags["C_CONTIGUOUS"] is False, (x.flags, y.flags)
+        # That depend of numpy version.
+        # assert y.flags["F_CONTIGUOUS"] is True, (x.flags, y.flags)
     else:
         if not (skip_single_f and x.shape == ()):
             # Numpy below 1.6.0 does not have a consistent handling of
             # f-contiguous for 0-d arrays
-            assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"]
+            if not any([s == 1 for s in x.shape]):
+                # Numpy 1.10 can set f contiguous more frequently by
+                # ignoring strides on dimensions of size 1.
+                assert x.flags["F_CONTIGUOUS"] == y.flags["F_CONTIGUOUS"], (
+                    x.flags, y.flags)
         else:
             assert x.flags["F_CONTIGUOUS"]
-    assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"]
+    assert x.flags["WRITEABLE"] == y.flags["WRITEABLE"], (x.flags, y.flags)
     # Don't check for OWNDATA since it is always true for a GpuArray
-    assert x.flags["ALIGNED"] == y.flags["ALIGNED"]
-    assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"]
+    assert x.flags["ALIGNED"] == y.flags["ALIGNED"], (x.flags, y.flags)
+    assert x.flags["UPDATEIFCOPY"] == y.flags["UPDATEIFCOPY"], (x.flags,
+                                                                y.flags)
 
 
 def check_meta_only(x, y):
@@ -151,6 +159,6 @@ def gen_gpuarray(shape_orig, dtype='float32', offseted_outer=False,
         assert a.shape == shape_orig, (a.shape, shape_orig)
         assert b.shape == shape_orig, (b.shape, shape_orig)
 
-    assert numpy.allclose(a, numpy.asarray(b))
+    assert numpy.allclose(a, numpy.asarray(b)), (a, numpy.asarray(b))
 
     return a, b
