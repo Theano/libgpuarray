@@ -1,11 +1,15 @@
 from __future__ import print_function
 
+import unittest
 import copy
 from six.moves import range
+from six import PY3
+import pickle
 
 import numpy
 
-import pygpu.gpuarray as gpu_ndarray
+import pygpu
+from pygpu.gpuarray import GpuArray, GpuContext, GpuKernel
 
 from .support import (guard_devsup, check_meta, check_flags, check_all,
                       gen_gpuarray, context as ctx, dtypes_all,
@@ -32,7 +36,7 @@ def permutations(elements):
 
 
 def test_hash():
-    g = gpu_ndarray.empty((2, 3), context=ctx)
+    g = pygpu.empty((2, 3), context=ctx)
     exc = None
     try:
         h = hash(g)
@@ -85,7 +89,7 @@ def test_transfer_not_contiguous():
 def transfer_not_contiguous(shp, dtype):
     a = numpy.random.rand(*shp) * 10
     a = a[::-1]
-    b = gpu_ndarray.array(a, context=ctx)
+    b = pygpu.array(a, context=ctx)
     c = numpy.asarray(b)
 
     assert numpy.allclose(c, a)
@@ -109,7 +113,7 @@ def transfer_fortran(shp, dtype):
     if len(shp) > 1:
         assert a_.strides != a.strides
     a = a_
-    b = gpu_ndarray.array(a, context=ctx)
+    b = pygpu.array(a, context=ctx)
     c = numpy.asarray(b)
 
     assert a.shape == b.shape == c.shape
@@ -137,7 +141,7 @@ def ascontiguousarray(shp, dtype, offseted_o, offseted_i, sliced, order):
                             ctx=ctx)
 
     a = numpy.ascontiguousarray(cpu)
-    b = gpu_ndarray.ascontiguousarray(gpu)
+    b = pygpu.ascontiguousarray(gpu)
 
     # numpy upcast with a view to 1d scalar.
     if (sliced != 1 or shp == () or
@@ -174,7 +178,7 @@ def asfortranarray(shp, dtype, offseted_outer, offseted_inner, sliced, order):
                             order, ctx=ctx)
 
     a = numpy.asfortranarray(cpu)
-    b = gpu_ndarray.asfortranarray(gpu)
+    b = pygpu.asfortranarray(gpu)
 
     # numpy upcast with a view to 1d scalar.
     if (sliced != 1 or shp == () or (offseted_outer and len(shp) > 1) or
@@ -205,21 +209,21 @@ def test_zeros():
 
 @guard_devsup
 def zeros(shp, order, dtype):
-    x = gpu_ndarray.zeros(shp, dtype, order, context=ctx)
+    x = pygpu.zeros(shp, dtype, order, context=ctx)
     y = numpy.zeros(shp, dtype, order)
     check_all(x, y)
 
 
 def test_zeros_no_dtype():
     # no dtype and order param
-    x = gpu_ndarray.zeros((), context=ctx)
+    x = pygpu.zeros((), context=ctx)
     y = numpy.zeros(())
     check_meta(x, y)
 
 
 def test_zero_noparam():
     try:
-        gpu_ndarray.zeros()
+        pygpu.zeros()
         assert False
     except TypeError:
         pass
@@ -236,20 +240,20 @@ def test_empty():
 
 
 def empty(shp, order, dtype):
-    x = gpu_ndarray.empty(shp, dtype, order, context=ctx)
+    x = pygpu.empty(shp, dtype, order, context=ctx)
     y = numpy.empty(shp, dtype, order)
     check_meta(x, y)
 
 
 def test_empty_no_dtype():
-    x = gpu_ndarray.empty((), context=ctx)# no dtype and order param
+    x = pygpu.empty((), context=ctx)# no dtype and order param
     y = numpy.empty(())
     check_meta(x, y)
 
 
 def test_empty_no_params():
     try:
-        gpu_ndarray.empty()
+        pygpu.empty()
         assert False
     except TypeError:
         pass
@@ -308,7 +312,7 @@ def test_copy_view():
 
 def check_memory_region(a, a_op, b, b_op):
     assert numpy.may_share_memory(a, a_op) == \
-        gpu_ndarray.may_share_memory(b, b_op)
+        pygpu.gpuarray.may_share_memory(b, b_op)
 
 @guard_devsup
 def copy_view(shp, dtype, offseted, order1, order2):
@@ -527,7 +531,7 @@ def mapping_getitem_w_int(dtype, offseted):
 
 
 def _cmp(x,y):
-    assert isinstance(x, gpu_ndarray.GpuArray)
+    assert isinstance(x, GpuArray)
     assert x.shape == y.shape
     assert x.dtype == y.dtype
     assert x.strides == y.strides
@@ -615,3 +619,51 @@ def flag_prop(p):
 
     assert getattr(c2.flags, p) == getattr(g2.flags, p)
     assert getattr(c3.flags, p) == getattr(g3.flags, p)
+
+
+class TestPickle(unittest.TestCase):
+    def test_GpuArray(self):
+        with self.assertRaises(RuntimeError):
+            pickle.dumps(pygpu.zeros((32,), context=ctx))
+        with self.assertRaises(RuntimeError):
+            pickle.dumps(pygpu.zeros((32,), context=ctx), protocol=0)
+        with self.assertRaises(RuntimeError):
+            pickle.dumps(pygpu.zeros((32,), context=ctx), protocol=1)
+        with self.assertRaises(RuntimeError):
+            pickle.dumps(pygpu.zeros((32,), context=ctx), protocol=2)
+        if PY3:
+            with self.assertRaises(RuntimeError):
+                pickle.dumps(pygpu.zeros((32,), context=ctx), protocol=3)
+        with self.assertRaises(RuntimeError):
+            pickle.dumps(pygpu.zeros((32,), context=ctx), protocol=-1)
+
+    def test_GpuContext(self):
+        with self.assertRaises(RuntimeError):
+            pickle.dumps(ctx)
+        with self.assertRaises(RuntimeError):
+            pickle.dumps(ctx, protocol=0)
+        with self.assertRaises(RuntimeError):
+            pickle.dumps(ctx, protocol=1)
+        with self.assertRaises(RuntimeError):
+            pickle.dumps(ctx, protocol=2)
+        if PY3:
+            with self.assertRaises(RuntimeError):
+                pickle.dumps(ctx, protocol=3)
+        with self.assertRaises(RuntimeError):
+            pickle.dumps(ctx, protocol=-1)
+
+    def test_GpuKernel(self):
+        k = GpuKernel("KERNEL void nothing(GLOBAL_MEM ga_float *in) {in[0] = 0;}", "nothing", [], context=ctx)
+        with self.assertRaises(RuntimeError):
+            pickle.dumps(k)
+        with self.assertRaises(RuntimeError):
+            pickle.dumps(k, protocol=0)
+        with self.assertRaises(RuntimeError):
+            pickle.dumps(k, protocol=1)
+        with self.assertRaises(RuntimeError):
+            pickle.dumps(k, protocol=2)
+        if PY3:
+            with self.assertRaises(RuntimeError):
+                pickle.dumps(k, protocol=3)
+        with self.assertRaises(RuntimeError):
+            pickle.dumps(k, protocol=-1)
