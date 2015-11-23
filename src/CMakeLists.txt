@@ -61,8 +61,9 @@ if(NOT HAVE_MKSTEMP)
 endif()
 
 if (CUDA_FOUND)
-  if (CUDA_VERSION_MAJOR LESS 6)
-    message( WARNING "This packages requires CUDA 6.0 or more.  Found version ${CUDA_VERSION_STRING}")
+  if (CUDA_VERSION_MAJOR LESS 6 OR
+      (CUDA_VERSION_MAJOR EQUAL 6 AND CUDA_VERSION_MINOR EQUAL 0))
+    message( WARNING "This package requires CUDA 6.5 or more.  Found version ${CUDA_VERSION_STRING}")
     set(CUDA_FOUND 0)
   endif()
 endif()

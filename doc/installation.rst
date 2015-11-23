@@ -18,7 +18,7 @@ Requirements
 
  - cmake >= 3.0 (cmake_).
  - a c99-compliant compiler (or MSVC if on windows).
- - (optional) CUDA >= 6.0 (cuda_).
+ - (optional) CUDA >= 6.5 (cuda_).
  - (optional) OpenCL runtime.
  - (optional) clBLAS (clblas_).
  - (optional) libcheck (check_) to run the C tests.
@@ -99,6 +99,19 @@ computer, you can install them in your home directory like this:
 
   python setup.py build
   python setup.py install --user
+
+
+Linux-specific instructions
+---------------------------
+
+If installed globally (in /usr/local), you might have to run:
+
+.. code-block:: bash
+
+   $ sudo ldconfig
+
+to make the linker know that there are new libraries available.  You
+can also reboot the machine to do that.
 
 
 Mac-specific instructions
