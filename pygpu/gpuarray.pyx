@@ -999,6 +999,9 @@ cdef class GpuContext:
         if self.ctx != NULL:
             self.ops.buffer_deinit(self.ctx)
 
+    def __reduce__(self):
+        raise RuntimeError, "Cannot pickle GpuContext object"
+
     def __cinit__(self, kind, devno, int flags):
         cdef int err = GA_NO_ERROR
         cdef void *ctx
@@ -1088,6 +1091,9 @@ cdef class flags(object):
 
     def __cinit__(self, fl):
         self.fl = fl
+
+    def __reduce__(self):
+        return (flags, (self.fl,))
 
     def __getitem__(self, idx):
         cdef const char *key
@@ -1426,6 +1432,9 @@ cdef class GpuArray:
     def __init__(self):
         if type(self) is GpuArray:
             raise RuntimeError, "Called raw GpuArray.__init__"
+
+    def __reduce__(self):
+        raise RuntimeError, "Cannot pickle GpuArray object"
 
     cdef __index_helper(self, key, unsigned int i, ssize_t *start,
                         ssize_t *stop, ssize_t *step):
@@ -1875,6 +1884,9 @@ cdef class GpuKernel:
     def __dealloc__(self):
         free(self.callbuf)
         kernel_clear(self)
+
+    def __reduce__(self):
+        raise RuntimeError, "Cannot pickle GpuKernel object"
 
     def __cinit__(self, source, name, types, GpuContext context=None,
                   cluda=True, have_double=False, have_small=False,
