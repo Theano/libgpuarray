@@ -99,7 +99,7 @@ cdef extern from "gpuarray/buffer.h":
         GA_USE_BINARY, GA_USE_PTX, GA_USE_CUDA, GA_USE_OPENCL
 
     char *Gpu_error(const gpuarray_buffer_ops *o, void *ctx, int err)
-    const gpuarray_buffer_ops *gpuarray_get_ops(const char *) nogil
+    const gpuarray_buffer_ops *gpuarray_get_ops(const char *)
 
 cdef extern from "gpuarray/kernel.h":
     ctypedef struct _GpuKernel "GpuKernel":
@@ -152,9 +152,9 @@ cdef extern from "gpuarray/array.h":
     int GpuArray_copy_from_host(_GpuArray *a, const gpuarray_buffer_ops *ops,
                             void *ctx, void *buf, int typecode,
                             unsigned int nd, const size_t *dims,
-                            const ssize_t *strides)
+                            const ssize_t *strides) nogil
     int GpuArray_view(_GpuArray *v, _GpuArray *a)
-    int GpuArray_sync(_GpuArray *a)
+    int GpuArray_sync(_GpuArray *a) nogil
     int GpuArray_index(_GpuArray *r, _GpuArray *a, const ssize_t *starts,
                        const ssize_t *stops, const ssize_t *steps)
     int GpuArray_setarray(_GpuArray *v, _GpuArray *a)
@@ -169,13 +169,13 @@ cdef extern from "gpuarray/array.h":
     void *GpuArray_context(_GpuArray *a)
 
     int GpuArray_move(_GpuArray *dst, _GpuArray *src)
-    int GpuArray_write(_GpuArray *dst, void *src, size_t src_sz)
-    int GpuArray_read(void *dst, size_t dst_sz, _GpuArray *src)
+    int GpuArray_write(_GpuArray *dst, void *src, size_t src_sz) nogil
+    int GpuArray_read(void *dst, size_t dst_sz, _GpuArray *src) nogil
     int GpuArray_memset(_GpuArray *a, int data)
     int GpuArray_copy(_GpuArray *res, _GpuArray *a, ga_order order)
 
     int GpuArray_transfer(_GpuArray *res, const _GpuArray *a, void *new_ctx,
-                          const gpuarray_buffer_ops *new_ops, int may_share)
+                          const gpuarray_buffer_ops *new_ops, int may_share) nogil
     int GpuArray_split(_GpuArray **rs, const _GpuArray *a, size_t n,
                        size_t *p, unsigned int axis)
     int GpuArray_concatenate(_GpuArray *r, const _GpuArray **as, size_t n,
@@ -188,7 +188,7 @@ cdef extern from "gpuarray/array.h":
     bint GpuArray_is_f_contiguous(_GpuArray *a)
 
 cdef extern from "gpuarray/extension.h":
-    void *gpuarray_get_extension(const char *) nogil
+    void *gpuarray_get_extension(const char *)
     cdef int GPUARRAY_CUDA_CTX_NOFREE
 
 cdef np.dtype dtype_to_npdtype(dtype)
