@@ -434,11 +434,9 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
     n[1] *= v->dimensions[j];
   }
 
-  if (check_error) {
-    err = v->ops->property(NULL, v->data, NULL, GA_CTX_PROP_ERRBUF, &errbuf);
-    if (err != GA_NO_ERROR)
-      return err;
-  }
+  err = v->ops->property(NULL, v->data, NULL, GA_CTX_PROP_ERRBUF, &errbuf);
+  if (err != GA_NO_ERROR)
+    return err;
 
   err = gen_take1_kernel(&k, a->ops, GpuArray_context(a),
 #if DEBUG
