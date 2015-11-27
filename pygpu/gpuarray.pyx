@@ -344,7 +344,8 @@ cdef int array_view(GpuArray v, GpuArray a) except -1:
 
 cdef int array_sync(GpuArray a) except -1:
     cdef int err
-    err = GpuArray_sync(&a.ga)
+    with nogil:
+        err = GpuArray_sync(&a.ga)
     if err != GA_NO_ERROR:
         raise get_exc(err), GpuArray_error(&a.ga, err)
 
