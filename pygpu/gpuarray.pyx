@@ -1016,7 +1016,7 @@ cdef class GpuContext:
             if err == GA_VALUE_ERROR:
                 raise get_exc(err), "No device %d"%(devno,)
             else:
-                raise get_exc(err), self.ops.ctx_error(NULL)
+                raise get_exc(err), self.ops.ctx_error(NULL) + ": " + str(devno)
 
     property kind:
         "Module name this context uses"
