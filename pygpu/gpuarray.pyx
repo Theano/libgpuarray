@@ -331,8 +331,9 @@ cdef int array_copy_from_host(GpuArray a, const gpuarray_buffer_ops *ops,
                               unsigned int nd, const size_t *dims,
                               const ssize_t *strides) except -1:
     cdef int err
-    err = GpuArray_copy_from_host(&a.ga, ops, ctx, buf, typecode, nd, dims,
-                                  strides);
+    with nogil:
+        err = GpuArray_copy_from_host(&a.ga, ops, ctx, buf, typecode, nd, dims,
+                                      strides);
     if err != GA_NO_ERROR:
         raise get_exc(err), Gpu_error(ops, ctx, err)
 
@@ -344,7 +345,8 @@ cdef int array_view(GpuArray v, GpuArray a) except -1:
 
 cdef int array_sync(GpuArray a) except -1:
     cdef int err
-    err = GpuArray_sync(&a.ga)
+    with nogil:
+        err = GpuArray_sync(&a.ga)
     if err != GA_NO_ERROR:
         raise get_exc(err), GpuArray_error(&a.ga, err)
 
@@ -397,13 +399,15 @@ cdef int array_move(GpuArray a, GpuArray src) except -1:
 
 cdef int array_write(GpuArray a, void *src, size_t sz) except -1:
     cdef int err
-    err = GpuArray_write(&a.ga, src, sz)
+    with nogil:
+        err = GpuArray_write(&a.ga, src, sz)
     if err != GA_NO_ERROR:
         raise get_exc(err), GpuArray_error(&a.ga, err)
 
 cdef int array_read(void *dst, size_t sz, GpuArray src) except -1:
     cdef int err
-    err = GpuArray_read(dst, sz, &src.ga)
+    with nogil:
+        err = GpuArray_read(dst, sz, &src.ga)
     if err != GA_NO_ERROR:
         raise get_exc(err), GpuArray_error(&src.ga, err)
 
@@ -423,7 +427,8 @@ cdef int array_transfer(GpuArray res, GpuArray a, void *new_ctx,
                         const gpuarray_buffer_ops *new_ops,
                         bint may_share) except -1:
     cdef int err
-    err = GpuArray_transfer(&res.ga, &a.ga, new_ctx, new_ops, may_share)
+    with nogil:
+        err = GpuArray_transfer(&res.ga, &a.ga, new_ctx, new_ops, may_share)
     if err != GA_NO_ERROR:
         raise get_exc(err), GpuArray_error(&a.ga, err)
 
@@ -1011,7 +1016,7 @@ cdef class GpuContext:
             if err == GA_VALUE_ERROR:
                 raise get_exc(err), "No device %d"%(devno,)
             else:
-                raise get_exc(err), self.ops.ctx_error(NULL)
+                raise get_exc(err), self.ops.ctx_error(NULL) + ": " + str(devno)
 
     property kind:
         "Module name this context uses"
