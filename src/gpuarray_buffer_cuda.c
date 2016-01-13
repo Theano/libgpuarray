@@ -102,7 +102,7 @@ static void deallocate(gpudata *);
 static void cuda_free_ctx(cuda_context *ctx) {
   gpuarray_blas_ops *blas_ops;
   gpudata *next, *curr;
-#ifdef CUDA_VERSION >= 7000
+#if CUDA_VERSION >= 7000
   CUdevice dev;
 #endif
 
@@ -299,6 +299,8 @@ static void *do_init(CUdevice dev, int flags, int *ret) {
     err = cuDevicePrimaryCtxSetFlags(dev, fl);
     CHKFAIL(NULL);
     err = cuDevicePrimaryCtxRetain(&ctx, dev);
+    CHKFAIL(NULL);
+    err = cuCtxPushCurrent(ctx);
     CHKFAIL(NULL);
 #endif
     res = cuda_make_ctx(ctx, 0);
