@@ -102,6 +102,9 @@ static void deallocate(gpudata *);
 static void cuda_free_ctx(cuda_context *ctx) {
   gpuarray_blas_ops *blas_ops;
   gpudata *next, *curr;
+#ifdef CUDA_VERSION >= 7000
+  CUdevice dev;
+#endif
 
   ASSERT_CTX(ctx);
   ctx->refcnt--;
@@ -124,8 +127,16 @@ static void cuda_free_ctx(cuda_context *ctx) {
       deallocate(curr);
     }
 
-    if (!(ctx->flags & DONTFREE))
-      cuDevicePrimaryCtxRelease(ctx->ctx);
+    if (!(ctx->flags & DONTFREE)) {
+#if CUDA_VERSION < 7000
+      cuCtxDestroy(ctx->ctx);
+#else
+      cuCtxPushCurrent(ctx->ctx);
+      cuCtxGetDevice(&dev);
+      cuCtxPopCurrent(NULL);
+      cuDevicePrimaryCtxRelease(dev);
+#endif
+    }
     cache_destroy(ctx->extcopy_cache);
     CLEAR(ctx);
     free(ctx);
@@ -262,8 +273,10 @@ static void *do_init(CUdevice dev, int flags, int *ret) {
     cuda_context *res;
     CUcontext ctx;
     unsigned int fl = CU_CTX_SCHED_AUTO;
+#if CUDA_VERSION >= 7000
     unsigned int cur_fl;
     int act;
+#endif
     int i;
 
     CHKFAIL(NULL);
@@ -275,6 +288,10 @@ static void *do_init(CUdevice dev, int flags, int *ret) {
     CHKFAIL(NULL);
     if (i != 1)
       FAIL(NULL, GA_UNSUPPORTED_ERROR);
+#if CUDA_VERSION < 7000
+    err = cuCtxCreate(&ctx, fl, dev);
+    CHKFAIL(NULL);
+#else
     err = cuDevicePrimaryCtxGetState(dev, &cur_fl, &act);
     CHKFAIL(NULL);
     if (act == 1 && (cur_fl & fl) != fl)
@@ -283,9 +300,14 @@ static void *do_init(CUdevice dev, int flags, int *ret) {
     CHKFAIL(NULL);
     err = cuDevicePrimaryCtxRetain(&ctx, dev);
     CHKFAIL(NULL);
+#endif
     res = cuda_make_ctx(ctx, 0);
     if (res == NULL) {
-      cuDevicePrimaryCtxRelease(ctx);
+#if CUDA_VERSION < 7000
+      cuCtxDestroy(ctx);
+#else
+      cuDevicePrimaryCtxRelease(dev);
+#endif
       FAIL(NULL, GA_IMPL_ERROR);
     }
     res->flags |= flags;
