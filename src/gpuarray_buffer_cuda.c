@@ -125,7 +125,7 @@ static void cuda_free_ctx(cuda_context *ctx) {
     }
 
     if (!(ctx->flags & DONTFREE))
-      cuCtxDestroy(ctx->ctx);
+      cuDevicePrimaryCtxRelease(ctx->ctx);
     cache_destroy(ctx->extcopy_cache);
     CLEAR(ctx);
     free(ctx);
@@ -262,6 +262,8 @@ static void *do_init(CUdevice dev, int flags, int *ret) {
     cuda_context *res;
     CUcontext ctx;
     unsigned int fl = CU_CTX_SCHED_AUTO;
+    unsigned int cur_fl;
+    int act;
     int i;
 
     CHKFAIL(NULL);
@@ -273,11 +275,17 @@ static void *do_init(CUdevice dev, int flags, int *ret) {
     CHKFAIL(NULL);
     if (i != 1)
       FAIL(NULL, GA_UNSUPPORTED_ERROR);
-    err = cuCtxCreate(&ctx, fl, dev);
+    err = cuDevicePrimaryCtxGetState(dev, &cur_fl, &act);
+    CHKFAIL(NULL);
+    if (act == 1 && (cur_fl & fl) != fl)
+      FAIL(NULL, GA_INVALID_ERROR);
+    err = cuDevicePrimaryCtxSetFlags(dev, fl);
+    CHKFAIL(NULL);
+    err = cuDevicePrimaryCtxRetain(&ctx, dev);
     CHKFAIL(NULL);
     res = cuda_make_ctx(ctx, 0);
     if (res == NULL) {
-      cuCtxDestroy(ctx);
+      cuDevicePrimaryCtxRelease(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
     res->flags |= flags;
@@ -290,21 +298,6 @@ static void *cuda_init(int ord, int flags, int *ret) {
     CUdevice dev;
     cuda_context *res;
     static int init_done = 0;
-
-    if (ord == -2) {
-      CUcontext ctx;
-      /* Grab the ambient context */
-      err = cuCtxGetCurrent(&ctx);
-      CHKFAIL(NULL);
-      /* If somebody made a context, then the api is initialized */
-      init_done = 1;
-      res = cuda_make_ctx(ctx, DONTFREE);
-      if (res == NULL) {
-        FAIL(NULL, GA_IMPL_ERROR);
-      }
-      res->flags |= flags;
-      return res;
-    }
 
     if (!init_done) {
       err = cuInit(0);
