@@ -4,9 +4,9 @@ Installation
 The library is routinely tested on OS X and linux and, less
 frequently, on Windows.  The OS most frequently tested are:
 
- - Mac OS X 10.10
- - Fedora Core 14
- - Ubuntu 12.04
+ - Debian 6
+ - Ubuntu 14.04
+ - Mac OS X 10.11
  - Windows 7
 
 It should also work on any decently recent OS not listed here. If you
@@ -38,8 +38,6 @@ Requirements
 Download
 --------
 
-The code is currently in a github repo branch. It will be moved. To
-get it:
 ::
 
   git clone https://github.com/Theano/libgpuarray.git
@@ -150,7 +148,9 @@ Since there is no standard install location on Windows, there is no
 install step.  It is up to you to copy the headers and libraries to an
 appropriate place.
 
-If you don't have Visual Studio installed, you can get the free Express version from `here <http://www.visualstudio.com/>`_ in the downloads section (select the "for Windows" edition).
+If you don't have Visual Studio installed, you can get the free
+Express version from `here <http://www.visualstudio.com/>`_ in the
+downloads section (select the "for Windows" edition).
 
 .. warning::
    While you may get the library to compile using cygwin, this is not
@@ -182,7 +182,8 @@ If you get an error message similar to this one:
 This means either you don't have check installed or it wasn't found by
 the cmake detection script.
 
-To run the python tests, install pygpu, then move outside its directory and run this command:
+To run the python tests, install pygpu, then move outside its
+directory and run this command:
 
 ::
 
