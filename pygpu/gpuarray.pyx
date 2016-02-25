@@ -728,6 +728,7 @@ def empty(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
     :rtype: array
     """
     cdef size_t *cdims
+    cdef unsigned int nd
 
     try:
         nd = <unsigned int>len(shape)
@@ -865,7 +866,12 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
 
     context = ensure_context(context)
 
-    nd = <unsigned int>len(shape)
+    try:
+        nd = <unsigned int>len(shape)
+    except TypeError:
+        nd = 1
+        shape = [shape]
+
     if strides is not None and len(strides) != nd:
         raise ValueError, "strides must be the same length as shape"
 
