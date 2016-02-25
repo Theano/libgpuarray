@@ -728,14 +728,21 @@ def empty(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
     :rtype: array
     """
     cdef size_t *cdims
+    cdef unsigned int nd
 
-    cdims = <size_t *>calloc(len(shape), sizeof(size_t))
+    try:
+        nd = <unsigned int>len(shape)
+    except TypeError:
+        nd = 1
+        shape = [shape]
+
+    cdims = <size_t *>calloc(nd, sizeof(size_t))
     if cdims == NULL:
         raise MemoryError, "could not allocate cdims"
     try:
         for i, d in enumerate(shape):
             cdims[i] = d
-        return pygpu_empty(<unsigned int>len(shape), cdims,
+        return pygpu_empty(nd, cdims,
                            dtype_to_typecode(dtype), to_ga_order(order),
                            context, cls)
     finally:
@@ -859,7 +866,12 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
 
     context = ensure_context(context)
 
-    nd = <unsigned int>len(shape)
+    try:
+        nd = <unsigned int>len(shape)
+    except TypeError:
+        nd = 1
+        shape = [shape]
+
     if strides is not None and len(strides) != nd:
         raise ValueError, "strides must be the same length as shape"
 
@@ -1590,7 +1602,13 @@ cdef class GpuArray:
         cdef unsigned int nd
         cdef unsigned int i
         cdef int compute_axis
-        nd = <unsigned int>len(shape)
+
+        try:
+            nd = <unsigned int>len(shape)
+        except TypeError:
+            nd = 1
+            shape = [shape]
+
         newdims = <size_t *>calloc(nd, sizeof(size_t))
         if newdims == NULL:
             raise MemoryError, "calloc"
