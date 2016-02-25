@@ -1828,6 +1828,13 @@ cdef class GpuArray:
             # structure.
             return <size_t>((<void **>self.ga.data)[0])
 
+    def __str__(self):
+        return str(numpy.asarray(self))
+
+    def __repr__(self):
+        return 'gpuarray.' + repr(numpy.asarray(self))
+
+
 
 cdef class GpuKernel:
     """
