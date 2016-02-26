@@ -1,4 +1,5 @@
 import sys
+import os
 
 have_cython = False
 
@@ -70,17 +71,29 @@ else:
     srcs = ['pygpu/gpuarray.c']
     blas_src = ['pygpu/blas.c']
 
+include_dirs = [np.get_include()]
+library_dirs = []
+if sys.platform == 'win32':
+    # This is a hack so users don't need to do many steps for windows install
+    # Just use the default location.
+    current_dir = os.path.abspath(os.path.dirname(__file__))
+    include_dirs += [os.path.join(current_dir, 'src')]
+    library_dirs += [os.path.join(current_dir, 'lib', 'Release')]
+print(include_dirs, library_dirs)
+    
 exts = [Extension('pygpu.gpuarray',
                   sources = srcs,
-                  include_dirs = [np.get_include()],
+                  include_dirs = include_dirs,
                   libraries = ['gpuarray'],
-                  define_macros = [('GPUARRAY_SHARED', None)],
+                  library_dirs = library_dirs,
+                  define_macros = [('GPUARRAY_SHARED', None)]
                   ),
         Extension('pygpu.blas',
                   sources = blas_src,
-                  include_dirs = [np.get_include()],
+                  include_dirs = include_dirs,
                   libraries = ['gpuarray'],
-                  define_macros = [('GPUARRAY_SHARED', None)],
+                  library_dirs = library_dirs,
+                  define_macros = [('GPUARRAY_SHARED', None)]
                   )]
 
 setup(name='pygpu',
