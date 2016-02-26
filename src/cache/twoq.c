@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "cache.h"
+#include "private_config.h"
 
 typedef struct _node node;
 typedef struct _list list;

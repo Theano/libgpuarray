@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include "private_config.h"
 
 typedef void *cache_key_t;
 typedef void *cache_value_t;

@@ -8,7 +8,9 @@
 #include <gpuarray/buffer.h>
 
 #ifdef _MSC_VER
-#define inline
+#ifndef inline
+#define inline __inline
+#endif
 #endif
 
 #ifdef __cplusplus
