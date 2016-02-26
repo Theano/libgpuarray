@@ -1,4 +1,5 @@
 build
+lib
 .*.sw[po]
 *~
 *.pyc
