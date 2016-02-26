@@ -297,6 +297,8 @@ static void *do_init(CUdevice dev, int flags, int *ret) {
     if (act == 1 && (cur_fl & fl) != fl)
       FAIL(NULL, GA_INVALID_ERROR);
     err = cuDevicePrimaryCtxSetFlags(dev, fl);
+    /* Repeated calls to init should not throw an error */
+    if (err == CUDA_ERROR_PRIMARY_CONTEXT_ACTIVE) err = CUDA_SUCCESS;
     CHKFAIL(NULL);
     err = cuDevicePrimaryCtxRetain(&ctx, dev);
     CHKFAIL(NULL);
