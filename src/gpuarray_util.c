@@ -130,3 +130,45 @@ int gpuarray_type_flags(int init, ...) {
   va_end(ap);
   return flags;
 }
+
+static inline void shiftdown(ssize_t *base, unsigned int i, unsigned int nd) {
+  if (base != NULL)
+    memmove(&base[i], &base[i+1], (nd - i - 1)*sizeof(size_t));
+}
+
+void gpuarray_elemwise_collapse(unsigned int n, unsigned int *_nd,
+                                size_t *dims, ssize_t **strs) {
+  unsigned int i;
+  unsigned int k;
+  unsigned int nd = *_nd;
+
+  /* Remove dimensions of size 1 */
+  for (i = nd; i > 0; i--) {
+    if (nd > 1 && dims[i-1] == 1) {
+      shiftdown((ssize_t *)dims, i-1, nd);
+      for (k = 0; k < n; k++)
+        shiftdown(strs[k], i-1, nd);
+      nd--;
+    }
+  }
+
+  for (i = nd - 1; i > 0; i--) {
+    int collapse = 1;
+    for (k = 0; k < n; k++) {
+      collapse &= (strs[k] == NULL || strs[k][i] == 0 ||
+                   strs[k][i - 1] == dims[i] * strs[k][i]);
+    }
+    if (collapse) {
+      dims[i-1] *= dims[i];
+      shiftdown((ssize_t *)dims, i, nd);
+      for (k = 0; k < n; k++) {
+        if (strs[k] != NULL) {
+          strs[k][i-1] = strs[k][i];
+          shiftdown(strs[k], i, nd);
+        }
+      }
+      nd--;
+    }
+  }
+  *_nd = nd;
+}
