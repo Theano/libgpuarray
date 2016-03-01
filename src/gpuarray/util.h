@@ -88,10 +88,10 @@ GPUARRAY_PUBLIC int gpuarray_type_flags(int init, ...);
  *
  * For scalar arguments, strs[k] can be NULL.
  *
- * \param n The number of arguemnts
+ * \param n The number of arguments
  * \param nd The number of dimensions of all arguments
  * \param dim The compute shape
- * \param strs The strides for all arguemnts
+ * \param strs The strides for all arguments
  *
  */
 GPUARRAY_PUBLIC void gpuarray_elemwise_collapse(unsigned int n,
