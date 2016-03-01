@@ -155,7 +155,7 @@ void gpuarray_elemwise_collapse(unsigned int n, unsigned int *_nd,
   for (i = nd - 1; i > 0; i--) {
     int collapse = 1;
     for (k = 0; k < n; k++) {
-      collapse &= (strs[k] == NULL || strs[k][i] == 0 ||
+      collapse &= (strs[k] == NULL ||
                    strs[k][i - 1] == dims[i] * strs[k][i]);
     }
     if (collapse) {
