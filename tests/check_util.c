@@ -39,7 +39,7 @@ END_TEST
 
 START_TEST(test_elemwise_collapse)
 {
-  size_t dims[2];
+  size_t dims[3];
   ssize_t *strs[2];
   ssize_t _strs0[3];
   ssize_t _strs1[3];
@@ -84,6 +84,26 @@ START_TEST(test_elemwise_collapse)
   ck_assert_int_eq(strs[0][1], 4);
   ck_assert_int_eq(strs[1][0], 80);
   ck_assert_int_eq(strs[1][1], 4);
+
+  nd = 3;
+  dims[0] = 20;
+  dims[1] = 1;
+  dims[2] = 50;
+  strs[0][0] = 4;
+  strs[0][1] = 80;
+  strs[0][2] = 168;
+  strs[1][0] = 4;
+  strs[1][1] = 80;
+  strs[1][2] = 80;
+
+  gpuarray_elemwise_collapse(2, &nd, dims, strs);
+  ck_assert_uint_eq(nd, 2);
+  ck_assert_uint_eq(dims[0], 20);
+  ck_assert_uint_eq(dims[1], 50);
+  ck_assert_int_eq(strs[0][0], 4);
+  ck_assert_int_eq(strs[0][1], 168);
+  ck_assert_int_eq(strs[1][0], 4);
+  ck_assert_int_eq(strs[1][1], 80);
 
   nd = 2;
   dims[0] = 1;
