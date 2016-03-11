@@ -265,16 +265,8 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   if (batchCount == 0) return GA_NO_ERROR;
 
   ASSERT_BUF(A[0]);
-
   ctx = A[0]->ctx;
-
-  /* Possibly optimize this to make multiple dispatch of sgemm for
-   * bigger sizes */
-  float **T_l = alloca(sizeof(float *) * batchCount * 3);
-  const float **A_l = (const float **)T_l;
-  const float **B_l = (const float **)T_l + batchCount;
-  float **C_l = T_l + (batchCount * 2);
-  CUdeviceptr Ta, Aa, Ba, Ca;
+  cuda_enter(ctx);
 
   if (order == cb_c) {
     /* swap A and B */
@@ -295,44 +287,81 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     offB = lt;
   }
 
-  cuda_enter(ctx);
+  // use parallel cublasSgemm calls rather than cublasSgemmBatched for large products
+  // (compute products in double because they can be large and we don't need to be exact)
+  const double threshold = 650;
+  const int multiple_dispatch = (double(M) * double(N) * double(K) <
+                                 threshold * threshold * threshold)
+  if (multiple_dispatch) {
+    for (i = 0; i < batchCount; i++) {
+      ASSERT_BUF(A[i]);
+      ASSERT_BUF(B[i]);
+      ASSERT_BUF(C[i]);
+      cuda_wait(A[i], CUDA_WAIT_READ);
+      cuda_wait(B[i], CUDA_WAIT_READ);
+      cuda_wait(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
 
-  for (i = 0; i < batchCount; i++) {
-    ASSERT_BUF(A[i]);
-    ASSERT_BUF(B[i]);
-    ASSERT_BUF(C[i]);
-    cuda_wait(A[i], CUDA_WAIT_READ);
-    cuda_wait(B[i], CUDA_WAIT_READ);
-    cuda_wait(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
-    A_l[i] = ((float *)A[i]->ptr) + offA[i];
-    B_l[i] = ((float *)B[i]->ptr) + offB[i];
-    C_l[i] = ((float *)C[i]->ptr) + offC[i];
-  }
+      err = cublasSgemm(ctx->blas_handle, convT(transA), convT(transB),
+                        M, N, K, &alpha,
+                        (float*)A[i]->ptr + offA[i], lda,
+                        (float*)B[i]->ptr + offB[i], ldb,
+                        &beta,
+                        (float*)C[i]->ptr + offC[i], ldc,
+                        batchCount);
+      if (err != CUBLAS_STATUS_SUCCESS) {
+        cuda_exit(ctx);
+        if (err == CUBLAS_STATUS_ARCH_MISMATCH)
+          return GA_DEVSUP_ERROR;
+        return GA_BLAS_ERROR;
+      }
 
-  cuMemAlloc(&Ta, sizeof(float *) * batchCount * 3);
-  Aa = Ta;
-  Ba = Ta + (batchCount * sizeof(float *));
-  Ca = Ta + (batchCount * sizeof(float *) * 2);
+      cuda_record(A[i], CUDA_WAIT_READ);
+      cuda_record(B[i], CUDA_WAIT_READ);
+      cuda_record(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+    }
+  } else {
+    float **T_l = alloca(sizeof(float *) * batchCount * 3);
+    const float **A_l = (const float **)T_l;
+    const float **B_l = (const float **)T_l + batchCount;
+    float **C_l = T_l + (batchCount * 2);
+    CUdeviceptr Ta, Aa, Ba, Ca;
 
-  cuMemcpyHtoD(Ta, T_l, sizeof(float *) * batchCount * 3);
+    for (i = 0; i < batchCount; i++) {
+      ASSERT_BUF(A[i]);
+      ASSERT_BUF(B[i]);
+      ASSERT_BUF(C[i]);
+      cuda_wait(A[i], CUDA_WAIT_READ);
+      cuda_wait(B[i], CUDA_WAIT_READ);
+      cuda_wait(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+      A_l[i] = ((float *)A[i]->ptr) + offA[i];
+      B_l[i] = ((float *)B[i]->ptr) + offB[i];
+      C_l[i] = ((float *)C[i]->ptr) + offC[i];
+    }
 
-  err = cublasSgemmBatched(ctx->blas_handle, convT(transA), convT(transB),
-                           M, N, K, &alpha, (const float **)Aa, lda,
-                           (const float **)Ba, ldb, &beta,
-                           (float **)Ca, ldc, batchCount);
-  cuMemFree(Ta);
-  if (err != CUBLAS_STATUS_SUCCESS) {
-    cuda_exit(ctx);
-    if (err == CUBLAS_STATUS_ARCH_MISMATCH)
-      return GA_DEVSUP_ERROR;
-    return GA_BLAS_ERROR;
-  }
+    cuMemAlloc(&Ta, sizeof(float *) * batchCount * 3);
+    Aa = Ta;
+    Ba = Ta + (batchCount * sizeof(float *));
+    Ca = Ta + (batchCount * sizeof(float *) * 2);
 
+    cuMemcpyHtoD(Ta, T_l, sizeof(float *) * batchCount * 3);
 
-  for (i = 0; i < batchCount; i++) {
-    cuda_record(A[i], CUDA_WAIT_READ);
-    cuda_record(B[i], CUDA_WAIT_READ);
-    cuda_record(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+    err = cublasSgemmBatched(ctx->blas_handle, convT(transA), convT(transB),
+                             M, N, K, &alpha, (const float **)Aa, lda,
+                             (const float **)Ba, ldb, &beta,
+                             (float **)Ca, ldc, batchCount);
+    cuMemFree(Ta);
+    if (err != CUBLAS_STATUS_SUCCESS) {
+      cuda_exit(ctx);
+      if (err == CUBLAS_STATUS_ARCH_MISMATCH)
+        return GA_DEVSUP_ERROR;
+      return GA_BLAS_ERROR;
+    }
+
+    for (i = 0; i < batchCount; i++) {
+      cuda_record(A[i], CUDA_WAIT_READ);
+      cuda_record(B[i], CUDA_WAIT_READ);
+      cuda_record(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+    }
   }
 
   cuda_exit(ctx);
