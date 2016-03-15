@@ -294,10 +294,13 @@ static void *do_init(CUdevice dev, int flags, int *ret) {
 #else
     err = cuDevicePrimaryCtxGetState(dev, &cur_fl, &act);
     CHKFAIL(NULL);
-    if (act == 1 && (cur_fl & fl) != fl)
-      FAIL(NULL, GA_INVALID_ERROR);
-    err = cuDevicePrimaryCtxSetFlags(dev, fl);
-    CHKFAIL(NULL);
+    if (act == 1) {
+      if ((cur_fl & fl) != fl)
+        FAIL(NULL, GA_INVALID_ERROR);
+    } else {
+      err = cuDevicePrimaryCtxSetFlags(dev, fl);
+      CHKFAIL(NULL);
+    }
     err = cuDevicePrimaryCtxRetain(&ctx, dev);
     CHKFAIL(NULL);
     err = cuCtxPushCurrent(ctx);
