@@ -1,91 +1,150 @@
+#include <gpuarray/elemwise.h>
+
 #include "util/strb.h"
 
-static void decl(strb *sb, int typecode, int isarray) {
-  const char *ctype = gpuarray_get_type(typecode).cluda_name;
-  if (ctype == NULL) strb_seterror(sb);
-  if (isarray)
-    strb_appendf(sb, "GLOBAL_MEM %s*", ctype);
-  else
-    strb_appends(sb, ctype);
+struct _GpuElemwise {
+  const char *expr;
+  const char *preamble;
+  gpuelemwise_arg *args;
+  GpuKernel k_contig;
+  unsigned int n;
+  int flags;
+};
+
+static inline const char *ctype(int typecode) {
+  return gpuarray_get_type(typecode).cluda_name;
 }
 
-static void decl2(strb *sb, int typecode, void *arg) {
-  int isarray = 0;
-  if (typecode == GA_BUFFER) {
-    typecode = ((GpuArray *)arg)->typecode;
-    isarray = 1;
+/* dst has to be zero-initialized on entry */
+static int copy_arg(gpuelemwise_arg *dst, gpuelemwise_arg *src) {
+  if (src->dims != NULL) {
+    dst->dims = memdup(src->dims, n * sizeof(size_t));
+    if (dst->dims == NULL) goto fail_dims;
   }
-  const char *ctype = gpuarray_get_type(typecode).cluda_name;
-  if (ctype == NULL) strb_seterror(sb);
-  if (isarray)
-    strb_appendf(sb, "GLOBAL_MEM %s*", ctype);
-  else
-    strb_appends(sb, ctype);
+
+  if (src->strs != NULL) {
+    dst->strs = memdup(src->strs, n * sizeof(ssize_t));
+    if (dst->strs == NULL) goto fail_strs;
+  }
+
+  dst->name = strdup(src->name);
+  if (dst->name == NULL)
+    goto fail_name;
+
+  dst->nd = src->nd;
+  dst->typecode = src->typecode;
+  dst->flags = src->flags;
+
+  return 0;
+
+ fail_name:
+  free(dst->strs);
+  dst->strs = NULL;
+ fail_strs:
+  free(dst->dims);
+  dst->dims = NULL;
+ fail_dims:
+  return -1;
+}
+
+static void clear_arg(gpuelemwise_arg *a) {
+  free(a->dims);
+  a->dims = NULL;
+  free(a->strs);
+  a->strs = NULL;
+  free(a->name);
+  a->name = NULL;
+}
+
+static gpuelemwise_args *copy_args(unsigned int n, gpuelemwise_arg *a) {
+  gpuelemwise_args *res = calloc(n, sizeof(gpuelemwise_arg));
+  unsigned int i;
+
+  if (res == NULL) return NULL;
+
+  for (i = 0; i < n; i++)
+    if (copy_arg(&res[i], &a[i]) != 0)
+      goto bail;
+
+  return res;
+ bail:
+  for (; i > 0; i--) {
+    clear_arg(&res[i]);
+  }
+}
+
+static void free_args(unsigned int n, gpuarray_arg *args) {
+  unsigned int i;
+
+  for (i = 0; i < n; i++)
+    clear_arg(&args[i]);
+  free(args);
 }
 
 static int gen_elemwise_basic_kernel(GpuKernel *k,
                                      const gpuarray_buffer_ops *ops,
                                      void *ctx, char **err_str,
                                      const char *preamble,
-                                     unsigned int nd, const char *expr,
-                                     unsigned int n, const char **name
-                                     const int *types, const int *isarray) {
+                                     const char *expr,
+                                     unsigned int nd,
+                                     unsigned int n, gpuarray_arg *args) {
   strb sb = STRB_STATIC_INIT;
   unsigned int i, _i, j;
-  int *atypes;
-  size_t nargs, apos;
+  int *ktypes;
+  size_t p;
   int flags = GA_USE_CLUDA;
   int res;
 
-  nargs = 1 + nd;
+  flags = gpuarray_type_flagsa(n, args);
+
+  p = 1 + nd;
   for (j = 0; j < n; j++) {
-    nargs += isarray[j] ? (2 + nd) : 1;
-    flags |= gpuarray_type_flags(types[j], -1);
+    p += ISSET(args[j].flags, GE_SCALAR) ? 1 : (2 + nd);
   }
 
-  atypes = calloc(nargs, sizeof(int));
-  if (atypes == NULL)
+  ktypes = calloc(p, sizeof(int));
+  if (ktypes == NULL)
     return GA_MEMORY_ERROR;
 
-  apos = 0;
+  p = 0;
 
   if (preamble)
     strb_appends(&sb, preamble);
-  strb_appends(&sb, "\nKERNEL void elem(const unsigned int n, ");
-  atypes[apos++] = GA_INT;
+  strb_appends(&sb, "\nKERNEL void elem(const ga_size n, ");
+  ktypes[p++] = GA_SIZE;
   for (i = 0; i < nd; i++) {
     strb_appendf(&sb "const ga_size dim%u", i);
-    atypes[apos++] = GA_SIZE;
+    ktypes[p++] = GA_SIZE;
   }
   for (j = 0; j < n; j++) {
-    decl(&sb, types[j], isarray[j]);
-    if (isarray[i]) {
-      strb_appendf(&sb " %s_data, const ga_size %s_offset, ", name[j], name[j]);
-      atypes[apos++] = GA_BUFFER;
-      atypes[apos++] = GA_SIZE;
+    if (ISCRL(args[j].flags, GE_SCALAR)) {
+      strb_appendf(&sb "GLOBAL_MEM *%s %s_data, const ga_size %s_offset%s",
+                   ctype(args[j].typecode), args[j].name, args[j].name,
+                   nd == 0 ? "" : ", ");
+      ktypes[p++] = GA_BUFFER;
+      ktypes[p++] = GA_SIZE;
 
       for (i = 0; i < nd; i++) {
-        strb_appendf(&sb, "const ga_ssize %s_str_%u%s", name[j], i,
+        strb_appendf(&sb, "const ga_ssize %s_str_%u%s", args[j].name, i,
                      (i == (nd - 1)) ? "", ", ");
-        atypes[apos++] = GA_SSIZE;
+        ktypes[p++] = GA_SSIZE;
       }
     } else {
-      strb_appendsf(&sb " %s", name[j]);
-      atypes[apos++] = types[j];
+      strb_appendsf(&sb "%s %s", args[j].name);
+      ktypes[p++] = types[j];
     }
     if (j != (n - 1)) strb_appends(&sb, ", ");
   }
   strb_appends(&sb, ") {\n"
-               "const unsigned int idx = LDIM_0 * GID_0 + LID_0;\n"
-               "const unsigned int numThreads = LDIM_0 * GDIM_0;\n"
-               "unsigned int i;\n"
+               "const ga_size idx = LDIM_0 * GID_0 + LID_0;\n"
+               "const ga_size numThreads = LDIM_0 * GDIM_0;\n"
+               "ga_size i;\n"
                "GLOBAL_MEM char *tmp;\n\n");
   for (j = 0; j < n; j++) {
-    if (isarray[j]) {
+    if (ISCLR(args[j].flags, GE_SCALAR)) {
       strb_appendf(&sb, "tmp = (GLOBAL_MEM char *)%s_data; tmp += %s_offset; "
-                   "%s_data = (", name[j], name[j], name[j]);
-      decl(sb, types[j], isarray[j]);
-      strb_appends(&sb, ")tmp;\n");
+                   "%s_data = (GLOBAL_MEM *%s)tmp;\n", args[j].name,
+                   args[j].name, args[j].name, ctype(args[j].typecode));
     }
   }
 
@@ -93,9 +152,9 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
   if (nd > 0)
     strb_appends(&sb, "int ii = i;\nint pos;\n");
   for (j = 0; j < n; j++) {
-    if (isarray[j])
+    if (ISCLR(args[j].flags, GE_SCALAR))
       strb_appendf(&sb, "GLOBAL_MEM char *%s_p = (GLOBAL_MEM char *)%s_data;\n",
-                   name[j], name[j]);
+                   args[j].name, args[j].name);
   }
   for (_i = nd; _i > 0; _i--) {
     i = _i - 1;
@@ -104,16 +163,17 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
     else
       strb_appends(&sb, "pos = ii;\n");
     for (j = 0; j < n; j++) {
-      if (isarray[j])
-        strb_appendf(&sb, "%s_p += pos * %s_str_%u;\n", name[j], name[j], i);
+      if (ISCLR(args[j].flags, GE_SCALAR))
+        strb_appendf(&sb, "%s_p += pos * %s_str_%u;\n", args[j].name,
+                     args[j].name, i);
     }
   }
   for (j = 0; j < n; j++) {
-    if (isarray[j]) {
+    if (ISCLR(args[j].flags, GE_SCALAR)) {
       decl(sb, types[j], isarray[j]);
-      strb_appendf(&sb, " %s = (", name[j]);
-      decl(sb, types[j], isarray[j]);
-      strb_appendf(&sb, ")%s_p;\n", name[j]);
+      strb_appendf(&sb, "GLOBAL_MEM *%s %s = (GLOBAL_MEM *%s)%s_p;\n",
+                   ctype(args[j].typecode), args[j].name,
+                   ctype(args[j].typecode), args[j].name);
     }
   }
   strb_appends(&sb, expr);
@@ -124,9 +184,9 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
   }
 
   res = GpuKernel_init(k, ops, ctx, 1, (const char **)&sb.s, &sb.l, "elem",
-                       nargs, atypes, flags, err_str);
+                       p, ktypes, flags, err_str);
  bail:
-  free(atypes);
+  free(ktypes);
   strb_clear(&sb);
   return res;
 }
@@ -136,28 +196,42 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
                                       void *ctx, char **err_str,
                                       const char *preamble,
                                       const char *expr,
-                                      gpuarray_args *args) {
+                                      unsigned int n,
+                                      gpuelemwise_args *args) {
   strb sb = STRB_STATIC_INIT;
+  int *ktypes = NULL;
+  unsigned int p;
   unsigned int j;
   int flags = GA_USE_CLUDA;
-  int res;
+  int res = GA_MEMORY_ERROR;
 
-  for (j = 0; j < n; j++) {
-    flags |= gpuarray_type_flags(types[j], -1);
-  }
+  flags = gpuarray_type_flagsa(n, args);
+
+  p = 1;
+  for (j = 0; j < n; j++)
+    p += ISSET(args[j].flags & GE_SCALAR) ? 1 : 2;
+
+  ktypes = calloc(p, sizeof(int));
+  if (ktypes == NULL)
+    goto bail;
+
+  p = 0;
 
   if (preamble)
     strb_appends(&sb, preamble);
   strb_appends(&sb, "\nKERNEL void elem(const ga_size n, ");
-  for (j = 0; j < args->n; j++) {
-    decl2(sb, args->types[j], args->args[j]);
-    if (args->types[j] == GA_BUFFER) {
-      strb_appendf(&sb, " %s_p,  const ga_size %s_offset",
-                   args->names[j], args->names[j]);
+  ktypes[p++] = GA_SIZE;
+  for (j = 0; j < n; j++) {
+    if (ISCLR(args[j].flags, GE_SCALAR)) {
+      strb_appendf(&sb, "GLOBAL MEM *%s %s_p,  const ga_size %s_offset",
+                   ctype(args[j].typecode), args[j].name, args[j].name);
+      ktypes[p++] = GA_BUFFER;
+      ktypes[p++] = GA_SIZE;
     } else {
-      strb_appendf(&sb, " %s", args->names[j]);
+      strb_appendf(&sb, "%s %s", ctype(args[j].typecode), args[j].name);
+      ktypes[p++] = args[j].typecode;
     }
-    if (j != (args->n - 1))
+    if (j != (n - 1))
       strb_appends(&sb, ", ");
   }
   strb_appends(&sb, ") {\n"
@@ -165,35 +239,33 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
                "const ga_size numThreads = LDIM_0 * GDIM_0;\n"
                "ga_size i;\n"
                "GLOBAL_MEM char *tmp;\n\n");
-  for (j = 0; j < args->n; j++) {
-    if (args->types[j] == GA_BUFFER) {
-      strb_appendf(&sb, "tmp = (GLOBAL_MEM char *)%s;"
-                   "tmp += %s_offset; %s = (",
-                   args->names[j], args->names[j], args->names[j]);
-      decl2(sb, args->types[j], args->args[j]);
-      strb_appends(&sb, ")tmp;\n");
+  for (j = 0; j < n; j++) {
+    if (ISCLR(args[j].flags, GE_SCALAR)) {
+      strb_appendf(&sb, "tmp = (GLOBAL_MEM char *)%s_p;"
+                   "tmp += %s_offset; %s_p = (GLOBAL_MEM %s*)tmp;",
+                   args[j].name, args[j].name, args[j].name,
+                   ctype(args[j].typecode));
     }
   }
 
   strb_appends(&sb, "for (i = idx; i < n; i += numThreads) {\n");
-  for (j = 0; j < args->n; j++) {
-    if (args->types[j] == GA_BUFFER) {
-      decl2(sb, args->types[j], args->args[j]);
-      strb_appendf(&sb, " %s = &%s_p[i];", args->names[j], args->names[j]);
+  for (j = 0; j < n; j++) {
+    if (ISCLR(args[j].flags, GE_SCALAR)) {
+      strb_appendf(&sb, "GLOBAL_MEM *%s %s = &%s_p[i];",
+                   ctype(args[j].typecode), args[j].name, args[j].name);
     }
   }
   strb_appends(&sb, expr);
   strb_appends(&sb, ";\n}\n}\n");
 
-  if (strb_error(&sb)) {
-    res = GA_MEMORY_ERROR;
+  if (strb_error(&sb))
     goto bail;
-  }
 
   res = GpuKernel_init(k, ops, ctx, 1, (const char **)&sb.s, &sb.l, "elem",
-                       args->n, args->types, flags, err_str);
+                       p, ktypes, flags, err_str);
  bail:
   strb_clear(&sb);
+  free(ktypes);
   return res;
 }
 

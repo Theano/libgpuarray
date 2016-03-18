@@ -49,6 +49,12 @@ GPUARRAY_LOCAL void gpukernel_source_with_line_numbers(unsigned int count,
                                                        size_t *newl,
                                                        strb *src);
 
+#define ISSET(v, fl) ((v) & (fl))
+#define ISCLR(v, fl) (!((v) & (fl)))
+
+#define FLSET(v, fl) (v |= (fl))
+#define FLCLR(v, fl) (v &= ~(fl))
+
 #ifdef __cplusplus
 }
 #endif
