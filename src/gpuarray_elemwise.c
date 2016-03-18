@@ -269,9 +269,49 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
   return res;
 }
 
-int gpuarray_elemwise_op(const gpuarray_buffer_ops *ops, void * ctx,
-                         const char *preamble, const char *expr,
-                         unsigned int n, const in *types, void **args,
-                         int flags, char **err_str) {
-  // TODO
+GpuElemwise *GpuElemwise_new(const gpuarray_buffer_ops *ops, void * ctx,
+                             const char *preamble, const char *expr,
+                             unsigned int n, gpuelemwise_arg *args,
+                             int flags) {
+  GpuElemwise *res;
+  int ret;
+
+  res = malloc(sizeof(*res));
+  if (res == NULL) return NULL;
+
+  res->flags = flags;
+
+  res->expr = strdup(expr);
+  if (res->expr == NULL)
+    goto fail_expr;
+  if (preamble == NULL) {
+    res->preamble = NULL;
+  } else {
+    res->preamble = strdup(preamble);
+    if (res->preamble == NULL)
+      goto fail_preamble;
+  }
+
+  res->n = n;
+  res->args = copy_args(n, args);
+  if (res->args == NULL)
+    goto fail_args;
+
+  ret = gen_elemwise_contig_kernel(&res->k_contig, ops, ctx, NULL,
+                                   res->preamble, res->expr,
+                                   res->n, res->args);
+  if (ret != GA_NO_ERROR)
+    goto fail_contig;
+
+  return res;
+
+ fail_contig:
+  free_args(res->n, res->args);
+ fail_args:
+  free(res->preamble);
+ fail_preamble:
+  free(res->expr);
+ fail_expr:
+  free(res);
+  return NULL;
 }
