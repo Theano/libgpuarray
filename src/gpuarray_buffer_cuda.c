@@ -1308,6 +1308,13 @@ static void cuda_freekernel(gpukernel *k) {
   _cuda_freekernel(k);
 }
 
+static int cuda_kernelsetarg(gpukernel *k, unsigned int i, void *arg) {
+  if (i >= k->argcount)
+    return GA_VALUE_ERROR;
+  k->args[i] = arg;
+  return GA_NO_ERROR;
+}
+
 static int cuda_callkernel(gpukernel *k, unsigned int n,
                            const size_t *bs, const size_t *gs,
                            size_t shared, void **args) {
@@ -1323,6 +1330,9 @@ static int cuda_callkernel(gpukernel *k, unsigned int n,
 	cuda_wait((gpudata *)args[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
       }
     }
+
+    if (args == NULL)
+      args = k->args;
 
     switch (n) {
     case 1:
@@ -1972,6 +1982,7 @@ const gpuarray_buffer_ops cuda_ops = {cuda_init,
                                       cuda_newkernel,
                                       cuda_retainkernel,
                                       cuda_freekernel,
+                                      cuda_kernelsetarg,
                                       cuda_callkernel,
                                       cuda_kernelbin,
                                       cuda_sync,

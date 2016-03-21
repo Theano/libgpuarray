@@ -76,6 +76,9 @@ GPUARRAY_PUBLIC void GpuKernel_clear(GpuKernel *k);
  */
 GPUARRAY_PUBLIC void *GpuKernel_context(GpuKernel *k);
 
+
+GPUARRAY_PUBLIC int GpuKernel_setarg(GpuKernel *k, unsigned int i, void *val);
+
 /**
  * Do a scheduling of local and global size for a kernel.
  *

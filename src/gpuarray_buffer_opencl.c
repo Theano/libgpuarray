@@ -859,6 +859,35 @@ static void cl_releasekernel(gpukernel *k) {
   }
 }
 
+static int cl_setkernelarg(gpukernel *k, unsigned int i, void *a) {
+  cl_ctx *ctx = k->ctx;
+  gpudata *btmp;
+  cl_ulong temp;
+  cl_long stemp;
+  switch (k->types[i]) {
+  case GA_POINTER:
+    return GA_DEVSUP_ERROR;
+  case GA_BUFFER:
+    btmp = (gpudata *)a;
+    ctx->err = clSetKernelArg(k->k, i, sizeof(cl_mem), &btmp->buf);
+    break;
+  case GA_SIZE:
+    temp = *((size_t *)a);
+    ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(GA_ULONG), &temp);
+    break;
+  case GA_SSIZE:
+    stemp = *((ssize_t *)a);
+    ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(GA_LONG), &stemp);
+    break;
+  default:
+    ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(k->types[i]), a);
+  }
+  if (ctx->err != CL_SUCCESS) {
+    return GA_IMPL_ERROR;
+  }
+  return GA_NO_ERROR;
+}
+
 static int cl_callkernel(gpukernel *k, unsigned int n,
                          const size_t *ls, const size_t *gs,
                          size_t shared, void **args) {
@@ -866,10 +895,7 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
   size_t _gs[3];
   cl_event ev;
   cl_event *evw;
-  gpudata *btmp;
   cl_device_id dev;
-  cl_ulong temp;
-  cl_long stemp;
   cl_uint num_ev;
   cl_uint i;
   int res = 0;
@@ -893,32 +919,13 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
   }
 
   for (i = 0; i < k->argcount; i++) {
-    switch (k->types[i]) {
-    case GA_POINTER:
+    err = cl_setkernelarg(k, i, args[i]);
+    if (err != GA_NO_ERROR) {
       free(evw);
-      return GA_DEVSUP_ERROR;
-    case GA_BUFFER:
-      btmp = (gpudata *)args[i];
-      if (btmp->ev != NULL)
-        evw[num_ev++] = btmp->ev;
-      ctx->err = clSetKernelArg(k->k, i, sizeof(cl_mem), &btmp->buf);
-      break;
-    case GA_SIZE:
-      temp = *((size_t *)args[i]);
-      ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(GA_ULONG), &temp);
-      break;
-    case GA_SSIZE:
-      stemp = *((ssize_t *)args[i]);
-      ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(GA_LONG), &stemp);
-      break;
-    default:
-      ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(k->types[i]),
-                                args[i]);
+      return err;
     }
-    if (ctx->err != CL_SUCCESS) {
-      free(evw);
-      return GA_IMPL_ERROR;
-    }
+    if (k->types[i] == GA_BUFFER && ((gpudata *)args[i])->ev != NULL)
+        evw[num_ev++] = ((gpudata *)args[i])->ev;
   }
 
   if (num_ev == 0) {
@@ -1388,6 +1395,7 @@ const gpuarray_buffer_ops opencl_ops = {cl_init,
                                        cl_newkernel,
                                        cl_retainkernel,
                                        cl_releasekernel,
+                                       cl_setkernelarg,
                                        cl_callkernel,
                                        cl_kernelbin,
                                        cl_sync,

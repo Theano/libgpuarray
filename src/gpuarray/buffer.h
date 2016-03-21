@@ -334,14 +334,32 @@ typedef struct _gpuarray_buffer_ops {
   void (*kernel_release)(gpukernel *k);
 
   /**
+   * Set kernel argument.
+   *
+   * Buffer arguments will not be retained and it is the
+   * responsability of the caller to ensure that the value is still
+   * valid whenever a call is made.
+   *
+   * \param k kernel
+   * \param i argument index (starting at 0)
+   * \param a pointer to argument
+   *
+   * \returns GA_NO_ERROR or an error code if an error occurred.
+   */
+  int (*kernel_setarg)(gpukernel *k, unsigned int i, void *a);
+
+  /**
    * Call a kernel.
+   *
+   * If args is NULL, it will be assumed that the arguments have
+   * previously been set with kernel_setarg().
    *
    * \param k kernel
    * \param n number of dimensions of grid/block
    * \param bs block sizes for this call (also known as local size)
    * \param gs grid sizes for this call (also known as global size)
    * \param shared amount of dynamic shared memory to reserve
-   * \param args table of pointers to each argument.
+   * \param args table of pointers to each argument (optional).
    *
    * \returns GA_NO_ERROR or an error code if an error occurred.
    */

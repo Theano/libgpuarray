@@ -70,6 +70,10 @@ int GpuKernel_sched(GpuKernel *k, size_t n, size_t *ls, size_t *gs) {
   return GA_NO_ERROR;
 }
 
+int GpuKernel_setarg(GpuKernel *k, unsigned int i, void *a) {
+  return k->ops->kernel_setarg(k->k, i, a);
+}
+
 int GpuKernel_call(GpuKernel *k, unsigned int n,
                    const size_t *bs, const size_t *gs,
                    size_t shared, void **args) {
