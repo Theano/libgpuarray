@@ -12,7 +12,7 @@ struct _GpuElemwise {
 };
 
 static inline const char *ctype(int typecode) {
-  return gpuarray_get_type(typecode).cluda_name;
+  return gpuarray_get_type(typecode)->cluda_name;
 }
 
 /* dst has to be zero-initialized on entry */
@@ -197,7 +197,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
                                       const char *preamble,
                                       const char *expr,
                                       unsigned int n,
-                                      gpuelemwise_args *args) {
+                                      gpuelemwise_arg *args) {
   strb sb = STRB_STATIC_INIT;
   int *ktypes = NULL;
   unsigned int p;
