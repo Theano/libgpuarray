@@ -373,3 +373,27 @@ GpuElemwise *GpuElemwise_new(const gpuarray_buffer_ops *ops, void * ctx,
   free(res);
   return NULL;
 }
+
+void GpuElemwise_free(GpuElemwise *ge) {
+  GpuKernel_clear(&ge->k_contig);
+  free_args(ge->n, ge->args);
+  free(ge->preamble);
+  free(ge->expr);
+  free(ge);
+}
+
+int GpuElemwise_call(GpuElemwise *ge, void **args, int flags) {
+  size_t n;
+  int contig;
+  it err;
+  err = check_contig(ge->args, args, &n, &contig);
+  if (err == GA_NO_ERROR && contig) {
+    return call_contig(ge, args, n);
+  }
+  return GA_UNSUPPORTED_ERROR;
+  /* WIP
+  err = check_basic(ge->args, args, &n, ...);
+  if (err == GA_NO_ERROR)
+    return call_basic(ge, args, ...);
+  */
+}
