@@ -269,6 +269,64 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
   return res;
 }
 
+static int check_contig(GpuElemwise *ge, void **args,
+                        size_t *_n, int *contig) {
+  GpuArray *a = NULL, *v;
+  size_t n = 1;
+  unsigned int i, j;
+  int c_contig = 1, f_contig = 1;
+
+  for (i = 0; i < ge->n; i++) {
+    if (ISCLR(a[i].flags, GE_SCALAR)) {
+      v = (GpuArray *)args[i];
+      if (a != NULL) {
+        a = v;
+        for (j = 0; j < a->nd; j++) n *= a->dims[j];
+      }
+      c_contig &= GpuArray_IS_C_CONTIGUOUS(v);
+      f_contig &= GpuArray_IS_F_CONTIGUOUS(v);
+      if (a != v) {
+        if (a->nd != v->nd)
+          return GA_INVALID_ERROR;
+        for (j = 0; j < a->nd; j++) {
+          if (v->dims[j] != a->dims[j])
+            return GA_VALUE_ERROR;
+        }
+      }
+    }
+  }
+  *contig = f_config || c_contig;
+  *_n = n;
+  return GA_NO_ERROR;
+}
+
+static int call_contig(GpuElemwise *ge, void **args, size_t n) {
+  GpuArray *a;
+  size_t ls = 0, gs = 0;
+  unsigned int i, p;
+  int err;
+
+  p = 0;
+  err = GpuKernel_setarg(&ge->k_contig, p++, &n);
+  if (err != GA_NO_ERROR) return err;
+  for (i = 0; i < ge->n; i++) {
+    if (ISCLR(ge->args[i].flags, GE_SCALAR)) {
+      a = (GpuArray *)args[i];
+      err = GpuKernel_setarg(&ge->k_contig, p++, a->data);
+      if (err != GA_NO_ERROR) return err;
+      err = GpuKernel_setarg(&ge->k_contig, p++, &a->offset);
+      if (err != GA_NO_ERROR) return err;
+    } else {
+      err = GpuKernel_setarg(&ge->k_contig, p++, args[i]);
+      if (err != GA_NO_ERROR) return err;
+    }
+  }
+  err = GpuKernel_sched(&ge->k_contig, n, &ls, &gs);
+  if (err != GA_NO_ERROR) return err;
+  err = GpuKernel_call(&ge->k_contig, 1, &ls, &gs, 0, NULL);
+  if (err != GA_NO_ERROR) return err;
+}
+
 GpuElemwise *GpuElemwise_new(const gpuarray_buffer_ops *ops, void * ctx,
                              const char *preamble, const char *expr,
                              unsigned int n, gpuelemwise_arg *args,
