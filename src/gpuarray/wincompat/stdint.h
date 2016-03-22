@@ -29,8 +29,8 @@
 // 
 ///////////////////////////////////////////////////////////////////////////////
 
-#ifndef _MSC_VER // [
-#error "Use this header only with Microsoft Visual C++ compilers!"
+#if !defined(_MSC_VER) || _MSC_VER > 1600 // [
+#error "Use this header only with Microsoft Visual C++ 2010 or older compilers!"
 #endif // _MSC_VER ]
 
 #ifndef _MSC_STDINT_H_ // [

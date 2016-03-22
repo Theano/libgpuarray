@@ -26,7 +26,8 @@ extern "C" {
 
 #ifdef _MSC_VER
 /* MS VC++ 2008 does not support inline */
-#define inline
+#define inline __inline
+#define alloca _alloca
 #endif
 
 #ifdef _MSC_VER
