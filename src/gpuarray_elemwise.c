@@ -11,6 +11,8 @@ struct _GpuElemwise {
   int flags;
 };
 
+#define is_array(a) (ISCLR((a).flags, GE_SCALAR))
+
 static inline const char *ctype(int typecode) {
   return gpuarray_get_type(typecode)->cluda_name;
 }
@@ -141,7 +143,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
                "ga_size i;\n"
                "GLOBAL_MEM char *tmp;\n\n");
   for (j = 0; j < n; j++) {
-    if (ISCLR(args[j].flags, GE_SCALAR)) {
+    if (is_array(args[j])) {
       strb_appendf(&sb, "tmp = (GLOBAL_MEM char *)%s_data; tmp += %s_offset; "
                    "%s_data = (GLOBAL_MEM *%s)tmp;\n", args[j].name,
                    args[j].name, args[j].name, ctype(args[j].typecode));
@@ -152,7 +154,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
   if (nd > 0)
     strb_appends(&sb, "int ii = i;\nint pos;\n");
   for (j = 0; j < n; j++) {
-    if (ISCLR(args[j].flags, GE_SCALAR))
+    if (is_array(args[j]))
       strb_appendf(&sb, "GLOBAL_MEM char *%s_p = (GLOBAL_MEM char *)%s_data;\n",
                    args[j].name, args[j].name);
   }
@@ -163,14 +165,13 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
     else
       strb_appends(&sb, "pos = ii;\n");
     for (j = 0; j < n; j++) {
-      if (ISCLR(args[j].flags, GE_SCALAR))
+      if (is_array(args[j]))
         strb_appendf(&sb, "%s_p += pos * %s_str_%u;\n", args[j].name,
                      args[j].name, i);
     }
   }
   for (j = 0; j < n; j++) {
-    if (ISCLR(args[j].flags, GE_SCALAR)) {
-      decl(sb, types[j], isarray[j]);
+    if (is_array(args[j])) {
       strb_appendf(&sb, "GLOBAL_MEM *%s %s = (GLOBAL_MEM *%s)%s_p;\n",
                    ctype(args[j].typecode), args[j].name,
                    ctype(args[j].typecode), args[j].name);
@@ -222,7 +223,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
   strb_appends(&sb, "\nKERNEL void elem(const ga_size n, ");
   ktypes[p++] = GA_SIZE;
   for (j = 0; j < n; j++) {
-    if (ISCLR(args[j].flags, GE_SCALAR)) {
+    if (is_array(args[j])) {
       strb_appendf(&sb, "GLOBAL MEM *%s %s_p,  const ga_size %s_offset",
                    ctype(args[j].typecode), args[j].name, args[j].name);
       ktypes[p++] = GA_BUFFER;
@@ -240,7 +241,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
                "ga_size i;\n"
                "GLOBAL_MEM char *tmp;\n\n");
   for (j = 0; j < n; j++) {
-    if (ISCLR(args[j].flags, GE_SCALAR)) {
+    if (is_array(args[j])) {
       strb_appendf(&sb, "tmp = (GLOBAL_MEM char *)%s_p;"
                    "tmp += %s_offset; %s_p = (GLOBAL_MEM %s*)tmp;",
                    args[j].name, args[j].name, args[j].name,
@@ -250,7 +251,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
 
   strb_appends(&sb, "for (i = idx; i < n; i += numThreads) {\n");
   for (j = 0; j < n; j++) {
-    if (ISCLR(args[j].flags, GE_SCALAR)) {
+    if (is_array(args[j])) {
       strb_appendf(&sb, "GLOBAL_MEM *%s %s = &%s_p[i];",
                    ctype(args[j].typecode), args[j].name, args[j].name);
     }
@@ -277,7 +278,7 @@ static int check_contig(GpuElemwise *ge, void **args,
   int c_contig = 1, f_contig = 1;
 
   for (i = 0; i < ge->n; i++) {
-    if (ISCLR(a[i].flags, GE_SCALAR)) {
+    if (is_array(a[i])) {
       v = (GpuArray *)args[i];
       if (a != NULL) {
         a = v;
@@ -310,7 +311,7 @@ static int call_contig(GpuElemwise *ge, void **args, size_t n) {
   err = GpuKernel_setarg(&ge->k_contig, p++, &n);
   if (err != GA_NO_ERROR) return err;
   for (i = 0; i < ge->n; i++) {
-    if (ISCLR(ge->args[i].flags, GE_SCALAR)) {
+    if (is_array(ge->args[i])) {
       a = (GpuArray *)args[i];
       err = GpuKernel_setarg(&ge->k_contig, p++, a->data);
       if (err != GA_NO_ERROR) return err;
