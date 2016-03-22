@@ -192,6 +192,133 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
   return res;
 }
 
+static ssize_t **strides_array(unsigned int num, unsigned int nd) {
+  ssize_t **res = calloc(num, sizeof(ssize_t *));
+  unsigned int i;
+
+  if (res == NULL) return NULL;
+  for (i = 0; i < num; i++) {
+    res[i] = calloc(nd, sizeof(ssize_t));
+    if (res[i] == NULL)
+      goto bail;
+  }
+
+  return res;
+
+ bail:
+  for (i = 0; i < num; i++)
+    free(res[i]);
+  free(res);
+  return NULL;
+}
+
+static int check_basic(GpuElemwise *ge, void **args, int flags,
+                       size_t *_n, unsigned int *_nd, size_t **_dims,
+                       ssize_t ***_strides) {
+  ssize_t **strs;
+  size_t *dims;
+  GpuArray *a = NULL, *v;
+  unsigned int i, j, p, num_arrays = 0, nd;
+  int err;
+
+  /* Go through the list and grab some info */
+  for (i = 0; i < ge->n; i++) {
+    if (is_array(ge->args[i])) {
+      num_arrays++;
+      if (a == NULL) {
+        a = (GpuArray *)args[i];
+        nd = a->nd;
+      }
+      if (((GpuArray *)args[i])->nd != nd)
+        return GA_VALUE_ERROR;
+    }
+  }
+
+  if (a == NULL)
+    return GA_VALUE_ERROR;
+
+  /* Now we know that there is at least one array argument and that
+     all array arguments have the same number of dimensions */
+
+  /* Allocate the dims and strides buffer */
+  dims = calloc(nd, sizeof(size_t));
+  if (dims == NULL)
+    return GA_MEMORY_ERROR;
+
+  strs = strides_array(num_arrays, nd);
+  if (strs == NULL) {
+    free(dims);
+    return GA_MEMORY_ERROR;
+  }
+
+  /* And copy their initial values in */
+  memcpy(dims, a->dims, nd*sizeof(size_t));
+  p = 0;
+  for (i = 0; i < ge->n; i++) {
+    if (is_array(ge->args[i])) {
+      memcpy(strs[p], ((GpuArray *)args[i])->strs, nd*sizeof(ssize_t));
+      p++;
+    }
+  }
+
+  /* Check that all arrays are the same size (or broadcast-compatible
+     if GE_BROADCAST).  Also compute the total size and adjust strides
+     of broadcastable dimensions.
+
+     Basically for each dimension go over all the arguments and make
+     sure that the dimension size matches. */
+  n = 1;
+  p = 0;
+  for (j = 0; j < nd; j++) {
+    for (i = 0; i < ge->n; i++) {
+      if (is_array(ge->args[i])) {
+        v = (GpuArray *)ge->args[i];
+        if (dims[j] != v->dims[j]) {
+          if (ISCLR(flags, GE_BROADCAST)) {
+            err = GA_VALUE_ERROR;
+            goto error;
+          }
+          /* GE_BROADCAST is set */
+          if (dims[j] == 1) {
+            dims[j] = v->dims[j];
+          } else {
+            if (v->dims[j] == 1) {
+              strs[p][j] = 0;
+            } else {
+              err = GA_VALUE_ERROR;
+              goto error;
+            }
+          }
+        }
+      p++;
+      } /* is_array() */
+    } /* for each arg */
+    /* We have the final value in dims[j] */
+    n *= dims[j];
+  } /* for each dim */
+
+  if (ISSET(flags, GE_COLLAPSE) && nd > 1) {
+    gpuarray_elemwise_collapse(num_arrays, &nd, dims, strs);
+  }
+
+  *_n = n;
+  *_nd = nd;
+  *_dims = dims;
+  *_strides = strs;
+
+  return GA_NO_ERROR;
+ error:
+  free(dims);
+  for (i = 0; i < num_arrays; i++)
+    free(strs[i]);
+  free(strs);
+  return err;
+}
+
+static int call_basic(GpuElemwise *ge, void **args, ...) {
+
+}
+
 static int gen_elemwise_contig_kernel(GpuKernel *k,
                                       const gpuarray_buffer_ops *ops,
                                       void *ctx, char **err_str,
@@ -385,16 +512,19 @@ void GpuElemwise_free(GpuElemwise *ge) {
 
 int GpuElemwise_call(GpuElemwise *ge, void **args, int flags) {
   size_t n;
+  size_t *dims;
+  ssize_t **strides;
+  unsigned int nd;
   int contig;
-  it err;
+  int err;
   err = check_contig(ge->args, args, &n, &contig);
   if (err == GA_NO_ERROR && contig) {
     return call_contig(ge, args, n);
   }
-  return GA_UNSUPPORTED_ERROR;
-  /* WIP
-  err = check_basic(ge->args, args, &n, ...);
+  err = check_basic(ge->args, args, &n, &nd, &dims, &strides);
   if (err == GA_NO_ERROR)
+    /* WIP
     return call_basic(ge, args, ...);
-  */
+    */;
+  return GA_UNSUPPORTED_ERROR;
 }
