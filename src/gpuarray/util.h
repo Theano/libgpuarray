@@ -75,6 +75,28 @@ GPUARRAY_PUBLIC size_t gpuarray_get_elsize(int typecode);
  */
 GPUARRAY_PUBLIC int gpuarray_type_flags(int init, ...);
 
+/**
+ * Perform dimension collapsing on the specified arguments.
+ *
+ * This function will check for dimension that are next to each other
+ * and contiguous for all inputs and merge them together. This allows
+ * to reduce the complexity of the indexing code in kernels and
+ * therefore enables faster runtime for kernels.
+ *
+ * On return the nd, dims and strs will be overwritten with the
+ * collapsed versions.
+ *
+ * For scalar arguments, strs[k] can be NULL.
+ *
+ * \param n The number of arguments
+ * \param nd The number of dimensions of all arguments
+ * \param dim The compute shape
+ * \param strs The strides for all arguments
+ *
+ */
+GPUARRAY_PUBLIC void gpuarray_elemwise_collapse(unsigned int n,
+                                                unsigned int *nd,
+                                                size_t *dim, ssize_t **strs);
 #ifdef __cplusplus
 }
 #endif
