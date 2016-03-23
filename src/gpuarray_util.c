@@ -1,10 +1,12 @@
 #include <assert.h>
 
 #include "private.h"
+#include "util/strb.h"
+
 #include "gpuarray/util.h"
 #include "gpuarray/error.h"
 #include "gpuarray/kernel.h"
-#include "util/strb.h"
+#include "gpuarray/elemwise.h"
 
 /*
  * API version is negative since we are still in the development

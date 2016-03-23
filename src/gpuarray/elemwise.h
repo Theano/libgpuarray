@@ -96,6 +96,12 @@ GPUARRAY_PUBLIC GpuElemwise *GpuElemwise_new(const gpuarray_buffer_ops *ops,
                                              unsigned int n,
                                              gpuelemwise_arg *args, int flags);
 
+GPUARRAY_PUBLIC void GpuElemwise_free(GpuElemwise *ge);
+
+GPUARRAY_PUBLIC int GpuElemwise_call(GpuElemwise *ge, void **args, int flags);
+
+#define GE_BROADCAST   0x0100
+#define GE_NOCOLLAPSE  0x0200
 
 #ifdef __cplusplus
 }
