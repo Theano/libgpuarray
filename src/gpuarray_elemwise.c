@@ -322,9 +322,53 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
   return err;
 }
 
-static int call_basic(GpuElemwise *ge, void **args, ...) {
+static int call_basic(GpuElemwise *ge, void **args, size_t n, unsigned int nd,
+                      size_t *dims, ssize_t **strs) {
+  GpuKernel k;
+  size_t ls = 0, gs = 0;
+  unsigned int p = 0, i, j;
+  int err;
 
-  return GA_UNSUPPORTED_ERROR;
+  /* XXX: can reuse the global args since we don't specialize, but
+     dims and strides are wrong if collapsing. */
+
+  err = gen_elemwise_basic_kernel(&k, ge->k_contig.ops,
+                                  GpuKernel_context(&ge->k_contig), NULL,
+                                  ge->preamble, ge->expr, nd, ge->n, ge->args);
+  if (err != GA_NO_ERROR) return err;
+
+  err = GpuKernel_setarg(&k, p++, &n);
+  if (err != GA_NO_ERROR) goto error;
+
+  for (i = 0; i < nd; i++) {
+    err = GpuKernel_setarg(&k, p++, &dims[i]);
+    if (err != GA_NO_ERROR) goto error;
+  }
+
+  for (j = 0; j < ge->n; j++) {
+    if (is_array(ge->args[i])) {
+      GpuArray *v = (GpuArray *)args[j];
+      err = GpuKernel_setarg(&k, p++, v->data);
+      if (err != GA_NO_ERROR) goto error;
+      err = GpuKernel_setarg(&k, p++, &v->offset);
+      if (err != GA_NO_ERROR) goto error;
+      for (i = 0; i < nd; i++) {
+        err = GpuKernel_setarg(&k, p++, &strs[j][i]);
+        if (err != GA_NO_ERROR) goto error;
+      }
+    } else {
+      err = GpuKernel_setarg(&k, p++, args[j]);
+      if (err != GA_NO_ERROR) goto error;
+    }
+  }
+
+  err = GpuKernel_sched(&ge->k_contig, n, &ls, &gs);
+  if (err != GA_NO_ERROR) goto error;
+
+  err = GpuKernel_call(&k, 1, &ls, &gs, 0, NULL);
+ error:
+  GpuKernel_clear(&k);
+  return err;
 }
 
 static int gen_elemwise_contig_kernel(GpuKernel *k,
@@ -529,9 +573,8 @@ int GpuElemwise_call(GpuElemwise *ge, void **args, int flags) {
     return call_contig(ge, args, n);
   }
   err = check_basic(ge, args, flags, &n, &nd, &dims, &strides);
-  if (err == GA_NO_ERROR)
-    /* WIP
-    return call_basic(ge, args, ...);
-    */;
-  return GA_UNSUPPORTED_ERROR;
+  if (err == GA_NO_ERROR) {
+    return call_basic(ge, args, n, nd, dims, strides);
+  }
+  return err;
 }
