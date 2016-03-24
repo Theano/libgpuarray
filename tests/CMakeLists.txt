@@ -24,7 +24,7 @@ add_executable(check_util main.c check_util.c)
 target_link_libraries(check_util ${LIBS} gpuarray)
 add_test(test_util ${CMAKE_CURRENT_BINARY_DIR}/check_util)
 
-add_executable(check_array main.c check_array.c)
+add_executable(check_array main.c device.c check_array.c)
 target_link_libraries(check_array ${LIBS} gpuarray)
 add_test(test_array ${CMAKE_CURRENT_BINARY_DIR}/check_array)
 
@@ -32,7 +32,7 @@ add_executable(check_error main.c check_error.c)
 target_link_libraries(check_error ${LIBS} gpuarray)
 add_test(test_error ${CMAKE_CURRENT_BINARY_DIR}/check_error)
 
-add_executable(check_buffer main.c check_buffer.c)
+add_executable(check_buffer main.c device.c check_buffer.c)
 target_link_libraries(check_buffer ${LIBS} gpuarray)
 add_test(test_buffer ${CMAKE_CURRENT_BINARY_DIR}/check_buffer)
 
