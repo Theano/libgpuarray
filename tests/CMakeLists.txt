@@ -28,6 +28,10 @@ add_executable(check_array main.c device.c check_array.c)
 target_link_libraries(check_array ${LIBS} gpuarray)
 add_test(test_array ${CMAKE_CURRENT_BINARY_DIR}/check_array)
 
+add_executable(check_elemwise main.c device.c check_elemwise.c)
+target_link_libraries(check_elemwise ${LIBS} gpuarray)
+add_test(test_elemwise ${CMAKE_CURRENT_BINARY_DIR}/check_elemwise)
+
 add_executable(check_error main.c check_error.c)
 target_link_libraries(check_error ${LIBS} gpuarray)
 add_test(test_error ${CMAKE_CURRENT_BINARY_DIR}/check_error)
