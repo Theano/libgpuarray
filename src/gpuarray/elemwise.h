@@ -72,16 +72,14 @@ typedef struct _gpuelemwise_arg {
 #define GE_SCALAR      0x0001
 
   /**
-   * Disable indexing for this argument on dimensions of size 1.
-   * Requires dims.
+   * Array is read from in the expression.
    */
-#define GE_NOINDEX1    0x0002
+#define GE_READ        0x0002
 
   /**
-   * Disable specialization on dimensions for this argument even if
-   * dims is provided.
+   * Array is written to in the expression.
    */
-#define GE_NODIMSPEC   0x0004
+#define GE_WRITE       0x0004
 
 /**
  * }@

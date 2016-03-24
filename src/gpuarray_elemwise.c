@@ -103,7 +103,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
   int flags = GA_USE_CLUDA;
   int res;
 
-  flags = gpuarray_type_flagsa(n, args);
+  flags |= gpuarray_type_flagsa(n, args);
 
   p = 1 + nd;
   for (j = 0; j < n; j++) {
@@ -121,12 +121,12 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
   strb_appends(&sb, "\nKERNEL void elem(const ga_size n, ");
   ktypes[p++] = GA_SIZE;
   for (i = 0; i < nd; i++) {
-    strb_appendf(&sb, "const ga_size dim%u", i);
+    strb_appendf(&sb, "const ga_size dim%u, ", i);
     ktypes[p++] = GA_SIZE;
   }
   for (j = 0; j < n; j++) {
     if (is_array(args[j])) {
-      strb_appendf(&sb, "GLOBAL_MEM *%s %s_data, const ga_size %s_offset%s",
+      strb_appendf(&sb, "GLOBAL_MEM %s *%s_data, const ga_size %s_offset%s",
                    ctype(args[j].typecode), args[j].name, args[j].name,
                    nd == 0 ? "" : ", ");
       ktypes[p++] = GA_BUFFER;
@@ -138,7 +138,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
         ktypes[p++] = GA_SSIZE;
       }
     } else {
-      strb_appendf(&sb, "%s %s", args[j].name);
+      strb_appendf(&sb, "%s %s", ctype(args[i].typecode), args[j].name);
       ktypes[p++] = args[j].typecode;
     }
     if (j != (n - 1)) strb_appends(&sb, ", ");
@@ -151,12 +151,12 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
   for (j = 0; j < n; j++) {
     if (is_array(args[j])) {
       strb_appendf(&sb, "tmp = (GLOBAL_MEM char *)%s_data; tmp += %s_offset; "
-                   "%s_data = (GLOBAL_MEM *%s)tmp;\n", args[j].name,
+                   "%s_data = (GLOBAL_MEM %s *)tmp;\n", args[j].name,
                    args[j].name, args[j].name, ctype(args[j].typecode));
     }
   }
 
-  strb_appends(&sb, "for i = idx; i < n; i += numThreads) {\n");
+  strb_appends(&sb, "for(i = idx; i < n; i += numThreads) {\n");
   if (nd > 0)
     strb_appends(&sb, "int ii = i;\nint pos;\n");
   for (j = 0; j < n; j++) {
@@ -167,7 +167,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
   for (_i = nd; _i > 0; _i--) {
     i = _i - 1;
     if (i > 0)
-      strb_appendf(&sb, "pos = ii % dim%u;\nii = ii / dim%u;\n", i, i);
+      strb_appendf(&sb, "pos = ii %% dim%u;\nii = ii / dim%u;\n", i, i);
     else
       strb_appends(&sb, "pos = ii;\n");
     for (j = 0; j < n; j++) {
@@ -178,13 +178,22 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
   }
   for (j = 0; j < n; j++) {
     if (is_array(args[j])) {
-      strb_appendf(&sb, "GLOBAL_MEM *%s %s = (GLOBAL_MEM *%s)%s_p;\n",
-                   ctype(args[j].typecode), args[j].name,
-                   ctype(args[j].typecode), args[j].name);
+      strb_appendf(&sb, "%s %s;", ctype(args[j].typecode), args[j].name);
+      if (ISSET(args[j].flags, GE_READ)) {
+        strb_appendf(&sb, "%s = *(GLOBAL_MEM %s *)%s_p;\n",
+                     args[j].name, ctype(args[j].typecode), args[j].name);
+      }
     }
   }
   strb_appends(&sb, expr);
-  strb_appends(&sb, ";\n}\n}\n");
+  strb_appends(&sb, ";\n");
+  for (j = 0; j < n; j++) {
+    if (is_array(args[j]) && ISSET(args[j].flags, GE_WRITE)) {
+      strb_appendf(&sb, "*(GLOBAL_MEM %s *)%s_p = %s;\n",
+                   ctype(args[j].typecode), args[j].name, args[j].name);
+    }
+  }
+  strb_appends(&sb, "}\n}\n");
   if (strb_error(&sb)) {
     res = GA_MEMORY_ERROR;
     goto bail;
@@ -275,8 +284,8 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
      Basically for each dimension go over all the arguments and make
      sure that the dimension size matches. */
   n = 1;
-  p = 0;
   for (j = 0; j < nd; j++) {
+    p = 0;
     for (i = 0; i < ge->n; i++) {
       if (is_array(ge->args[i])) {
         v = (GpuArray *)args[i];
@@ -346,7 +355,7 @@ static int call_basic(GpuElemwise *ge, void **args, size_t n, unsigned int nd,
   }
 
   for (j = 0; j < ge->n; j++) {
-    if (is_array(ge->args[i])) {
+    if (is_array(ge->args[j])) {
       GpuArray *v = (GpuArray *)args[j];
       err = GpuKernel_setarg(&k, p++, v->data);
       if (err != GA_NO_ERROR) goto error;
@@ -385,7 +394,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
   int flags = GA_USE_CLUDA;
   int res = GA_MEMORY_ERROR;
 
-  flags = gpuarray_type_flagsa(n, args);
+  flags |= gpuarray_type_flagsa(n, args);
 
   p = 1;
   for (j = 0; j < n; j++)
@@ -403,7 +412,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
   ktypes[p++] = GA_SIZE;
   for (j = 0; j < n; j++) {
     if (is_array(args[j])) {
-      strb_appendf(&sb, "GLOBAL MEM *%s %s_p,  const ga_size %s_offset",
+      strb_appendf(&sb, "GLOBAL_MEM %s *%s_p,  const ga_size %s_offset",
                    ctype(args[j].typecode), args[j].name, args[j].name);
       ktypes[p++] = GA_BUFFER;
       ktypes[p++] = GA_SIZE;
@@ -422,7 +431,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
   for (j = 0; j < n; j++) {
     if (is_array(args[j])) {
       strb_appendf(&sb, "tmp = (GLOBAL_MEM char *)%s_p;"
-                   "tmp += %s_offset; %s_p = (GLOBAL_MEM %s*)tmp;",
+                   "tmp += %s_offset; %s_p = (GLOBAL_MEM %s *)tmp;",
                    args[j].name, args[j].name, args[j].name,
                    ctype(args[j].typecode));
     }
@@ -431,12 +440,21 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
   strb_appends(&sb, "for (i = idx; i < n; i += numThreads) {\n");
   for (j = 0; j < n; j++) {
     if (is_array(args[j])) {
-      strb_appendf(&sb, "GLOBAL_MEM *%s %s = &%s_p[i];",
-                   ctype(args[j].typecode), args[j].name, args[j].name);
+      strb_appendf(&sb, "%s %s;\n", ctype(args[j].typecode), args[j].name);
+      if (ISSET(args[j].flags, GE_READ))
+        strb_appendf(&sb, "%s = %s_p[i];\n", args[j].name, args[j].name);
     }
   }
   strb_appends(&sb, expr);
-  strb_appends(&sb, ";\n}\n}\n");
+  strb_appends(&sb, ";\n");
+
+  for (j = 0; j < n; j++) {
+    if (is_array(args[j])) {
+      if (ISSET(args[j].flags, GE_WRITE))
+        strb_appendf(&sb, "%s_p[i] = %s;\n", args[j].name, args[j].name);
+    }
+  }
+  strb_appends(&sb, "}\n}\n");
 
   if (strb_error(&sb))
     goto bail;
@@ -457,9 +475,9 @@ static int check_contig(GpuElemwise *ge, void **args,
   int c_contig = 1, f_contig = 1;
 
   for (i = 0; i < ge->n; i++) {
-    if (is_array(a[i])) {
+    if (is_array(ge->args[i])) {
       v = (GpuArray *)args[i];
-      if (a != NULL) {
+      if (a == NULL) {
         a = v;
         for (j = 0; j < a->nd; j++) n *= a->dimensions[j];
       }
