@@ -298,15 +298,18 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
           if (dims[j] == 1) {
             dims[j] = v->dimensions[j];
           } else {
-            if (v->dimensions[j] == 1) {
-              strs[p][j] = 0;
-            } else {
+            if (v->dimensions[j] != 1) {
               err = GA_VALUE_ERROR;
               goto error;
             }
           }
         }
-      p++;
+        /* If the dimension is 1 set the strides to 0 regardless since
+           it won't change anything in the non-broadcast case. */
+        if (v->dimensions[j] == 1) {
+          strs[p][j] = 0;
+        }
+        p++;
       } /* is_array() */
     } /* for each arg */
     /* We have the final value in dims[j] */
