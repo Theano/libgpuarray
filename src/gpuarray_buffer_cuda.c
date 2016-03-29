@@ -264,7 +264,9 @@ static const char CUDA_PREAMBLE[] =
     "#define ga_double double\n"
     "#define ga_half ga_ushort\n"
     "#define ga_size size_t\n"
-    "#define ga_ssize ptrdiff_t\n";
+    "#define ga_ssize ptrdiff_t\n"
+    "#define load_half(p) __half2float(*(p))\n"
+    "#define store_half(p, v) (*(p) = __float2half_rn(v))\n";
 
 /* XXX: add complex, quads, longlong */
 /* XXX: add vector types */

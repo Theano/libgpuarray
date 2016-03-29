@@ -223,7 +223,10 @@ static const char CL_PREAMBLE[] =
   "#define ga_double double\n"
   "#define ga_half half\n"
   "#define ga_size ulong\n"
-  "#define ga_ssize long\n";
+  "#define ga_ssize long\n"
+  "#define load_half(p) vload_half(0, p)\n"
+  "#define store_half(p, v) vstore_half_rtn(v, 0, p)\n";
+
 /* XXX: add complex types, quad types, and longlong */
 /* XXX: add vector types */
 
