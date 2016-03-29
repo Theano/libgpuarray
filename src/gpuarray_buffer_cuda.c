@@ -1888,6 +1888,11 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     cuda_exit(ctx);
     return ctx->err == CUDA_SUCCESS ? GA_NO_ERROR : GA_IMPL_ERROR;
 
+  case GA_CTX_PROP_NATIVE_FLOAT16:
+    /* We claim that nobody supports this for now */
+    *((int *)res) = 0;
+    return CUDA_SUCCESS;
+
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;
     return GA_NO_ERROR;

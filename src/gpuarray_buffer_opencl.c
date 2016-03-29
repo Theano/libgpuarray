@@ -1260,6 +1260,36 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((gpudata **)res) = ctx->errbuf;
     return GA_NO_ERROR;
 
+  case GA_CTX_PROP_TOTAL_GMEM:
+    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id), &id,
+                                NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(sz), &sz,
+                               NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    *((size_t *)res) = sz;
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_FREE_GMEM:
+    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id), &id,
+                                NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    /* XXX: This is not exaclty the amount of free memory but there is
+       no way to query that in the OpenCL API. */
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(sz),
+                               &sz, NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    *((size_t *)res) = sz;
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_NATIVE_FLOAT16:
+    *((int *)res) = 0;
+    return GA_NO_ERROR;
+
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;
     return GA_NO_ERROR;
