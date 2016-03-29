@@ -34,27 +34,27 @@ START_TEST(test_contig_simple)
 
   dims[0] = 3;
 
-  ga_assert_ok(GpuArray_empty(&a, ops, ctx, GA_FLOAT, 1, dims, GA_C_ORDER));
+  ga_assert_ok(GpuArray_empty(&a, ops, ctx, GA_UINT, 1, dims, GA_C_ORDER));
   ga_assert_ok(GpuArray_write(&a, data1, sizeof(data1)));
 
-  ga_assert_ok(GpuArray_empty(&b, ops, ctx, GA_FLOAT, 1, dims, GA_C_ORDER));
+  ga_assert_ok(GpuArray_empty(&b, ops, ctx, GA_UINT, 1, dims, GA_C_ORDER));
   ga_assert_ok(GpuArray_write(&b, data2, sizeof(data2)));
 
-  ga_assert_ok(GpuArray_empty(&c, ops, ctx, GA_FLOAT, 1, dims, GA_C_ORDER));
+  ga_assert_ok(GpuArray_empty(&c, ops, ctx, GA_UINT, 1, dims, GA_C_ORDER));
 
   args[0].name = "a";
   args[0].nd = 1;
-  args[0].typecode = GA_FLOAT;
+  args[0].typecode = GA_UINT;
   args[0].flags = GE_READ;
 
   args[1].name = "b";
   args[1].nd = 1;
-  args[1].typecode = GA_FLOAT;
+  args[1].typecode = GA_UINT;
   args[1].flags = GE_READ;
 
   args[2].name = "c";
   args[2].nd = 1;
-  args[2].typecode = GA_FLOAT;
+  args[2].typecode = GA_UINT;
   args[2].flags = GE_WRITE;
 
   ge = GpuElemwise_new(ops, ctx, "", "c = a + b", 3, args, 0);
