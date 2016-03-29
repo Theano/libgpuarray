@@ -12,7 +12,7 @@
  * there.
  */
 const int gpuarray_api_major = -10000;
-const int gpuarray_api_minor = 1;
+const int gpuarray_api_minor = 2;
 
 static gpuarray_type **custom_types = NULL;
 static int n_types = 0;
