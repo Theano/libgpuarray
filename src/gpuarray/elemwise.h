@@ -16,7 +16,7 @@ extern "C" {
 struct _GpuElemwise;
 
 /**
- * Elementwise genearator structure.
+ * Elementwise generator structure.
  *
  * The contents are private.
  */
