@@ -5,7 +5,7 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <stddef.h>
-#ifndef _MSC_VER < 1600
+#if _MSC_VER < 1600
 #include <stdint.h>
 #endif
 #include <stdlib.h>
