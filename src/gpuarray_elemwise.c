@@ -234,7 +234,7 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
   size_t *dims;
   size_t n;
   GpuArray *a = NULL, *v;
-  unsigned int i, j, p, num_arrays = 0, nd;
+  unsigned int i, j, p, num_arrays = 0, nd = 0;
   int err;
 
   /* Go through the list and grab some info */
