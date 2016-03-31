@@ -1324,15 +1324,15 @@ static int cuda_callkernel(gpukernel *k, unsigned int n,
     ASSERT_KER(k);
     cuda_enter(ctx);
 
+    if (args == NULL)
+      args = k->args;
+
     for (i = 0; i < k->argcount; i++) {
       if (k->types[i] == GA_BUFFER) {
 	/* We don't have any better info for now */
 	cuda_wait((gpudata *)args[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
       }
     }
-
-    if (args == NULL)
-      args = k->args;
 
     switch (n) {
     case 1:
