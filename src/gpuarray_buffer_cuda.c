@@ -264,7 +264,9 @@ static const char CUDA_PREAMBLE[] =
     "#define ga_double double\n"
     "#define ga_half ga_ushort\n"
     "#define ga_size size_t\n"
-    "#define ga_ssize ptrdiff_t\n";
+    "#define ga_ssize ptrdiff_t\n"
+    "#define load_half(p) __half2float(*(p))\n"
+    "#define store_half(p, v) (*(p) = __float2half_rn(v))\n";
 
 /* XXX: add complex, quads, longlong */
 /* XXX: add vector types */
@@ -1887,6 +1889,11 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     ctx->err = cuMemGetInfo((size_t *)res, &sz);
     cuda_exit(ctx);
     return ctx->err == CUDA_SUCCESS ? GA_NO_ERROR : GA_IMPL_ERROR;
+
+  case GA_CTX_PROP_NATIVE_FLOAT16:
+    /* We claim that nobody supports this for now */
+    *((int *)res) = 0;
+    return CUDA_SUCCESS;
 
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;

@@ -568,6 +568,12 @@ typedef struct _gpuarray_buffer_ops {
  */
 #define GA_CTX_PROP_FREE_GMEM 10
 
+/**
+ * Get the status of native float16 support on the device.
+ *
+ * Type: `int`
+ */
+#define GA_CTX_PROP_NATIVE_FLOAT16   11
 
 /* Start at 512 for GA_BUFFER_PROP_ */
 /**

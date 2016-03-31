@@ -223,7 +223,10 @@ static const char CL_PREAMBLE[] =
   "#define ga_double double\n"
   "#define ga_half half\n"
   "#define ga_size ulong\n"
-  "#define ga_ssize long\n";
+  "#define ga_ssize long\n"
+  "#define load_half(p) vload_half(0, p)\n"
+  "#define store_half(p, v) vstore_half_rtn(v, 0, p)\n";
+
 /* XXX: add complex types, quad types, and longlong */
 /* XXX: add vector types */
 
@@ -1258,6 +1261,36 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
   case GA_CTX_PROP_ERRBUF:
     *((gpudata **)res) = ctx->errbuf;
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_TOTAL_GMEM:
+    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id), &id,
+                                NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(sz), &sz,
+                               NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    *((size_t *)res) = sz;
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_FREE_GMEM:
+    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id), &id,
+                                NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    /* XXX: This is not exaclty the amount of free memory but there is
+       no way to query that in the OpenCL API. */
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(sz),
+                               &sz, NULL);
+    if (ctx->err != GA_NO_ERROR)
+      return GA_IMPL_ERROR;
+    *((size_t *)res) = sz;
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_NATIVE_FLOAT16:
+    *((int *)res) = 0;
     return GA_NO_ERROR;
 
   case GA_BUFFER_PROP_REFCNT:
