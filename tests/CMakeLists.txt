@@ -4,6 +4,19 @@ find_package(PkgConfig)
 
 pkg_search_module(CHECK check)
 
+if (NOT CHECK_FOUND)
+
+find_path(CHECK_INCLUDE_DIRS check.h)
+find_library(CHECK_LIBRARIES NAMES check)
+
+if (CHECK_INCLUDE_DIRS AND CHECK_LIBRARIES)
+  set(CHECK_CFLAGS)
+  set(CHECK_LIBRARY_DIRS)
+  set(CHECK_FOUND 1)
+endif()
+
+endif()
+
 if (CHECK_FOUND)
 
 include_directories(${CHECK_INCLUDE_DIRS})
