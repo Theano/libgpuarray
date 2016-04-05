@@ -1,14 +1,17 @@
 enable_testing()
 
-find_package(Check)
+find_package(PkgConfig)
+
+pkg_search_module(CHECK check)
 
 if (CHECK_FOUND)
 
 include_directories(${CHECK_INCLUDE_DIRS})
+link_directories(${CHECK_LIBRARY_DIRS})
 
 set(LIBS ${LIBS} ${CHECK_LIBRARIES})
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CHECK_DEFINITIONS}")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CHECK_CFLAGS}")
 
 include_directories(. ../src)
 
