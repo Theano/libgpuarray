@@ -327,4 +327,10 @@ GPUARRAY_LOCAL gpuarray_blas_ops clblas_ops = {
   NULL, /* hgemmBatch */
   sgemmBatch,
   dgemmBatch,
+  NULL, /* hgemvBatch */
+  NULL,
+  NULL,
+  NULL, /* hgerBatch */
+  NULL,
+  NULL
 };
