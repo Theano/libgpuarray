@@ -2,6 +2,7 @@
 #include "private_cuda.h"
 
 #include "gpuarray/buffer_blas.h"
+#include "gpuarray/kernel.h"
 #include "gpuarray/error.h"
 
 #include "cublas_v2.h"
@@ -31,7 +32,7 @@ typedef struct _blas_handle {
   GpuKernel dgerBH_gen_small;
 } blas_handle;
 
-static const char code_sgemvBH_N_a1_b1_small[] =                        \
+static const char *code_sgemvBH_N_a1_b1_small =                         \
   "__global__ void _sgemv(const float *A[], size_t lda, "               \
   "                       const float *x[], size_t incX, "              \
   "                       float *y[], size_t incy, "                    \
@@ -54,7 +55,7 @@ static const char code_sgemvBH_N_a1_b1_small[] =                        \
   "  }"                                                                 \
   "}";
 
-static const char code_sgemvBH_T_a1_b1_small[] =                \
+static const char *code_sgemvBH_T_a1_b1_small =                 \
   "__global__ void _sgemv(const float *A[], size_t lda, "       \
   "                       const float *x[], size_t incX, "      \
   "                       float *y[], size_t incy, "            \
@@ -73,7 +74,7 @@ static const char code_sgemvBH_T_a1_b1_small[] =                \
   "  atomicAdd(&y[p][i*incy], yi);"                             \
   "}\n";
 
-static const char atomicadd_double[] =                                  \
+static const char *atomicadd_double =                                   \
   "__device__ double atomicAdd(ga_double* address, ga_double val) {"    \
   "  unsigned long long int* address_as_ull ="                          \
   "  (unsigned long long int*)address;"                                 \
@@ -87,7 +88,7 @@ static const char atomicadd_double[] =                                  \
   "  return __longlong_as_double(old);"                                 \
   "}\n";
 
-static const char code_dgemvBH_N_a1_b1_small[] =                        \
+static const char *code_dgemvBH_N_a1_b1_small =                         \
   "__global__ void _dgemv(const double *A[], size_t lda, "              \
   "                       const double *x[], size_t incX, "             \
   "                       double *y[], size_t incy, "                   \
@@ -110,7 +111,7 @@ static const char code_dgemvBH_N_a1_b1_small[] =                        \
   "  }"                                                                 \
   "}\n";
 
-static const char code_dgemvBH_T_a1_b1_small[] =                \
+static const char *code_dgemvBH_T_a1_b1_small =                 \
   "__global__ void _dgemv(const double *A[], size_t lda, "      \
   "                       const double *x[], size_t incX, "     \
   "                       double *y[], size_t incy, "           \
@@ -129,7 +130,7 @@ static const char code_dgemvBH_T_a1_b1_small[] =                \
   "  atomicAdd(&y[p][i*incy], yi);"                             \
   "}\n";
 
-static const char code_sgerBH_gen_small[] =                             \
+static const char *code_sgerBH_gen_small =                              \
   "__global__ void _sgerBH_gen_small(const float *x[], size_t incx,"    \
   "                                  const float *y[], size_t incy,"    \
   "                                  float alpha,"                      \
@@ -144,7 +145,7 @@ static const char code_sgerBH_gen_small[] =                             \
   "  }"                                                                 \
   "}\n";
 
-static const char code_dgerBH_gen_small[] =                             \
+static const char *code_dgerBH_gen_small =                              \
   "__global__ void _dgerBH_gen_small(const double *x[], size_t incx,"   \
   "                                  const double *y[], size_t incy,"   \
   "                                  double alpha,"                     \
@@ -162,6 +163,7 @@ static const char code_dgerBH_gen_small[] =                             \
 static int setup(void *c) {
   cuda_context *ctx = (cuda_context *)c;
   blas_handle *handle;
+  const char *tmp[2];
   cublasStatus_t err;
   int e;
   int types[10];
@@ -181,14 +183,14 @@ static int setup(void *c) {
     return GA_BLAS_ERROR;
   }
 
-  err = cublasSetStream(handle, ctx->s);
+  err = cublasSetStream(handle->h, ctx->s);
   if (err != CUBLAS_STATUS_SUCCESS) {
     e = GA_BLAS_ERROR;
     goto e1;
   }
 
-  cublasSetPointerMode(handle, CUBLAS_POINTER_MODE_HOST);
-  cublasSetAtomicsMode(handle, CUBLAS_ATOMICS_ALLOWED);
+  cublasSetPointerMode(handle->h, CUBLAS_POINTER_MODE_HOST);
+  cublasSetAtomicsMode(handle->h, CUBLAS_ATOMICS_ALLOWED);
 
   types[0] = GA_BUFFER;
   types[1] = GA_SIZE;
@@ -203,9 +205,13 @@ static int setup(void *c) {
   if (e != GA_NO_ERROR) goto e1;
   e = GpuKernel_init(&handle->sgemvBH_T_a1_b1_small, &cuda_ops, ctx, 1, &code_sgemvBH_T_a1_b1_small, NULL, "_sgemv", 9, types, 0, NULL);
   if (e != GA_NO_ERROR) goto e2;
-  e = GpuKernel_init(&handle->dgemvBH_N_a1_b1_small, &cuda_ops, ctx, 1, &code_dgemvBH_N_a1_b1_small, NULL, "_dgemv", 9, types, GA_USE_DOUBLE, NULL);
+  tmp[0] = atomicadd_double;
+  tmp[1] = code_dgemvBH_N_a1_b1_small;
+  e = GpuKernel_init(&handle->dgemvBH_N_a1_b1_small, &cuda_ops, ctx, 1, tmp, NULL, "_dgemv", 9, types, GA_USE_DOUBLE, NULL);
   if (e != GA_NO_ERROR) goto e3;
-  e = GpuKernel_init(&handle->dgemvBH_T_a1_b1_small, &cuda_ops, ctx, 1, &code_dgemvBH_T_a1_b1_small, NULL, "_dgemv", 9, types, GA_USE_DOUBLE, NULL);
+  tmp[0] = atomicadd_double;
+  tmp[1] = code_dgemvBH_T_a1_b1_small;
+  e = GpuKernel_init(&handle->dgemvBH_T_a1_b1_small, &cuda_ops, ctx, 1, tmp, NULL, "_dgemv", 9, types, GA_USE_DOUBLE, NULL);
   if (e != GA_NO_ERROR) goto e4;
 
   types[0] = GA_BUFFER;
@@ -221,7 +227,9 @@ static int setup(void *c) {
   e = GpuKernel_init(&handle->sgerBH_gen_small, &cuda_ops, ctx, 1, &code_sgerBH_gen_small, NULL, "_sgerBH_gen_small", 10, types, 0, NULL);
   if (e != GA_NO_ERROR) goto e5;
   types[4] = GA_DOUBLE;
-  e = GpuKernel_init(&handle->dgerBH_gen_small, &cuda_ops, ctx, 1, &code_dgerBH_gen_small, NULL, "_dgerBH_gen_small", 10, types, GA_USE_DOUBLE, NULL);
+  tmp[0] = atomicadd_double;
+  tmp[1] = code_dgerBH_gen_small;
+  e = GpuKernel_init(&handle->dgerBH_gen_small, &cuda_ops, ctx, 1, tmp, NULL, "_dgerBH_gen_small", 10, types, GA_USE_DOUBLE, NULL);
   if (e != GA_NO_ERROR) goto e6;
 
   ctx->blas_handle = handle;
@@ -249,18 +257,19 @@ static int setup(void *c) {
 
 static void teardown(void *c) {
   cuda_context *ctx = (cuda_context *)c;
+  blas_handle *handle = (blas_handle *)ctx->blas_handle;
 
   if (ctx->blas_handle == NULL)
     return;
 
   cuda_enter(ctx);
-  cublasDestroy(ctx->blas_handle->h);
-  GpuKernel_clear(&ctx->blas_handle->sgemvBH_N_a1_b1_small);
-  GpuKernel_clear(&ctx->blas_handle->sgemvBH_T_a1_b1_small);
-  GpuKernel_clear(&ctx->blas_handle->dgemvBH_N_a1_b1_small);
-  GpuKernel_clear(&ctx->blas_handle->dgemvBH_T_a1_b1_small);
-  GpuKernel_clear(&ctx->blas_handle->sgerBH_gen_small);
-  GpuKernel_clear(&ctx->blas_handle->dgerBH_gen_small);
+  cublasDestroy(handle->h);
+  GpuKernel_clear(&handle->sgemvBH_N_a1_b1_small);
+  GpuKernel_clear(&handle->sgemvBH_T_a1_b1_small);
+  GpuKernel_clear(&handle->dgemvBH_N_a1_b1_small);
+  GpuKernel_clear(&handle->dgemvBH_T_a1_b1_small);
+  GpuKernel_clear(&handle->sgerBH_gen_small);
+  GpuKernel_clear(&handle->dgerBH_gen_small);
   cuda_exit(ctx);
   free(ctx->blas_handle);
   ctx->blas_handle = NULL;
@@ -306,7 +315,8 @@ static int sgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   cuda_wait(B, CUDA_WAIT_READ);
   cuda_wait(C, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
 
-  err = cublasSgemm(ctx->blas_handle->h, convT(transA), convT(transB), M, N, K,
+  err = cublasSgemm(((blas_handle *)ctx->blas_handle)->h,
+                    convT(transA), convT(transB), M, N, K,
                     &alpha, ((float *)A->ptr) + offA, lda,
                     ((float *)B->ptr) + offB, ldb, &beta,
                     ((float *)C->ptr) + offC, ldc);
@@ -365,7 +375,8 @@ static int dgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   cuda_wait(B, CUDA_WAIT_READ);
   cuda_wait(C, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
 
-  err = cublasDgemm(ctx->blas_handle->h, convT(transA), convT(transB), M, N, K,
+  err = cublasDgemm(((blas_handle *)ctx->blas_handle)->h,
+                    convT(transA), convT(transB), M, N, K,
                     &alpha, ((double *)A->ptr) + offA, lda,
                     ((double *)B->ptr) + offB, ldb, &beta,
                     ((double *)C->ptr) + offC, ldc);
@@ -428,7 +439,8 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   cuda_wait(B, CUDA_WAIT_READ);
   cuda_wait(C, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
 
-  err = cublasSgemmEx(ctx->blas_handle->h, convT(transA), convT(transB), M, N, K,
+  err = cublasSgemmEx(((blas_handle *)ctx->blas_handle)->h,
+                      convT(transA), convT(transB), M, N, K,
                       &alpha,
                       ((uint16_t *)A->ptr) + offA, CUBLAS_DATA_HALF, lda,
                       ((uint16_t *)B->ptr) + offB, CUBLAS_DATA_HALF, ldb,
@@ -714,7 +726,8 @@ static int sgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
   cuda_wait(X, CUDA_WAIT_READ);
   cuda_wait(Y, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
 
-  err = cublasSgemv(ctx->blas_handle->h, convT(transA), M, N, &alpha,
+  err = cublasSgemv(((blas_handle *)ctx->blas_handle)->h,
+                    convT(transA), M, N, &alpha,
                     ((float *)A->ptr) + offA, lda,
                     ((float *)X->ptr) + offX, incX,
                     &beta, ((float *)Y->ptr) + offY, incY);
@@ -764,7 +777,8 @@ static int dgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
   cuda_wait(X, CUDA_WAIT_READ);
   cuda_wait(Y, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
 
-  err = cublasDgemv(ctx->blas_handle->h, convT(transA), M, N, &alpha,
+  err = cublasDgemv(((blas_handle *)ctx->blas_handle)->h,
+                     convT(transA), M, N, &alpha,
                     ((double *)A->ptr) + offA, lda,
                     ((double *)X->ptr) + offX, incX,
                     &beta, ((double *)Y->ptr) + offY, incY);
@@ -784,7 +798,8 @@ static int dgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
   return GA_NO_ERROR;
 }
 
-static int sgemvBatch(cb_order order, size_t M, size_t N, float alpha,
+static int sgemvBatch(cb_order order, cb_transpose transA,
+                      size_t M, size_t N, float alpha,
                       gpudata **A, size_t *offA, size_t lda,
                       gpudata **x, size_t *offX, size_t incX,
                       float beta, gpudata **y, size_t *offY, size_t incY,
@@ -801,7 +816,7 @@ static int sgemvBatch(cb_order order, size_t M, size_t N, float alpha,
 
   if (alpha != 1.0 || beta != 1.0) return GA_UNSUPPORTED_ERROR;
 
-  if (m < 512) {
+  if (M < 512) {
     ls[0] = 32;
     if (batchCount > 16)
       ls[1] = 16;
@@ -811,7 +826,7 @@ static int sgemvBatch(cb_order order, size_t M, size_t N, float alpha,
     ls[0] = 512;
     ls[1] = 1;
   }
-  gs[0] = (m + ls[0] - 1) / ls[0];
+  gs[0] = (M + ls[0] - 1) / ls[0];
   gs[1] = (batchCount + ls[1] - 1) / ls[1];
   if (gs[0] * gs[1] / 65535) {
     gs[1] = (65535 / gs[0]);
@@ -824,7 +839,7 @@ static int sgemvBatch(cb_order order, size_t M, size_t N, float alpha,
     if (transA == cb_no_trans) {
       transA = cb_trans;
     } else {
-      transA = ch_no_trans;
+      transA = cb_no_trans;
     }
   }
 
@@ -878,13 +893,13 @@ static int sgemvBatch(cb_order order, size_t M, size_t N, float alpha,
   args[4] = ya;
   args[5] = &incY;
   args[6] = &batchCount;
-  args[7] = &m;
-  args[8] = &n;
+  args[7] = &M;
+  args[8] = &N;
 
   if (transA == cb_no_trans) {
-    err = GpuKernel_call(&ctx->blas_handle->sgemvBH_N_a1_b1_small, 2, ls, gs, 0, args);
+    err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->sgemvBH_N_a1_b1_small, 2, ls, gs, 0, args);
   } else {
-    err = GpuKernel_call(&ctx->blas_handle->sgemvBH_T_a1_b1_small, 2, ls, gs, 0, args);
+    err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->sgemvBH_T_a1_b1_small, 2, ls, gs, 0, args);
   }
 
   cuda_ops.buffer_release(Aa);
@@ -907,7 +922,8 @@ static int sgemvBatch(cb_order order, size_t M, size_t N, float alpha,
   return GA_NO_ERROR;
 }
 
-static int dgemvBatch(cb_order order, size_t M, size_t N, double alpha,
+static int dgemvBatch(cb_order order, cb_transpose transA,
+                      size_t M, size_t N, double alpha,
                       gpudata **A, size_t *offA, size_t lda,
                       gpudata **x, size_t *offX, size_t incX,
                       double beta, gpudata **y, size_t *offY, size_t incY,
@@ -924,7 +940,7 @@ static int dgemvBatch(cb_order order, size_t M, size_t N, double alpha,
 
   if (alpha != 1.0 || beta != 1.0) return GA_UNSUPPORTED_ERROR;
 
-  if (m < 512) {
+  if (M < 512) {
     ls[0] = 32;
     if (batchCount > 16)
       ls[1] = 16;
@@ -934,7 +950,7 @@ static int dgemvBatch(cb_order order, size_t M, size_t N, double alpha,
     ls[0] = 512;
     ls[1] = 1;
   }
-  gs[0] = (m + ls[0] - 1) / ls[0];
+  gs[0] = (M + ls[0] - 1) / ls[0];
   gs[1] = (batchCount + ls[1] - 1) / ls[1];
   if (gs[0] * gs[1] / 65535) {
     gs[1] = (65535 / gs[0]);
@@ -947,7 +963,7 @@ static int dgemvBatch(cb_order order, size_t M, size_t N, double alpha,
     if (transA == cb_no_trans) {
       transA = cb_trans;
     } else {
-      transA = ch_no_trans;
+      transA = cb_no_trans;
     }
   }
 
@@ -1001,13 +1017,13 @@ static int dgemvBatch(cb_order order, size_t M, size_t N, double alpha,
   args[4] = ya;
   args[5] = &incY;
   args[6] = &batchCount;
-  args[7] = &m;
-  args[8] = &n;
+  args[7] = &M;
+  args[8] = &N;
 
   if (transA == cb_no_trans) {
-    err = GpuKernel_call(&ctx->blas_handle->dgemvBH_N_a1_b1_small, 2, ls, gs, 0, args);
+    err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->dgemvBH_N_a1_b1_small, 2, ls, gs, 0, args);
   } else {
-    err = GpuKernel_call(&ctx->blas_handle->dgemvBH_T_a1_b1_small, 2, ls, gs, 0, args);
+    err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->dgemvBH_T_a1_b1_small, 2, ls, gs, 0, args);
   }
 
   cuda_ops.buffer_release(Aa);
@@ -1063,7 +1079,7 @@ static int sger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
   cuda_wait(Y, CUDA_WAIT_READ);
   cuda_wait(A, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
 
-  err = cublasSger(ctx->blas_handle->h, M, N, &alpha,
+  err = cublasSger(((blas_handle *)ctx->blas_handle)->h, M, N, &alpha,
                    ((float *)X->ptr) + offX, incX,
                    ((float *)Y->ptr) + offY, incY,
                    ((float *)A->ptr) + offA, lda);
@@ -1116,7 +1132,7 @@ static int dger(cb_order order, size_t M, size_t N, double alpha, gpudata *X,
   cuda_wait(Y, CUDA_WAIT_READ);
   cuda_wait(A, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
 
-  err = cublasDger(ctx->blas_handle->h, M, N, &alpha,
+  err = cublasDger(((blas_handle *)ctx->blas_handle)->h, M, N, &alpha,
                    ((double *)X->ptr) + offX, incX,
                    ((double *)Y->ptr) + offY, incY,
                    ((double *)A->ptr) + offA, lda);
@@ -1142,8 +1158,8 @@ static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
                      gpudata **A, size_t *offA, size_t lda,
                      size_t batchCount, int flags) {
   cuda_context *ctx;
-  size_t t, i;
-  size_t ls[3] = {m, n, 1}, gs[3] = {1, 1, batchCount};
+  size_t t, *tp, i;
+  size_t ls[3] = {M, N, 1}, gs[3] = {1, 1, batchCount};
   void *args[10];
   gpudata **T;
   gpudata *Aa, *xa, *ya;
@@ -1181,9 +1197,9 @@ static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
     t = M;
     M = N;
     N = t;
-    t = offX;
+    tp = offX;
     offX = offY;
-    offY = t;
+    offY = tp;
     t = incX;
     incX = incY;
     incY = t;
@@ -1243,10 +1259,10 @@ static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
   args[5] = Aa;
   args[6] = &lda;
   args[7] = &batchCount;
-  args[8] = &m;
-  args[9] = &n;
+  args[8] = &M;
+  args[9] = &N;
 
-  err = GpuKernel_call(&ctx->blas_handle->sgerBH_gen_small, 3, ls, gs, 0, args);
+  err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->sgerBH_gen_small, 3, ls, gs, 0, args);
 
   cuda_ops.buffer_release(Aa);
   cuda_ops.buffer_release(xa);
@@ -1274,8 +1290,8 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
                      gpudata **A, size_t *offA, size_t lda,
                      size_t batchCount, int flags) {
   cuda_context *ctx;
-  size_t t, i;
-  size_t ls[3] = {m, n, 1}, gs[3] = {1, 1, batchCount};
+  size_t t, *tp, i;
+  size_t ls[3] = {M, N, 1}, gs[3] = {1, 1, batchCount};
   void *args[10];
   gpudata **T;
   gpudata *Aa, *xa, *ya;
@@ -1313,9 +1329,9 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
     t = M;
     M = N;
     N = t;
-    t = offX;
+    tp = offX;
     offX = offY;
-    offY = t;
+    offY = tp;
     t = incX;
     incX = incY;
     incY = t;
@@ -1375,10 +1391,10 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
   args[5] = Aa;
   args[6] = &lda;
   args[7] = &batchCount;
-  args[8] = &m;
-  args[9] = &n;
+  args[8] = &M;
+  args[9] = &N;
 
-  err = GpuKernel_call(&ctx->blas_handle->sgerBH_gen_small, 3, ls, gs, 0, args);
+  err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->sgerBH_gen_small, 3, ls, gs, 0, args);
 
   cuda_ops.buffer_release(Aa);
   cuda_ops.buffer_release(xa);

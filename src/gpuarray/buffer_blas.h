@@ -92,17 +92,20 @@ typedef struct _gpuarray_blas_ops {
                     gpudata **B, size_t *offB, size_t ldb,
                     double beta, gpudata **C, size_t *offC, size_t ldc,
                     size_t batchCount);
-  int (*hgemvBatch)(cb_order order, size_t M, size_t N, float alpha,
+  int (*hgemvBatch)(cb_order order, cb_transpose transA,
+                    size_t M, size_t N, float alpha,
                     gpudata **A, size_t *offA, size_t lda,
                     gpudata **x, size_t *offX, size_t incX,
                     float beta, gpudata **y, size_t *offY, size_t incY,
                     size_t batchCount, int flags);
-  int (*sgemvBatch)(cb_order order, size_t M, size_t N, float alpha,
+  int (*sgemvBatch)(cb_order order, cb_transpose transA,
+                    size_t M, size_t N, float alpha,
                     gpudata **A, size_t *offA, size_t lda,
                     gpudata **x, size_t *offX, size_t incX,
                     float beta, gpudata **y, size_t *offY, size_t incY,
                     size_t batchCount, int flags);
-  int (*dgemvBatch)(cb_order order, size_t M, size_t N, double alpha,
+  int (*dgemvBatch)(cb_order order, cb_transpose transA,
+                    size_t M, size_t N, double alpha,
                     gpudata **A, size_t *offA, size_t lda,
                     gpudata **x, size_t *offX, size_t incX,
                     double beta, gpudata **y, size_t *offY, size_t incY,
