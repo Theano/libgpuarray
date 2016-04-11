@@ -99,9 +99,6 @@ int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
 
   switch (Ap->typecode) {
   case GA_HALF:
-    if (blas->hgemv == NULL)
-      err = GA_DEVSUP_ERROR;
-    else
       err = blas->hgemv(o, transA, m, n, (float)alpha, Ap->data, Ap->offset / elsize, lda, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, (float)beta, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize);
     break;
   case GA_FLOAT:
@@ -259,9 +256,6 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
 
   switch (Ap->typecode) {
   case GA_HALF:
-    if (blas->hgemm == NULL)
-      err = GA_DEVSUP_ERROR;
-    else
       err = blas->hgemm(o, transA, transB, m, n, k, (float)alpha, Ap->data, Ap->offset / elsize, lda, Bp->data, Bp->offset / elsize, ldb, (float)beta, Cp->data, Cp->offset / elsize, ldc);
     break;
   case GA_FLOAT:
@@ -364,9 +358,6 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
 
   switch(Xp->typecode) {
   case GA_HALF:
-    if (blas->hger == NULL)
-      err = GA_DEVSUP_ERROR;
-    else
       err = blas->hger(o, m, n, (float)alpha, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize, Ap->data, Ap->offset / elsize, lda);
     break;
   case GA_FLOAT:

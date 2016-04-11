@@ -464,6 +464,15 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
 #endif
 }
 
+static int hgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
+                      size_t M, size_t N, size_t K, float alpha,
+                      gpudata **A, size_t *offA, size_t lda,
+                      gpudata **B, size_t *offB, size_t ldb,
+                      float beta, gpudata **C, size_t *offC, size_t ldc,
+                      size_t batchCount) {
+  return GA_DEVSUP_ERROR;
+}
+
 static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
                       size_t M, size_t N, size_t K, float alpha,
                       gpudata **A, size_t *offA, size_t lda,
@@ -696,6 +705,13 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   return GA_NO_ERROR;
 }
 
+static int hgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
+                 float alpha, gpudata *A, size_t offA, size_t lda,
+                 gpudata *X, size_t offX, int incX,
+                 float beta, gpudata *Y, size_t offY, int incY) {
+  return GA_DEVSUP_ERROR;
+}
+
 static int sgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
                  float alpha, gpudata *A, size_t offA, size_t lda,
                  gpudata *X, size_t offX, int incX,
@@ -796,6 +812,15 @@ static int dgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
   cuda_exit(ctx);
 
   return GA_NO_ERROR;
+}
+
+static int hgemvBatch(cb_order order, cb_transpose transA,
+                      size_t M, size_t N, float alpha,
+                      gpudata **A, size_t *offA, size_t lda,
+                      gpudata **x, size_t *offX, size_t incX,
+                      float beta, gpudata **y, size_t *offY, size_t incY,
+                      size_t batchCount, int flags) {
+  return GA_DEVSUP_ERROR;
 }
 
 static int sgemvBatch(cb_order order, cb_transpose transA,
@@ -1046,6 +1071,12 @@ static int dgemvBatch(cb_order order, cb_transpose transA,
 }
 
 
+static int hger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
+                size_t offX, int incX, gpudata *Y, size_t offY, int incY,
+                gpudata *A, size_t offA, size_t lda) {
+  return GA_DEVSUP_ERROR;
+}
+
 static int sger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
                 size_t offX, int incX, gpudata *Y, size_t offY, int incY,
                 gpudata *A, size_t offA, size_t lda) {
@@ -1150,6 +1181,14 @@ static int dger(cb_order order, size_t M, size_t N, double alpha, gpudata *X,
   cuda_exit(ctx);
 
   return GA_NO_ERROR;
+}
+
+static int hgerBatch(cb_order order, size_t M, size_t N, float alpha,
+                     gpudata **x, size_t *offX, size_t incX,
+                     gpudata **y, size_t *offY, size_t incY,
+                     gpudata **A, size_t *offA, size_t lda,
+                     size_t batchCount, int flags) {
+  return GA_DEVSUP_ERROR;
 }
 
 static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
@@ -1419,22 +1458,22 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
 GPUARRAY_LOCAL gpuarray_blas_ops cublas_ops = {
   setup,
   teardown,
-  NULL, /* hgemv */
+  hgemv, /* TODO */
   sgemv,
   dgemv,
   hgemm,
   sgemm,
   dgemm,
-  NULL, /* hger */
+  hger, /* TODO */
   sger,
   dger,
-  NULL, /* hgemmBatch */
+  hgemmBatch, /* TODO */
   sgemmBatch,
   dgemmBatch,
-  NULL, /* hgemvBatch */
+  hgemvBatch, /* TODO */
   sgemvBatch,
   dgemvBatch,
-  NULL, /* hgerBatch */
+  hgerBatch, /* TODO */
   sgerBatch,
   dgerBatch
 };
