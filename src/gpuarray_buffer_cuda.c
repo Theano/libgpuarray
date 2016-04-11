@@ -42,7 +42,7 @@ void *cuda_make_ctx(CUcontext ctx, int flags) {
   cuda_context *res;
   void *p;
 
-  res = malloc(sizeof(*res));
+  res = calloc(1, sizeof(*res));
   if (res == NULL)
     return NULL;
   res->ctx = ctx;
