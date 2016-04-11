@@ -33,10 +33,10 @@ typedef struct _blas_handle {
 } blas_handle;
 
 static const char *code_sgemvBH_N_a1_b1_small =                         \
-  "__global__ void _sgemv(const float *A[], size_t lda, "               \
-  "                       const float *x[], size_t incx, "              \
-  "                       float *y[], size_t incy, "                    \
-  "                       size_t b, size_t m, size_t n) {"              \
+  "extern \"C\"__global__ void sgemv(const float *A[], size_t lda, "    \
+  "                                  const float *x[], size_t incx, "   \
+  "                                  float *y[], size_t incy, "         \
+  "                                  size_t b, size_t m, size_t n) {"   \
   "  for (size_t p = blockIdx.y * blockDim.y + threadIdx.y; p < b;"     \
   "       p += gridDim.y * blockDim.y) {"                               \
   "    for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < m;"   \
@@ -55,23 +55,23 @@ static const char *code_sgemvBH_N_a1_b1_small =                         \
   "  }"                                                                 \
   "}";
 
-static const char *code_sgemvBH_T_a1_b1_small =                 \
-  "__global__ void _sgemv(const float *A[], size_t lda, "       \
-  "                       const float *x[], size_t incx, "      \
-  "                       float *y[], size_t incy, "            \
-  "                       size_t b, size_t m, size) n) {"       \
-  "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;"         \
-  "  size_t p = blockIdx.y * blockDim.y + threadIdx.y;"         \
-  "  if (i >= m || p >= b) return;"                             \
-  "  float yi = 0.0f;"                                          \
-  "  const float *Ap = A[p] + i * lda;"                         \
-  "  const float *xp = x[p];\n"                                 \
-  "  # pragma unroll 32\n"                                      \
-  "  for (size_t j = 0; j < n; j++) {"                          \
-  "    yi += Ap[j] * xp[0];"                                    \
-  "    xp += incx;"                                             \
-  "  }"                                                         \
-  "  atomicAdd(&y[p][i*incy], yi);"                             \
+static const char *code_sgemvBH_T_a1_b1_small =                         \
+  "extern \"C\" __global__ void sgemv(const float *A[], size_t lda, "   \
+  "                                   const float *x[], size_t incx, "  \
+  "                                   float *y[], size_t incy, "        \
+  "                                   size_t b, size_t m, size) n) {"   \
+  "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;"                 \
+  "  size_t p = blockIdx.y * blockDim.y + threadIdx.y;"                 \
+  "  if (i >= m || p >= b) return;"                                     \
+  "  float yi = 0.0f;"                                                  \
+  "  const float *Ap = A[p] + i * lda;"                                 \
+  "  const float *xp = x[p];\n"                                         \
+  "  # pragma unroll 32\n"                                              \
+  "  for (size_t j = 0; j < n; j++) {"                                  \
+  "    yi += Ap[j] * xp[0];"                                            \
+  "    xp += incx;"                                                     \
+  "  }"                                                                 \
+  "  atomicAdd(&y[p][i*incy], yi);"                                     \
   "}\n";
 
 static const char *atomicadd_double =                                   \
@@ -89,10 +89,10 @@ static const char *atomicadd_double =                                   \
   "}\n";
 
 static const char *code_dgemvBH_N_a1_b1_small =                         \
-  "__global__ void _dgemv(const double *A[], size_t lda, "              \
-  "                       const double *x[], size_t incx, "             \
-  "                       double *y[], size_t incy, "                   \
-  "                       size_t b, size_t m, size_t n) {"              \
+  "extern \"C\" __global__ void _dgemv(const double *A[], size_t lda, " \
+  "                                    const double *x[], size_t incx," \
+  "                                    double *y[], size_t incy, "      \
+  "                                    size_t b, size_t m, size_t n) {" \
   "  for (size_t p = blockIdx.y * blockDim.y + threadIdx.y; p < b;"     \
   "       p += gridDim.y * blockDim.y) {"                               \
   "    for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < m;"   \
@@ -111,31 +111,31 @@ static const char *code_dgemvBH_N_a1_b1_small =                         \
   "  }"                                                                 \
   "}\n";
 
-static const char *code_dgemvBH_T_a1_b1_small =                 \
-  "__global__ void _dgemv(const double *A[], size_t lda, "      \
-  "                       const double *x[], size_t incx, "     \
-  "                       double *y[], size_t incy, "           \
-  "                       size_t b, size_t m, size_t n) {"      \
-  "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;"         \
-  "  size_t p = blockIdx.y * blockDim.y + threadIdx.y;"         \
-  "  if (i >= m || p >= b) return;"                             \
-  "  double yi = 0.0;"                                          \
-  "  const double *Ap = A[p] + i * lda;"                        \
-  "  const double *xp = x[p];\n"                                \
-  "  # pragma unroll 32\n"                                      \
-  "  for (size_t j = 0; j < n; j++) {"                          \
-  "    yi += Ap[j] * xp[0];"                                    \
-  "    xp += incx;"                                             \
-  "  }"                                                         \
-  "  atomicAdd(&y[p][i*incy], yi);"                             \
+static const char *code_dgemvBH_T_a1_b1_small =                         \
+  "extern \"C\" __global__ void _dgemv(const double *A[], size_t lda, " \
+  "                                    const double *x[], size_t incx," \
+  "                                    double *y[], size_t incy, "      \
+  "                                    size_t b, size_t m, size_t n) {" \
+  "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;"                 \
+  "  size_t p = blockIdx.y * blockDim.y + threadIdx.y;"                 \
+  "  if (i >= m || p >= b) return;"                                     \
+  "  double yi = 0.0;"                                                  \
+  "  const double *Ap = A[p] + i * lda;"                                \
+  "  const double *xp = x[p];\n"                                        \
+  "  # pragma unroll 32\n"                                              \
+  "  for (size_t j = 0; j < n; j++) {"                                  \
+  "    yi += Ap[j] * xp[0];"                                            \
+  "    xp += incx;"                                                     \
+  "  }"                                                                 \
+  "  atomicAdd(&y[p][i*incy], yi);"                                     \
   "}\n";
 
 static const char *code_sgerBH_gen_small =                              \
-  "__global__ void _sgerBH_gen_small(const float *x[], size_t incx,"    \
-  "                                  const float *y[], size_t incy,"    \
-  "                                  float alpha,"                      \
-  "                                  float *A[], size_t lda,"           \
-  "                                  size_t b, size_t m, size_t n) {"   \
+  "extern \"C\" __global__ void _sgerBH_gen_small("                     \
+  "    const float *x[], size_t incx,"                                  \
+  "    const float *y[], size_t incy,"                                  \
+  "    float alpha, float *A[], size_t lda,"                            \
+  "    size_t b, size_t m, size_t n) {"                                 \
   "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;"                 \
   "  size_t j = blockIdx.y * blockDim.y + threadIdx.y;"                 \
   "  if (i >= m || j >= n) return;"                                     \
@@ -146,11 +146,11 @@ static const char *code_sgerBH_gen_small =                              \
   "}\n";
 
 static const char *code_dgerBH_gen_small =                              \
-  "__global__ void _dgerBH_gen_small(const double *x[], size_t incx,"   \
-  "                                  const double *y[], size_t incy,"   \
-  "                                  double alpha,"                     \
-  "                                  double *A[], size_t lda,"          \
-  "                                  size_t b, size_t m, size_t n) {"   \
+  "extern \"C\" __global__ void _dgerBH_gen_small("                     \
+  "      const double *x[], size_t incx, "                              \
+  "      const double *y[], size_t incy,"                               \
+  "      double alpha, double *A[], size_t lda,"                        \
+  "      size_t b, size_t m, size_t n) {"                               \
   "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;"                 \
   "  size_t j = blockIdx.y * blockDim.y + threadIdx.y;"                 \
   "  if (i >= m || j >= n) return;"                                     \
