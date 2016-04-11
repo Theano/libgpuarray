@@ -171,7 +171,7 @@ static int setup(void *c) {
   if (ctx->blas_handle != NULL)
     return GA_NO_ERROR;
 
-  handle = calloc(1, sizeof(handle));
+  handle = calloc(1, sizeof(*handle));
   if (handle == NULL)
     return GA_MEMORY_ERROR;
 
