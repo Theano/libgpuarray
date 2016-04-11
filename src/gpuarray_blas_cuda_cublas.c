@@ -34,9 +34,9 @@ typedef struct _blas_handle {
 
 static const char *code_sgemvBH_N_a1_b1_small =                         \
   "__global__ void _sgemv(const float *A[], size_t lda, "               \
-  "                       const float *x[], size_t incX, "              \
+  "                       const float *x[], size_t incx, "              \
   "                       float *y[], size_t incy, "                    \
-  "                       ga_size b, ga_size m, ga_size n) {"           \
+  "                       size_t b, size_t m, size_t n) {"              \
   "  for (size_t p = blockIdx.y * blockDim.y + threadIdx.y; p < b;"     \
   "       p += gridDim.y * blockDim.y) {"                               \
   "    for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < m;"   \
@@ -57,9 +57,9 @@ static const char *code_sgemvBH_N_a1_b1_small =                         \
 
 static const char *code_sgemvBH_T_a1_b1_small =                 \
   "__global__ void _sgemv(const float *A[], size_t lda, "       \
-  "                       const float *x[], size_t incX, "      \
+  "                       const float *x[], size_t incx, "      \
   "                       float *y[], size_t incy, "            \
-  "                       ga_size b, ga_size m, ga_size n) {"   \
+  "                       size_t b, size_t m, size) n) {"       \
   "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;"         \
   "  size_t p = blockIdx.y * blockDim.y + threadIdx.y;"         \
   "  if (i >= m || p >= b) return;"                             \
@@ -90,9 +90,9 @@ static const char *atomicadd_double =                                   \
 
 static const char *code_dgemvBH_N_a1_b1_small =                         \
   "__global__ void _dgemv(const double *A[], size_t lda, "              \
-  "                       const double *x[], size_t incX, "             \
+  "                       const double *x[], size_t incx, "             \
   "                       double *y[], size_t incy, "                   \
-  "                       ga_size b, ga_size m, ga_size n) {"           \
+  "                       size_t b, size_t m, size_t n) {"              \
   "  for (size_t p = blockIdx.y * blockDim.y + threadIdx.y; p < b;"     \
   "       p += gridDim.y * blockDim.y) {"                               \
   "    for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < m;"   \
@@ -113,9 +113,9 @@ static const char *code_dgemvBH_N_a1_b1_small =                         \
 
 static const char *code_dgemvBH_T_a1_b1_small =                 \
   "__global__ void _dgemv(const double *A[], size_t lda, "      \
-  "                       const double *x[], size_t incX, "     \
+  "                       const double *x[], size_t incx, "     \
   "                       double *y[], size_t incy, "           \
-  "                       ga_size b, ga_size m, ga_size n) {"   \
+  "                       size_t b, size_t m, size_t n) {"      \
   "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;"         \
   "  size_t p = blockIdx.y * blockDim.y + threadIdx.y;"         \
   "  if (i >= m || p >= b) return;"                             \
