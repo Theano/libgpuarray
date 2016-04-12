@@ -12,7 +12,9 @@ struct _GpuElemwise {
   const char *preamble;
   gpuelemwise_arg *args;
   GpuKernel k_contig;
+  GpuKernel *k_basic;
   unsigned int n;
+  unsigned int nd;
   int flags;
 };
 
@@ -24,41 +26,17 @@ static inline const char *ctype(int typecode) {
 
 /* dst has to be zero-initialized on entry */
 static int copy_arg(gpuelemwise_arg *dst, gpuelemwise_arg *src) {
-  if (src->dims != NULL) {
-    dst->dims = memdup(src->dims, src->nd * sizeof(size_t));
-    if (dst->dims == NULL) goto fail_dims;
-  }
-
-  if (src->strs != NULL) {
-    dst->strs = memdup(src->strs, src->nd * sizeof(ssize_t));
-    if (dst->strs == NULL) goto fail_strs;
-  }
-
   dst->name = strdup(src->name);
   if (dst->name == NULL)
-    goto fail_name;
+    return -1;
 
-  dst->nd = src->nd;
   dst->typecode = src->typecode;
   dst->flags = src->flags;
 
   return 0;
-
- fail_name:
-  free(dst->strs);
-  dst->strs = NULL;
- fail_strs:
-  free(dst->dims);
-  dst->dims = NULL;
- fail_dims:
-  return -1;
 }
 
 static void clear_arg(gpuelemwise_arg *a) {
-  free(a->dims);
-  a->dims = NULL;
-  free(a->strs);
-  a->strs = NULL;
   free((void *)a->name);
   a->name = NULL;
 }
@@ -336,50 +314,45 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
 
 static int call_basic(GpuElemwise *ge, void **args, size_t n, unsigned int nd,
                       size_t *dims, ssize_t **strs) {
-  GpuKernel k;
+  GpuKernel *k;
   size_t ls = 0, gs = 0;
   unsigned int p = 0, i, j;
   int err;
 
-  /* XXX: can reuse the global args since we don't specialize, but
-     dims and strides are wrong if collapsing. */
+  if (nd == 0) return GA_VALUE_ERROR;
 
-  err = gen_elemwise_basic_kernel(&k, ge->k_contig.ops,
-                                  GpuKernel_context(&ge->k_contig), NULL,
-                                  ge->preamble, ge->expr, nd, ge->n, ge->args);
-  if (err != GA_NO_ERROR) return err;
+  k = &ge->k_basic[nd-1];
 
-  err = GpuKernel_setarg(&k, p++, &n);
+  err = GpuKernel_setarg(k, p++, &n);
   if (err != GA_NO_ERROR) goto error;
 
   for (i = 0; i < nd; i++) {
-    err = GpuKernel_setarg(&k, p++, &dims[i]);
+    err = GpuKernel_setarg(k, p++, &dims[i]);
     if (err != GA_NO_ERROR) goto error;
   }
 
   for (j = 0; j < ge->n; j++) {
     if (is_array(ge->args[j])) {
       GpuArray *v = (GpuArray *)args[j];
-      err = GpuKernel_setarg(&k, p++, v->data);
+      err = GpuKernel_setarg(k, p++, v->data);
       if (err != GA_NO_ERROR) goto error;
-      err = GpuKernel_setarg(&k, p++, &v->offset);
+      err = GpuKernel_setarg(k, p++, &v->offset);
       if (err != GA_NO_ERROR) goto error;
       for (i = 0; i < nd; i++) {
-        err = GpuKernel_setarg(&k, p++, &strs[j][i]);
+        err = GpuKernel_setarg(k, p++, &strs[j][i]);
         if (err != GA_NO_ERROR) goto error;
       }
     } else {
-      err = GpuKernel_setarg(&k, p++, args[j]);
+      err = GpuKernel_setarg(k, p++, args[j]);
       if (err != GA_NO_ERROR) goto error;
     }
   }
 
-  err = GpuKernel_sched(&ge->k_contig, n, &ls, &gs);
+  err = GpuKernel_sched(k, n, &ls, &gs);
   if (err != GA_NO_ERROR) goto error;
 
-  err = GpuKernel_call(&k, 1, &ls, &gs, 0, NULL);
+  err = GpuKernel_call(k, 1, &ls, &gs, 0, NULL);
  error:
-  GpuKernel_clear(&k);
   return err;
 }
 
@@ -530,8 +503,9 @@ static int call_contig(GpuElemwise *ge, void **args, size_t n) {
 GpuElemwise *GpuElemwise_new(const gpuarray_buffer_ops *ops, void * ctx,
                              const char *preamble, const char *expr,
                              unsigned int n, gpuelemwise_arg *args,
-                             int flags) {
+                             unsigned int nd, int flags) {
   GpuElemwise *res;
+  unsigned int i;
   int ret;
 
   res = malloc(sizeof(*res));
@@ -555,15 +529,35 @@ GpuElemwise *GpuElemwise_new(const gpuarray_buffer_ops *ops, void * ctx,
   if (res->args == NULL)
     goto fail_args;
 
+  res->nd = nd;
+  res->k_basic = calloc(nd, sizeof(GpuKernel));
+  if (res->k_basic == NULL)
+    goto fail_basicl;
+
   ret = gen_elemwise_contig_kernel(&res->k_contig, ops, ctx, NULL,
                                    res->preamble, res->expr,
                                    res->n, res->args);
   if (ret != GA_NO_ERROR)
     goto fail_contig;
 
+  for (i = 0; i < nd; i++) {
+    ret = gen_elemwise_basic_kernel(&res->k_basic[i], ops, ctx, NULL,
+                                    res->preamble, res->expr,
+                                    i+1, res->n, res->args);
+    if (ret != GA_NO_ERROR)
+      goto fail_basic_gen;
+  }
+
   return res;
 
+fail_basic_gen:
+  for (; i > 0; i--) {
+    GpuKernel_clear(&res->k_basic[i-1]);
+  }
+  GpuKernel_clear(&res->k_contig);
  fail_contig:
+  free(res->k_basic);
+ fail_basicl:
   free_args(res->n, res->args);
  fail_args:
   free((void *)res->preamble);
@@ -575,6 +569,10 @@ GpuElemwise *GpuElemwise_new(const gpuarray_buffer_ops *ops, void * ctx,
 }
 
 void GpuElemwise_free(GpuElemwise *ge) {
+  unsigned int i;
+  for (i = 0; i < ge->nd; i++) {
+    GpuKernel_clear(&ge->k_basic[i]);
+  }
   GpuKernel_clear(&ge->k_contig);
   free_args(ge->n, ge->args);
   free((void *)ge->preamble);

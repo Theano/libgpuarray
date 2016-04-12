@@ -43,21 +43,18 @@ START_TEST(test_contig_simple)
   ga_assert_ok(GpuArray_empty(&c, ops, ctx, GA_UINT, 1, dims, GA_C_ORDER));
 
   args[0].name = "a";
-  args[0].nd = 1;
   args[0].typecode = GA_UINT;
   args[0].flags = GE_READ;
 
   args[1].name = "b";
-  args[1].nd = 1;
   args[1].typecode = GA_UINT;
   args[1].flags = GE_READ;
 
   args[2].name = "c";
-  args[2].nd = 1;
   args[2].typecode = GA_UINT;
   args[2].flags = GE_WRITE;
 
-  ge = GpuElemwise_new(ops, ctx, "", "c = a + b", 3, args, 0);
+  ge = GpuElemwise_new(ops, ctx, "", "c = a + b", 3, args, 1, 0);
 
   ck_assert_ptr_ne(ge, NULL);
 
@@ -105,21 +102,18 @@ START_TEST(test_basic_simple)
   ga_assert_ok(GpuArray_empty(&c, ops, ctx, GA_UINT, 2, dims, GA_C_ORDER));
 
   args[0].name = "a";
-  args[0].nd = 2;
   args[0].typecode = GA_UINT;
   args[0].flags = GE_READ;
 
   args[1].name = "b";
-  args[1].nd = 2;
   args[1].typecode = GA_UINT;
   args[1].flags = GE_READ;
 
   args[2].name = "c";
-  args[2].nd = 2;
   args[2].typecode = GA_UINT;
   args[2].flags = GE_WRITE;
 
-  ge = GpuElemwise_new(ops, ctx, "", "c = a + b", 3, args, 0);
+  ge = GpuElemwise_new(ops, ctx, "", "c = a + b", 3, args, 2, 0);
 
   ck_assert_ptr_ne(ge, NULL);
 
@@ -169,21 +163,18 @@ START_TEST(test_basic_remove1)
   ga_assert_ok(GpuArray_empty(&c, ops, ctx, GA_UINT, 4, dims, GA_C_ORDER));
 
   args[0].name = "a";
-  args[0].nd = 4;
   args[0].typecode = GA_UINT;
   args[0].flags = GE_READ;
 
   args[1].name = "b";
-  args[1].nd = 4;
   args[1].typecode = GA_UINT;
   args[1].flags = GE_READ;
 
   args[2].name = "c";
-  args[2].nd = 4;
   args[2].typecode = GA_UINT;
   args[2].flags = GE_WRITE;
 
-  ge = GpuElemwise_new(ops, ctx, "", "c = a + b", 3, args, 0);
+  ge = GpuElemwise_new(ops, ctx, "", "c = a + b", 3, args, 4, 0);
 
   ck_assert_ptr_ne(ge, NULL);
 
@@ -240,21 +231,18 @@ START_TEST(test_basic_broadcast)
   ga_assert_ok(GpuArray_empty(&c, ops, ctx, GA_UINT, 2, dims, GA_C_ORDER));
 
   args[0].name = "a";
-  args[0].nd = 2;
   args[0].typecode = GA_UINT;
   args[0].flags = GE_READ;
 
   args[1].name = "b";
-  args[1].nd = 2;
   args[1].typecode = GA_UINT;
   args[1].flags = GE_READ;
 
   args[2].name = "c";
-  args[2].nd = 2;
   args[2].typecode = GA_UINT;
   args[2].flags = GE_WRITE;
 
-  ge = GpuElemwise_new(ops, ctx, "", "c = a + b", 3, args, 0);
+  ge = GpuElemwise_new(ops, ctx, "", "c = a + b", 3, args, 2, 0);
 
   ck_assert_ptr_ne(ge, NULL);
 
@@ -307,21 +295,18 @@ START_TEST(test_basic_collapse)
   ga_assert_ok(GpuArray_empty(&c, ops, ctx, GA_UINT, 2, dims, GA_C_ORDER));
 
   args[0].name = "a";
-  args[0].nd = 2;
   args[0].typecode = GA_UINT;
   args[0].flags = GE_READ;
 
   args[1].name = "b";
-  args[1].nd = 2;
   args[1].typecode = GA_UINT;
   args[1].flags = GE_READ;
 
   args[2].name = "c";
-  args[2].nd = 2;
   args[2].typecode = GA_UINT;
   args[2].flags = GE_WRITE;
 
-  ge = GpuElemwise_new(ops, ctx, "", "c = a + b", 3, args, 0);
+  ge = GpuElemwise_new(ops, ctx, "", "c = a + b", 3, args, 2, 0);
 
   ck_assert_ptr_ne(ge, NULL);
 
