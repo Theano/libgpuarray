@@ -53,7 +53,7 @@ static const char *code_sgemvBH_N_a1_b1_small =                         \
   "     atomicAdd(&y[p][i*incy], yi);"                                  \
   "    }"                                                               \
   "  }"                                                                 \
-  "}";
+  "}\n";
 
 static const char *code_sgemvBH_T_a1_b1_small =                         \
   "extern \"C\" __global__ void sgemv(const float *A[], size_t lda, "   \
@@ -154,7 +154,7 @@ static const char *code_dgerBH_gen_small =                              \
   "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;"                 \
   "  size_t j = blockIdx.y * blockDim.y + threadIdx.y;"                 \
   "  if (i >= m || j >= n) return;"                                     \
-  "  for (size-t p = blockIdx.z; p < b; p += gridDim.z) {"              \
+  "  for (size_t p = blockIdx.z; p < b; p += gridDim.z) {"              \
   "    atomicAdd(&A[p][j * lda + i],"                                   \
   "              alpha * x[p][i * incx] * y[p][j * incy]);"             \
   "  }"                                                                 \

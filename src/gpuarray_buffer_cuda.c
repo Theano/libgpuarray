@@ -1170,7 +1170,7 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
       if (strb_error(&sb)) {
         strb_clear(&sb);
         cuda_exit(ctx);
-        return NULL;
+        FAIL(NULL, GA_MEMORY_ERROR);
       }
 
       if (ptx_mode) {
