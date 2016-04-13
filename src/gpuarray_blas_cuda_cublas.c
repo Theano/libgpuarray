@@ -306,8 +306,7 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
                         (float*)A[i]->ptr + offA[i], lda,
                         (float*)B[i]->ptr + offB[i], ldb,
                         &beta,
-                        (float*)C[i]->ptr + offC[i], ldc,
-                        batchCount);
+                        (float*)C[i]->ptr + offC[i], ldc);
       if (err != CUBLAS_STATUS_SUCCESS) {
         cuda_exit(ctx);
         if (err == CUBLAS_STATUS_ARCH_MISMATCH)
