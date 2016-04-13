@@ -1,18 +1,30 @@
 enable_testing()
 
-find_package(Check)
+find_package(PkgConfig)
+
+pkg_search_module(CHECK check)
+
+if (NOT CHECK_FOUND)
+
+find_path(CHECK_INCLUDE_DIRS check.h)
+find_library(CHECK_LIBRARIES NAMES check)
+
+if (CHECK_INCLUDE_DIRS AND CHECK_LIBRARIES)
+  set(CHECK_CFLAGS)
+  set(CHECK_LIBRARY_DIRS)
+  set(CHECK_FOUND 1)
+endif()
+
+endif()
 
 if (CHECK_FOUND)
 
 include_directories(${CHECK_INCLUDE_DIRS})
+link_directories(${CHECK_LIBRARY_DIRS})
 
 set(LIBS ${LIBS} ${CHECK_LIBRARIES})
 
-# This is a workaround because cmake is stupid when dealing with
-# pkg-config output
-STRING(REPLACE ";" " " CHK_FLAGS "${CHECK_CFLAGS}")
-
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CHK_FLAGS}")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CHECK_CFLAGS}")
 
 include_directories(. ../src)
 
