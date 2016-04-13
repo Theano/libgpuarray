@@ -402,8 +402,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   gpudata **A_datas = NULL, **B_datas = NULL, **C_datas = NULL;
   size_t *A_offsets = NULL, *B_offsets = NULL, *C_offsets = NULL;
 
-  if (A->typecode != GA_HALF && A->typecode != GA_FLOAT &&
-      A->typecode != GA_DOUBLE)
+  if (A->typecode != GA_FLOAT && A->typecode != GA_DOUBLE)
     return GA_INVALID_ERROR;
 
   if (A->nd != 3 || B->nd != 3 || C->nd != 3 ||
@@ -548,16 +547,6 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   }
 
   switch (C->typecode) {
-  case GA_HALF:
-    if (blas->hgemm == NULL)
-      err = GA_DEVSUP_ERROR;
-    else
-      err = blas->hgemmBatch(o, transA, transB, m, n, k, (float)alpha,
-                             A_datas, A_offsets, lda,
-                             B_datas, B_offsets, ldb,
-                             (float)beta,
-                             C_datas, C_offsets, ldc, batchCount);
-    break;
   case GA_FLOAT:
     err = blas->sgemmBatch(o, transA, transB, m, n, k, (float)alpha,
                            A_datas, A_offsets, lda,
