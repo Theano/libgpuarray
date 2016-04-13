@@ -136,7 +136,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
 
   strb_appends(&sb, "for(i = idx; i < n; i += numThreads) {\n");
   if (nd > 0)
-    strb_appends(&sb, "int ii = i;\nint pos;\n");
+    strb_appends(&sb, "ga_size ii = i;\nga_size pos;\n");
   for (j = 0; j < n; j++) {
     if (is_array(args[j]))
       strb_appendf(&sb, "GLOBAL_MEM char *%s_p = (GLOBAL_MEM char *)%s_data;\n",
