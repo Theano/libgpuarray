@@ -623,6 +623,8 @@ def init(dev, sched='default', disable_alloc_cache=False):
     are no gaps in the valid numbers.
     """
     cdef int flags = 0
+    if gpuarray_api_major != -9999 or gpuarray_api_minor < 0:
+        raise RuntimeError("Pygpu was compiled for a different version of the api, recompile it to avoid problems.")
     if sched == 'single':
         flags |= GA_CTX_SINGLE_THREAD
     elif sched == 'multi':
