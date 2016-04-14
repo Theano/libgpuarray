@@ -441,6 +441,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
 
   elsize = gpuarray_get_elsize(A->typecode);
 
+  // FIXME: these conditions are overly restrictive; the first axis need not be contiguous
   if (!GpuArray_ISONESEGMENT(A)) {
     if (nocopy)
       return GA_COPY_ERROR;
