@@ -288,10 +288,8 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   }
 
   // use parallel cublasSgemm calls rather than cublasSgemmBatched for large products
-  // (compute products in double because they can be large and we don't need to be exact)
-  const double threshold = 650;
-  const int multiple_dispatch = ((double)M * (double)N * (double)K >
-                                 threshold * threshold * threshold);
+  const size_t threshold = 650;
+  const int multiple_dispatch = M * N * K > threshold * threshold * threshold;
   if (multiple_dispatch) {
     for (i = 0; i < batchCount; i++) {
       ASSERT_BUF(A[i]);
@@ -406,10 +404,8 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   }
 
   // use parallel cublasSgemm calls rather than cublasSgemmBatched for large products
-  // (compute products in double because they can be large and we don't need to be exact)
-  const double threshold = 650;
-  const int multiple_dispatch = ((double)M * (double)N * (double)K >
-                                 threshold * threshold * threshold);
+  const size_t threshold = 650;
+  const int multiple_dispatch = M * N * K > threshold * threshold * threshold;
   if (multiple_dispatch) {
     for (i = 0; i < batchCount; i++) {
       ASSERT_BUF(A[i]);
