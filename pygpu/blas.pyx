@@ -17,10 +17,6 @@ cdef extern from "gpuarray/blas.h":
                        double beta, _GpuArray *C, int nocopy)
     int GpuArray_rger(double alpha, _GpuArray *X, _GpuArray *Y, _GpuArray *A,
                       int nocopy)
-    int GpuArray_rgemmBatch(cb_transpose transA, cb_transpose transB,
-                            double alpha, _GpuArray **A, _GpuArray **B,
-                            double beta, _GpuArray **C, size_t batchCount,
-                            int nocopy);
 
 cdef api int pygpu_blas_rgemv(cb_transpose transA, double alpha, GpuArray A,
                               GpuArray X, double beta, GpuArray Y,
