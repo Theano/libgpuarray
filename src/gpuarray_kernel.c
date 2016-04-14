@@ -73,15 +73,15 @@ int GpuKernel_sched(GpuKernel *k, size_t n, size_t *ls, size_t *gs) {
   }
 
   if (*gs == 0) {
-    *gs = ((n-1) / *ls);
+    *gs = ((n-1) / *ls) + 1;
     if (*gs > target_g)
       *gs = target_g;
   }
 
-  if (want_ls) {
+  if (want_ls && n > (*ls * *gs)) {
     /* The division and multiplication by min_l is to ensure we end up
      * with a multiple of min_l */
-    *ls = (((n-1) / min_l) / *gs) * min_l;
+    *ls = ((n / min_l) / *gs) * min_l;
     if (*ls > target_l)
       *ls = target_l;
   }
