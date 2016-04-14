@@ -627,6 +627,9 @@ fail_basic_gen:
 void GpuElemwise_free(GpuElemwise *ge) {
   unsigned int i;
   for (i = 0; i < ge->nd; i++) {
+    GpuKernel_clear(&ge->k_basic_32[i]);
+  }
+  for (i = 0; i < ge->nd; i++) {
     GpuKernel_clear(&ge->k_basic[i]);
   }
   GpuKernel_clear(&ge->k_contig);
