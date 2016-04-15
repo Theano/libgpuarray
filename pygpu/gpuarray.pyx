@@ -916,6 +916,12 @@ def array(proto, dtype=None, copy=True, order=None, int ndmin=0,
                               np.PyArray_NDIM(a), <size_t *>np.PyArray_DIMS(a),
                               <ssize_t *>np.PyArray_STRIDES(a), context, cls)
 
+cdef void (*cuda_enter)(void *)
+cdef void (*cuda_exit)(void *)
+
+cuda_enter = <void (*)(void *)>gpuarray_get_extension("cuda_enter")
+cuda_exit = <void (*)(void *)>gpuarray_get_extension("cuda_exit")
+
 cdef class GpuContext:
     """
     Class that holds all the information pertaining to a context.
@@ -958,6 +964,19 @@ cdef class GpuContext:
                 raise get_exc(err), "No device %d"%(devno,)
             else:
                 raise get_exc(err), self.ops.ctx_error(NULL) + ": " + str(devno)
+
+    def __enter__(self):
+        if cuda_enter == NULL:
+            raise RuntimeError("cuda_enter not available")
+        if cuda_exit == NULL:
+            raise RuntimeError("cuda_exit not available")
+        if self.ops != gpuarray_get_ops("cuda"):
+            raise ValueError("Context manager only works for cuda")
+        cuda_enter(self.ctx)
+        return self
+
+    def __exit__(self, t, v, tb):
+        cuda_exit(self.ctx)
 
     property kind:
         "Module name this context uses"
