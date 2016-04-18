@@ -111,7 +111,7 @@ void gpukernel_source_with_line_numbers(unsigned int count,
   }
 }
 
-static int get_flags(int typecode) {
+static int get_type_flags(int typecode) {
   int flags = 0;
   if (typecode == GA_DOUBLE || typecode == GA_CDOUBLE)
     flags |= GA_USE_DOUBLE;
@@ -132,7 +132,7 @@ int gpuarray_type_flags(int init, ...) {
 
   va_start(ap, init);
   while (typecode != -1) {
-    flags |= get_flags(typecode);
+    flags |= get_type_flags(typecode);
     typecode = va_arg(ap, int);
   }
   va_end(ap);
@@ -143,7 +143,7 @@ int gpuarray_type_flagsa(unsigned int n, gpuelemwise_arg *args) {
   unsigned int i;
   int flags = 0;
   for (i = 0; i < n; i++) {
-    flags |= get_flags(args[i].typecode);
+    flags |= get_type_flags(args[i].typecode);
   }
   return flags;
 }
