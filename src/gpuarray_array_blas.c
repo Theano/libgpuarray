@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "gpuarray/blas.h"
 #include "gpuarray/buffer_blas.h"
 #include "gpuarray/types.h"
@@ -381,5 +382,194 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
     GpuArray_clear(&copyX);
   if (Yp == &copyY)
     GpuArray_clear(&copyY);
+  return err;
+}
+
+int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alpha,
+                           GpuArray *A, GpuArray *B, double beta, GpuArray *C,
+                           int nocopy) {
+  GpuArray *Ap = A;
+  GpuArray copyA;
+  GpuArray *Bp = B;
+  GpuArray copyB;
+  GpuArray *Cp = C;
+  gpuarray_blas_ops *blas;
+  void *ctx;
+  size_t elsize;
+  size_t batchCount, m, n, k, lda, ldb, ldc;
+  cb_order o;
+  int err;
+  gpudata **A_datas = NULL, **B_datas = NULL, **C_datas = NULL;
+  size_t *A_offsets = NULL, *B_offsets = NULL, *C_offsets = NULL;
+
+  if (A->typecode != GA_FLOAT && A->typecode != GA_DOUBLE)
+    return GA_INVALID_ERROR;
+
+  if (A->nd != 3 || B->nd != 3 || C->nd != 3 ||
+      A->typecode != A->typecode || B->typecode != A->typecode ||
+      C->typecode != A->typecode)
+    return GA_VALUE_ERROR;
+
+  if (!(A->flags & GA_ALIGNED) || !(B->flags & GA_ALIGNED) ||
+      !(C->flags & GA_ALIGNED))
+    return GA_UNALIGNED_ERROR;
+
+  batchCount = A->dimensions[0];
+  if (B->dimensions[0] != batchCount || C->dimensions[0] != batchCount)
+    return GA_VALUE_ERROR;
+
+  if (transA == cb_no_trans) {
+    m = A->dimensions[1];
+    k = A->dimensions[2];
+  } else {
+    m = A->dimensions[2];
+    k = A->dimensions[1];
+  }
+
+  if (transB == cb_no_trans) {
+    n = B->dimensions[2];
+    if (B->dimensions[1] != k)
+      return GA_VALUE_ERROR;
+  } else {
+    n = B->dimensions[1];
+    if (B->dimensions[2] != k)
+      return GA_VALUE_ERROR;
+  }
+
+  if (C->dimensions[1] != m || C->dimensions[2] != n)
+    return GA_VALUE_ERROR;
+
+  elsize = gpuarray_get_elsize(A->typecode);
+
+  // FIXME: these conditions are overly restrictive; the first axis need not be contiguous
+  if (!GpuArray_ISONESEGMENT(A)) {
+    if (nocopy)
+      return GA_COPY_ERROR;
+    else {
+      err = GpuArray_copy(&copyA, A, GA_F_ORDER);
+      if (err != GA_NO_ERROR)
+	goto cleanup;
+      Ap = &copyA;
+    }
+  }
+  if (!GpuArray_ISONESEGMENT(B)) {
+    if (nocopy)
+      return GA_COPY_ERROR;
+    else {
+      err = GpuArray_copy(&copyB, B, GA_F_ORDER);
+      if (err != GA_NO_ERROR)
+	goto cleanup;
+      Bp = &copyB;
+    }
+  }
+  if (!GpuArray_ISONESEGMENT(C)) {
+    err = GA_VALUE_ERROR;
+    goto cleanup;
+  }
+
+  if (Cp->flags & GA_F_CONTIGUOUS) {
+    o = cb_fortran;
+    ldc = Cp->dimensions[1];
+  } else if (Cp->flags & GA_C_CONTIGUOUS) {
+    o = cb_c;
+    ldc = Cp->dimensions[2];
+  } else {
+    err = GA_VALUE_ERROR;
+    goto cleanup;
+  }
+  if (Ap->flags & GA_F_CONTIGUOUS) {
+    lda = Ap->dimensions[1];
+    if (o == cb_c) {
+      if (transA == cb_no_trans)
+        transA = cb_trans;
+      else
+        transA = cb_no_trans;
+    }
+  } else if (Ap->flags & GA_C_CONTIGUOUS) {
+    lda = Ap->dimensions[2];
+    if (o == cb_fortran) {
+      if (transA == cb_no_trans)
+        transA = cb_trans;
+      else
+        transA = cb_no_trans;
+    }
+  } else {
+    err = GA_VALUE_ERROR;
+    goto cleanup;
+  }
+  if (Bp->flags & GA_F_CONTIGUOUS) {
+    ldb = Bp->dimensions[1];
+    if (o == cb_c) {
+      if (transB == cb_no_trans)
+        transB = cb_trans;
+      else
+        transB = cb_no_trans;
+    }
+  } else if (Bp->flags & GA_C_CONTIGUOUS) {
+    ldb = Bp->dimensions[2];
+    if (o == cb_fortran) {
+      if (transB == cb_no_trans)
+        transB = cb_trans;
+      else
+        transB = cb_no_trans;
+    }
+  } else {
+    err = GA_VALUE_ERROR;
+    goto cleanup;
+  }
+
+  err = Ap->ops->property(NULL, Ap->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
+  if (err != GA_NO_ERROR)
+    goto cleanup;
+  err = Ap->ops->property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas);
+  if (err != GA_NO_ERROR)
+    goto cleanup;
+
+  err = blas->setup(ctx);
+  if (err != GA_NO_ERROR)
+    goto cleanup;
+
+  A_datas = (gpudata**)malloc(batchCount * sizeof(gpudata*));
+  B_datas = (gpudata**)malloc(batchCount * sizeof(gpudata*));
+  C_datas = (gpudata**)malloc(batchCount * sizeof(gpudata*));
+
+  A_offsets = (size_t*)malloc(batchCount * sizeof(size_t));
+  B_offsets = (size_t*)malloc(batchCount * sizeof(size_t));
+  C_offsets = (size_t*)malloc(batchCount * sizeof(size_t));
+
+  int i;
+  for (i = 0; i < batchCount; i++) {
+    A_datas[i] = Ap->data;
+    B_datas[i] = Bp->data;
+    C_datas[i] = Cp->data;
+    A_offsets[i] = (Ap->offset + i * Ap->strides[0]) / elsize;
+    B_offsets[i] = (Bp->offset + i * Bp->strides[0]) / elsize;
+    C_offsets[i] = (Cp->offset + i * Cp->strides[0]) / elsize;
+  }
+
+  switch (C->typecode) {
+  case GA_FLOAT:
+    err = blas->sgemmBatch(o, transA, transB, m, n, k, (float)alpha,
+                           A_datas, A_offsets, lda,
+                           B_datas, B_offsets, ldb,
+                           (float)beta,
+                           C_datas, C_offsets, ldc, batchCount);
+    break;
+  case GA_DOUBLE:
+    err = blas->dgemmBatch(o, transA, transB, m, n, k, (double)alpha,
+                           A_datas, A_offsets, lda,
+                           B_datas, B_offsets, ldb,
+                           (double)beta,
+                           C_datas, C_offsets, ldc, batchCount);
+    break;
+  }
+
+  cleanup:
+  free(A_datas); free(B_datas); free(C_datas);
+  free(A_offsets); free(B_offsets); free(C_offsets);
+  if (Ap == &copyA)
+    GpuArray_clear(&copyA);
+  if (Bp == &copyB)
+    GpuArray_clear(&copyB);
   return err;
 }
