@@ -30,77 +30,6 @@ cdef bytes _s(s):
         return s
     raise TypeError("Expected a string")
 
-cdef object call_compiler_fn = None
-
-cdef void *call_compiler_python(const char *src, size_t sz,
-                                size_t *bin_len, int *ret) with gil:
-    cdef bytes res
-    cdef void *buf
-    cdef char *tmp
-    try:
-        res = call_compiler_fn(src[:sz])
-        buf = malloc(len(res))
-        if buf == NULL:
-            if ret != NULL:
-                ret[0] = GA_SYS_ERROR
-            return NULL
-        tmp = res
-        memcpy(buf, tmp, len(res))
-        bin_len[0] = len(res);
-        return buf
-    except:
-        # XXX: maybe should store the exception somewhere
-        if ret != NULL:
-            ret[0] = GA_RUN_ERROR
-        return NULL
-
-ctypedef void *(*comp_f)(const char *, size_t, size_t *, int*)
-
-def set_cuda_compiler_fn(fn):
-    """
-    set_cuda_compiler_fn(fn)
-
-    Sets the compiler function for cuda kernels.
-
-    :param fn: compiler function
-    :type fn: callable
-    :rtype: None
-
-    `fn` must have the following signature::
-
-        fn(source)
-
-    It will recieve a python bytes string consiting the of complete
-    kernel source code and must return a python byte string consisting
-    of the compilation results or raise an exception.
-
-    .. warning::
-
-        Exceptions raised by the function will not be propagated
-        because the call path goes through libgpuarray.  They are only
-        used to indicate that there was a problem during the
-        compilation.
-
-    This overrides the built-in compiler function with the provided
-    one or resets to the default if `None` is given.  The provided
-    function must be rentrant if the library is used in a
-    multi-threaded context.
-
-    .. note::
-        If the "cuda" module was not compiled in libgpuarray then this function will raise a `RuntimeError` unconditionaly.
-    """
-    cdef void (*set_comp)(comp_f f)
-    set_comp = <void (*)(comp_f)>gpuarray_get_extension("cuda_set_compiler")
-    if set_comp == NULL:
-        raise RuntimeError, "cannot set compiler, extension is absent"
-    if callable(fn):
-        call_compiler_fn = fn
-        set_comp(call_compiler_python)
-    elif fn is None:
-        set_comp(NULL)
-    else:
-        raise ValueError, "needs a callable"
-
 def cl_wrap_ctx(size_t ptr):
     """
     cl_wrap_ctx(ptr)
@@ -987,6 +916,12 @@ def array(proto, dtype=None, copy=True, order=None, int ndmin=0,
                               np.PyArray_NDIM(a), <size_t *>np.PyArray_DIMS(a),
                               <ssize_t *>np.PyArray_STRIDES(a), context, cls)
 
+cdef void (*cuda_enter)(void *)
+cdef void (*cuda_exit)(void *)
+
+cuda_enter = <void (*)(void *)>gpuarray_get_extension("cuda_enter")
+cuda_exit = <void (*)(void *)>gpuarray_get_extension("cuda_exit")
+
 cdef class GpuContext:
     """
     Class that holds all the information pertaining to a context.
@@ -1029,6 +964,19 @@ cdef class GpuContext:
                 raise get_exc(err), "No device %d"%(devno,)
             else:
                 raise get_exc(err), self.ops.ctx_error(NULL) + ": " + str(devno)
+
+    def __enter__(self):
+        if cuda_enter == NULL:
+            raise RuntimeError("cuda_enter not available")
+        if cuda_exit == NULL:
+            raise RuntimeError("cuda_exit not available")
+        if self.ops != gpuarray_get_ops("cuda"):
+            raise ValueError("Context manager only works for cuda")
+        cuda_enter(self.ctx)
+        return self
+
+    def __exit__(self, t, v, tb):
+        cuda_exit(self.ctx)
 
     property kind:
         "Module name this context uses"
