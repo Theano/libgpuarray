@@ -299,10 +299,10 @@ typedef struct _gpuarray_buffer_ops {
    * \param fname name of the kernel function (as defined in the code)
    * \param flags flags for compilation (see #ga_usefl)
    * \param ret error return pointer
-   * \param err_str returns pointer to debug message from GPU backend 
+   * \param err_str returns pointer to debug message from GPU backend
    *        (if provided a non-NULL err_str)
    *
-   * If `*err_str` is not NULL on return, the caller must call 
+   * If `*err_str` is not NULL on return, the caller must call
    * `free(*err_str)` after use.
    *
    * \returns Allocated kernel structure or NULL if an error occured.
@@ -573,7 +573,50 @@ typedef struct _gpuarray_buffer_ops {
  *
  * Type: `int`
  */
-#define GA_CTX_PROP_NATIVE_FLOAT16   11
+#define GA_CTX_PROP_NATIVE_FLOAT16 11
+
+/**
+ * Get the maximum global size for dimension 0.
+ *
+ * Type: `size_t`
+ */
+#define GA_CTX_PROP_MAXGSIZE0 12
+
+/**
+ * Get the maximum global size for dimension 1.
+ *
+ * Type: `size_t`
+ */
+#define GA_CTX_PROP_MAXGSIZE1 13
+
+/**
+ * Get the maximum global size for dimension 2.
+ *
+ * Type: `size_t`
+ */
+#define GA_CTX_PROP_MAXGSIZE2 14
+
+/**
+ * Get the maximum local size for dimension 0.
+ *
+ * Type: `size_t`
+ */
+#define GA_CTX_PROP_MAXLSIZE0 15
+
+/**
+ * Get the maximum local size for dimension 1.
+ *
+ * Type: `size_t`
+ */
+#define GA_CTX_PROP_MAXLSIZE1 16
+
+/**
+ * Get the maximum loca size for dimension 2.
+ *
+ * Type: `size_t`
+ */
+#define GA_CTX_PROP_MAXLSIZE2 17
+
 
 /* Start at 512 for GA_BUFFER_PROP_ */
 /**

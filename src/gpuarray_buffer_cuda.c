@@ -1895,6 +1895,102 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((int *)res) = 0;
     return CUDA_SUCCESS;
 
+  case GA_CTX_PROP_MAXGSIZE0:
+    cuda_enter(ctx);
+    ctx->err = cuCtxGetDevice(&id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    ctx->err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_X, id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    cuda_exit(ctx);
+    *((size_t *)res) = i;
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_MAXGSIZE1:
+    cuda_enter(ctx);
+    ctx->err = cuCtxGetDevice(&id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    ctx->err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_Y, id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    cuda_exit(ctx);
+    *((size_t *)res) = i;
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_MAXGSIZE2:
+    cuda_enter(ctx);
+    ctx->err = cuCtxGetDevice(&id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    ctx->err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_Z, id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    cuda_exit(ctx);
+    *((size_t *)res) = i;
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_MAXLSIZE0:
+    cuda_enter(ctx);
+    ctx->err = cuCtxGetDevice(&id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    ctx->err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_X, id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    cuda_exit(ctx);
+    *((size_t *)res) = i;
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_MAXLSIZE1:
+    cuda_enter(ctx);
+    ctx->err = cuCtxGetDevice(&id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    ctx->err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Y, id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    cuda_exit(ctx);
+    *((size_t *)res) = i;
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_MAXLSIZE2:
+    cuda_enter(ctx);
+    ctx->err = cuCtxGetDevice(&id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    ctx->err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Z, id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    cuda_exit(ctx);
+    *((size_t *)res) = i;
+    return GA_NO_ERROR;
+
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;
     return GA_NO_ERROR;

@@ -1293,6 +1293,87 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
     *((int *)res) = 0;
     return GA_NO_ERROR;
 
+  case GA_CTX_PROP_MAXGSIZE0:
+    /* It might be bigger than that, but it's not readily available
+       information. */
+    *((size_t *)res) = (1>>31) - 1;
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_MAXGSIZE1:
+    /* It might be bigger than that, but it's not readily available
+       information. */
+    *((size_t *)res) = (1>>31) - 1;
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_MAXGSIZE2:
+    /* It might be bigger than that, but it's not readily available
+       information. */
+    *((size_t *)res) = (1>>31) - 1;
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_MAXLSIZE0:
+    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
+                                &id, NULL);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_MAX_WORK_ITEM_SIZES, 0, NULL,
+                               &sz);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+    psz = malloc(sz);
+    if (psz == NULL)
+      return GA_MEMORY_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_MAX_WORK_ITEM_SIZES, sz, psz, NULL);
+    if (ctx->err != CL_SUCCESS) {
+      free(psz);
+      return GA_IMPL_ERROR;
+    }
+    *((size_t *)res) = psz[0];
+    free(psz);
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_MAXLSIZE1:
+    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
+                                &id, NULL);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_MAX_WORK_ITEM_SIZES, 0, NULL,
+                               &sz);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+    psz = malloc(sz);
+    if (psz == NULL)
+      return GA_MEMORY_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_MAX_WORK_ITEM_SIZES, sz, psz, NULL);
+    if (ctx->err != CL_SUCCESS) {
+      free(psz);
+      return GA_IMPL_ERROR;
+    }
+    *((size_t *)res) = psz[1];
+    free(psz);
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_MAXLSIZE2:
+    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
+                                &id, NULL);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_MAX_WORK_ITEM_SIZES, 0, NULL,
+                               &sz);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+    psz = malloc(sz);
+    if (psz == NULL)
+      return GA_MEMORY_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_MAX_WORK_ITEM_SIZES, sz, psz, NULL);
+    if (ctx->err != CL_SUCCESS) {
+      free(psz);
+      return GA_IMPL_ERROR;
+    }
+    *((size_t *)res) = psz[2];
+    free(psz);
+    return GA_NO_ERROR;
+
   case GA_BUFFER_PROP_REFCNT:
     *((unsigned int *)res) = buf->refcnt;
     return GA_NO_ERROR;
