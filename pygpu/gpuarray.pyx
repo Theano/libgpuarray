@@ -1052,6 +1052,48 @@ cdef class GpuContext:
             ctx_property(self, GA_CTX_PROP_FREE_GMEM, &res)
             return res
 
+    property maxlsize0:
+        "Maximum local size for dimension 0"
+        def __get__(self):
+            cdef size_t res
+            ctx_property(self, GA_CTX_PROP_MAXLSIZE0, &res)
+            return res
+
+    property maxlsize1:
+        "Maximum local size for dimension 1"
+        def __get__(self):
+            cdef size_t res
+            ctx_property(self, GA_CTX_PROP_MAXLSIZE1, &res)
+            return res
+
+    property maxlsize2:
+        "Maximum local size for dimension 2"
+        def __get__(self):
+            cdef size_t res
+            ctx_property(self, GA_CTX_PROP_MAXLSIZE2, &res)
+            return res
+
+    property maxgsize0:
+        "Maximum global size for dimension 0"
+        def __get__(self):
+            cdef size_t res
+            ctx_property(self, GA_CTX_PROP_MAXGSIZE0, &res)
+            return res
+
+    property maxgsize1:
+        "Maximum global size for dimension 1"
+        def __get__(self):
+            cdef size_t res
+            ctx_property(self, GA_CTX_PROP_MAXGSIZE1, &res)
+            return res
+
+    property maxgsize2:
+        "Maximum global size for dimension 2"
+        def __get__(self):
+            cdef size_t res
+            ctx_property(self, GA_CTX_PROP_MAXGSIZE2, &res)
+            return res
+
 
 cdef class flags(object):
     cdef int fl
