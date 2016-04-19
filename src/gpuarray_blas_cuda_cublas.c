@@ -523,7 +523,8 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
       cuda_wait(B[i], CUDA_WAIT_READ);
       cuda_wait(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
 
-      err = cublasSgemm(ctx->blas_handle->h, convT(transA), convT(transB),
+      err = cublasSgemm(((blas_handle *)ctx->blas_handle)->h,
+                        convT(transA), convT(transB),
                         M, N, K, &alpha,
                         (float*)A[i]->ptr + offA[i], lda,
                         (float*)B[i]->ptr + offB[i], ldb,
@@ -566,7 +567,8 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
 
     cuMemcpyHtoD(Ta, T_l, sizeof(float *) * batchCount * 3);
 
-    err = cublasSgemmBatched(ctx->blas_handle->h, convT(transA), convT(transB),
+    err = cublasSgemmBatched(((blas_handle *)ctx->blas_handle)->h,
+                             convT(transA), convT(transB),
                              M, N, K, &alpha, (const float **)Aa, lda,
                              (const float **)Ba, ldb, &beta,
                              (float **)Ca, ldc, batchCount);
@@ -639,7 +641,8 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
       cuda_wait(B[i], CUDA_WAIT_READ);
       cuda_wait(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
 
-      err = cublasDgemm(ctx->blas_handle->h, convT(transA), convT(transB),
+      err = cublasDgemm(((blas_handle *)ctx->blas_handle)->h,
+                        convT(transA), convT(transB),
                         M, N, K, &alpha,
                         (double*)A[i]->ptr + offA[i], lda,
                         (double*)B[i]->ptr + offB[i], ldb,
@@ -682,7 +685,8 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
 
     cuMemcpyHtoD(Ta, T_l, sizeof(double *) * batchCount * 3);
 
-    err = cublasDgemmBatched(ctx->blas_handle->h, convT(transA), convT(transB),
+    err = cublasDgemmBatched(((blas_handle *)ctx->blas_handle)->h,
+                             convT(transA), convT(transB),
                              M, N, K, &alpha, (const double **)Aa, lda,
                              (const double **)Ba, ldb, &beta,
                              (double **)Ca, ldc, batchCount);
