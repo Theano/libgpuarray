@@ -1,18 +1,20 @@
 #include <assert.h>
 
 #include "private.h"
+#include "util/strb.h"
+
 #include "gpuarray/util.h"
 #include "gpuarray/error.h"
 #include "gpuarray/kernel.h"
-#include "util/strb.h"
+#include "gpuarray/elemwise.h"
 
 /*
  * API version is negative since we are still in the development
  * phase. Once we go stable, this will move to 0 and go up from
  * there.
  */
-const int gpuarray_api_major = -10000;
-const int gpuarray_api_minor = 2;
+const int gpuarray_api_major = -9999;
+const int gpuarray_api_minor = 0;
 
 static gpuarray_type **custom_types = NULL;
 static int n_types = 0;
@@ -109,6 +111,19 @@ void gpukernel_source_with_line_numbers(unsigned int count,
   }
 }
 
+static int get_type_flags(int typecode) {
+  int flags = 0;
+  if (typecode == GA_DOUBLE || typecode == GA_CDOUBLE)
+    flags |= GA_USE_DOUBLE;
+  if (typecode == GA_HALF)
+    flags |= GA_USE_HALF;
+  if (typecode == GA_CFLOAT || typecode == GA_CDOUBLE)
+    flags |= GA_USE_COMPLEX;
+  if (gpuarray_get_elsize(typecode) < 4)
+    flags |= GA_USE_SMALL;
+  return flags;
+}
+
 /* List of typecodes terminated by -1 */
 int gpuarray_type_flags(int init, ...) {
   va_list ap;
@@ -117,17 +132,19 @@ int gpuarray_type_flags(int init, ...) {
 
   va_start(ap, init);
   while (typecode != -1) {
-    if (typecode == GA_DOUBLE || typecode == GA_CDOUBLE)
-      flags |= GA_USE_DOUBLE;
-    if (typecode == GA_HALF)
-      flags |= GA_USE_HALF;
-    if (typecode == GA_CFLOAT || typecode == GA_CDOUBLE)
-      flags |= GA_USE_COMPLEX;
-    if (gpuarray_get_elsize(typecode) < 4)
-      flags |= GA_USE_SMALL;
+    flags |= get_type_flags(typecode);
     typecode = va_arg(ap, int);
   }
   va_end(ap);
+  return flags;
+}
+
+int gpuarray_type_flagsa(unsigned int n, gpuelemwise_arg *args) {
+  unsigned int i;
+  int flags = 0;
+  for (i = 0; i < n; i++) {
+    flags |= get_type_flags(args[i].typecode);
+  }
   return flags;
 }
 

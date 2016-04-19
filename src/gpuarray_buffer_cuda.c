@@ -1217,9 +1217,8 @@ static gpukernel *cuda_newkernel(void *c, unsigned int count,
           return NULL;
         }
         if (compile_cache == NULL)
-          compile_cache = cache_twoq(16, 16, 16, 8, src_eq, src_hash, src_free,
-                                     bin_free);
-
+          compile_cache = cache_twoq(64, 128, 64, 8, src_eq, src_hash,
+				     src_free, bin_free);
         if (compile_cache != NULL) {
           ak = malloc(sizeof(*ak));
           av = malloc(sizeof(*av));
@@ -1308,6 +1307,13 @@ static void cuda_freekernel(gpukernel *k) {
   _cuda_freekernel(k);
 }
 
+static int cuda_kernelsetarg(gpukernel *k, unsigned int i, void *arg) {
+  if (i >= k->argcount)
+    return GA_VALUE_ERROR;
+  k->args[i] = arg;
+  return GA_NO_ERROR;
+}
+
 static int cuda_callkernel(gpukernel *k, unsigned int n,
                            const size_t *bs, const size_t *gs,
                            size_t shared, void **args) {
@@ -1316,6 +1322,9 @@ static int cuda_callkernel(gpukernel *k, unsigned int n,
 
     ASSERT_KER(k);
     cuda_enter(ctx);
+
+    if (args == NULL)
+      args = k->args;
 
     for (i = 0; i < k->argcount; i++) {
       if (k->types[i] == GA_BUFFER) {
@@ -2068,6 +2077,7 @@ const gpuarray_buffer_ops cuda_ops = {cuda_init,
                                       cuda_newkernel,
                                       cuda_retainkernel,
                                       cuda_freekernel,
+                                      cuda_kernelsetarg,
                                       cuda_callkernel,
                                       cuda_kernelbin,
                                       cuda_sync,

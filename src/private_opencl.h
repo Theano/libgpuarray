@@ -64,10 +64,12 @@ struct _gpukernel {
 #endif
   cl_kernel k;
   cl_event ev;
-  unsigned int argcount;
-  int *types;
+  cl_event **evr;
   cl_ctx *ctx;
+  int *types;
+  unsigned int argcount;
   unsigned int refcnt;
+  cl_uint num_ev;
 };
 
 GPUARRAY_LOCAL cl_ctx *cl_make_ctx(cl_context ctx);

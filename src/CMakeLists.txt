@@ -43,6 +43,7 @@ gpuarray_array.c
 gpuarray_array_blas.c
 gpuarray_kernel.c
 gpuarray_extension.c
+gpuarray_elemwise.c
 )
 
 check_function_exists(strlcat HAVE_STRL)
@@ -152,6 +153,7 @@ SET(headers
   gpuarray/buffer.h
   gpuarray/buffer_blas.h
   gpuarray/config.h
+  gpuarray/elemwise.h
   gpuarray/error.h
   gpuarray/extension.h
   gpuarray/ext_cuda.h

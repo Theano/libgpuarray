@@ -12,6 +12,7 @@ extern "C" {
 #endif
 
 #include <gpuarray/config.h>
+#include <gpuarray/elemwise.h>
 #include <gpuarray/types.h>
 
 extern GPUARRAY_PUBLIC const int gpuarray_api_major;
@@ -75,6 +76,8 @@ GPUARRAY_PUBLIC size_t gpuarray_get_elsize(int typecode);
  */
 GPUARRAY_PUBLIC int gpuarray_type_flags(int init, ...);
 
+GPUARRAY_PUBLIC int gpuarray_type_flagsa(unsigned int n, gpuelemwise_arg *arg);
+
 /**
  * Perform dimension collapsing on the specified arguments.
  *
@@ -97,6 +100,7 @@ GPUARRAY_PUBLIC int gpuarray_type_flags(int init, ...);
 GPUARRAY_PUBLIC void gpuarray_elemwise_collapse(unsigned int n,
                                                 unsigned int *nd,
                                                 size_t *dim, ssize_t **strs);
+
 #ifdef __cplusplus
 }
 #endif

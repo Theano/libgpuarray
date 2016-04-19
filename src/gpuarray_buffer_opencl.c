@@ -822,6 +822,7 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
   res->argcount = argcount;
   res->k = clCreateKernel(p, fname, &ctx->err);
   res->types = NULL;  /* This avoids a crash in cl_releasekernel */
+  res->evr = NULL;   /* This avoids a crash in cl_releasekernel */
   res->ctx = ctx;
   ctx->refcnt++;
   clReleaseProgram(p);
@@ -836,6 +837,12 @@ static gpukernel *cl_newkernel(void *c, unsigned int count,
     FAIL(NULL, GA_IMPL_ERROR);
   }
   memcpy(res->types, types, argcount * sizeof(int));
+
+  res->evr = calloc(argcount, sizeof(cl_event *));
+  if (res->evr == NULL) {
+    cl_releasekernel(res);
+    FAIL(NULL, GA_IMPL_ERROR);
+  }
 
   return res;
 }
@@ -855,8 +862,42 @@ static void cl_releasekernel(gpukernel *k) {
     if (k->k) clReleaseKernel(k->k);
     cl_free_ctx(k->ctx);
     free(k->types);
+    free(k->evr);
     free(k);
   }
+}
+
+static int cl_setkernelarg(gpukernel *k, unsigned int i, void *a) {
+  cl_ctx *ctx = k->ctx;
+  gpudata *btmp;
+  cl_ulong temp;
+  cl_long stemp;
+  switch (k->types[i]) {
+  case GA_POINTER:
+    return GA_DEVSUP_ERROR;
+  case GA_BUFFER:
+    btmp = (gpudata *)a;
+    ctx->err = clSetKernelArg(k->k, i, sizeof(cl_mem), &btmp->buf);
+    k->evr[i] = &btmp->ev;
+    break;
+  case GA_SIZE:
+    temp = *((size_t *)a);
+    ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(GA_ULONG), &temp);
+    k->evr[i] = NULL;
+    break;
+  case GA_SSIZE:
+    stemp = *((ssize_t *)a);
+    ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(GA_LONG), &stemp);
+    k->evr[i] = NULL;
+    break;
+  default:
+    ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(k->types[i]), a);
+    k->evr[i] = NULL;
+  }
+  if (ctx->err != CL_SUCCESS) {
+    return GA_IMPL_ERROR;
+  }
+  return GA_NO_ERROR;
 }
 
 static int cl_callkernel(gpukernel *k, unsigned int n,
@@ -866,10 +907,7 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
   size_t _gs[3];
   cl_event ev;
   cl_event *evw;
-  gpudata *btmp;
   cl_device_id dev;
-  cl_ulong temp;
-  cl_long stemp;
   cl_uint num_ev;
   cl_uint i;
   int res = 0;
@@ -886,38 +924,22 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
   dev = get_dev(ctx->ctx, &res);
   if (dev == NULL) return res;
 
-  num_ev = 0;
+  if (args != NULL) {
+    for (i = 0; i < k->argcount; i++) {
+      err = cl_setkernelarg(k, i, args[i]);
+      if (err != GA_NO_ERROR) return err;
+    }
+  }
+
   evw = calloc(sizeof(cl_event), k->argcount);
   if (evw == NULL) {
     return GA_MEMORY_ERROR;
   }
 
+  num_ev = 0;
   for (i = 0; i < k->argcount; i++) {
-    switch (k->types[i]) {
-    case GA_POINTER:
-      free(evw);
-      return GA_DEVSUP_ERROR;
-    case GA_BUFFER:
-      btmp = (gpudata *)args[i];
-      if (btmp->ev != NULL)
-        evw[num_ev++] = btmp->ev;
-      ctx->err = clSetKernelArg(k->k, i, sizeof(cl_mem), &btmp->buf);
-      break;
-    case GA_SIZE:
-      temp = *((size_t *)args[i]);
-      ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(GA_ULONG), &temp);
-      break;
-    case GA_SSIZE:
-      stemp = *((ssize_t *)args[i]);
-      ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(GA_LONG), &stemp);
-      break;
-    default:
-      ctx->err = clSetKernelArg(k->k, i, gpuarray_get_elsize(k->types[i]),
-                                args[i]);
-    }
-    if (ctx->err != CL_SUCCESS) {
-      free(evw);
-      return GA_IMPL_ERROR;
+    if (k->evr[i] != NULL && *k->evr[i] != NULL) {
+      evw[num_ev++] = *k->evr[i];
     }
   }
 
@@ -941,9 +963,9 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
 
   for (i = 0; i < k->argcount; i++) {
     if (k->types[i] == GA_BUFFER) {
-      if (((gpudata *)args[i])->ev != NULL)
-        clReleaseEvent(((gpudata *)args[i])->ev);
-      ((gpudata *)args[i])->ev = ev;
+      if (*k->evr[i] != NULL)
+        clReleaseEvent(*k->evr[i]);
+      *k->evr[i] = ev;
       clRetainEvent(ev);
     }
   }
@@ -1469,6 +1491,7 @@ const gpuarray_buffer_ops opencl_ops = {cl_init,
                                        cl_newkernel,
                                        cl_retainkernel,
                                        cl_releasekernel,
+                                       cl_setkernelarg,
                                        cl_callkernel,
                                        cl_kernelbin,
                                        cl_sync,
