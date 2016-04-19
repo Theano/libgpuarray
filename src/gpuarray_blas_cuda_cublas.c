@@ -829,6 +829,8 @@ static int sgemvBatch(cb_order order, cb_transpose transA,
                       gpudata **x, size_t *offX, size_t incX,
                       float beta, gpudata **y, size_t *offY, size_t incY,
                       size_t batchCount, int flags) {
+  /* Flags is there for possible future implementations where we might
+     not use atomics or have some alternate implemntation. */
   cuda_context *ctx;
   size_t t, i;
   size_t ls[2], gs[2];
