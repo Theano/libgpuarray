@@ -135,6 +135,7 @@ def check_args(args, collapse=False, broadcast=False):
         strs = [list(str) if str is not None else str for str in strs]
 
     if broadcast:
+        # Set strides to 0s when needed.
         # Get the full shape in dims (no ones unless all arrays have it).
         if 1 in dims:
             for i, ary in enumerate(args):

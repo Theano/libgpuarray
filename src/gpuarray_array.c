@@ -147,7 +147,6 @@ int GpuArray_fromdata(GpuArray *a, const gpuarray_buffer_ops *ops,
   a->ops = ops;
   assert(data != NULL);
   a->data = data;
-  ops->buffer_retain(a->data);
   a->nd = nd;
   a->offset = offset;
   a->typecode = typecode;
@@ -198,7 +197,6 @@ int GpuArray_copy_from_host(GpuArray *a, const gpuarray_buffer_ops *ops,
   if (b == NULL) return err;
 
   err = GpuArray_fromdata(a, ops, b, offset, typecode, nd, dims, strides, 1);
-  ops->buffer_release(b);
   return err;
 }
 
@@ -885,7 +883,6 @@ int GpuArray_transfer(GpuArray *res, const GpuArray *a, void *new_ctx,
 
   err = GpuArray_fromdata(res, new_ops, tmp, a->offset - start, a->typecode,
 			  a->nd, a->dimensions, a->strides, 1);
-  new_ops->buffer_release(tmp);
   return err;
 }
 
