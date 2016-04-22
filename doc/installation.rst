@@ -80,6 +80,7 @@ computer, you can install them in your home directory like this:
 ::
 
   cd <dir>
+  rm -rf build Build
   mkdir Build
   cd Build
   cmake .. -DCMAKE_INSTALL_PREFIX=~/.local -DCMAKE_BUILD_TYPE=Release
