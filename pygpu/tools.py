@@ -127,7 +127,6 @@ def check_args(args, collapse=False, broadcast=False):
     if dims is None:
         raise TypeError("No arrays in kernel arguments, "
                         "something is wrong")
-    tdims = dims
 
     if broadcast or collapse:
         # make the strides and dims editable
@@ -135,7 +134,9 @@ def check_args(args, collapse=False, broadcast=False):
         strs = [list(str) if str is not None else str for str in strs]
 
     if broadcast:
+        # Set strides to 0s when needed.
         # Get the full shape in dims (no ones unless all arrays have it).
+        tdims = dims
         if 1 in dims:
             for i, ary in enumerate(args):
                 if strs[i] is None:
