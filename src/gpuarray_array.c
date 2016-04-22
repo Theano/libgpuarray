@@ -883,8 +883,10 @@ int GpuArray_transfer(GpuArray *res, const GpuArray *a, void *new_ctx,
   if (tmp == NULL)
     return err;
 
-  return GpuArray_fromdata(res, new_ops, tmp, a->offset - start, a->typecode,
-                           a->nd, a->dimensions, a->strides, 1);
+  err = GpuArray_fromdata(res, new_ops, tmp, a->offset - start, a->typecode,
+			  a->nd, a->dimensions, a->strides, 1);
+  new_ops->buffer_release(tmp);
+  return err;
 }
 
 int GpuArray_split(GpuArray **rs, const GpuArray *a, size_t n, size_t *p,
