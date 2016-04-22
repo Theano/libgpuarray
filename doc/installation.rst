@@ -85,6 +85,7 @@ computer, you can install them in your home directory like this:
   cmake .. -DCMAKE_INSTALL_PREFIX=~/.local -DCMAKE_BUILD_TYPE=Release
   make
   make install
+  make test
 
   cd ..
 
@@ -97,6 +98,8 @@ computer, you can install them in your home directory like this:
 
   python setup.py build
   python setup.py install --user
+  cd
+  python -c "import pygpu;pygpu.test()"
 
 
 Linux-specific instructions
