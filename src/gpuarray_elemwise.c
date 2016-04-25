@@ -141,23 +141,15 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
   strb_appendf(&sb, ") {\n"
                "const %s idx = LDIM_0 * GID_0 + LID_0;\n"
                "const %s numThreads = LDIM_0 * GDIM_0;\n"
-               "%s i;\n"
-               "GLOBAL_MEM char *tmp;\n\n", size, size, size);
-  for (j = 0; j < n; j++) {
-    if (is_array(args[j])) {
-      strb_appendf(&sb, "tmp = (GLOBAL_MEM char *)%s_data; tmp += %s_offset; "
-                   "%s_data = (GLOBAL_MEM %s *)tmp;\n", args[j].name,
-                   args[j].name, args[j].name, ctype(args[j].typecode));
-    }
-  }
+               "%s i;\n", size, size, size);
 
   strb_appends(&sb, "for(i = idx; i < n; i += numThreads) {\n");
   if (nd > 0)
     strb_appendf(&sb, "%s ii = i;\n%s pos;\n", size, size);
   for (j = 0; j < n; j++) {
     if (is_array(args[j]))
-      strb_appendf(&sb, "GLOBAL_MEM char *%s_p = (GLOBAL_MEM char *)%s_data;\n",
-                   args[j].name, args[j].name);
+      strb_appendf(&sb, "%s %s_p = %s_offset;\n",
+                   size, args[j].name, args[j].name);
   }
   for (_i = nd; _i > 0; _i--) {
     i = _i - 1;
@@ -175,8 +167,8 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
     if (is_array(args[j])) {
       strb_appendf(&sb, "%s %s;", ctype(args[j].typecode), args[j].name);
       if (ISSET(args[j].flags, GE_READ)) {
-        strb_appendf(&sb, "%s = *(GLOBAL_MEM %s *)%s_p;\n",
-                     args[j].name, ctype(args[j].typecode), args[j].name);
+        strb_appendf(&sb, "%s = *(GLOBAL_MEM %s *)(((GLOBAL_MEM char *)%s_data) + %s_p);\n",
+                     args[j].name, ctype(args[j].typecode), args[j].name, args[j].name);
       }
     }
   }
@@ -184,8 +176,8 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
   strb_appends(&sb, ";\n");
   for (j = 0; j < n; j++) {
     if (is_array(args[j]) && ISSET(args[j].flags, GE_WRITE)) {
-      strb_appendf(&sb, "*(GLOBAL_MEM %s *)%s_p = %s;\n",
-                   ctype(args[j].typecode), args[j].name, args[j].name);
+      strb_appendf(&sb, "*(GLOBAL_MEM %s *)(((GLOBAL_MEM char *)%s_data) + %s_p) = %s;\n",
+                   ctype(args[j].typecode), args[j].name, args[j].name, args[j].name);
     }
   }
   strb_appends(&sb, "}\n}\n");
