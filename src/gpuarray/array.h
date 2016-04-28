@@ -250,9 +250,7 @@ GPUARRAY_PUBLIC int GpuArray_zeros(GpuArray *a, const gpuarray_buffer_ops *ops,
  * The array will be considered to own the gpudata structure after the
  * call is made and will free it when deallocated.  An error return
  * from this function will deallocate `data`.
- *
- * This steal the reference from data. So this don't increment the
- * refcount of data.
+ * This increment the ref count of gpudata. This seem to contradict the above.
  *
  * \param a the GpuArray structure to initialize.  Content will be
  * ignored so make sure to deallocate any previous array first.
