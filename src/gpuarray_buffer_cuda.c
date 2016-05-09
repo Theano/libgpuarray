@@ -24,7 +24,7 @@
 
 /* No returned allocations will be smaller than this size.
    Also, they will be aligned to this size. */
-#define FRAG_SIZE (16)
+#define FRAG_SIZE (64)
 
 static CUresult err;
 
