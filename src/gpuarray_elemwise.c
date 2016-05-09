@@ -87,15 +87,12 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
   int *ktypes;
   size_t p;
   char *size = "ga_size", *ssize = "ga_ssize";
-  int sz_code = GA_SIZE, ssz_code = GA_SSIZE;
   int flags = GA_USE_CLUDA;
   int res;
 
   if (ISSET(gen_flags, GEN_ADDR32)) {
     size = "ga_uint";
     ssize = "ga_int";
-    sz_code = GA_UINT;
-    ssz_code = GA_INT;
   }
 
   flags |= gpuarray_type_flagsa(n, args);
@@ -113,24 +110,24 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
 
   if (preamble)
     strb_appends(&sb, preamble);
-  strb_appendf(&sb, "\nKERNEL void elem(const %s n, ", size);
-  ktypes[p++] = sz_code;
+  strb_appends(&sb, "\nKERNEL void elem(const ga_size n, ");
+  ktypes[p++] = GA_SIZE;
   for (i = 0; i < nd; i++) {
-    strb_appendf(&sb, "const %s dim%u, ", size, i);
-    ktypes[p++] = sz_code;
+    strb_appendf(&sb, "const ga_size dim%u, ", i);
+    ktypes[p++] = GA_SIZE;
   }
   for (j = 0; j < n; j++) {
     if (is_array(args[j])) {
-      strb_appendf(&sb, "GLOBAL_MEM %s *%s_data, const %s %s_offset%s",
-                   ctype(args[j].typecode), args[j].name, size, args[j].name,
+      strb_appendf(&sb, "GLOBAL_MEM %s *%s_data, const ga_size %s_offset%s",
+                   ctype(args[j].typecode), args[j].name, args[j].name,
                    nd == 0 ? "" : ", ");
       ktypes[p++] = GA_BUFFER;
-      ktypes[p++] = sz_code;
+      ktypes[p++] = GA_SIZE;
 
       for (i = 0; i < nd; i++) {
-        strb_appendf(&sb, "const %s %s_str_%u%s", ssize, args[j].name, i,
+        strb_appendf(&sb, "const ga_ssize %s_str_%u%s", args[j].name, i,
                      (i == (nd - 1)) ? "": ", ");
-        ktypes[p++] = ssz_code;
+        ktypes[p++] = GA_SSIZE;
       }
     } else {
       strb_appendf(&sb, "%s %s", ctype(args[i].typecode), args[j].name);
@@ -154,13 +151,13 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
   for (_i = nd; _i > 0; _i--) {
     i = _i - 1;
     if (i > 0)
-      strb_appendf(&sb, "pos = ii %% dim%u;\nii = ii / dim%u;\n", i, i);
+      strb_appendf(&sb, "pos = ii %% (%s)dim%u;\nii = ii / (%s)dim%u;\n", size, i, size, i);
     else
       strb_appends(&sb, "pos = ii;\n");
     for (j = 0; j < n; j++) {
       if (is_array(args[j]))
-        strb_appendf(&sb, "%s_p += pos * %s_str_%u;\n", args[j].name,
-                     args[j].name, i);
+        strb_appendf(&sb, "%s_p += pos * (%s)%s_str_%u;\n", args[j].name,
+                     ssize, args[j].name, i);
     }
   }
   for (j = 0; j < n; j++) {
@@ -312,18 +309,7 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
     gpuarray_elemwise_collapse(num_arrays, &nd, dims, strs);
   }
 
-  if (call32) {
-    /* Convert our data in-place to 32 bits */
-    *((unsigned int *)_n) = n;
-    for (j = 0; j < nd; j++) {
-      *((unsigned int *)&dims[i]) = dims[i];
-      for (p = 0; p < num_arrays; p++) {
-        *((int *)&strs[p][j]) = strs[p][j];
-      }
-    }
-  } else {
-    *_n = n;
-  }
+  *_n = n;
   *_nd = nd;
   *_dims = dims;
   *_strides = strs;
