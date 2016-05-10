@@ -382,7 +382,7 @@ static int gen_take1_kernel(GpuKernel *k, const gpuarray_buffer_ops *ops,
       strb_appendf(&sb, "      p += pos * (%s)s%u;\n", ssz, i);
     }
   }
-  strb_appendf(&sb, "      r[i0*((%s)n1) + i1] = (((GLOBAL_MEM %s *)(GLOBAL_MEM char *)v) + p);\n",
+  strb_appendf(&sb, "      r[i0*((%s)n1) + i1] = ((GLOBAL_MEM %s *)(((GLOBAL_MEM char *)v) + p));\n",
                sz, gpuarray_get_type(v->typecode)->cluda_name);
   strb_appends(&sb, "    }\n"
                "  }\n"
