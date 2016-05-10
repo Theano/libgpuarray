@@ -328,7 +328,7 @@ static int gen_take1_kernel(GpuKernel *k, const gpuarray_buffer_ops *ops,
 
   if (addr32) {
     sz = "ga_uint";
-    ssz "ga_int";
+    ssz = "ga_int";
   } else {
     sz = "ga_size";
     ssz = "ga_ssize";
@@ -369,7 +369,7 @@ static int gen_take1_kernel(GpuKernel *k, const gpuarray_buffer_ops *ops,
                "    }\n"
                "    pos0 += ii0 * (%s)s0;\n"
                "    for (i1 = idx1; i1 < n1; i1 += numThreads1) {\n"
-               "      %s p = pos0;\n", ssz, sz, sz, ssz, sz);
+               "      %s p = pos0;\n", ssz, sz, sz, sz);
   if (v->nd > 1) {
     strb_appendf(&sb, "      %s pos, ii = i1;\n", sz);
     for (i2 = v->nd; i2 > 1; i2--) {
@@ -382,8 +382,8 @@ static int gen_take1_kernel(GpuKernel *k, const gpuarray_buffer_ops *ops,
       strb_appendf(&sb, "      p += pos * (%s)s%u;\n", ssz, i);
     }
   }
-  strb_appendf(&sb, "      r[i0*((%s)n1) + (%s)i1] = (((GLOBAL_MEM %s *)(GLOBAL_MEM char *)v) + p);\n",
-               sz, sz, gpuarray_get_type(v->typecode)->cluda_name);
+  strb_appendf(&sb, "      r[i0*((%s)n1) + i1] = (((GLOBAL_MEM %s *)(GLOBAL_MEM char *)v) + p);\n",
+               sz, gpuarray_get_type(v->typecode)->cluda_name);
   strb_appends(&sb, "    }\n"
                "  }\n"
                "}\n");
@@ -411,7 +411,6 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
   size_t argp;
   GpuKernel k;
   unsigned int j;
-  unsigned int _n[2], _o;
   int err, kerr = 0;
   int addr32 = 0;
 
@@ -443,7 +442,7 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
     n[1] *= v->dimensions[j];
   }
 
-  if (n[0] * n[1] < INT_MAX) {
+  if (n[0] * n[1] < SADDR32_MAX) {
     addr32 = 1;
   }
 

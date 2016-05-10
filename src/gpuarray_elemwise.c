@@ -21,10 +21,6 @@ struct _GpuElemwise {
 
 #define GEN_ADDR32 0x1
 
-#define ADDR32_MAX   4294967295
-#define SADDR32_MIN -2147483648
-#define SADDR32_MAX  2147483647
-
 #define is_array(a) (ISCLR((a).flags, GE_SCALAR))
 
 static inline const char *ctype(int typecode) {
