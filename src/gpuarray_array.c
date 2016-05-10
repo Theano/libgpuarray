@@ -941,8 +941,8 @@ int GpuArray_split(GpuArray **rs, const GpuArray *a, size_t n, size_t *p,
 int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
                          unsigned int axis, int restype) {
   size_t *dims;
-  size_t i;
-  size_t res_off;
+  size_t i, j;
+  size_t res_off, sz;
   unsigned int p;
   int err = GA_NO_ERROR;
 
@@ -988,7 +988,7 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
   }
 
   err = GpuArray_empty(r, as[0]->ops, GpuArray_context(as[0]), restype,
-                       as[0]->nd, dims, GA_ANY_ORDER);
+                       as[0]->nd, dims, GA_C_ORDER);
   free(dims);
   if (err != GA_NO_ERROR) {
     return err;
@@ -996,11 +996,19 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
 
   res_off = r->offset;
   for (i = 0; i < n; i++) {
-    err = r->ops->buffer_extcopy(as[i]->data, as[i]->offset, r->data,
-                                 res_off, as[i]->typecode, r->typecode,
-                                 as[i]->nd, as[i]->dimensions,
-                                 as[i]->strides, r->nd, as[i]->dimensions,
-                                 r->strides);
+    if (axis == 0 &&
+        GpuArray_IS_C_CONTIGUOUS(as[i]) &&
+        as[i]->typecode == r->typecode) {
+      sz = gpuarray_get_elsize(r->typecode);
+      for (j = 0; j < r->nd; j++) sz *= as[i]->dimensions[j];
+      err = r->ops->buffer_move(r->data, res_off, as[i]->data, as[i]->offset, sz);
+    } else {
+      err = r->ops->buffer_extcopy(as[i]->data, as[i]->offset, r->data,
+                                   res_off, as[i]->typecode, r->typecode,
+                                   as[i]->nd, as[i]->dimensions,
+                                   as[i]->strides, r->nd, as[i]->dimensions,
+                                   r->strides);
+    }
     if (err != GA_NO_ERROR)
       goto fail;
     res_off += r->strides[axis] * as[i]->dimensions[axis];
@@ -1104,7 +1112,7 @@ int GpuArray_is_c_contiguous(const GpuArray *a) {
   int i;
   
   for (i = a->nd - 1; i >= 0; i--) {
-    if (a->dimensions[i] != 1 && a->strides[i] != size)
+    if (a->strides[i] != size)
       return 0;
     // We suppose that overflow will not happen since data has to fit in memory
     size *= a->dimensions[i];
@@ -1117,7 +1125,7 @@ int GpuArray_is_f_contiguous(const GpuArray *a) {
   unsigned int i;
 
   for (i = 0; i < a->nd; i++) {
-    if (a->dimensions[i] != 1 && a->strides[i] != size) return 0;
+    if (a->strides[i] != size) return 0;
     // We suppose that overflow will not happen since data has to fit in memory
     size *= a->dimensions[i];
   }
