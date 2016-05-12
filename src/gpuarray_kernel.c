@@ -4,7 +4,7 @@
 
 #include <stdlib.h>
 
-int GpuKernel_init(GpuKernel *k, const gpuarray_buffer_ops *ops, void *ctx,
+int GpuKernel_init(GpuKernel *k, const gpuarray_buffer_ops *ops, gpucontext *ctx,
                    unsigned int count, const char **strs, const size_t *lens,
                    const char *name, unsigned int argcount, const int *types,
                    int flags, char **err_str) {
@@ -30,8 +30,8 @@ void GpuKernel_clear(GpuKernel *k) {
   k->args = NULL;
 }
 
-void *GpuKernel_context(GpuKernel *k) {
-  void *res = NULL;
+gpucontext *GpuKernel_context(GpuKernel *k) {
+  gpucontext *res = NULL;
   (void)k->ops->property(NULL, NULL, k->k, GA_KERNEL_PROP_CTX, &res);
   return res;
 }
@@ -104,7 +104,7 @@ int GpuKernel_binary(const GpuKernel *k, size_t *sz, void **bin) {
 }
 
 const char *GpuKernel_error(const GpuKernel *k, int err) {
-  void *ctx;
+  gpucontext *ctx;
   int err2 = k->ops->property(NULL, NULL, k->k, GA_KERNEL_PROP_CTX, &ctx);
   if (err2 != GA_NO_ERROR) {
     /* If CUDA refuses to work after any kind of error in kernels

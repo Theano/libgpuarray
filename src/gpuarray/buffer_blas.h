@@ -33,8 +33,8 @@ typedef enum _cb_uplo {
 } cb_uplo;
 
 typedef struct _gpuarray_blas_ops {
-  int (*setup)(void *ctx);
-  void (*teardown)(void *ctx);
+  int (*setup)(gpucontext *ctx);
+  void (*teardown)(gpucontext *ctx);
   int (*hgemv)(cb_order order, cb_transpose transA, size_t M, size_t N,
                float alpha, gpudata *A, size_t offA, size_t lda,
                gpudata *X, size_t offX, int incX, float beta,

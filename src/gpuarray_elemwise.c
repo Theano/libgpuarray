@@ -74,7 +74,7 @@ static void free_args(unsigned int n, gpuelemwise_arg *args) {
 
 static int gen_elemwise_basic_kernel(GpuKernel *k,
                                      const gpuarray_buffer_ops *ops,
-                                     void *ctx, char **err_str,
+                                     gpucontext *ctx, char **err_str,
                                      const char *preamble,
                                      const char *expr,
                                      unsigned int nd,
@@ -353,7 +353,7 @@ static int call_basic(GpuElemwise *ge, void **args, size_t n, unsigned int nd,
 
 static int gen_elemwise_contig_kernel(GpuKernel *k,
                                       const gpuarray_buffer_ops *ops,
-                                      void *ctx, char **err_str,
+                                      gpucontext *ctx, char **err_str,
                                       const char *preamble,
                                       const char *expr,
                                       unsigned int n,
@@ -495,7 +495,7 @@ static int call_contig(GpuElemwise *ge, void **args, size_t n) {
   return GpuKernel_call(&ge->k_contig, 1, &ls, &gs, 0, NULL);
 }
 
-GpuElemwise *GpuElemwise_new(const gpuarray_buffer_ops *ops, void * ctx,
+GpuElemwise *GpuElemwise_new(const gpuarray_buffer_ops *ops, gpucontext *ctx,
                              const char *preamble, const char *expr,
                              unsigned int n, gpuelemwise_arg *args,
                              unsigned int nd, int flags) {

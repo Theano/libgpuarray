@@ -29,7 +29,7 @@
 static CUresult err;
 
 static void cuda_freekernel(gpukernel *);
-static int cuda_property(void *, gpudata *, gpukernel *, int, void *);
+static int cuda_property(gpucontext *, gpudata *, gpukernel *, int, void *);
 static int cuda_waits(gpudata *, int, CUstream);
 static int cuda_records(gpudata *, int, CUstream);
 
@@ -38,7 +38,7 @@ static int cuda_records(gpudata *, int, CUstream);
 static int detect_arch(const char *prefix, char *ret, CUresult *err);
 static gpudata *new_gpudata(cuda_context *ctx, CUdeviceptr ptr, size_t size);
 
-void *cuda_make_ctx(CUcontext ctx, int flags) {
+cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   cuda_context *res;
   void *p;
 
@@ -143,14 +143,9 @@ static void cuda_free_ctx(cuda_context *ctx) {
   }
 }
 
-CUcontext cuda_get_ctx(void *ctx) {
-  ASSERT_CTX((cuda_context *)ctx);
-  return ((cuda_context *)ctx)->ctx;
-}
-
-CUstream cuda_get_stream(void *ctx) {
-  ASSERT_CTX((cuda_context *)ctx);
-  return ((cuda_context *)ctx)->s;
+CUstream cuda_get_stream(cuda_context *ctx) {
+  ASSERT_CTX(ctx);
+  return ctx->s;
 }
 
 void cuda_enter(cuda_context *ctx) {
@@ -209,8 +204,7 @@ static gpudata *new_gpudata(cuda_context *ctx, CUdeviceptr ptr, size_t size) {
   return res;
 }
 
-gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz) {
-  cuda_context *ctx = (cuda_context *)c;
+gpudata *cuda_make_buf(cuda_context *ctx, CUdeviceptr p, size_t sz) {
   gpudata *res = new_gpudata(ctx, p, sz);
 
   if (res == NULL) return NULL;
@@ -271,7 +265,7 @@ static const char CUDA_PREAMBLE[] =
 /* XXX: add complex, quads, longlong */
 /* XXX: add vector types */
 
-static void *do_init(CUdevice dev, int flags, int *ret) {
+static cuda_context *do_init(CUdevice dev, int flags, int *ret) {
     cuda_context *res;
     CUcontext ctx;
     unsigned int fl = CU_CTX_SCHED_AUTO;
@@ -323,7 +317,7 @@ static void *do_init(CUdevice dev, int flags, int *ret) {
 
     return res;
 }
-static void *cuda_init(int ord, int flags, int *ret) {
+static gpucontext *cuda_init(int ord, int flags, int *ret) {
     CUdevice dev;
     cuda_context *res;
     static int init_done = 0;
@@ -343,16 +337,16 @@ static void *cuda_init(int ord, int flags, int *ret) {
         CHKFAIL(NULL);
         res = do_init(dev, flags, NULL);
         if (res != NULL)
-          return res;
+          return (gpucontext *)res;
       }
       FAIL(NULL, GA_NODEV_ERROR);
     } else {
       err = cuDeviceGet(&dev, ord);
       CHKFAIL(NULL);
-      return do_init(dev, flags, ret);
+      return (gpucontext *)do_init(dev, flags, ret);
     }
 }
-static void cuda_deinit(void *c) {
+static void cuda_deinit(gpucontext *c) {
   cuda_free_ctx((cuda_context *)c);
 }
 
@@ -465,7 +459,7 @@ static inline size_t roundup(size_t s, size_t m) {
   return ((s + (m - 1)) / m) * m;
 }
 
-static gpudata *cuda_alloc(void *c, size_t size, void *data, int flags,
+static gpudata *cuda_alloc(gpucontext *c, size_t size, void *data, int flags,
 			   int *ret) {
   gpudata *res = NULL, *prev = NULL;
   cuda_context *ctx = (cuda_context *)c;
@@ -1075,7 +1069,7 @@ static void _cuda_freekernel(gpukernel *k) {
   }
 }
 
-static gpukernel *cuda_newkernel(void *c, unsigned int count,
+static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
                                  const char **strings, const size_t *lengths,
                                  const char *fname, unsigned int argcount,
                                  const int *types, int flags, int *ret,
@@ -1688,7 +1682,7 @@ fail:
 }
 
 static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
-                              void *dst_c, int may_share) {
+                              gpucontext *dst_c, int may_share) {
   cuda_context *ctx = src->ctx;
   cuda_context *dst_ctx = (cuda_context *)dst_c;
   gpudata *dst;
@@ -1747,7 +1741,7 @@ static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
 extern gpuarray_blas_ops cublas_ops;
 #endif
 
-static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
+static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
                          void *res) {
   cuda_context *ctx = NULL;
   if (c != NULL) {
@@ -2010,7 +2004,7 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
 
   case GA_BUFFER_PROP_CTX:
   case GA_KERNEL_PROP_CTX:
-    *((void **)res) = (void *)ctx;
+    *((gpucontext **)res) = (gpucontext *)ctx;
     return GA_NO_ERROR;
 
   case GA_KERNEL_PROP_MAXLSIZE:
@@ -2053,7 +2047,7 @@ static int cuda_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
   }
 }
 
-static const char *cuda_error(void *c) {
+static const char *cuda_error(gpucontext *c) {
   cuda_context *ctx = (cuda_context *)c;
   const char *errstr = NULL;
   if (ctx == NULL)

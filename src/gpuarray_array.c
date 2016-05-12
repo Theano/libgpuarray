@@ -55,7 +55,7 @@ static void ga_boundaries(size_t *start, size_t *end, size_t offset,
 /* Value below which a size_t multiplication will never overflow. */
 #define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
 
-int GpuArray_empty(GpuArray *a, const gpuarray_buffer_ops *ops, void *ctx,
+int GpuArray_empty(GpuArray *a, const gpuarray_buffer_ops *ops, gpucontext *ctx,
 		   int typecode, unsigned int nd, const size_t *dims,
                    ga_order ord) {
   size_t size = gpuarray_get_elsize(typecode);
@@ -124,7 +124,7 @@ int GpuArray_empty(GpuArray *a, const gpuarray_buffer_ops *ops, void *ctx,
   return GA_NO_ERROR;
 }
 
-int GpuArray_zeros(GpuArray *a, const gpuarray_buffer_ops *ops, void *ctx,
+int GpuArray_zeros(GpuArray *a, const gpuarray_buffer_ops *ops, gpucontext *ctx,
                    int typecode, unsigned int nd, const size_t *dims,
                    ga_order ord) {
   int err;
@@ -169,7 +169,7 @@ int GpuArray_fromdata(GpuArray *a, const gpuarray_buffer_ops *ops,
 }
 
 int GpuArray_copy_from_host(GpuArray *a, const gpuarray_buffer_ops *ops,
-                            void *ctx, void *buf, int typecode,
+                            gpucontext *ctx, void *buf, int typecode,
                             unsigned int nd, const size_t *dims,
                             const ssize_t *strides) {
   char *base = (char *)buf;
@@ -309,7 +309,7 @@ int GpuArray_index(GpuArray *r, const GpuArray *a, const ssize_t *starts,
 }
 
 static int gen_take1_kernel(GpuKernel *k, const gpuarray_buffer_ops *ops,
-                            void *ctx, char **err_str,
+                            gpucontext *ctx, char **err_str,
                             GpuArray *a, const GpuArray *v,
                             const GpuArray *ind, int addr32) {
   strb sb = STRB_STATIC_INIT;
@@ -807,8 +807,8 @@ int GpuArray_share(const GpuArray *a, const GpuArray *b) {
   return a->ops->buffer_share(a->data, b->data, NULL);
 }
 
-void *GpuArray_context(const GpuArray *a) {
-  void *res = NULL;
+gpucontext *GpuArray_context(const GpuArray *a) {
+  gpucontext *res = NULL;
   (void)a->ops->property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &res);
   return res;
 }
@@ -873,7 +873,7 @@ int GpuArray_copy(GpuArray *res, const GpuArray *a, ga_order order) {
   return err;
 }
 
-int GpuArray_transfer(GpuArray *res, const GpuArray *a, void *new_ctx,
+int GpuArray_transfer(GpuArray *res, const GpuArray *a, gpucontext *new_ctx,
                       const gpuarray_buffer_ops *new_ops, int may_share) {
   size_t start, end;
   gpudata *tmp;
@@ -1018,7 +1018,7 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
 }
 
 const char *GpuArray_error(const GpuArray *a, int err) {
-  void *ctx;
+  gpucontext *ctx;
   int err2 = a->ops->property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
   if (err2 != GA_NO_ERROR) {
     /* If CUDA refuses to work after any kind of error in kernels
