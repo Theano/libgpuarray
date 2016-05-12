@@ -37,9 +37,9 @@ def cl_wrap_ctx(size_t ptr):
     Wrap an existing OpenCL context (the cl_context struct) into a
     GpuContext class.
     """
-    cdef void *(*cl_make_ctx)(void *)
+    cdef gpucontext *(*cl_make_ctx)(void *)
     cdef GpuContext res
-    cl_make_ctx = <void *(*)(void *)>gpuarray_get_extension("cl_make_ctx")
+    cl_make_ctx = <gpucontext *(*)(void *)>gpuarray_get_extension("cl_make_ctx")
     if cl_make_ctx == NULL:
         raise RuntimeError, "cl_make_ctx extension is absent"
     res = GpuContext.__new__(GpuContext)
@@ -61,10 +61,10 @@ def cuda_wrap_ctx(size_t ptr, bint own):
     Otherwise, the context will not be destroyed and it is the calling
     code's reponsability.
     """
-    cdef void *(*cuda_make_ctx)(void *, int)
+    cdef gpucontext *(*cuda_make_ctx)(void *, int)
     cdef int flags
     cdef GpuContext res
-    cuda_make_ctx = <void *(*)(void *, int)>gpuarray_get_extension("cuda_make_ctx")
+    cuda_make_ctx = <gpucontext *(*)(void *, int)>gpuarray_get_extension("cuda_make_ctx")
     if cuda_make_ctx == NULL:
         raise RuntimeError, "cuda_make_ctx extension is absent"
     res = GpuContext.__new__(GpuContext)
@@ -235,7 +235,7 @@ cdef bint py_CHKFLAGS(GpuArray a, int flags):
 cdef bint py_ISONESEGMENT(GpuArray a):
     return GpuArray_ISONESEGMENT(&a.ga)
 
-cdef int array_empty(GpuArray a, const gpuarray_buffer_ops *ops, void *ctx,
+cdef int array_empty(GpuArray a, const gpuarray_buffer_ops *ops, gpucontext *ctx,
                      int typecode, unsigned int nd, const size_t *dims,
                      ga_order ord) except -1:
     cdef int err
@@ -248,7 +248,7 @@ cdef int array_fromdata(GpuArray a, const gpuarray_buffer_ops *ops,
                         unsigned int nd, const size_t *dims,
                         const ssize_t *strides, int writeable) except -1:
     cdef int err
-    cdef void *ctx
+    cdef gpucontext *ctx
     err = GpuArray_fromdata(&a.ga, ops, data, offset, typecode, nd, dims,
                             strides, writeable)
     if err != GA_NO_ERROR:
@@ -256,7 +256,7 @@ cdef int array_fromdata(GpuArray a, const gpuarray_buffer_ops *ops,
         raise get_exc(err), Gpu_error(ops, ctx, err)
 
 cdef int array_copy_from_host(GpuArray a, const gpuarray_buffer_ops *ops,
-                              void *ctx, void *buf, int typecode,
+                              gpucontext *ctx, void *buf, int typecode,
                               unsigned int nd, const size_t *dims,
                               const ssize_t *strides) except -1:
     cdef int err
@@ -313,8 +313,8 @@ cdef int array_clear(GpuArray a) except -1:
 cdef bint array_share(GpuArray a, GpuArray b):
     return GpuArray_share(&a.ga, &b.ga)
 
-cdef void *array_context(GpuArray a) except NULL:
-    cdef void *res
+cdef gpucontext *array_context(GpuArray a) except NULL:
+    cdef gpucontext *res
     res = GpuArray_context(&a.ga)
     if res is NULL:
         raise GpuArrayException, "Invalid array or destroyed context"
@@ -352,7 +352,7 @@ cdef int array_copy(GpuArray res, GpuArray a, ga_order order) except -1:
     if err != GA_NO_ERROR:
         raise get_exc(err), GpuArray_error(&a.ga, err)
 
-cdef int array_transfer(GpuArray res, GpuArray a, void *new_ctx,
+cdef int array_transfer(GpuArray res, GpuArray a, gpucontext *new_ctx,
                         const gpuarray_buffer_ops *new_ops,
                         bint may_share) except -1:
     cdef int err
@@ -378,7 +378,7 @@ cdef int array_concatenate(GpuArray r, const _GpuArray **a, size_t n,
 cdef const char *kernel_error(GpuKernel k, int err) except NULL:
     return Gpu_error(k.k.ops, kernel_context(k), err)
 
-cdef int kernel_init(GpuKernel k, const gpuarray_buffer_ops *ops, void *ctx,
+cdef int kernel_init(GpuKernel k, const gpuarray_buffer_ops *ops, gpucontext *ctx,
                      unsigned int count, const char **strs, const size_t *len,
                      const char *name, unsigned int argcount, const int *types,
                      int flags) except -1:
@@ -398,8 +398,8 @@ cdef int kernel_init(GpuKernel k, const gpuarray_buffer_ops *ops, void *ctx,
 cdef int kernel_clear(GpuKernel k) except -1:
     GpuKernel_clear(&k.k)
 
-cdef void *kernel_context(GpuKernel k) except NULL:
-    cdef void *res
+cdef gpucontext *kernel_context(GpuKernel k) except NULL:
+    cdef gpucontext *res
     res = GpuKernel_context(&k.k)
     if res is NULL:
         raise GpuArrayException, "Invalid kernel or destroyed context"
@@ -922,11 +922,11 @@ def array(proto, dtype=None, copy=True, order=None, int ndmin=0,
                               np.PyArray_NDIM(a), <size_t *>np.PyArray_DIMS(a),
                               <ssize_t *>np.PyArray_STRIDES(a), context, cls)
 
-cdef void (*cuda_enter)(void *)
-cdef void (*cuda_exit)(void *)
+cdef void (*cuda_enter)(gpucontext *)
+cdef void (*cuda_exit)(gpucontext *)
 
-cuda_enter = <void (*)(void *)>gpuarray_get_extension("cuda_enter")
-cuda_exit = <void (*)(void *)>gpuarray_get_extension("cuda_exit")
+cuda_enter = <void (*)(gpucontext *)>gpuarray_get_extension("cuda_enter")
+cuda_exit = <void (*)(gpucontext *)>gpuarray_get_extension("cuda_exit")
 
 cdef class GpuContext:
     """
@@ -962,7 +962,7 @@ cdef class GpuContext:
 
     def __cinit__(self, kind, devno, int flags):
         cdef int err = GA_NO_ERROR
-        cdef void *ctx
+        cdef gpucontext *ctx
         self.ops = get_ops(_s(kind))
         self.ctx = self.ops.buffer_init(devno, flags, &err)
         if (err != GA_NO_ERROR):
