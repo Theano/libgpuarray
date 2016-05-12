@@ -219,8 +219,8 @@ static inline int GpuArray_CHKFLAGS(const GpuArray *a, int flags) {
  * left uninitialized.
  */
 GPUARRAY_PUBLIC int GpuArray_empty(GpuArray *a, const gpuarray_buffer_ops *ops,
-                                  void *ctx, int typecode, unsigned int nd,
-                                  const size_t *dims, ga_order ord);
+                                   gpucontext *ctx, int typecode, unsigned int nd,
+                                   const size_t *dims, ga_order ord);
 
 /**
  * Initialize and allocate a new zero-initialized array.
@@ -241,8 +241,8 @@ GPUARRAY_PUBLIC int GpuArray_empty(GpuArray *a, const gpuarray_buffer_ops *ops,
  * left uninitialized.
  */
 GPUARRAY_PUBLIC int GpuArray_zeros(GpuArray *a, const gpuarray_buffer_ops *ops,
-                                  void *ctx, int typecode, unsigned int nd,
-                                  const size_t *dims, ga_order ord);
+                                   gpucontext *ctx, int typecode, unsigned int nd,
+                                   const size_t *dims, ga_order ord);
 
 /**
  * Initialize and allocate a new array structure from a pre-existing buffer.
@@ -268,17 +268,17 @@ GPUARRAY_PUBLIC int GpuArray_zeros(GpuArray *a, const gpuarray_buffer_ops *ops,
  * is left uninitialized and the provided buffer is deallocated.
  */
 GPUARRAY_PUBLIC int GpuArray_fromdata(GpuArray *a,
-                                     const gpuarray_buffer_ops *ops,
-                                     gpudata *data, size_t offset,
-                                     int typecode, unsigned int nd,
-                                     const size_t *dims,
-                                     const ssize_t *strides, int writeable);
+                                      const gpuarray_buffer_ops *ops,
+                                      gpudata *data, size_t offset,
+                                      int typecode, unsigned int nd,
+                                      const size_t *dims,
+                                      const ssize_t *strides, int writeable);
 
 GPUARRAY_PUBLIC int GpuArray_copy_from_host(GpuArray *a,
-                                           const gpuarray_buffer_ops *ops,
-                                           void *ctx, void *buf, int typecode,
-                                           unsigned int nd, const size_t *dims,
-                                           const ssize_t *strides);
+                                            const gpuarray_buffer_ops *ops,
+                                            gpucontext *ctx, void *buf, int typecode,
+                                            unsigned int nd, const size_t *dims,
+                                            const ssize_t *strides);
 
 /**
  * Initialize an array structure to provide a view of another.
@@ -464,7 +464,7 @@ GPUARRAY_PUBLIC int GpuArray_share(const GpuArray *a, const GpuArray *b);
  *
  * \returns the context in which `a` was allocated.
  */
-GPUARRAY_PUBLIC void *GpuArray_context(const GpuArray *a);
+GPUARRAY_PUBLIC gpucontext *GpuArray_context(const GpuArray *a);
 
 /**
  * Copies all the elements of and array to another.
@@ -491,7 +491,7 @@ GPUARRAY_PUBLIC int GpuArray_move(GpuArray *dst, const GpuArray *src);
  * \return an error code otherwise
  */
 GPUARRAY_PUBLIC int GpuArray_write(GpuArray *dst, const void *src,
-                                  size_t src_sz);
+                                   size_t src_sz);
 
 /**
  * Copy data from the device memory to the host memory.
@@ -548,9 +548,9 @@ GPUARRAY_PUBLIC int GpuArray_copy(GpuArray *res, const GpuArray *a,
  * \return an error code otherwise
  */
 GPUARRAY_PUBLIC int GpuArray_transfer(GpuArray *res, const GpuArray *a,
-                                     void *new_ctx,
-                                     const gpuarray_buffer_ops *new_ops,
-                                     int may_share);
+                                      gpucontext *new_ctx,
+                                      const gpuarray_buffer_ops *new_ops,
+                                      int may_share);
 
 /**
  * Split an array into multiple views.

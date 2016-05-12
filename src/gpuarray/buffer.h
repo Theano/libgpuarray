@@ -22,8 +22,25 @@ extern "C" {
 #ifdef CONFUSE_EMACS
 }
 #endif
-
 struct _gpudata;
+
+#define GPUCONTEXT_HEAD                         \
+  void *blas_handle;                            \
+  unsigned int refcnt;                          \
+  int flags;                                    \
+  struct _gpudata *errbuf;                      \
+  char bin_id[64];                              \
+  char tag[8]
+
+/**
+ * Partially opaque struct for context data.
+ */
+typedef struct _gpucontext {
+  GPUCONTEXT_HEAD;
+  void *ctx_ptr;
+  void *private[7];
+} gpucontext;
+
 
 /**
  * Opaque struct for buffer data.
@@ -37,11 +54,14 @@ struct _gpukernel;
  */
 typedef struct _gpukernel gpukernel;
 
+struct _gpuarray_buffer_ops;
 /**
  * Function table that a backend must provide.
  * \headerfile gpuarray/buffer.h
  */
-typedef struct _gpuarray_buffer_ops {
+typedef struct _gpuarray_buffer_ops gpuarray_buffer_ops;
+
+struct _gpuarray_buffer_ops {
   /**
    * Create a context on the specified device.
    *
@@ -55,7 +75,7 @@ typedef struct _gpuarray_buffer_ops {
    * \returns An opaque pointer to the created context or NULL if an
    * error occured.
    */
-  void *(*buffer_init)(int dev, int flags, int *ret);
+  gpucontext *(*buffer_init)(int dev, int flags, int *ret);
 
 /**
  * \defgroup context_flags Context flags
@@ -108,7 +128,7 @@ typedef struct _gpuarray_buffer_ops {
    *
    * \param ctx a valid context pointer.
    */
-  void (*buffer_deinit)(void *ctx);
+  void (*buffer_deinit)(gpucontext *ctx);
 
   /**
    * Allocates a buffer of size `sz` in context `ctx`.
@@ -126,7 +146,7 @@ typedef struct _gpuarray_buffer_ops {
    * structure is intentionally opaque as its content may change
    * according to the backend used.
    */
-  gpudata *(*buffer_alloc)(void *ctx, size_t sz, void *data, int flags,
+  gpudata *(*buffer_alloc)(gpucontext *ctx, size_t sz, void *data, int flags,
                            int *ret);
 
 /**
@@ -308,7 +328,7 @@ typedef struct _gpuarray_buffer_ops {
    * \returns Allocated kernel structure or NULL if an error occured.
    * `ret` will be updated with the error code if not NULL.
    */
-  gpukernel *(*kernel_alloc)(void *ctx, unsigned int count,
+  gpukernel *(*kernel_alloc)(gpucontext *ctx, unsigned int count,
                              const char **strings, const size_t *lengths,
                              const char *fname, unsigned int numargs,
                              const int *typecodes, int flags, int *ret, char **err_str);
@@ -453,7 +473,7 @@ typedef struct _gpuarray_buffer_ops {
    *          transfer could be found.
    */
   gpudata *(*buffer_transfer)(gpudata *src, size_t offset, size_t sz,
-                              void *dst_ctx, int may_share);
+                              gpucontext *dst_ctx, int may_share);
 
   /**
    * Fetch a property.
@@ -471,7 +491,7 @@ typedef struct _gpuarray_buffer_ops {
    *
    * \returns GA_NO_ERROR or an error code if an error occurred.
    */
-  int (*property)(void *ctx, gpudata *buf, gpukernel *k, int prop_id,
+  int (*property)(gpucontext *ctx, gpudata *buf, gpukernel *k, int prop_id,
                   void *res);
 
   /**
@@ -488,8 +508,8 @@ typedef struct _gpuarray_buffer_ops {
    *
    * \returns string description of the last error
    */
-  const char *(*ctx_error)(void *ctx);
-} gpuarray_buffer_ops;
+  const char *(*ctx_error)(gpucontext *ctx);
+};
 
 /**
  * \defgroup props Properties
@@ -640,7 +660,7 @@ typedef struct _gpuarray_buffer_ops {
 /**
  * Get the context in which this buffer was allocated.
  *
- * Type: `void *`
+ * Type: `gpucontext *`
  */
 #define GA_BUFFER_PROP_CTX    512
 
@@ -665,7 +685,7 @@ typedef struct _gpuarray_buffer_ops {
 /**
  * Get the context for which this kernel was compiled.
  *
- * Type: `void *`
+ * Type: `gpucontext *`
  */
 #define GA_KERNEL_PROP_CTX       1024
 
@@ -769,8 +789,8 @@ typedef enum _ga_usefl {
  *
  * \returns A string description of the error.
  */
-GPUARRAY_PUBLIC const char *Gpu_error(const gpuarray_buffer_ops *o, void *ctx,
-				     int err);
+GPUARRAY_PUBLIC const char *Gpu_error(const gpuarray_buffer_ops *o,
+                                      gpucontext *ctx, int err);
 /**
  * Get operations vector for a backend.
  *
@@ -790,14 +810,14 @@ GPUARRAY_PUBLIC const gpuarray_buffer_ops *gpuarray_get_ops(const char *name);
  * can be done.
  */
 GPUARRAY_PUBLIC gpudata *gpuarray_buffer_transfer(gpudata *buf, size_t offset,
-                                                  size_t sz, void *src_ctx,
+                                                  size_t sz, gpucontext *src_ctx,
                                                   const gpuarray_buffer_ops *src_ops,
-                                                  void *dst_ctx,
+                                                  gpucontext *dst_ctx,
                                                   const gpuarray_buffer_ops *dst_ops,
                                                   int may_share, int *ret);
 
-GPUARRAY_PUBLIC void *gpuarray_buffer_context(const gpuarray_buffer_ops *ops,
-                                              gpudata *b);
+GPUARRAY_PUBLIC gpucontext *gpuarray_buffer_context(const gpuarray_buffer_ops *ops,
+                                                    gpudata *b);
 
 #ifdef __cplusplus
 }

@@ -41,25 +41,19 @@
 /* Keep in sync with the copy in gpuarray/extension.h */
 #define DONTFREE 0x10000000
 
-#define BIN_ID_LEN 12
-
 typedef struct _cuda_context {
-#ifdef DEBUG
-  char tag[8];
-#endif
+  GPUCONTEXT_HEAD;
   CUcontext ctx;
   CUresult err;
   CUstream s;
   CUstream mem_s;
-  void *blas_handle;
-  gpudata *errbuf;
   cache *extcopy_cache;
-  char bin_id[BIN_ID_LEN];
-  unsigned int refcnt;
-  int flags;
-  unsigned int enter;
   gpudata *freeblocks;
+  unsigned int enter;
 } cuda_context;
+
+STATIC_ASSERT(sizeof(cuda_context) <= sizeof(gpucontext), sizeof_struct_gpucontext_cuda);
+
 
 /*
  * About freeblocks.
