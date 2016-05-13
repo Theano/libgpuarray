@@ -111,9 +111,9 @@ static void cuda_free_ctx(cuda_context *ctx) {
   if (ctx->refcnt == 0) {
     assert(ctx->enter == 0 && "Context was active when freed!");
     if (ctx->blas_handle != NULL) {
-      ctx->err = cuda_property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS,
+      ctx->err = cuda_property((gpucontext *)ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS,
                                &blas_ops);
-      blas_ops->teardown(ctx);
+      blas_ops->teardown((gpucontext *)ctx);
     }
     cuMemFreeHost((void *)ctx->errbuf->ptr);
     deallocate(ctx->errbuf);
@@ -790,7 +790,7 @@ static cache *compile_cache = NULL;
 typedef struct _srckey {
   const char *src;
   size_t len;
-  char arch[BIN_ID_LEN];
+  char arch[64];
 } srckey;
 
 static void src_free(void *_k) {
@@ -1175,7 +1175,7 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
         if (compile_cache != NULL) {
           k.src = sb.s;
           k.len = sb.l;
-          memcpy(k.arch, ctx->bin_id, BIN_ID_LEN);
+          memcpy(k.arch, ctx->bin_id, sizeof(ctx->bin_id));
           av = cache_get(compile_cache, &k);
           if (av != NULL) {
             bin = memdup(av->bin, av->len);
@@ -1228,7 +1228,7 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
             goto done;
           }
           ak->len = sb.l;
-          memmove(ak->arch, ctx->bin_id, BIN_ID_LEN);
+          memmove(ak->arch, ctx->bin_id, sizeof(ctx->bin_id));
           av->len = bin_len;
           av->bin = memdup(bin, bin_len);
           if (av->bin == NULL) {
@@ -1596,7 +1596,7 @@ static inline int gen_extcopy_kernel(const extcopy_args *a,
 
   types[0] = types[1] = GA_BUFFER;
   res = GA_NO_ERROR;
-  *v = cuda_newkernel(ctx, 1, (const char **)&sb.s, &sb.l, "extcpy",
+  *v = cuda_newkernel((gpucontext *)ctx, 1, (const char **)&sb.s, &sb.l, "extcpy",
                       2, types, flags, &res, NULL);
  fail:
   strb_clear(&sb);
@@ -1696,7 +1696,7 @@ static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
         cuda_retain(src);
         return src;
     }
-    dst = cuda_alloc(ctx, sz, NULL, 0, NULL);
+    dst = cuda_alloc((gpucontext *)ctx, sz, NULL, 0, NULL);
     if (dst == NULL) return NULL;
     cuda_enter(ctx);
 
@@ -1716,7 +1716,7 @@ static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
     return dst;
   }
 
-  dst = cuda_alloc(dst_ctx, sz, NULL, 0, NULL);
+  dst = cuda_alloc((gpucontext *)dst_ctx, sz, NULL, 0, NULL);
   if (dst == NULL)
     return NULL;
   cuda_enter(ctx);
