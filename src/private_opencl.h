@@ -46,8 +46,10 @@ STATIC_ASSERT(sizeof(cl_ctx) <= sizeof(gpucontext), sizeof_struct_gpucontext_cl)
 
 struct _gpudata {
   cl_mem buf;
-  cl_event ev;
   cl_ctx *ctx;
+  /* Don't change anyhting above this without checking
+     struct _partial_gpudata */
+  cl_event ev;
   unsigned int refcnt;
 #ifdef DEBUG
   char tag[8];
@@ -55,17 +57,17 @@ struct _gpudata {
 };
 
 struct _gpukernel {
-#ifdef DEBUG
-  char tag[8];
-#endif
+  cl_ctx *ctx; /* Keep the context first */
   cl_kernel k;
   cl_event ev;
   cl_event **evr;
-  cl_ctx *ctx;
   int *types;
   unsigned int argcount;
   unsigned int refcnt;
   cl_uint num_ev;
+#ifdef DEBUG
+  char tag[8];
+#endif
 };
 
 GPUARRAY_LOCAL cl_ctx *cl_make_ctx(cl_context ctx);

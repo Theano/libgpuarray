@@ -67,8 +67,7 @@ typedef struct _gpuelemwise_arg {
 
 } gpuelemwise_arg;
 
-GPUARRAY_PUBLIC GpuElemwise *GpuElemwise_new(const gpuarray_buffer_ops *ops,
-                                             gpucontext *ctx,
+GPUARRAY_PUBLIC GpuElemwise *GpuElemwise_new(gpucontext *ctx,
                                              const char *preamble,
                                              const char *expr,
                                              unsigned int n,

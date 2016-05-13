@@ -24,6 +24,9 @@ static cl_int err;
 #define FAIL(v, e) { if (ret) *ret = e; return v; }
 #define CHKFAIL(v) if (err != CL_SUCCESS) FAIL(v, GA_IMPL_ERROR)
 
+
+GPUARRAY_LOCAL const gpuarray_buffer_ops opencl_ops;
+
 static int cl_property(gpucontext *c, gpudata *b, gpukernel *k, int p, void *r);
 static gpudata *cl_alloc(gpucontext *c, size_t size, void *data, int flags,
                          int *ret);
@@ -82,6 +85,7 @@ cl_ctx *cl_make_ctx(cl_context ctx) {
   if (res == NULL) return NULL;
 
   res->ctx = ctx;
+  res->ops = &opencl_ops;
   res->err = CL_SUCCESS;
   res->refcnt = 1;
   res->exts = NULL;
@@ -1015,19 +1019,12 @@ static int cl_sync(gpudata *b) {
   return GA_NO_ERROR;
 }
 
-static gpudata *cl_transfer(gpudata *buf, size_t offset, size_t sz,
-                            gpucontext *dst_ctx, int may_share) {
-  cl_ctx *ctx = buf->ctx;
+static int cl_transfer(gpudata *dst, size_t dstoff,
+                       gpudata *src, size_t srcoff, size_t sz) {
+  ASSERT_BUF(dst);
+  ASSERT_BUF(src);
 
-  ASSERT_BUF(buf);
-  ASSERT_CTX(ctx);
-  ASSERT_CTX((cl_ctx *)dst_ctx);
-
-  if ((gpucontext *)ctx == dst_ctx && may_share && offset == 0) {
-    cl_retain(buf);
-    return buf;
-  }
-  return NULL;
+  return GA_UNSUPPORTED_ERROR;
 }
 
 static const char ELEM_HEADER[] = "#define DTYPEA %s\n"

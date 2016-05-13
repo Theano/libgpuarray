@@ -83,13 +83,15 @@ GPUARRAY_LOCAL void cuda_exit(cuda_context *ctx);
 
 struct _gpudata {
   CUdeviceptr ptr;
+  cuda_context *ctx;
+  /* Don't change anything abovbe this without checking
+     struct _partial_gpudata */
   CUevent rev;
   CUevent wev;
-  size_t sz;
-  cuda_context *ctx;
-  gpudata *next;
-  int flags;
   unsigned int refcnt;
+  int flags;
+  size_t sz;
+  gpudata *next;
 #ifdef DEBUG
   char tag[8];
 #endif
@@ -112,10 +114,7 @@ GPUARRAY_LOCAL int cuda_record(gpudata *, int);
 #define CUDA_MAPPED_PTR 0x80000
 
 struct _gpukernel {
-#ifdef DEBUG
-  char tag[8];
-#endif
-  cuda_context *ctx;
+  cuda_context *ctx; /* Keep the context first */
   CUmodule m;
   CUfunction k;
   void **args;
@@ -124,6 +123,9 @@ struct _gpukernel {
   int *types;
   unsigned int argcount;
   unsigned int refcnt;
+#ifdef DEBUG
+  char tag[8];
+#endif
 };
 
 #endif

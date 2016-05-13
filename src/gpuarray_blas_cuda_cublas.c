@@ -201,17 +201,17 @@ static int setup(gpucontext *c) {
   types[6] = GA_SIZE;
   types[7] = GA_SIZE;
   types[8] = GA_SIZE;
-  e = GpuKernel_init(&handle->sgemvBH_N_a1_b1_small, &cuda_ops, c, 1, &code_sgemvBH_N_a1_b1_small, NULL, "sgemv", 9, types, 0, NULL);
+  e = GpuKernel_init(&handle->sgemvBH_N_a1_b1_small, c, 1, &code_sgemvBH_N_a1_b1_small, NULL, "sgemv", 9, types, 0, NULL);
   if (e != GA_NO_ERROR) goto e1;
-  e = GpuKernel_init(&handle->sgemvBH_T_a1_b1_small, &cuda_ops, c, 1, &code_sgemvBH_T_a1_b1_small, NULL, "sgemv", 9, types, 0, NULL);
+  e = GpuKernel_init(&handle->sgemvBH_T_a1_b1_small, c, 1, &code_sgemvBH_T_a1_b1_small, NULL, "sgemv", 9, types, 0, NULL);
   if (e != GA_NO_ERROR) goto e2;
   tmp[0] = atomicadd_double;
   tmp[1] = code_dgemvBH_N_a1_b1_small;
-  e = GpuKernel_init(&handle->dgemvBH_N_a1_b1_small, &cuda_ops, c, 2, tmp, NULL, "dgemv", 9, types, GA_USE_DOUBLE, NULL);
+  e = GpuKernel_init(&handle->dgemvBH_N_a1_b1_small, c, 2, tmp, NULL, "dgemv", 9, types, GA_USE_DOUBLE, NULL);
   if (e != GA_NO_ERROR) goto e3;
   tmp[0] = atomicadd_double;
   tmp[1] = code_dgemvBH_T_a1_b1_small;
-  e = GpuKernel_init(&handle->dgemvBH_T_a1_b1_small, &cuda_ops, c, 2, tmp, NULL, "dgemv", 9, types, GA_USE_DOUBLE, NULL);
+  e = GpuKernel_init(&handle->dgemvBH_T_a1_b1_small, c, 2, tmp, NULL, "dgemv", 9, types, GA_USE_DOUBLE, NULL);
   if (e != GA_NO_ERROR) goto e4;
 
   types[0] = GA_BUFFER;
@@ -224,12 +224,12 @@ static int setup(gpucontext *c) {
   types[7] = GA_SIZE;
   types[8] = GA_SIZE;
   types[9] = GA_SIZE;
-  e = GpuKernel_init(&handle->sgerBH_gen_small, &cuda_ops, c, 1, &code_sgerBH_gen_small, NULL, "_sgerBH_gen_small", 10, types, 0, NULL);
+  e = GpuKernel_init(&handle->sgerBH_gen_small, c, 1, &code_sgerBH_gen_small, NULL, "_sgerBH_gen_small", 10, types, 0, NULL);
   if (e != GA_NO_ERROR) goto e5;
   types[4] = GA_DOUBLE;
   tmp[0] = atomicadd_double;
   tmp[1] = code_dgerBH_gen_small;
-  e = GpuKernel_init(&handle->dgerBH_gen_small, &cuda_ops, c, 2, tmp, NULL, "_dgerBH_gen_small", 10, types, GA_USE_DOUBLE, NULL);
+  e = GpuKernel_init(&handle->dgerBH_gen_small, c, 2, tmp, NULL, "_dgerBH_gen_small", 10, types, GA_USE_DOUBLE, NULL);
   if (e != GA_NO_ERROR) goto e6;
 
   ctx->blas_handle = handle;
