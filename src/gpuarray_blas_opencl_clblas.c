@@ -32,8 +32,7 @@ static inline clblasTranspose convT(cb_transpose trans) {
 
 static unsigned int refcnt = 0;
 
-static int setup(void *c) {
-  cl_ctx *ctx = (cl_ctx *)c;
+static int setup(gpucontext *ctx) {
   clblasStatus err;
 
   if (refcnt == 0) {
@@ -48,8 +47,7 @@ static int setup(void *c) {
   return GA_NO_ERROR;
 }
 
-static void teardown(void *c) {
-  cl_ctx *ctx = (cl_ctx *)c;
+static void teardown(gpucontext *ctx) {
   if (ctx->blas_handle != NULL) {
     ctx->blas_handle = NULL;
     refcnt--;

@@ -86,10 +86,8 @@ int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
     goto cleanup;
   }
 
-  err = Ap->ops->property(NULL, Ap->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
-  if (err != GA_NO_ERROR)
-    goto cleanup;
-  err = Ap->ops->property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas);
+  ctx = gpudata_context(Ap->data);
+  err = gpucontext_property(ctx, GA_CTX_PROP_BLAS_OPS, &blas);
   if (err != GA_NO_ERROR)
     goto cleanup;
 
@@ -243,10 +241,8 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
     goto cleanup;
   }
 
-  err = Ap->ops->property(NULL, Ap->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
-  if (err != GA_NO_ERROR)
-    goto cleanup;
-  err = Ap->ops->property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas);
+  ctx = gpudata_context(Ap->data);
+  err = gpucontext_property(ctx, GA_CTX_PROP_BLAS_OPS, &blas);
   if (err != GA_NO_ERROR)
     goto cleanup;
 
@@ -345,10 +341,8 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
     goto cleanup;
   }
 
-  err = Xp->ops->property(NULL, Xp->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
-  if (err != GA_NO_ERROR)
-    goto cleanup;
-  err = Xp->ops->property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas);
+  ctx = gpudata_context(Xp->data);
+  err = gpucontext_property(ctx, GA_CTX_PROP_BLAS_OPS, &blas);
   if (err != GA_NO_ERROR)
     goto cleanup;
 
@@ -509,10 +503,8 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
     goto cleanup;
   }
 
-  err = Ap->ops->property(NULL, Ap->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
-  if (err != GA_NO_ERROR)
-    goto cleanup;
-  err = Ap->ops->property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas);
+  ctx = gpudata_context(Ap->data);
+  err = gpucontext_property(ctx, GA_CTX_PROP_BLAS_OPS, &blas);
   if (err != GA_NO_ERROR)
     goto cleanup;
 

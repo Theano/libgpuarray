@@ -28,6 +28,8 @@
 
 static CUresult err;
 
+GPUARRAY_LOCAL const gpuarray_buffer_ops cuda_ops;
+
 static void cuda_freekernel(gpukernel *);
 static int cuda_property(gpucontext *, gpudata *, gpukernel *, int, void *);
 static int cuda_waits(gpudata *, int, CUstream);
@@ -46,6 +48,7 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   if (res == NULL)
     return NULL;
   res->ctx = ctx;
+  res->ops = &cuda_ops;
   res->err = CUDA_SUCCESS;
   res->blas_handle = NULL;
   res->refcnt = 1;
@@ -1681,60 +1684,27 @@ fail:
   return res;
 }
 
-static gpudata *cuda_transfer(gpudata *src, size_t offset, size_t sz,
-                              gpucontext *dst_c, int may_share) {
-  cuda_context *ctx = src->ctx;
-  cuda_context *dst_ctx = (cuda_context *)dst_c;
-  gpudata *dst;
-
+static int cuda_transfer(gpudata *dst, size_t dstoff,
+                         gpudata *src, size_t srcoff, size_t sz) {
   ASSERT_BUF(src);
-  ASSERT_CTX(ctx);
-  ASSERT_CTX(dst_ctx);
+  ASSERT_BUF(dst);
 
-  if (ctx == dst_ctx) {
-    if (may_share && offset == 0) {
-        cuda_retain(src);
-        return src;
-    }
-    dst = cuda_alloc((gpucontext *)ctx, sz, NULL, 0, NULL);
-    if (dst == NULL) return NULL;
-    cuda_enter(ctx);
-
-    cuda_wait(src, CUDA_WAIT_READ);
-    cuda_wait(dst, CUDA_WAIT_WRITE);
-
-    ctx->err = cuMemcpyDtoDAsync(dst->ptr, src->ptr+offset, sz, ctx->s);
-    if (ctx->err != CUDA_SUCCESS) {
-      cuda_exit(ctx);
-      cuda_free(dst);
-      return NULL;
-    }
-    cuda_record(src, CUDA_WAIT_READ);
-    cuda_record(dst, CUDA_WAIT_WRITE);
-
-    cuda_exit(ctx);
-    return dst;
+  cuda_enter(dst->ctx);
+  cuda_waits(src, CUDA_WAIT_READ, dst->ctx->mem_s);
+  cuda_waits(dst, CUDA_WAIT_WRITE, dst->ctx->mem_s);
+  dst->ctx->err = cuMemcpyPeerAsync(dst->ptr+dstoff, dst->ctx->ctx,
+                                    src->ptr+srcoff, src->ctx->ctx,
+                                    sz, dst->ctx->mem_s);
+  if (dst->ctx->err != CUDA_SUCCESS) {
+    cuda_exit(dst->ctx);
+    return GA_IMPL_ERROR;
   }
 
-  dst = cuda_alloc((gpucontext *)dst_ctx, sz, NULL, 0, NULL);
-  if (dst == NULL)
-    return NULL;
-  cuda_enter(ctx);
-  cuda_waits(src, CUDA_WAIT_READ, dst_ctx->mem_s);
-  cuda_waits(dst, CUDA_WAIT_WRITE, dst_ctx->mem_s);
-  ctx->err = cuMemcpyPeerAsync(dst->ptr, dst->ctx->ctx, src->ptr+offset,
-			       src->ctx->ctx, sz, dst_ctx->mem_s);
-  if (ctx->err != CUDA_SUCCESS) {
-    cuda_free(dst);
-    cuda_exit(ctx);
-    return NULL;
-  }
+  cuda_records(dst, CUDA_WAIT_WRITE, dst->ctx->mem_s);
+  cuda_records(src, CUDA_WAIT_READ, dst->ctx->mem_s);
 
-  cuda_records(dst, CUDA_WAIT_WRITE, dst_ctx->mem_s);
-  cuda_records(src, CUDA_WAIT_READ, dst_ctx->mem_s);
-
-  cuda_exit(ctx);
-  return dst;
+  cuda_exit(dst->ctx);
+  return GA_NO_ERROR;
 }
 
 #ifdef WITH_CUDA_CUBLAS
