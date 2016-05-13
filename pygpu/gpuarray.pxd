@@ -70,11 +70,13 @@ cdef extern from "gpuarray/buffer.h":
     ctypedef struct gpukernel:
         pass
 
-    ctypedef struct gpuarray_buffer_ops:
-        gpucontext *buffer_init(int devno, int flags, int *ret)
-        void buffer_deinit(gpucontext *ctx)
-        char *ctx_error(gpucontext *ctx)
-        int property(gpucontext *c, gpudata *b, gpukernel *k, int prop_id, void *res)
+    gpucontext *gpucontext_init(const char *name, int devno, int flags, int *ret)
+    void gpucontext_deref(gpucontext *ctx)
+    char *gpucontext_error(gpucontext *ctx, int err)
+    int gpucontext_property(gpucontext *ctx, int prop_id, void *res)
+    int gpukernel_property(gpukernel *k, int prop_id, void *res)
+    gpucontext *gpudata_context(gpudata *)
+    gpucontext *gpukernel_context(gpukernel *)
 
     int GA_CTX_DEFAULT
     int GA_CTX_MULTI_THREAD
@@ -95,8 +97,6 @@ cdef extern from "gpuarray/buffer.h":
     int GA_CTX_PROP_MAXGSIZE0
     int GA_CTX_PROP_MAXGSIZE1
     int GA_CTX_PROP_MAXGSIZE2
-    int GA_BUFFER_PROP_CTX
-    int GA_KERNEL_PROP_CTX
     int GA_KERNEL_PROP_MAXLSIZE
     int GA_KERNEL_PROP_PREFLSIZE
     int GA_KERNEL_PROP_NUMARGS
@@ -106,15 +106,11 @@ cdef extern from "gpuarray/buffer.h":
         GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF,
         GA_USE_BINARY, GA_USE_PTX, GA_USE_CUDA, GA_USE_OPENCL
 
-    char *Gpu_error(const gpuarray_buffer_ops *o, gpucontext *ctx, int err)
-    const gpuarray_buffer_ops *gpuarray_get_ops(const char *)
-
 cdef extern from "gpuarray/kernel.h":
     ctypedef struct _GpuKernel "GpuKernel":
         gpukernel *k
-        const gpuarray_buffer_ops *ops
 
-    int GpuKernel_init(_GpuKernel *k, const gpuarray_buffer_ops *ops, gpucontext *ctx,
+    int GpuKernel_init(_GpuKernel *k, gpucontext *ctx,
                        unsigned int count, const char **strs,
                        const size_t *lens, const char *name,
                        unsigned int argcount, const int *types, int flags, char **err_str)
@@ -129,7 +125,6 @@ cdef extern from "gpuarray/kernel.h":
 cdef extern from "gpuarray/array.h":
     ctypedef struct _GpuArray "GpuArray":
         gpudata *data
-        const gpuarray_buffer_ops *ops
         size_t offset
         size_t *dimensions
         ssize_t *strides
@@ -151,13 +146,13 @@ cdef extern from "gpuarray/array.h":
     ctypedef enum ga_order:
         GA_ANY_ORDER, GA_C_ORDER, GA_F_ORDER
 
-    int GpuArray_empty(_GpuArray *a, const gpuarray_buffer_ops *ops, gpucontext *ctx,
+    int GpuArray_empty(_GpuArray *a, gpucontext *ctx,
                        int typecode, int nd, const size_t *dims, ga_order ord)
-    int GpuArray_fromdata(_GpuArray *a, const gpuarray_buffer_ops *ops,
+    int GpuArray_fromdata(_GpuArray *a,
                           gpudata *data, size_t offset, int typecode,
                           unsigned int nd, const size_t *dims,
                           const ssize_t *strides, int writable)
-    int GpuArray_copy_from_host(_GpuArray *a, const gpuarray_buffer_ops *ops,
+    int GpuArray_copy_from_host(_GpuArray *a,
                             gpucontext *ctx, void *buf, int typecode,
                             unsigned int nd, const size_t *dims,
                             const ssize_t *strides) nogil
@@ -182,8 +177,7 @@ cdef extern from "gpuarray/array.h":
     int GpuArray_memset(_GpuArray *a, int data)
     int GpuArray_copy(_GpuArray *res, _GpuArray *a, ga_order order)
 
-    int GpuArray_transfer(_GpuArray *res, const _GpuArray *a, gpucontext *new_ctx,
-                          const gpuarray_buffer_ops *new_ops, int may_share) nogil
+    int GpuArray_transfer(_GpuArray *res, const _GpuArray *a) nogil
     int GpuArray_split(_GpuArray **rs, const _GpuArray *a, size_t n,
                        size_t *p, unsigned int axis)
     int GpuArray_concatenate(_GpuArray *r, const _GpuArray **as, size_t n,
@@ -212,14 +206,14 @@ cdef ga_order to_ga_order(ord) except <ga_order>-2
 cdef bint py_CHKFLAGS(GpuArray a, int flags)
 cdef bint py_ISONESEGMENT(GpuArray a)
 
-cdef int array_empty(GpuArray a, const gpuarray_buffer_ops *ops, gpucontext *ctx,
+cdef int array_empty(GpuArray a, gpucontext *ctx,
                      int typecode, unsigned int nd, const size_t *dims,
                      ga_order ord) except -1
-cdef int array_fromdata(GpuArray a, const gpuarray_buffer_ops *ops,
+cdef int array_fromdata(GpuArray a,
                         gpudata *data, size_t offset, int typecode,
                         unsigned int nd, const size_t *dims,
                         const ssize_t *strides, int writeable) except -1
-cdef int array_copy_from_host(GpuArray a, const gpuarray_buffer_ops *ops,
+cdef int array_copy_from_host(GpuArray a,
                               gpucontext *ctx, void *buf, int typecode,
                               unsigned int nd, const size_t *dims,
                               const ssize_t *strides) except -1
@@ -241,12 +235,10 @@ cdef int array_write(GpuArray a, void *src, size_t sz) except -1
 cdef int array_read(void *dst, size_t sz, GpuArray src) except -1
 cdef int array_memset(GpuArray a, int data) except -1
 cdef int array_copy(GpuArray res, GpuArray a, ga_order order) except -1
-cdef int array_transfer(GpuArray res, GpuArray a, gpucontext *new_ctx,
-                        const gpuarray_buffer_ops *ops,
-                        bint may_share) except -1
+cdef int array_transfer(GpuArray res, GpuArray a) except -1
 
 cdef const char *kernel_error(GpuKernel k, int err) except NULL
-cdef int kernel_init(GpuKernel k, const gpuarray_buffer_ops *ops, gpucontext *ctx,
+cdef int kernel_init(GpuKernel k, gpucontext *ctx,
                      unsigned int count, const char **strs, const size_t *len,
                      const char *name, unsigned int argcount, const int *types,
                      int flags) except -1
@@ -260,8 +252,6 @@ cdef int kernel_binary(GpuKernel k, size_t *, void **) except -1
 cdef int kernel_property(GpuKernel k, int prop_id, void *res) except -1
 
 cdef int ctx_property(GpuContext c, int prop_id, void *res) except -1
-cdef const gpuarray_buffer_ops *get_ops(bytes kind) except NULL
-cdef ops_kind(const gpuarray_buffer_ops *ops)
 cdef GpuContext ensure_context(GpuContext c)
 
 cdef api GpuContext pygpu_default_context()
@@ -306,15 +296,14 @@ cdef api GpuArray pygpu_reshape(GpuArray a, unsigned int nd,
                                 bint nocopy, int compute_axis)
 cdef api GpuArray pygpu_transpose(GpuArray a, const unsigned int *newaxes)
 
-cdef api GpuArray pygpu_transfer(GpuArray a, GpuContext new_ctx,
-                                 bint may_share)
+cdef api int pygpu_transfer(GpuArray res, GpuArray a) except -1
 cdef api GpuArray pygpu_concatenate(const _GpuArray **a, size_t n,
                                     unsigned int axis, int restype,
                                     object cls, GpuContext context)
 
 cdef api class GpuContext [type PyGpuContextType, object PyGpuContextObject]:
-    cdef const gpuarray_buffer_ops *ops
     cdef gpucontext* ctx
+    cdef readonly bytes kind
 
 cdef GpuArray new_GpuArray(object cls, GpuContext ctx, object base)
 
