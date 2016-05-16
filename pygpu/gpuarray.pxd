@@ -142,6 +142,7 @@ cdef extern from "gpuarray/array.h":
 
     bint GpuArray_CHKFLAGS(_GpuArray *a, int fl)
     bint GpuArray_ISONESEGMENT(_GpuArray *a)
+    bint GpuArray_IS_C_CONTIGUOUS(_GpuArray *a)
 
     ctypedef enum ga_order:
         GA_ANY_ORDER, GA_C_ORDER, GA_F_ORDER
