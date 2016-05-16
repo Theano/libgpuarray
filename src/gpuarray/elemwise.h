@@ -81,6 +81,7 @@ GPUARRAY_PUBLIC int GpuElemwise_call(GpuElemwise *ge, void **args, int flags);
 
 #define GE_BROADCAST   0x0100
 #define GE_NOCOLLAPSE  0x0200
+#define GE_NOADDR64    0x0400
 
 #ifdef __cplusplus
 }
