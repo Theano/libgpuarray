@@ -38,7 +38,7 @@ struct _gpudata;
 typedef struct _gpucontext {
   GPUCONTEXT_HEAD;
   void *ctx_ptr;
-  void *private[7];
+  void *_private[7];
 } gpucontext;
 
 
