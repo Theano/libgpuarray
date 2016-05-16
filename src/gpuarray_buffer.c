@@ -35,12 +35,17 @@ gpucontext *gpucontext_init(const char *name, int dev, int flags, int *ret) {
   if (gpucontext_property(res, GA_CTX_PROP_BLAS_OPS, &res->blas_ops) != GA_NO_ERROR)
     res->blas_ops = NULL;
   res->blas_handle = NULL;
+  res->extcopy_cache = NULL;
   return res;
 }
 
 void gpucontext_deref(gpucontext *ctx) {
   if (ctx->blas_handle != NULL)
     ctx->blas_ops->teardown(ctx);
+  if (ctx->extcopy_cache != NULL) {
+    cache_destroy(ctx->extcopy_cache);
+    ctx->extcopy_cache = NULL;
+  }
   ctx->ops->buffer_deinit(ctx);
 }
 

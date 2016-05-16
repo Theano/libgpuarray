@@ -1027,115 +1027,6 @@ static int cl_transfer(gpudata *dst, size_t dstoff,
   return GA_UNSUPPORTED_ERROR;
 }
 
-static const char ELEM_HEADER[] = "#define DTYPEA %s\n"
-  "#define DTYPEB %s\n"
-  "__kernel void elemk(__global const DTYPEA *a_data,"
-  "                    __global DTYPEB *b_data){"
-  "const int idx = get_global_id(0);"
-  "const int numThreads = get_global_size(0);"
-  "__global char *tmp; tmp = (__global char *)a_data; tmp += %" SPREFIX "u;"
-  "a_data = (__global const DTYPEA *)tmp; tmp = (__global char *)b_data;"
-  "tmp += %" SPREFIX "u; b_data = (__global DTYPEB *)tmp;"
-  "for (int i = idx; i < %" SPREFIX "u; i+= numThreads) {"
-  "__global const char *a_p = (__global const char *)a_data;"
-  "__global char *b_p = (__global char *)b_data;";
-
-static const char ELEM_FOOTER[] =
-  "__global const DTYPEA *a = (__global const DTYPEA *)a_p;"
-  "__global DTYPEB *b = (__global DTYPEB *)b_p;"
-  "b[0] = a[0];}}\n";
-
-static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
-                      size_t ooff, int intype, int outtype, unsigned int a_nd,
-                      const size_t *a_dims, const ssize_t *a_str,
-                      unsigned int b_nd, const size_t *b_dims,
-                      const ssize_t *b_str) {
-  cl_ctx *ctx = input->ctx;
-  strb sb = STRB_STATIC_INIT;
-  size_t nEls, ls, gs;
-  gpukernel *k;
-  void *args[2];
-  cl_mem_flags fl;
-  int res = GA_SYS_ERROR;
-  unsigned int i;
-  int flags = GA_USE_CLUDA;
-  int types[2];
-
-  ASSERT_BUF(input);
-  ASSERT_BUF(output);
-  ASSERT_CTX(ctx);
-
-  if (input->ctx != output->ctx) return GA_VALUE_ERROR;
-
-  ctx->err = clGetMemObjectInfo(input->buf, CL_MEM_FLAGS, sizeof(fl), &fl,
-                                NULL);
-  if (ctx->err != CL_SUCCESS) return GA_IMPL_ERROR;
-  if (fl & CL_MEM_WRITE_ONLY) return GA_WRITEONLY_ERROR;
-
-  ctx->err = clGetMemObjectInfo(output->buf, CL_MEM_FLAGS, sizeof(fl), &fl,
-                                NULL);
-  if (ctx->err != CL_SUCCESS) return GA_IMPL_ERROR;
-  if (fl & CL_MEM_READ_ONLY) return GA_READONLY_ERROR;
-
-  nEls = 1;
-  for (i = 0; i < a_nd; i++) {
-    nEls *= a_dims[i];
-  }
-
-  if (nEls == 0) return GA_NO_ERROR;
-
-  if (outtype == GA_DOUBLE || intype == GA_DOUBLE ||
-      outtype == GA_CDOUBLE || intype == GA_CDOUBLE) {
-    flags |= GA_USE_DOUBLE;
-  }
-
-  if (outtype == GA_HALF || intype == GA_HALF) {
-    flags |= GA_USE_HALF;
-  }
-
-  if (gpuarray_get_elsize(outtype) < 4 || gpuarray_get_elsize(intype) < 4) {
-    /* Should check for non-mod4 strides too */
-    flags |= GA_USE_SMALL;
-  }
-
-  if (outtype == GA_CFLOAT || intype == GA_CFLOAT ||
-      outtype == GA_CDOUBLE || intype == GA_CDOUBLE) {
-    flags |= GA_USE_COMPLEX;
-  }
-
-  strb_appendf(&sb, ELEM_HEADER,
-	       gpuarray_get_type(intype)->cluda_name,
-	       gpuarray_get_type(outtype)->cluda_name,
-	       ioff, ooff, nEls);
-
-  gpuarray_elem_perdim(&sb, a_nd, a_dims, a_str, "a_p");
-  gpuarray_elem_perdim(&sb, b_nd, b_dims, b_str, "b_p");
-
-  strb_appends(&sb, ELEM_FOOTER);
-
-  if (strb_error(&sb))
-    goto fail;
-
-  types[0] = types[1] = GA_BUFFER;
-  k = cl_newkernel((gpucontext *)ctx, 1, (const char **)&sb.s, &sb.l, "elemk",
-                   2, types, flags, &res, NULL);
-  if (k == NULL) goto fail;
-  /* Cheap kernel scheduling */
-  res = cl_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, &ls);
-  if (res != GA_NO_ERROR) goto kfail;
-
-  gs = ((nEls-1) / ls) + 1;
-  args[0] = input;
-  args[1] = output;
-  res = cl_callkernel(k, 1, &ls, &gs, 0, args);
-
- kfail:
-  cl_releasekernel(k);
- fail:
-  strb_clear(&sb);
-  return res;
-}
-
 #ifdef WITH_OPENCL_CLBLAS
 extern gpuarray_blas_ops clblas_ops;
 #endif
@@ -1487,7 +1378,6 @@ const gpuarray_buffer_ops opencl_ops = {cl_init,
                                        cl_callkernel,
                                        cl_kernelbin,
                                        cl_sync,
-                                       cl_extcopy,
                                        cl_transfer,
                                        cl_property,
                                        cl_error};

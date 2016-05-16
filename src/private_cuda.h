@@ -47,7 +47,6 @@ typedef struct _cuda_context {
   CUresult err;
   CUstream s;
   CUstream mem_s;
-  cache *extcopy_cache;
   gpudata *freeblocks;
   unsigned int enter;
 } cuda_context;

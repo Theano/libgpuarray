@@ -35,8 +35,6 @@ static int cuda_property(gpucontext *, gpudata *, gpukernel *, int, void *);
 static int cuda_waits(gpudata *, int, CUstream);
 static int cuda_records(gpudata *, int, CUstream);
 
-#include "cache_extcopy.h"
-
 static int detect_arch(const char *prefix, char *ret, CUresult *err);
 static gpudata *new_gpudata(cuda_context *ctx, CUdeviceptr ptr, size_t size);
 
@@ -50,20 +48,12 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   res->ctx = ctx;
   res->ops = &cuda_ops;
   res->err = CUDA_SUCCESS;
-  res->blas_handle = NULL;
   res->refcnt = 1;
   res->flags = flags;
   res->enter = 0;
   res->freeblocks = NULL;
   if (detect_arch(ARCH_PREFIX, res->bin_id, &err)) {
-    goto fail_cache;
-  }
-  res->extcopy_cache = cache_lru(64, 32, (cache_eq_fn)extcopy_eq,
-                                 (cache_hash_fn)extcopy_hash,
-                                 (cache_freek_fn)extcopy_free,
-                                 (cache_freev_fn)cuda_freekernel);
-  if (res->extcopy_cache == NULL) {
-    goto fail_cache;
+    goto fail_stream;
   }
   err = cuStreamCreate(&res->s, 0);
   if (err != CUDA_SUCCESS) {
@@ -94,8 +84,6 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
  fail_mem_stream:
   cuStreamDestroy(res->s);
  fail_stream:
-  cache_destroy(res->extcopy_cache);
- fail_cache:
   free(res);
   return NULL;
 }
@@ -140,7 +128,6 @@ static void cuda_free_ctx(cuda_context *ctx) {
       cuDevicePrimaryCtxRelease(dev);
 #endif
     }
-    cache_destroy(ctx->extcopy_cache);
     CLEAR(ctx);
     free(ctx);
   }
@@ -1389,301 +1376,6 @@ static int cuda_sync(gpudata *b) {
   return err;
 }
 
-static const char ELEM_HEADER_PTX[] = ".version %s\n.target %s\n\n"
-    ".entry extcpy (\n"
-    ".param .u%u a_data,\n"
-    ".param .u%u b_data ) {\n"
-    ".reg .u16 rh1, rh2;\n"
-    ".reg .u32 r1;\n"
-    ".reg .u%u numThreads, i, a_pi, b_pi, a_p, b_p, rl1;\n"
-    ".reg .u%u rp1, rp2;\n"
-    ".reg .%s tmpa;\n"
-    ".reg .%s tmpb;\n"
-    ".reg .pred p;\n"
-    "mov.u16 rh1, %%ntid.x;\n"
-    "mov.u16 rh2, %%ctaid.x;\n"
-    "mul.wide.u16 r1, rh1, rh2;\n"
-    "cvt.u%u.u32 i, r1;\n"
-    "mov.u32 r1, %%tid.x;\n"
-    "cvt.u%u.u32 rl1, r1;\n"
-    "add.u%u i, i, rl1;\n"
-    "mov.u16 rh2, %%nctaid.x;\n"
-    "mul.wide.u16 r1, rh2, rh1;\n"
-    "cvt.u%u.u32 numThreads, r1;\n"
-    "setp.ge.u%u p, i, %" SPREFIX "uU;\n"
-    "@p bra $end;\n"
-    "$loop_begin:\n"
-    "mov.u%u a_p, 0U;\n"
-    "mov.u%u b_p, 0U;\n";
-
-static inline ssize_t ssabs(ssize_t v) {
-    return (v < 0 ? -v : v);
-}
-
-static void cuda_perdim_ptx(strb *sb, unsigned int nd,
-			    const size_t *dims, const ssize_t *str,
-			    const char *id, unsigned int bits) {
-  int i;
-
-  if (nd > 0) {
-    strb_appendf(sb, "mov.u%u %si, i;\n", bits, id);
-    for (i = nd-1; i > 0; i--) {
-      strb_appendf(sb, "rem.u%u rl1, %si, %" SPREFIX "uU;\n"
-		   "mad.lo.s%u %s, rl1, %" SPREFIX "d, %s;\n"
-		   "div.u%u %si, %si, %" SPREFIX "uU;\n",
-		   bits, id, dims[i],
-		   bits, id, str[i], id,
-		   bits, id, id, dims[i]);
-    }
-
-    strb_appendf(sb, "mad.lo.s%u %s, %si, %" SPREFIX "d, %s;\n",
-		 bits, id, id, str[0], id);
-  }
-}
-
-static const char ELEM_FOOTER_PTX[] = "add.u%u i, i, numThreads;\n"
-    "setp.lt.u%u p, i, %" SPREFIX "uU;\n"
-    "@p bra $loop_begin;\n"
-    "$end:\n"
-    "ret;\n"
-    "}\n";
-
-static inline const char *map_t(int typecode) {
-    switch (typecode) {
-    case GA_BYTE:
-        return "s8";
-    case GA_BOOL:
-    case GA_UBYTE:
-        return "u8";
-    case GA_SHORT:
-        return "s16";
-    case GA_USHORT:
-        return "u16";
-    case GA_INT:
-        return "s32";
-    case GA_UINT:
-        return "u32";
-    case GA_LONG:
-        return "s64";
-    case GA_ULONG:
-        return "u64";
-    case GA_FLOAT:
-        return "f32";
-    case GA_DOUBLE:
-        return "f64";
-    case GA_HALF:
-        return "f16";
-    default:
-        return NULL;
-    }
-}
-
-static inline const char *get_rmod(int intype, int outtype) {
-    switch (intype) {
-    case GA_DOUBLE:
-        if (outtype == GA_HALF || outtype == GA_FLOAT) return ".rn";
-    case GA_FLOAT:
-        if (outtype == GA_HALF) return ".rn";
-    case GA_HALF:
-        switch (outtype) {
-        case GA_BYTE:
-        case GA_UBYTE:
-        case GA_BOOL:
-        case GA_SHORT:
-        case GA_USHORT:
-        case GA_INT:
-        case GA_UINT:
-        case GA_LONG:
-        case GA_ULONG:
-            return ".rni";
-        }
-        break;
-    case GA_BYTE:
-    case GA_UBYTE:
-    case GA_BOOL:
-    case GA_SHORT:
-    case GA_USHORT:
-    case GA_INT:
-    case GA_UINT:
-    case GA_LONG:
-    case GA_ULONG:
-        switch (outtype) {
-        case GA_HALF:
-        case GA_FLOAT:
-        case GA_DOUBLE:
-            return ".rn";
-        }
-    }
-    return "";
-}
-
-static inline unsigned int xmin(unsigned long a, unsigned long b) {
-    return (unsigned int)((a < b) ? a : b);
-}
-
-static inline int gen_extcopy_kernel(const extcopy_args *a,
-				     cuda_context *ctx, gpukernel **v,
-				     size_t nEls) {
-  strb sb = STRB_STATIC_INIT;
-  int res = GA_SYS_ERROR;
-  int flags = GA_USE_PTX;
-  unsigned int bits = sizeof(void *)*8;
-  int types[2];
-  const char *in_t, *in_ld_t;
-  const char *out_t, *out_ld_t;
-  const char *rmod;
-
-  in_t = map_t(a->itype);
-  out_t = map_t(a->otype);
-  /* Since float16 ('f16') is not a fully-supported type we need to use
-     it as b16 (basically uint16) for read and write operations. */
-  if (a->itype == GA_HALF)
-    in_ld_t = "b16";
-  else
-    in_ld_t = in_t;
-  if (a->otype == GA_HALF)
-    out_ld_t = "b16";
-  else
-    out_ld_t = out_t;
-  rmod = get_rmod(a->itype, a->otype);
-  if (in_t == NULL || out_t == NULL) return GA_DEVSUP_ERROR;
-
-  strb_appendf(&sb, ELEM_HEADER_PTX, "4.1", ctx->bin_id,
-               bits, bits, bits, bits, in_t, out_t, bits,
-               bits, bits, bits, bits, nEls, bits, bits);
-
-  cuda_perdim_ptx(&sb, a->ind, a->idims, a->istr, "a_p", bits);
-  cuda_perdim_ptx(&sb, a->ond, a->odims, a->ostr, "b_p", bits);
-
-  strb_appendf(&sb, "ld.param.u%u rp1, [a_data];\n"
-	       "cvt.s%u.s%u rp2, a_p;\n"
-	       "add.s%u rp1, rp1, rp2;\n"
-	       "ld.global.%s tmpa, [rp1+%" SPREFIX "u];\n"
-	       "cvt%s.%s.%s tmpb, tmpa;\n"
-	       "ld.param.u%u rp1, [b_data];\n"
-	       "cvt.s%u.s%u rp2, b_p;\n"
-	       "add.s%u rp1, rp1, rp2;\n"
-	       "st.global.%s [rp1+%" SPREFIX "u], tmpb;\n", bits,
-	       bits, bits,
-	       bits,
-	       in_ld_t, a->ioff,
-	       rmod, out_t, in_t,
-	       bits,
-	       bits, bits,
-	       bits,
-	       out_ld_t, a->ooff);
-
-  strb_appendf(&sb, ELEM_FOOTER_PTX, bits, bits, nEls);
-
-  if (strb_error(&sb))
-    goto fail;
-
-  if (a->itype == GA_DOUBLE || a->otype == GA_DOUBLE ||
-      a->itype == GA_CDOUBLE || a->otype == GA_CDOUBLE) {
-    flags |= GA_USE_DOUBLE;
-  }
-
-  if (a->otype == GA_HALF || a->itype == GA_HALF) {
-    flags |= GA_USE_HALF;
-  }
-
-  if (gpuarray_get_elsize(a->otype) < 4 || gpuarray_get_elsize(a->itype) < 4) {
-    /* Should check for non-mod4 strides too */
-    flags |= GA_USE_SMALL;
-  }
-
-  if (a->otype == GA_CFLOAT || a->itype == GA_CFLOAT ||
-      a->otype == GA_CDOUBLE || a->itype == GA_CDOUBLE) {
-    flags |= GA_USE_COMPLEX;
-  }
-
-  types[0] = types[1] = GA_BUFFER;
-  res = GA_NO_ERROR;
-  *v = cuda_newkernel((gpucontext *)ctx, 1, (const char **)&sb.s, &sb.l, "extcpy",
-                      2, types, flags, &res, NULL);
- fail:
-  strb_clear(&sb);
-  return res;
-}
-
-#include <time.h>
-
-static int cuda_extcopy(gpudata *input, size_t ioff, gpudata *output,
-                        size_t ooff, int intype, int outtype,
-                        unsigned int a_nd, const size_t *a_dims,
-                        const ssize_t *a_str, unsigned int b_nd,
-                        const size_t *b_dims, const ssize_t *b_str) {
-  cuda_context *ctx = input->ctx;
-  void *args[2];
-  int res = GA_SYS_ERROR;
-  unsigned int i;
-  size_t nEls = 1, ls, gs;
-  gpukernel *k;
-  extcopy_args a, *aa;
-
-  ASSERT_BUF(input);
-  ASSERT_BUF(output);
-  if (input->ctx != output->ctx)
-    return GA_INVALID_ERROR;
-
-  for (i = 0; i < a_nd; i++) {
-    nEls *= a_dims[i];
-  }
-  if (nEls == 0) return GA_NO_ERROR;
-
-  a.ind = a_nd;
-  a.ond = b_nd;
-  a.itype = intype;
-  a.otype = outtype;
-  a.ioff = ioff;
-  a.ooff = ooff;
-  a.idims = a_dims;
-  a.odims = b_dims;
-  a.istr = a_str;
-  a.ostr = b_str;
-
-  k = cache_get(ctx->extcopy_cache, &a);
-  if (k == NULL) {
-    res = gen_extcopy_kernel(&a, input->ctx, &k, nEls);
-    if (res != GA_NO_ERROR)
-      return res;
-
-    /* Cache the kernel */
-    aa = memdup(&a, sizeof(a));
-    if (aa == NULL) goto done;
-    aa->idims = memdup(a_dims, a_nd*sizeof(size_t));
-    aa->odims = memdup(b_dims, b_nd*sizeof(size_t));
-    aa->istr = memdup(a_str, a_nd*sizeof(ssize_t));
-    aa->ostr = memdup(b_str, b_nd*sizeof(ssize_t));
-    if (aa->idims == NULL || aa->odims == NULL ||
-        aa->istr == NULL || aa->ostr == NULL) {
-      extcopy_free(aa);
-      goto done;
-    }
-    /* One ref is given to the cache, we manage the other */
-    cuda_retainkernel(k);
-    cache_add(ctx->extcopy_cache, aa, k);
-  } else {
-    /* This is our reference */
-    cuda_retainkernel(k);
-  }
-done:
-
-  /* Cheap kernel scheduling */
-  res = cuda_property(NULL, NULL, k, GA_KERNEL_PROP_MAXLSIZE, &ls);
-  if (res != GA_NO_ERROR) goto fail;
-
-  gs = ((nEls-1) / ls) + 1;
-  args[0] = input;
-  args[1] = output;
-  res = cuda_callkernel(k, 1, &ls, &gs, 0, args);
-
-fail:
-  /* We free our reference here */
-  cuda_freekernel(k);
-  return res;
-}
-
 static int cuda_transfer(gpudata *dst, size_t dstoff,
                          gpudata *src, size_t srcoff, size_t sz) {
   ASSERT_BUF(src);
@@ -2045,7 +1737,6 @@ const gpuarray_buffer_ops cuda_ops = {cuda_init,
                                       cuda_callkernel,
                                       cuda_kernelbin,
                                       cuda_sync,
-                                      cuda_extcopy,
                                       cuda_transfer,
                                       cuda_property,
                                       cuda_error};

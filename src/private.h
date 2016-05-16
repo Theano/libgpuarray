@@ -15,6 +15,7 @@
 #include <gpuarray/buffer.h>
 #include <gpuarray/buffer_blas.h>
 #include "util/strb.h"
+#include "cache.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,6 +41,7 @@ typedef struct _gpuarray_blas_ops gpuarray_blas_ops;
   unsigned int refcnt;                          \
   int flags;                                    \
   struct _gpudata *errbuf;                      \
+  cache *extcopy_cache;                         \
   char bin_id[64];                              \
   char tag[8]
 
@@ -87,13 +89,6 @@ struct _gpuarray_buffer_ops {
 
   int (*kernel_binary)(gpukernel *k, size_t *sz, void **obj);
   int (*buffer_sync)(gpudata *b);
-  int (*buffer_extcopy)(gpudata *input, size_t ioff,
-                        gpudata *output, size_t ooff,
-                        int intype, int outtype,
-                        unsigned int a_nd, const size_t *a_dims,
-                        const ssize_t *a_str,
-                        unsigned int b_nd, const size_t *b_dims,
-                        const ssize_t *b_str);
   int (*buffer_transfer)(gpudata *dst, size_t dstoff,
                          gpudata *src, size_t srcoff, size_t sz);
   int (*property)(gpucontext *ctx, gpudata *buf, gpukernel *k, int prop_id,

@@ -19,37 +19,67 @@
 #include "gpuarray/util.h"
 
 #include "util/strb.h"
+#include "util/xxhash.h"
 
-/*
- * Returns the boundaries of an array.
- *
- * This function works on virtual addresses where 0 is the start of
- * the gpu buffer and `offset` is the address of the first (0, ..., 0)
- * element of the array.  If you do not pass offset correctly, this
- * function will most likely overflow and return garbage results.
- *
- * On exit `start` holds the lowest (virtual) address ever touched by
- * the array and `end` holds the highest (virtual) address touched.
- * If you want the size of the memory region (to copy the data) you
- * need to add the size of one element to `end - start`.
- */
-static void ga_boundaries(size_t *start, size_t *end, size_t offset,
-                          unsigned int nd, size_t *dims, ssize_t *strs) {
-  unsigned int i;
-  *start = offset;
-  *end = offset;
+struct extcopy_args {
+  int itype;
+  int otype;
+};
 
-  for (i = 0; i < nd; i++) {
-    if (dims[i] == 0) {
-      *start = *end = offset;
-      break;
-    }
+static int extcopy_eq(cache_key_t _k1, cache_key_t _k2) {
+  struct extcopy_args *k1 = _k1;
+  struct extcopy_args *k2 = _k2;
+  return k1->itype == k2->itype && k1->otype == k2->otype;
+}
 
-    if (strs[i] < 0)
-      *start += (dims[i] - 1) * strs[i];
-    else
-      *end += (dims[i] - 1) * strs[i];
+static void extcopy_free(cache_key_t k) {
+  free(k);
+}
+
+static uint32_t extcopy_hash(cache_key_t k) {
+  return XXH32(k, sizeof(struct extcopy_args), 42);
+}
+
+static int ga_extcopy(GpuArray *dst, const GpuArray *src) {
+  struct extcopy_args a, *aa;
+  gpucontext *ctx = gpudata_context(dst->data);
+  GpuElemwise *k = NULL;
+  void *args[2];
+
+  if (ctx != gpudata_context(src->data))
+    return GA_INVALID_ERROR;
+
+  a.itype = src->typecode;
+  a.otype = dst->typecode;
+
+  if (ctx->extcopy_cache != NULL)
+    k = cache_get(ctx->extcopy_cache, &a);
+  if (k == NULL) {
+    gpuelemwise_arg gargs[2];
+    gargs[0].name = "a";
+    gargs[0].typecode = src->typecode;
+    gargs[0].flags = GE_READ;
+    gargs[1].name = "b";
+    gargs[2].typecode = dst->typecode;
+    gargs[2].flags = GE_WRITE;
+    k = GpuElemwise_new(ctx, "", "a = b", 2, gargs, 0, 0);
+    if (k == NULL)
+      return GA_MISC_ERROR;
+    aa = memdup(&a, sizeof(a));
+    if (aa == NULL)
+      return GA_MEMORY_ERROR;
+    if (ctx->extcopy_cache == NULL)
+      ctx->extcopy_cache = cache_twoq(4, 8, 8, 2, extcopy_eq, extcopy_hash,
+                                      extcopy_free,
+                                      (cache_freev_fn)GpuElemwise_free);
+    if (ctx->extcopy_cache == NULL)
+      return GA_MISC_ERROR;
+    if (cache_add(ctx->extcopy_cache, aa, k) != 0)
+      return GA_MISC_ERROR;
   }
+  args[0] = (void *)src;
+  args[1] = (void *)dst;
+  return GpuElemwise_call(k, args, 0);
 }
 
 /* Value below which a size_t multiplication will never overflow. */
@@ -499,11 +529,11 @@ out:
 }
 
 int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
-  unsigned int i;
-  unsigned int off;
-  int err = GA_NO_ERROR;
+  GpuArray tv;
   size_t sz;
   ssize_t *strs;
+  unsigned int i, off;
+  int err = GA_NO_ERROR;
   int simple_move = 1;
 
   if (a->nd < v->nd)
@@ -544,9 +574,12 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
     }
   }
 
-  err = GA_UNSUPPORTED_ERROR;/*a->ops->buffer_extcopy(v->data, v->offset, a->data, a->offset,
-			       v->typecode, a->typecode, a->nd, a->dimensions,
-			       strs, a->nd, a->dimensions, a->strides);*/
+
+  memcpy(&tv, v, sizeof(GpuArray));
+  tv.nd = a->nd;
+  tv.dimensions = a->dimensions;
+  tv.strides = strs;
+  err = ga_extcopy(a, &tv);
   free(strs);
   return err;
 }
@@ -813,10 +846,7 @@ int GpuArray_move(GpuArray *dst, const GpuArray *src) {
   if (!GpuArray_ISONESEGMENT(dst) || !GpuArray_ISONESEGMENT(src) ||
       GpuArray_ISFORTRAN(dst) != GpuArray_ISFORTRAN(src) ||
       dst->typecode != src->typecode) {
-    return GA_UNSUPPORTED_ERROR; /*dst->ops->buffer_extcopy(src->data, src->offset, dst->data,
-                                    dst->offset, src->typecode, dst->typecode,
-                                    src->nd, src->dimensions, src->strides,
-                                    dst->nd, dst->dimensions, dst->strides);*/
+    return ga_extcopy(dst, src);
   }
   sz = gpuarray_get_elsize(dst->typecode);
   for (i = 0; i < dst->nd; i++) sz *= dst->dimensions[i];
@@ -857,7 +887,7 @@ int GpuArray_copy(GpuArray *res, const GpuArray *a, ga_order order) {
 int GpuArray_transfer(GpuArray *res, const GpuArray *a) {
   size_t sz;
   unsigned int i;
-  
+
   if (!GpuArray_ISONESEGMENT(res))
     return GA_UNSUPPORTED_ERROR;
   if (!GpuArray_ISONESEGMENT(a))
@@ -868,7 +898,7 @@ int GpuArray_transfer(GpuArray *res, const GpuArray *a) {
 
   sz = gpuarray_get_elsize(a->typecode);
   for (i = 0; i < a->nd; i++) sz *= a->dimensions[i];
- 
+
  return gpudata_transfer(res->data, res->offset, a->data, a->offset, sz);
 }
 
@@ -923,9 +953,8 @@ int GpuArray_split(GpuArray **rs, const GpuArray *a, size_t n, size_t *p,
 
 int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
                          unsigned int axis, int restype) {
-  size_t *dims;
-  size_t i;
-  size_t res_off;
+  size_t *dims, *res_dims;
+  size_t i, res_off;
   unsigned int p;
   int err = GA_NO_ERROR;
 
@@ -978,16 +1007,16 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
   }
 
   res_off = r->offset;
+  res_dims = r->dimensions;
   for (i = 0; i < n; i++) {
-    err = GA_UNSUPPORTED_ERROR; /*r->ops->buffer_extcopy(as[i]->data, as[i]->offset, r->data,
-                                 res_off, as[i]->typecode, r->typecode,
-                                 as[i]->nd, as[i]->dimensions,
-                                 as[i]->strides, r->nd, as[i]->dimensions,
-                                 r->strides);*/
+    r->dimensions = as[i]->dimensions;
+    err = GpuArray_move(r, as[i]);
     if (err != GA_NO_ERROR)
       goto fail;
-    res_off += r->strides[axis] * as[i]->dimensions[axis];
+    r->offset += r->strides[axis] * as[i]->dimensions[axis];
   }
+  r->offset = res_off;
+  r->dimensions = res_dims;
 
   return GA_NO_ERROR;
  fail:
