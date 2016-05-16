@@ -956,6 +956,8 @@ cdef class GpuContext:
             raise RuntimeError("cuda_enter not available")
         if cuda_exit == NULL:
             raise RuntimeError("cuda_exit not available")
+        if self.kind != b"cuda":
+            raise ValueError("Context manager only works for cuda")
         cuda_enter(self.ctx)
         return self
 
@@ -1490,8 +1492,12 @@ cdef class GpuArray:
 
     def transfer(self, GpuContext new_ctx):
         cdef GpuArray r
+        if not GpuArray_ISONESEGMENT(&self.ga):
+            # For now raise an error, may make it work later
+            raise ValueError("transfer() only works for contigous source")
         r = pygpu_empty(self.ga.nd, self.ga.dimensions, self.ga.typecode,
-                        GA_C_ORDER, new_ctx, None)
+                        GA_C_ORDER if GpuArray_IS_C_CONTIGUOUS(&self.ga) else GA_F_ORDER,
+                        new_ctx, None)
         return pygpu_transfer(self, new_ctx)
 
     def __copy__(self):
