@@ -19,8 +19,8 @@ struct _GpuElemwise {
   size_t *dims;
   ssize_t **strides;
   unsigned int nd;
-  unsigned int n;
-  unsigned int narray;
+  unsigned int n; /* Number of arguments */
+  unsigned int narray; /* Number of array arguments */
   int flags;
 };
 
@@ -81,18 +81,18 @@ static void free_args(unsigned int n, gpuelemwise_arg *args) {
 
 #define MUL_NO_OVERFLOW ((size_t)1 << (sizeof(size_t) * 4))
 
-static int reallocaz(void **p, size_t e, size_t o, size_t n) {
+static int reallocaz(void **p, size_t elsz, size_t old, size_t new) {
   char *res;
 
-  assert(o <= n);
+  assert(old <= new);
 
-  if ((n >= MUL_NO_OVERFLOW || e >= MUL_NO_OVERFLOW) &&
-      n > 0 && SIZE_MAX / n < e) {
+  if ((new >= MUL_NO_OVERFLOW || elsz >= MUL_NO_OVERFLOW) &&
+      new > 0 && SIZE_MAX / new < elsz) {
     return 1;
   }
-  res = realloc(*p, e*n);
+  res = realloc(*p, elsz*new);
   if (res == NULL) return 1;
-  memset(res + (e*o), 0, e*(n-o));
+  memset(res + (elsz*old), 0, elsz*(new-old));
   *p = (void *)res;
   return 0;
 }
@@ -118,8 +118,9 @@ static int gen_elemwise_basic_kernel(GpuKernel *k, gpucontext *ctx,
                                      char **err_str,
                                      const char *preamble,
                                      const char *expr,
-                                     unsigned int nd,
-                                     unsigned int n, gpuelemwise_arg *args,
+                                     unsigned int nd, /* Number of dims */
+                                     unsigned int n, /* Length of args */
+                                     gpuelemwise_arg *args,
                                      int gen_flags) {
   strb sb = STRB_STATIC_INIT;
   unsigned int i, _i, j;

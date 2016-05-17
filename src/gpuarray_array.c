@@ -79,7 +79,7 @@ static int ga_extcopy(GpuArray *dst, const GpuArray *src) {
   }
   args[0] = (void *)src;
   args[1] = (void *)dst;
-  return GpuElemwise_call(k, args, 0);
+  return GpuElemwise_call(k, args, GE_BROADCAST);
 }
 
 /* Value below which a size_t multiplication will never overflow. */
