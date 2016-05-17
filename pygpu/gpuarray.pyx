@@ -532,7 +532,7 @@ def init(dev, sched='default', disable_alloc_cache=False):
     are no gaps in the valid numbers.
     """
     cdef int flags = 0
-    expected_version = -9998
+    expected_version = -9997
     if gpuarray_api_major != expected_version or gpuarray_api_minor < 0:
         raise RuntimeError(
             "Pygpu was expecting libgpuarray version %d, but %d is available "
