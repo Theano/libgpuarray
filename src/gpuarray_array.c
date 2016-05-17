@@ -956,6 +956,7 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
   size_t *dims, *res_dims;
   size_t i, res_off;
   unsigned int p;
+  int res_flags;
   int err = GA_NO_ERROR;
 
   if (axis >= as[0]->nd)
@@ -1008,15 +1009,18 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
 
   res_off = r->offset;
   res_dims = r->dimensions;
+  res_flags = r->flags;
+  r->flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
   for (i = 0; i < n; i++) {
     r->dimensions = as[i]->dimensions;
-    err = GpuArray_move(r, as[i]);
+    err = ga_extcopy(r, as[i]);
     if (err != GA_NO_ERROR)
       goto fail;
     r->offset += r->strides[axis] * as[i]->dimensions[axis];
   }
   r->offset = res_off;
   r->dimensions = res_dims;
+  r->flags = res_flags;
 
   return GA_NO_ERROR;
  fail:
