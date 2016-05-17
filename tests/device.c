@@ -50,7 +50,7 @@ int get_env_dev(const char **name) {
 gpucontext *ctx;
 
 void setup(void) {
-  const char *name;
+  const char *name = NULL;
   int dev = get_env_dev(&name);
   if (dev == -1)
     ck_abort_msg("Bad test device");

@@ -173,7 +173,7 @@ START_TEST(test_basic_remove1)
   args[2].typecode = GA_UINT;
   args[2].flags = GE_WRITE;
 
-  ge = GpuElemwise_new(ctx, "", "c = a + b", 3, args, 4, 0);
+  ge = GpuElemwise_new(ctx, "", "c = a + b", 3, args, 0, 0);
 
   ck_assert_ptr_ne(ge, NULL);
 
@@ -403,6 +403,7 @@ Suite *get_suite(void) {
   tcase_add_test(tc, test_contig_simple);
   suite_add_tcase(s, tc);
   tc = tcase_create("basic");
+  tcase_set_timeout(tc, 8.0);
   tcase_add_checked_fixture(tc, setup, teardown);
   tcase_add_test(tc, test_basic_simple);
   tcase_add_test(tc, test_basic_remove1);

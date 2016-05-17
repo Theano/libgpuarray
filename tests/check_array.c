@@ -249,6 +249,7 @@ Suite *get_suite(void) {
   Suite *s = suite_create("array");
   TCase *tc = tcase_create("take1");
   tcase_add_checked_fixture(tc, setup, teardown);
+  tcase_set_timeout(tc, 8.0);
   tcase_add_test(tc, test_take1_ok);
   suite_add_tcase(s, tc);
   return s;
