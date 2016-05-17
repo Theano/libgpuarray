@@ -5,7 +5,7 @@
 #include "gpuarray/buffer.h"
 #include "gpuarray/error.h"
 
-const char *Gpu_error(const gpuarray_buffer_ops *o, void *ctx, int err) {
+const char *Gpu_error(const gpuarray_buffer_ops *o, gpucontext *ctx, int err) {
   if (err == GA_IMPL_ERROR)
     return o->ctx_error(ctx);
   else
@@ -31,12 +31,22 @@ const gpuarray_buffer_ops *gpuarray_get_ops(const char *name) {
 
 #define FAIL(v, e) { if (ret) *ret = e; return v; }
 
+int gpucontext_init(gpucontext **res, const gpuarray_buffer_ops *ops,
+                    int dev, int flags) {
+  int ret;
+  *res = ops->buffer_init(dev, flags, &ret);
+  return ret;
+}
+
+
+
+
 gpudata *gpuarray_buffer_transfer(gpudata *buf, size_t offset, size_t sz,
-                                 void *src_ctx,
-                                 const gpuarray_buffer_ops *src_ops,
-                                 void *dst_ctx,
-                                 const gpuarray_buffer_ops *dst_ops,
-                                 int may_share, int *ret) {
+                                  gpucontext *src_ctx,
+                                  const gpuarray_buffer_ops *src_ops,
+                                  gpucontext *dst_ctx,
+                                  const gpuarray_buffer_ops *dst_ops,
+                                  int may_share, int *ret) {
   gpudata *res;
   void *tmp;
   int err;
@@ -61,8 +71,8 @@ gpudata *gpuarray_buffer_transfer(gpudata *buf, size_t offset, size_t sz,
   return res;
 }
 
-void *gpuarray_buffer_context(const gpuarray_buffer_ops *ops, gpudata *b) {
-  void *ctx;
+gpucontext *gpuarray_buffer_context(const gpuarray_buffer_ops *ops, gpudata *b) {
+  gpucontext *ctx;
   int err = ops->property(NULL, b, NULL, GA_BUFFER_PROP_CTX, &ctx);
   if (err != GA_NO_ERROR)
     return NULL;

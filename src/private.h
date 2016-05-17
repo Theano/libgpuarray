@@ -25,6 +25,8 @@ extern "C" {
 #define SADDR32_MIN -2147483648
 #define SADDR32_MAX  2147483647
 
+#define STATIC_ASSERT(COND, MSG) typedef char static_assertion_##MSG[2*(!!(COND))-1]
+
 static inline void *memdup(const void *p, size_t s) {
   void *res = malloc(s);
   if (res != NULL)

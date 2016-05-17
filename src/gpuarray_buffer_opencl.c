@@ -24,8 +24,8 @@ static cl_int err;
 #define FAIL(v, e) { if (ret) *ret = e; return v; }
 #define CHKFAIL(v) if (err != CL_SUCCESS) FAIL(v, GA_IMPL_ERROR)
 
-static int cl_property(void *c, gpudata *b, gpukernel *k, int p, void *r);
-static gpudata *cl_alloc(void *c, size_t size, void *data, int flags,
+static int cl_property(gpucontext *c, gpudata *b, gpukernel *k, int p, void *r);
+static gpudata *cl_alloc(gpucontext *c, size_t size, void *data, int flags,
                          int *ret);
 static void cl_release(gpudata *b);
 static void cl_free_ctx(cl_ctx *ctx);
@@ -101,7 +101,7 @@ cl_ctx *cl_make_ctx(cl_context ctx) {
 
   clRetainContext(res->ctx);
   TAG_CTX(res);
-  res->errbuf = cl_alloc(res, 8, &v, GA_BUFFER_INIT, &e);
+  res->errbuf = cl_alloc((gpucontext *)res, 8, &v, GA_BUFFER_INIT, &e);
   if (e != GA_NO_ERROR) {
     err = res->err;
     cl_free_ctx(res);
@@ -111,12 +111,7 @@ cl_ctx *cl_make_ctx(cl_context ctx) {
   return res;
 }
 
-cl_context cl_get_ctx(void *ctx) {
-  ASSERT_CTX((cl_ctx *)ctx);
-  return ((cl_ctx *)ctx)->ctx;
-}
-
-cl_command_queue cl_get_stream(void *ctx) {
+cl_command_queue cl_get_stream(gpucontext *ctx) {
   ASSERT_CTX((cl_ctx *)ctx);
   return ((cl_ctx *)ctx)->q;
 }
@@ -129,8 +124,8 @@ static void cl_free_ctx(cl_ctx *ctx) {
   ctx->refcnt--;
   if (ctx->refcnt == 0) {
     if (ctx->blas_handle != NULL) {
-      ctx->err = cl_property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas_ops);
-      blas_ops->teardown(ctx);
+      ctx->err = cl_property((gpucontext *)ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas_ops);
+      blas_ops->teardown((gpucontext *)ctx);
     }
     if (ctx->errbuf != NULL) {
       ctx->refcnt = 2; /* Avoid recursive release */
@@ -143,7 +138,7 @@ static void cl_free_ctx(cl_ctx *ctx) {
   }
 }
 
-gpudata *cl_make_buf(void *c, cl_mem buf) {
+gpudata *cl_make_buf(gpucontext *c, cl_mem buf) {
   cl_ctx *ctx = (cl_ctx *)c;
   gpudata *res;
   cl_context buf_ctx;
@@ -180,7 +175,7 @@ cl_mem cl_get_buf(gpudata *g) { ASSERT_BUF(g); return g->buf; }
 #define CL_DOUBLE "cl_khr_fp64"
 #define CL_HALF "cl_khr_fp16"
 
-static gpukernel *cl_newkernel(void *ctx, unsigned int count,
+static gpukernel *cl_newkernel(gpucontext *ctx, unsigned int count,
                                const char **strings, const size_t *lengths,
                                const char *fname, unsigned int argcount,
                                const int *types, int flags, int *ret,
@@ -324,7 +319,7 @@ errcb(const char *errinfo, const void *pi, size_t cb, void *u) {
   fprintf(stderr, "%s\n", errinfo);
 }
 
-static void *cl_init(int devno, int flags, int *ret) {
+static gpucontext *cl_init(int devno, int flags, int *ret) {
   int platno;
   cl_device_id *ds;
   cl_device_id d;
@@ -374,15 +369,15 @@ static void *cl_init(int devno, int flags, int *ret) {
   res = cl_make_ctx(ctx);
   clReleaseContext(ctx);
   if (res == NULL) FAIL(NULL, GA_IMPL_ERROR);  // can also be a sys_error
-  return res;
+  return (gpucontext *)res;
 }
 
-static void cl_deinit(void *c) {
+static void cl_deinit(gpucontext *c) {
   ASSERT_CTX((cl_ctx *)c);
   cl_free_ctx((cl_ctx *)c);
 }
 
-static gpudata *cl_alloc(void *c, size_t size, void *data, int flags,
+static gpudata *cl_alloc(gpucontext *c, size_t size, void *data, int flags,
                          int *ret) {
   cl_ctx *ctx = (cl_ctx *)c;
   gpudata *res;
@@ -649,7 +644,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
   rlk[0] = local_kern;
   type = GA_BUFFER;
 
-  m = cl_newkernel(ctx, 1, rlk, &sz, "kmemset", 1, &type, 0, &res, NULL);
+  m = cl_newkernel((gpucontext *)ctx, 1, rlk, &sz, "kmemset", 1, &type, 0, &res, NULL);
   if (m == NULL) return res;
 
   /* Cheap kernel scheduling */
@@ -694,7 +689,7 @@ static int cl_check_extensions(const char **preamble, unsigned int *count,
   return GA_NO_ERROR;
 }
 
-static gpukernel *cl_newkernel(void *c, unsigned int count,
+static gpukernel *cl_newkernel(gpucontext *c, unsigned int count,
                                const char **strings, const size_t *lengths,
                                const char *fname, unsigned int argcount,
                                const int *types, int flags, int *ret,
@@ -1021,14 +1016,14 @@ static int cl_sync(gpudata *b) {
 }
 
 static gpudata *cl_transfer(gpudata *buf, size_t offset, size_t sz,
-                            void *dst_ctx, int may_share) {
+                            gpucontext *dst_ctx, int may_share) {
   cl_ctx *ctx = buf->ctx;
 
   ASSERT_BUF(buf);
   ASSERT_CTX(ctx);
   ASSERT_CTX((cl_ctx *)dst_ctx);
 
-  if (ctx == dst_ctx && may_share && offset == 0) {
+  if ((gpucontext *)ctx == dst_ctx && may_share && offset == 0) {
     cl_retain(buf);
     return buf;
   }
@@ -1125,7 +1120,7 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
     goto fail;
 
   types[0] = types[1] = GA_BUFFER;
-  k = cl_newkernel(ctx, 1, (const char **)&sb.s, &sb.l, "elemk",
+  k = cl_newkernel((gpucontext *)ctx, 1, (const char **)&sb.s, &sb.l, "elemk",
                    2, types, flags, &res, NULL);
   if (k == NULL) goto fail;
   /* Cheap kernel scheduling */
@@ -1148,7 +1143,7 @@ static int cl_extcopy(gpudata *input, size_t ioff, gpudata *output,
 extern gpuarray_blas_ops clblas_ops;
 #endif
 
-static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
+static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
                        void *res) {
   cl_ctx *ctx = NULL;
   if (c != NULL) {
@@ -1411,7 +1406,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
   /* GA_BUFFER_PROP_CTX is not ordered to simplify code */
   case GA_BUFFER_PROP_CTX:
   case GA_KERNEL_PROP_CTX:
-    *((void **)res) = (void *)ctx;
+    *((gpucontext **)res) = (gpucontext *)ctx;
     return GA_NO_ERROR;
 
   case GA_KERNEL_PROP_MAXLSIZE:
@@ -1468,7 +1463,7 @@ static int cl_property(void *c, gpudata *buf, gpukernel *k, int prop_id,
   }
 }
 
-static const char *cl_error(void *c) {
+static const char *cl_error(gpucontext *c) {
   cl_ctx *ctx = (cl_ctx *)c;
   if (ctx == NULL)
     return get_error_string(err);
