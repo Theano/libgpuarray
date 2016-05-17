@@ -666,6 +666,8 @@ void GpuElemwise_free(GpuElemwise *ge) {
       GpuKernel_clear(&ge->k_basic_32[i]);
     if (k_initialized(&ge->k_basic[i]))
       GpuKernel_clear(&ge->k_basic[i]);
+  }
+  for (i = 0; i < ge->narray; i++) {
     if (ge->strides != NULL)
       free(ge->strides[i]);
   }
