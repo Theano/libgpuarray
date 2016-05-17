@@ -480,13 +480,13 @@ cdef bint pygpu_GpuArray_Check(object o):
 
 cdef GpuContext pygpu_init(dev, int flags):
     if dev.startswith('cuda'):
-        kind = "cuda"
+        kind = b"cuda"
         if dev[4:] == '':
             devnum = -1
         else:
             devnum = int(dev[4:])
     elif dev.startswith('opencl'):
-        kind = "opencl"
+        kind = b"opencl"
         devspec = dev[6:].split(':')
         if len(devspec) < 2:
             raise ValueError, "OpenCL name incorrect. Should be opencl<int>:<int> instead got: " + dev
@@ -940,7 +940,7 @@ cdef class GpuContext:
     def __reduce__(self):
         raise RuntimeError, "Cannot pickle GpuContext object"
 
-    def __cinit__(self, kind, devno, int flags):
+    def __cinit__(self, bytes kind, devno, int flags):
         cdef int err = GA_NO_ERROR
         cdef gpucontext *ctx
         self.kind = kind
