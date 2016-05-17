@@ -574,11 +574,11 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
     }
   }
 
-
   memcpy(&tv, v, sizeof(GpuArray));
   tv.nd = a->nd;
   tv.dimensions = a->dimensions;
   tv.strides = strs;
+  tv.flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
   err = ga_extcopy(a, &tv);
   free(strs);
   return err;
