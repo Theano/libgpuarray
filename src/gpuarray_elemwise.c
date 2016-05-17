@@ -232,7 +232,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k, gpucontext *ctx,
 }
 
 static ssize_t **strides_array(unsigned int num, unsigned int nd) {
-  ssize_t **res = calloc(num, sizeof(ssize_t *) + 1);
+  ssize_t **res = calloc(num, sizeof(ssize_t *));
   unsigned int i;
 
   if (res == NULL) return NULL;

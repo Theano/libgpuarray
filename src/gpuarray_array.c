@@ -60,8 +60,8 @@ static int ga_extcopy(GpuArray *dst, const GpuArray *src) {
     gargs[0].typecode = src->typecode;
     gargs[0].flags = GE_READ;
     gargs[1].name = "b";
-    gargs[2].typecode = dst->typecode;
-    gargs[2].flags = GE_WRITE;
+    gargs[1].typecode = dst->typecode;
+    gargs[1].flags = GE_WRITE;
     k = GpuElemwise_new(ctx, "", "a = b", 2, gargs, 0, 0);
     if (k == NULL)
       return GA_MISC_ERROR;
