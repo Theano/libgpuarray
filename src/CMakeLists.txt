@@ -39,6 +39,7 @@ gpuarray_types.c
 gpuarray_error.c
 gpuarray_util.c
 gpuarray_buffer.c
+gpuarray_buffer_blas.c
 gpuarray_array.c
 gpuarray_array_blas.c
 gpuarray_kernel.c

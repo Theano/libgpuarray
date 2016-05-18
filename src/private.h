@@ -13,6 +13,7 @@
 #include <gpuarray/array.h>
 #include <gpuarray/types.h>
 #include <gpuarray/buffer.h>
+#include <gpuarray/buffer_blas.h>
 #include "util/strb.h"
 
 #ifdef __cplusplus
@@ -29,8 +30,12 @@ extern "C" {
 struct _gpuarray_buffer_ops;
 typedef struct _gpuarray_buffer_ops gpuarray_buffer_ops;
 
+struct _gpuarray_blas_ops;
+typedef struct _gpuarray_blas_ops gpuarray_blas_ops;
+
 #define GPUCONTEXT_HEAD                         \
   const gpuarray_buffer_ops *ops;               \
+  const gpuarray_blas_ops *blas_ops;            \
   void *blas_handle;                            \
   unsigned int refcnt;                          \
   int flags;                                    \
@@ -94,6 +99,101 @@ struct _gpuarray_buffer_ops {
   int (*property)(gpucontext *ctx, gpudata *buf, gpukernel *k, int prop_id,
                   void *res);
   const char *(*ctx_error)(gpucontext *ctx);
+};
+
+struct _gpuarray_blas_ops {
+  int (*setup)(gpucontext *ctx);
+  void (*teardown)(gpucontext *ctx);
+  int (*hgemv)(cb_order order, cb_transpose transA, size_t M, size_t N,
+               float alpha, gpudata *A, size_t offA, size_t lda,
+               gpudata *X, size_t offX, int incX, float beta,
+               gpudata *Y, size_t offY, int incY);
+  int (*sgemv)(cb_order order, cb_transpose transA, size_t M, size_t N,
+               float alpha, gpudata *A, size_t offA, size_t lda,
+               gpudata *X, size_t offX, int incX, float beta,
+               gpudata *Y, size_t offY, int incY);
+  int (*dgemv)(cb_order order, cb_transpose transA, size_t M, size_t N,
+               double alpha, gpudata *A, size_t offA, size_t lda,
+               gpudata *X, size_t offX, int incX, double beta,
+               gpudata *Y, size_t offY, int incY);
+  int (*hgemm)(cb_order order, cb_transpose transA, cb_transpose transB,
+               size_t M, size_t N, size_t K, float alpha,
+               gpudata *A, size_t offA, size_t lda,
+               gpudata *B, size_t offB, size_t ldb,
+               float beta, gpudata *C, size_t offC, size_t ldc);
+  int (*sgemm)(cb_order order, cb_transpose transA, cb_transpose transB,
+               size_t M, size_t N, size_t K, float alpha,
+               gpudata *A, size_t offA, size_t lda,
+               gpudata *B, size_t offB, size_t ldb,
+               float beta, gpudata *C, size_t offC, size_t ldc);
+  int (*dgemm)(cb_order order, cb_transpose transA, cb_transpose transB,
+               size_t M, size_t N, size_t K, double alpha,
+               gpudata *A, size_t offA, size_t lda,
+               gpudata *B, size_t offB, size_t ldb,
+               double beta, gpudata *C, size_t offC, size_t ldc);
+  int (*hger)(cb_order order, size_t M, size_t N, float alpha,
+              gpudata *X, size_t offX, int incX,
+              gpudata *Y, size_t offY, int incY,
+              gpudata *A, size_t offA, size_t lda);
+  int (*sger)(cb_order order, size_t M, size_t N, float alpha,
+              gpudata *X, size_t offX, int incX,
+              gpudata *Y, size_t offY, int incY,
+              gpudata *A, size_t offA, size_t lda);
+  int (*dger)(cb_order order, size_t M, size_t N, double alpha,
+              gpudata *X, size_t offX, int incX,
+              gpudata *Y, size_t offY, int incY,
+              gpudata *A, size_t offA, size_t lda);
+  int (*hgemmBatch)(cb_order order, cb_transpose transA, cb_transpose transB,
+                    size_t M, size_t N, size_t K, float alpha,
+                    gpudata **A, size_t *offA, size_t lda,
+                    gpudata **B, size_t *offB, size_t ldb,
+                    float beta, gpudata **C, size_t *offC, size_t ldc,
+                    size_t batchCount);
+  int (*sgemmBatch)(cb_order order, cb_transpose transA, cb_transpose transB,
+                    size_t M, size_t N, size_t K, float alpha,
+                    gpudata **A, size_t *offA, size_t lda,
+                    gpudata **B, size_t *offB, size_t ldb,
+                    float beta, gpudata **C, size_t *offC, size_t ldc,
+                    size_t batchCount);
+  int (*dgemmBatch)(cb_order order, cb_transpose transA, cb_transpose transB,
+                    size_t M, size_t N, size_t K, double alpha,
+                    gpudata **A, size_t *offA, size_t lda,
+                    gpudata **B, size_t *offB, size_t ldb,
+                    double beta, gpudata **C, size_t *offC, size_t ldc,
+                    size_t batchCount);
+  int (*hgemvBatch)(cb_order order, cb_transpose transA,
+                    size_t M, size_t N, float alpha,
+                    gpudata **A, size_t *offA, size_t lda,
+                    gpudata **x, size_t *offX, size_t incX,
+                    float beta, gpudata **y, size_t *offY, size_t incY,
+                    size_t batchCount, int flags);
+  int (*sgemvBatch)(cb_order order, cb_transpose transA,
+                    size_t M, size_t N, float alpha,
+                    gpudata **A, size_t *offA, size_t lda,
+                    gpudata **x, size_t *offX, size_t incX,
+                    float beta, gpudata **y, size_t *offY, size_t incY,
+                    size_t batchCount, int flags);
+  int (*dgemvBatch)(cb_order order, cb_transpose transA,
+                    size_t M, size_t N, double alpha,
+                    gpudata **A, size_t *offA, size_t lda,
+                    gpudata **x, size_t *offX, size_t incX,
+                    double beta, gpudata **y, size_t *offY, size_t incY,
+                    size_t batchCount, int flags);
+  int (*hgerBatch)(cb_order order, size_t M, size_t N, float alpha,
+                   gpudata **x, size_t *offX, size_t incX,
+                   gpudata **y, size_t *offY, size_t incY,
+                   gpudata **A, size_t *offA, size_t lda,
+                   size_t batchCount, int flags);
+  int (*sgerBatch)(cb_order order, size_t M, size_t N, float alpha,
+                   gpudata **x, size_t *offX, size_t incX,
+                   gpudata **y, size_t *offY, size_t incY,
+                   gpudata **A, size_t *offA, size_t lda,
+                   size_t batchCount, int flags);
+  int (*dgerBatch)(cb_order order, size_t M, size_t N, double alpha,
+                   gpudata **x, size_t *offX, size_t incX,
+                   gpudata **y, size_t *offY, size_t incY,
+                   gpudata **A, size_t *offA, size_t lda,
+                   size_t batchCount, int flags);
 };
 
 #define STATIC_ASSERT(COND, MSG) typedef char static_assertion_##MSG[2*(!!(COND))-1]

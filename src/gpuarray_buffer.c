@@ -32,11 +32,15 @@ gpucontext *gpucontext_init(const char *name, int dev, int flags, int *ret) {
     FAIL(NULL, GA_INVALID_ERROR);
   res = ops->buffer_init(dev, flags, ret);
   res->ops = ops;
+  if (gpucontext_property(res, GA_CTX_PROP_BLAS_OPS, &res->blas_ops) != GA_NO_ERROR)
+    res->blas_ops = NULL;
   res->blas_handle = NULL;
   return res;
 }
 
 void gpucontext_deref(gpucontext *ctx) {
+  if (ctx->blas_handle != NULL)
+    ctx->blas_ops->teardown(ctx);
   ctx->ops->buffer_deinit(ctx);
 }
 
