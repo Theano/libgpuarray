@@ -22,8 +22,15 @@ extern "C" {
 #ifdef CONFUSE_EMACS
 }
 #endif
-
 struct _gpudata;
+
+struct _gpucontext;
+
+/**
+ * Opaque struct for context data.
+ */
+typedef struct _gpucontext gpucontext;
+
 
 /**
  * Opaque struct for buffer data.
@@ -37,25 +44,23 @@ struct _gpukernel;
  */
 typedef struct _gpukernel gpukernel;
 
+
 /**
- * Function table that a backend must provide.
- * \headerfile gpuarray/buffer.h
+ * Create a context on the specified device.
+ *
+ * \warning This function is not thread-safe.
+ *
+ * \param name the backend name.
+ * \param dev the device number.  The precise meaning of the device
+ *            number is backend-dependent
+ * \param flags see \ref context_flags "Context flags"
+ * \param ret error return location.  Will be ignored if set to NULL.
+ *
+ * \returns An opaque pointer to the created context or NULL if an
+ * error occured.
  */
-typedef struct _gpuarray_buffer_ops {
-  /**
-   * Create a context on the specified device.
-   *
-   * \warning This function is not thread-safe.
-   *
-   * \param dev the device number.  The precise meaning of the device
-   *            number is backend-dependent
-   * \param flags see \ref context_flags "Context flags"
-   * \param ret error return location.  Will be ignored if set to NULL.
-   *
-   * \returns An opaque pointer to the created context or NULL if an
-   * error occured.
-   */
-  void *(*buffer_init)(int dev, int flags, int *ret);
+GPUARRAY_PUBLIC gpucontext *gpucontext_init(const char *name, int dev,
+                                            int flags, int *ret);
 
 /**
  * \defgroup context_flags Context flags
@@ -97,37 +102,65 @@ typedef struct _gpuarray_buffer_ops {
  * @}
  */
 
-  /**
-   * Destroy a context.
-   *
-   * This removes the external reference to the context and as soon as
-   * all buffer and kernels associated with it are free all its
-   * resources will be released.
-   *
-   * Do not call this function more than once on a given context.
-   *
-   * \param ctx a valid context pointer.
-   */
-  void (*buffer_deinit)(void *ctx);
+/**
+ * Derefence a context.
+ *
+ * This removes a reference to the context and as soon as the
+ * reference count drops to zero the context is destroyed.  The
+ * context can stay alive after you call this function because some
+ * object keep a reference to their context.
+ *
+ * \param ctx a valid context pointer.
+ */
+GPUARRAY_PUBLIC void gpucontext_deref(gpucontext *ctx);
 
-  /**
-   * Allocates a buffer of size `sz` in context `ctx`.
-   *
-   * Buffers are reference counted internally and start with a
-   * reference count of 1.
-   *
-   * \param ctx a context pointer
-   * \param sz the requested size
-   * \param flags see \ref alloc_flags "Allocation flags"
-   * \param data optional pointer to host buffer
-   * \param ret error return pointer
-   *
-   * \returns A non-NULL pointer to a gpudata structure.  This
-   * structure is intentionally opaque as its content may change
-   * according to the backend used.
-   */
-  gpudata *(*buffer_alloc)(void *ctx, size_t sz, void *data, int flags,
-                           int *ret);
+/**
+ * Fetch a context property.
+ *
+ * The property must be a context property.  The currently defined
+ * properties and their type are defined in \ref props "Properties".
+ *
+ * \param ctx context
+ * \param prop_id property id (from \ref props "Properties")
+ * \param res pointer to the return space of the appropriate type
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpucontext_property(gpucontext *ctx, int prop_id,
+                                        void *res);
+
+/**
+ * Get a string describing `err`.
+ *
+ * If you need to get a description of a error that occurred during
+ * context creation, call this function using NULL as the context.
+ * This version of the call is not thread-safe.
+ *
+ * \param ctx the context in which the error occured
+ * \param err error code
+ *
+ * \returns string description of error
+ */
+GPUARRAY_PUBLIC const char *gpucontext_error(gpucontext *ctx, int err);
+
+/**
+ * Allocates a buffer of size `sz` in context `ctx`.
+ *
+ * Buffers are reference counted internally and start with a
+ * reference count of 1.
+ *
+ * \param ctx a context pointer
+ * \param sz the requested size
+ * \param flags see \ref alloc_flags "Allocation flags"
+ * \param data optional pointer to host buffer
+ * \param ret error return pointer
+ *
+ * \returns A non-NULL pointer to a gpudata structure.  This
+ * structure is intentionally opaque as its content may change
+ * according to the backend used.
+ */
+GPUARRAY_PUBLIC gpudata *gpudata_alloc(gpucontext *ctx, size_t sz, void *data,
+                                       int flags, int *ret);
 
 /**
  * \defgroup alloc_flags Allocation flags
@@ -151,10 +184,10 @@ typedef struct _gpuarray_buffer_ops {
 /**
  * Signal that the memory in this buffer will only be read by kernels.
  *
- * You can use buffer_write() to set the contents.
+ * You can use gpudata_write() to set the contents.
  *
- * You may not call buffer_extcopy() or buffer_memset() with the
- * resulting buffer as the destination.
+ * You may not call gpudata_memset() with the resulting buffer as the
+ * destination.
  */
 #define GA_BUFFER_READ_ONLY  0x01
 
@@ -162,10 +195,7 @@ typedef struct _gpuarray_buffer_ops {
  * Signal that the memory in this buffer will only be written by
  * kernels (i.e. it is an output buffer).
  *
- * You can read the contents with buffer_read().
- *
- * You may not call buffer_extcopy() with the resuting buffer as
- * source.
+ * You can read the contents with gpudata_read().
  */
 
 #define GA_BUFFER_WRITE_ONLY 0x02
@@ -188,309 +218,280 @@ typedef struct _gpuarray_buffer_ops {
 /* The upper 16 bits are private flags */
 #define GA_BUFFER_MASK       0xffff
 
-
 /**
  * @}
  */
 
-  /**
-   * Increase the reference count to the passed buffer by 1.
-   *
-   * \param b a buffer
-   */
-  void (*buffer_retain)(gpudata *b);
+/**
+ * Increase the reference count to the passed buffer by 1.
+ *
+ * \param b a buffer
+ */
+GPUARRAY_PUBLIC void gpudata_retain(gpudata *b);
 
-  /**
-   * Release a buffer.
-   *
-   * This will decrement the reference count of the buffer by 1.  If
-   * that count reaches 0 all associated ressources will be released.
-   *
-   * Even if your application does not have any references left to a
-   * buffer it may still hang around if it is in use by internal
-   * mechanisms (kernel call, ...)
-   */
-  void (*buffer_release)(gpudata *b);
+/**
+ * Release a buffer.
+ *
+ * This will decrement the reference count of the buffer by 1.  If
+ * that count reaches 0 all associated ressources will be released.
+ *
+ * Even if your application does not have any references left to a
+ * buffer it may still hang around if it is in use by internal
+ * mechanisms (kernel call, ...)
+ */
+GPUARRAY_PUBLIC void gpudata_release(gpudata *b);
 
-  /**
-   * Check if two buffers may overlap.
-   *
-   * Both buffers must have been created with the same backend.
-   *
-   * \param a first buffer
-   * \param b second buffer
-   * \param ret error return pointer
-   *
-   * \retval 1 The buffers may overlap
-   * \retval 0 The buffers do not overlap.
-   * \retval -1 An error was encoutered, `ret` contains a detailed
-   * error code if not NULL.
-   */
-  int (*buffer_share)(gpudata *a, gpudata *b, int *ret);
+/**
+ * Check if two buffers may overlap.
+ *
+ * Both buffers must have been created with the same backend.
+ *
+ * \param a first buffer
+ * \param b second buffer
+ * \param ret error return pointer
+ *
+ * \retval 1 The buffers may overlap
+ * \retval 0 The buffers do not overlap.
+ * \retval -1 An error was encoutered, `ret` contains a detailed
+ * error code if not NULL.
+ */
+GPUARRAY_PUBLIC int gpudata_share(gpudata *a, gpudata *b, int *ret);
 
-  /**
-   * Copy the content of a buffer to another.
-   *
-   * Both buffers must be in the same context.  Additionally the
-   * buffers must not overlap otherwise the content of the destination
-   * buffer is not defined.
-   *
-   * \param dst destination buffer
-   * \param dstoff offset inside the destination buffer
-   * \param src source buffer
-   * \param srcoff offset inside the source buffer
-   * \param sz size of data to copy (in bytes)
-   *
-   * \returns GA_NO_ERROR or an error code if an error occurred.
-   */
-  int (*buffer_move)(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff,
-                     size_t sz);
+/**
+ * Copy the content of a buffer to another.
+ *
+ * Both buffers must be in the same context and contiguous.
+ * Additionally the buffers must not overlap otherwise the content of
+ * the destination buffer is not defined.
+ *
+ * \param dst destination buffer
+ * \param dstoff offset inside the destination buffer
+ * \param src source buffer
+ * \param srcoff offset inside the source buffer
+ * \param sz size of data to copy (in bytes)
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpudata_move(gpudata *dst, size_t dstoff,
+                                 gpudata *src, size_t srcoff,
+                                 size_t sz);
 
-  /**
-   * Transfer data from a buffer to memory.
-   *
-   * \param dst destination in memory
-   * \param src source buffer
-   * \param srcoff offset inside the source buffer
-   * \param sz size of data to copy (in bytes)
-   *
-   * \returns GA_NO_ERROR or an error code if an error occurred.
-   */
-  int (*buffer_read)(void *dst, gpudata *src, size_t srcoff, size_t sz);
+/**
+ * Transfer the content of buffer across contexts.
+ *
+ * If possible it will try to the the transfer in an efficient way
+ * using backend-specific tricks.  If those fail or can't be used, it
+ * will fallback to a copy through the host.
+ *
+ * \param dst buffer to transfer to
+ * \param dstoff offset in the destination buffer
+ * \param src buffer to transfer from
+ * \param srcoff offset in the source buffer
+ * \param sz size of the region to transfer
+ *
+ * \returns the new buffer in dst_ctx or NULL if no efficient way to
+ *          transfer could be found.
+ */
+GPUARRAY_LOCAL int gpudata_transfer(gpudata *dst, size_t dstoff,
+                                    gpudata *src, size_t srcoff,
+                                    size_t sz);
 
-  /**
-   * Transfer data from memory to a buffer.
-   *
-   * \param dst destination buffer
-   * \param dstoff offset inside the destination buffer
-   * \param src source in memory
-   * \param sz size of data to copy (in bytes)
-   *
-   * \returns GA_NO_ERROR or an error code if an error occurred.
-   */
-  int (*buffer_write)(gpudata *dst, size_t dstoff, const void *src, size_t sz);
+/**
+ * Transfer data from a buffer to memory.
+ *
+ * The buffer and the memory region must be contiguous.
+ *
+ * \param dst destination in memory
+ * \param src source buffer
+ * \param srcoff offset inside the source buffer
+ * \param sz size of data to copy (in bytes)
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpudata_read(void *dst,
+                                 gpudata *src, size_t srcoff,
+                                 size_t sz);
 
-  /**
-   * Set a buffer to a byte pattern.
-   *
-   * This function acts like the C function memset() for device buffers.
-   *
-   * \param dst destination buffer
-   * \param dstoff offset into the destination buffer
-   * \param data byte value to write into the destination.
-   *
-   * \returns GA_NO_ERROR or an error code if an error occurred.
-   */
-  int (*buffer_memset)(gpudata *dst, size_t dstoff, int data);
+/**
+ * Transfer data from memory to a buffer.
+ *
+ * The buffer and the memory region must be contiguous.
+ *
+ * \param dst destination buffer
+ * \param dstoff offset inside the destination buffer
+ * \param src source in memory
+ * \param sz size of data to copy (in bytes)
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpudata_write(gpudata *dst, size_t dstoff,
+                                  const void *src, size_t sz);
 
-  /**
-   * Compile a kernel.
-   *
-   * Compile the kernel composed of the concatenated strings in
-   * `strings` and return a callable kernel.  If lengths is NULL then
-   * all the strings must be NUL-terminated.  Otherwise, it doesn't
-   * matter (but the lengths must not include the final NUL byte if
-   * provided).
-   *
-   * \param ctx context to work in
-   * \param count number of input strings
-   * \param strings table of string pointers
-   * \param lengths (optional) length for each string in the table
-   * \param fname name of the kernel function (as defined in the code)
-   * \param flags flags for compilation (see #ga_usefl)
-   * \param ret error return pointer
-   * \param err_str returns pointer to debug message from GPU backend
-   *        (if provided a non-NULL err_str)
-   *
-   * If `*err_str` is not NULL on return, the caller must call
-   * `free(*err_str)` after use.
-   *
-   * \returns Allocated kernel structure or NULL if an error occured.
-   * `ret` will be updated with the error code if not NULL.
-   */
-  gpukernel *(*kernel_alloc)(void *ctx, unsigned int count,
-                             const char **strings, const size_t *lengths,
-                             const char *fname, unsigned int numargs,
-                             const int *typecodes, int flags, int *ret, char **err_str);
+/**
+ * Set a buffer to a byte pattern.
+ *
+ * This function acts like the C function memset() for device buffers.
+ *
+ * \param dst destination buffer
+ * \param dstoff offset into the destination buffer
+ * \param data byte value to write into the destination.
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpudata_memset(gpudata *dst, size_t dstoff, int data);
 
-  /**
-   * Retain a kernel.
-   *
-   * Increase the reference count of the passed kernel by 1.
-   *
-   * \param k a kernel
-   */
-  void (*kernel_retain)(gpukernel *);
+/**
+ * Synchronize a buffer.
+ *
+ * Waits for all previous read, writes, copies and kernel calls
+ * involving this buffer to be finished.
+ *
+ * This call is not required for normal use of the library as all
+ * exposed operations will properly synchronize amongst themselves.
+ * This call may be useful in a performance timing context to ensure
+ * that the work is really done, or before interaction with another
+ * library to wait for pending operations.
+ */
+GPUARRAY_PUBLIC int gpudata_sync(gpudata *b);
 
-  /**
-   * Release a kernel.
-   *
-   * Decrease the reference count of a kernel.  If it reaches 0, all
-   * resources associated with `k` will be released.
-   *
-   * If the reference count of a kernel reaches 0 while it is running,
-   * this call will block until completion.
-   */
-  void (*kernel_release)(gpukernel *k);
+/**
+ * Fetch a buffer property.
+ *
+ * Can be used for buffer properties and context properties.  Context
+ * properties will fetch the value for the context associated with the
+ * buffer.  The currently defined properties and their type are
+ * defined in \ref props "Properties".
+ *
+ * \param buf buffer
+ * \param prop_id property id (from \ref props "Properties")
+ * \param res pointer to the return space of the appropriate type
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpudata_property(gpudata *buf, int prop_id, void *res);
 
-  /**
-   * Set kernel argument.
-   *
-   * Buffer arguments will not be retained and it is the
-   * responsability of the caller to ensure that the value is still
-   * valid whenever a call is made.
-   *
-   * \param k kernel
-   * \param i argument index (starting at 0)
-   * \param a pointer to argument
-   *
-   * \returns GA_NO_ERROR or an error code if an error occurred.
-   */
-  int (*kernel_setarg)(gpukernel *k, unsigned int i, void *a);
+GPUARRAY_PUBLIC gpucontext *gpudata_context(gpudata *b);
 
-  /**
-   * Call a kernel.
-   *
-   * If args is NULL, it will be assumed that the arguments have
-   * previously been set with kernel_setarg().
-   *
-   * \param k kernel
-   * \param n number of dimensions of grid/block
-   * \param bs block sizes for this call (also known as local size)
-   * \param gs grid sizes for this call (also known as global size)
-   * \param shared amount of dynamic shared memory to reserve
-   * \param args table of pointers to each argument (optional).
-   *
-   * \returns GA_NO_ERROR or an error code if an error occurred.
-   */
-  int (*kernel_call)(gpukernel *k, unsigned int n,
-                     const size_t *bs, const size_t *gs,
-                     size_t shared, void **args);
+/**
+ * Compile a kernel.
+ *
+ * Compile the kernel composed of the concatenated strings in
+ * `strings` and return a callable kernel.  If lengths is NULL then
+ * all the strings must be NUL-terminated.  Otherwise, it doesn't
+ * matter (but the lengths must not include the final NUL byte if
+ * provided).
+ *
+ * \param ctx context to work in
+ * \param count number of input strings
+ * \param strings table of string pointers
+ * \param lengths (optional) length for each string in the table
+ * \param fname name of the kernel function (as defined in the code)
+ * \param flags flags for compilation (see #ga_usefl)
+ * \param ret error return pointer
+ * \param err_str returns pointer to debug message from GPU backend
+ *        (if provided a non-NULL err_str)
+ *
+ * If `*err_str` is not NULL on return, the caller must call
+ * `free(*err_str)` after use.
+ *
+ * \returns Allocated kernel structure or NULL if an error occured.
+ * `ret` will be updated with the error code if not NULL.
+ */
+GPUARRAY_PUBLIC gpukernel *gpukernel_init(gpucontext *ctx, unsigned int count,
+                                          const char **strings, const size_t *lengths,
+                                          const char *fname, unsigned int numargs,
+                                          const int *typecodes, int flags, int *ret,
+                                          char **err_str);
 
-  /**
-   * Get the kernel binary.
-   *
-   * This can be use to cache kernel binaries after compilation of a
-   * specific device.  The kernel can be recreated by calling
-   * kernel_alloc with the binary and size and passing `GA_USE_BINARY`
-   * as the use flags.
-   *
-   * The returned pointer is allocated and must be freed by the caller.
-   *
-   * \param k kernel
-   * \param sz size of the returned binary
-   * \param obj pointer to the binary for the kernel.
-   *
-   * \returns GA_NO_ERROR or an error code if an error occurred.
-   */
-  int (*kernel_binary)(gpukernel *k, size_t *sz, void **obj);
+/**
+ * Retain a kernel.
+ *
+ * Increase the reference count of the passed kernel by 1.
+ *
+ * \param k a kernel
+ */
+GPUARRAY_PUBLIC void gpukernel_retain(gpukernel *k);
 
-  /**
-   * Synchronize a buffer.
-   *
-   * Waits for all previous read, writes, copies and kernel calls
-   * involving this buffer to be finished.
-   *
-   * This call is not required for normal use of the library as all
-   * exposed operations will properly synchronize amongst themselves.
-   * This call may be useful in a performance timing context to ensure
-   * that the work is really done, or before interaction with another
-   * library to wait for pending operations.
-   */
-  int (*buffer_sync)(gpudata *b);
+/**
+ * Release a kernel.
+ *
+ * Decrease the reference count of a kernel.  If it reaches 0, all
+ * resources associated with `k` will be released.
+ *
+ * If the reference count of a kernel reaches 0 while it is running,
+ * this call will block until completion.
+ */
+GPUARRAY_PUBLIC void gpukernel_release(gpukernel *k);
 
-  /**
-   * Copy non-contiguous buffers.
-   *
-   * Specialized kernel to copy memory from a generic array structure
-   * to another.  May be used to perform casts on the data and/or
-   * change data layout.
-   *
-   * This function requires that the input and output buffers have the
-   * same number of items.
-   *
-   * \param input input data buffer
-   * \param ioff offset into input buffer
-   * \param output output data buffer
-   * \param ooff offset into output buffer
-   * \param intype data type of input
-   * \param outtype data type of output
-   * \param a_nd order of input (number of dimensions)
-   * \param a_dims dimensions of input
-   * \param a_str strides of input
-   * \param b_nd order of output (number of dimensions)
-   * \param b_dims dimensions of output
-   * \param b_str strides of output
-   *
-   * \returns GA_NO_ERROR or an error code if an error occurred.
-   */
-  int (*buffer_extcopy)(gpudata *input, size_t ioff,
-                        gpudata *output, size_t ooff,
-                        int intype, int outtype,
-                        unsigned int a_nd, const size_t *a_dims,
-                        const ssize_t *a_str,
-                        unsigned int b_nd, const size_t *b_dims,
-                        const ssize_t *b_str);
+/**
+ * Set kernel argument.
+ *
+ * Buffer arguments will not be retained and it is the
+ * responsability of the caller to ensure that the value is still
+ * valid whenever a call is made.
+ *
+ * \param k kernel
+ * \param i argument index (starting at 0)
+ * \param a pointer to argument
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpukernel_setarg(gpukernel *k, unsigned int i, void *a);
 
-  /**
-   * Efficiently transfer the contents of a buffer to a new context.
-   *
-   * Both the buffer and the new context must come from the same
-   * backend.
-   *
-   * If there is no way to do an efficient transfer within the
-   * provided constraints, then this function may return NULL
-   * indicating to the caller that it should fallback to some other
-   * means of performing the transfer.
-   *
-   * \param src buffer to transfer from
-   * \param offset start of the region transfer
-   * \param sz size of the region to transfer
-   * \param dst_ctx context for the result buffer
-   * \param may_share set to 1 to allow the returned buffer to be a view
-   *
-   * \returns the new buffer in dst_ctx or NULL if no efficient way to
-   *          transfer could be found.
-   */
-  gpudata *(*buffer_transfer)(gpudata *src, size_t offset, size_t sz,
-                              void *dst_ctx, int may_share);
+/**
+ * Call a kernel.
+ *
+ * If args is NULL, it will be assumed that the arguments have
+ * previously been set with kernel_setarg().
+ *
+ * \param k kernel
+ * \param n number of dimensions of grid/block
+ * \param bs block sizes for this call (also known as local size)
+ * \param gs grid sizes for this call (also known as global size)
+ * \param shared amount of dynamic shared memory to reserve
+ * \param args table of pointers to each argument (optional).
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpukernel_call(gpukernel *k, unsigned int n,
+                                   const size_t *ls, const size_t *gs,
+                                   size_t shared, void **args);
 
-  /**
-   * Fetch a property.
-   *
-   * Can be used to get a property of a context, a buffer or a kernel.
-   * The element corresponding to the property category must be given
-   * as argument and the other two are ignored.  The currently defined
-   * properties and their type are defined in \ref props "Properties".
-   *
-   * \param ctx context
-   * \param buf buffer
-   * \param k kernel
-   * \param prop_id property id (from \ref props "Properties")
-   * \param res pointer to the return space of the appropriate type
-   *
-   * \returns GA_NO_ERROR or an error code if an error occurred.
-   */
-  int (*property)(void *ctx, gpudata *buf, gpukernel *k, int prop_id,
-                  void *res);
+/**
+ * Get the kernel binary.
+ *
+ * This can be use to cache kernel binaries after compilation of a
+ * specific device.  The kernel can be recreated by calling
+ * kernel_alloc with the binary and size and passing `GA_USE_BINARY`
+ * as the use flags.
+ *
+ * The returned pointer is allocated and must be freed by the caller.
+ *
+ * \param k kernel
+ * \param sz size of the returned binary
+ * \param obj pointer to the binary for the kernel.
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpukernel_binary(gpukernel *k, size_t *sz, void **obj);
 
-  /**
-   * Get a string describing the last error that happened.
-   *
-   * This function will return a string description of the last
-   * backend error to happen on the specified context.
-   *
-   * If you need to get a description of a error that occurred during
-   * context creation, call this function using NULL as the context.
-   * This version of the call is not thread-safe.
-   *
-   * \param ctx context for which to query the error
-   *
-   * \returns string description of the last error
-   */
-  const char *(*ctx_error)(void *ctx);
-} gpuarray_buffer_ops;
+/**
+ * Fetch a property.
+ *
+ * Can be used for kernel and context properties. The context
+ * properties will fetch the value for the context associated with the
+ * kernel.  The currently defined properties and their type are
+ * defined in \ref props "Properties".
+ *
+ * \param k kernel
+ * \param prop_id property id (from \ref props "Properties")
+ * \param res pointer to the return space of the appropriate type
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpukernel_property(gpukernel *k, int prop_id, void *res);
 
+GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
 /**
  * \defgroup props Properties
  * @{
@@ -640,7 +641,7 @@ typedef struct _gpuarray_buffer_ops {
 /**
  * Get the context in which this buffer was allocated.
  *
- * Type: `void *`
+ * Type: `gpucontext *`
  */
 #define GA_BUFFER_PROP_CTX    512
 
@@ -665,7 +666,7 @@ typedef struct _gpuarray_buffer_ops {
 /**
  * Get the context for which this kernel was compiled.
  *
- * Type: `void *`
+ * Type: `gpucontext *`
  */
 #define GA_KERNEL_PROP_CTX       1024
 
@@ -707,7 +708,7 @@ typedef struct _gpuarray_buffer_ops {
  */
 
 /**
- * Flags for gpuarray_buffer_ops#buffer_newkernel.
+ * Flags for gpukernel_init().
  *
  * It is important to specify these properly as the compilation
  * machinery will ensure that the proper configuration is made to
@@ -757,47 +758,6 @@ typedef enum _ga_usefl {
    */
   GA_USE_OPENCL =   0x4000,
 } ga_usefl;
-
-/**
- * Get the error string corresponding to `err`.
- *
- * \param o operations vector for the backend that produced the error.
- * \param ctx the context in which the error occured or NULL if the
- *            error occured outside a context (like during context
- *            creation).
- * \param err error code
- *
- * \returns A string description of the error.
- */
-GPUARRAY_PUBLIC const char *Gpu_error(const gpuarray_buffer_ops *o, void *ctx,
-				     int err);
-/**
- * Get operations vector for a backend.
- *
- * The available backends depend on how the library was built.
- *
- * \param name backend name, currently one of `"cuda"`  or `"opencl"`
- *
- * \returns the operation vector or NULL if the backend name is unrecognized.
- */
-GPUARRAY_PUBLIC const gpuarray_buffer_ops *gpuarray_get_ops(const char *name);
-
-/**
- * Transfer a buffer from one context to another.
- *
- * This function will try to use an efficient method if one is
- * available and fallback to going through host memory if nothing else
- * can be done.
- */
-GPUARRAY_PUBLIC gpudata *gpuarray_buffer_transfer(gpudata *buf, size_t offset,
-                                                  size_t sz, void *src_ctx,
-                                                  const gpuarray_buffer_ops *src_ops,
-                                                  void *dst_ctx,
-                                                  const gpuarray_buffer_ops *dst_ops,
-                                                  int may_share, int *ret);
-
-GPUARRAY_PUBLIC void *gpuarray_buffer_context(const gpuarray_buffer_ops *ops,
-                                              gpudata *b);
 
 #ifdef __cplusplus
 }

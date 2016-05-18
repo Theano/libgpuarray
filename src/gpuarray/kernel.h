@@ -23,10 +23,6 @@ typedef struct _GpuKernel {
    */
   gpukernel *k;
   /**
-   * Backend operations vector.
-   */
-  const gpuarray_buffer_ops *ops;
-  /**
    * Argument buffer.
    */
   void **args;
@@ -40,7 +36,6 @@ typedef struct _GpuKernel {
  * or equivalent code.
  *
  * \param k a kernel structure
- * \param ops operations vector
  * \param ctx context in which to build the kernel
  * \param count number of source code strings
  * \param strs C array of source code strings
@@ -54,11 +49,11 @@ typedef struct _GpuKernel {
  * \return GA_NO_ERROR if the operation is successful
  * \return any other value if an error occured
  */
-GPUARRAY_PUBLIC int GpuKernel_init(GpuKernel *k, const gpuarray_buffer_ops *ops,
-                                  void *ctx, unsigned int count,
-                                  const char **strs, const size_t *lens,
-                                  const char *name, unsigned int argcount,
-                                  const int *types, int flags, char **err_str);
+GPUARRAY_PUBLIC int GpuKernel_init(GpuKernel *k, gpucontext *ctx,
+                                   unsigned int count, const char **strs,
+                                   const size_t *lens, const char *name,
+                                   unsigned int argcount, const int *types,
+                                   int flags, char **err_str);
 
 /**
  * Clear and release data associated with a kernel.
@@ -74,7 +69,7 @@ GPUARRAY_PUBLIC void GpuKernel_clear(GpuKernel *k);
  *
  * \returns a context pointer
  */
-GPUARRAY_PUBLIC void *GpuKernel_context(GpuKernel *k);
+GPUARRAY_PUBLIC gpucontext *GpuKernel_context(GpuKernel *k);
 
 
 GPUARRAY_PUBLIC int GpuKernel_setarg(GpuKernel *k, unsigned int i, void *val);

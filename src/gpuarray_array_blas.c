@@ -12,7 +12,6 @@ int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
   GpuArray *Xp = X;
   GpuArray copyX;
   GpuArray *Yp = Y;
-  gpuarray_blas_ops *blas;
   void *ctx;
   size_t elsize;
   size_t m, n, lda;
@@ -86,26 +85,20 @@ int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
     goto cleanup;
   }
 
-  err = Ap->ops->property(NULL, Ap->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
-  if (err != GA_NO_ERROR)
-    goto cleanup;
-  err = Ap->ops->property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas);
-  if (err != GA_NO_ERROR)
-    goto cleanup;
-
-  err = blas->setup(ctx);
+  ctx = gpudata_context(Ap->data);
+  err = gpublas_setup(ctx);
   if (err != GA_NO_ERROR)
     goto cleanup;
 
   switch (Ap->typecode) {
   case GA_HALF:
-      err = blas->hgemv(o, transA, m, n, (float)alpha, Ap->data, Ap->offset / elsize, lda, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, (float)beta, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize);
+    err = gpublas_hgemv(o, transA, m, n, (float)alpha, Ap->data, Ap->offset / elsize, lda, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, (float)beta, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize);
     break;
   case GA_FLOAT:
-    err = blas->sgemv(o, transA, m, n, (float)alpha, Ap->data, Ap->offset / elsize, lda, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, (float)beta, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize);
+    err = gpublas_sgemv(o, transA, m, n, (float)alpha, Ap->data, Ap->offset / elsize, lda, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, (float)beta, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize);
     break;
   case GA_DOUBLE:
-    err = blas->dgemv(o, transA, m, n, (double)alpha, Ap->data, Ap->offset / elsize, lda, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, (double)beta, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize);
+    err = gpublas_dgemv(o, transA, m, n, (double)alpha, Ap->data, Ap->offset / elsize, lda, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, (double)beta, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize);
     break;
   }
  cleanup:
@@ -124,7 +117,6 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
   GpuArray *Bp = B;
   GpuArray copyB;
   GpuArray *Cp = C;
-  gpuarray_blas_ops *blas;
   void *ctx;
   size_t elsize;
   size_t m, n, k, lda, ldb, ldc;
@@ -243,26 +235,20 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
     goto cleanup;
   }
 
-  err = Ap->ops->property(NULL, Ap->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
-  if (err != GA_NO_ERROR)
-    goto cleanup;
-  err = Ap->ops->property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas);
-  if (err != GA_NO_ERROR)
-    goto cleanup;
-
-  err = blas->setup(ctx);
+  ctx = gpudata_context(Ap->data);
+  err = gpublas_setup(ctx);
   if (err != GA_NO_ERROR)
     goto cleanup;
 
   switch (Ap->typecode) {
   case GA_HALF:
-      err = blas->hgemm(o, transA, transB, m, n, k, (float)alpha, Ap->data, Ap->offset / elsize, lda, Bp->data, Bp->offset / elsize, ldb, (float)beta, Cp->data, Cp->offset / elsize, ldc);
+      err = gpublas_hgemm(o, transA, transB, m, n, k, (float)alpha, Ap->data, Ap->offset / elsize, lda, Bp->data, Bp->offset / elsize, ldb, (float)beta, Cp->data, Cp->offset / elsize, ldc);
     break;
   case GA_FLOAT:
-    err = blas->sgemm(o, transA, transB, m, n, k, (float)alpha, Ap->data, Ap->offset / elsize, lda, Bp->data, Bp->offset / elsize, ldb, (float)beta, Cp->data, Cp->offset / elsize, ldc);
+    err = gpublas_sgemm(o, transA, transB, m, n, k, (float)alpha, Ap->data, Ap->offset / elsize, lda, Bp->data, Bp->offset / elsize, ldb, (float)beta, Cp->data, Cp->offset / elsize, ldc);
     break;
   case GA_DOUBLE:
-    err = blas->dgemm(o, transA, transB, m, n, k, (double)alpha, Ap->data, Ap->offset / elsize, lda, Bp->data, Bp->offset / elsize, ldb, (double)beta, Cp->data, Cp->offset / elsize, ldc);
+    err = gpublas_dgemm(o, transA, transB, m, n, k, (double)alpha, Ap->data, Ap->offset / elsize, lda, Bp->data, Bp->offset / elsize, ldb, (double)beta, Cp->data, Cp->offset / elsize, ldc);
     break;
   }
 
@@ -281,7 +267,6 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
   GpuArray *Yp = Y;
   GpuArray copyY;
   GpuArray *Ap = A;
-  gpuarray_blas_ops *blas;
   void *ctx;
   size_t elsize;
   size_t m, n, lda;
@@ -345,26 +330,20 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
     goto cleanup;
   }
 
-  err = Xp->ops->property(NULL, Xp->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
-  if (err != GA_NO_ERROR)
-    goto cleanup;
-  err = Xp->ops->property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas);
-  if (err != GA_NO_ERROR)
-    goto cleanup;
-
-  err = blas->setup(ctx);
+  ctx = gpudata_context(Xp->data);
+  err = gpublas_setup(ctx);
   if (err != GA_NO_ERROR)
     goto cleanup;
 
   switch(Xp->typecode) {
   case GA_HALF:
-      err = blas->hger(o, m, n, (float)alpha, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize, Ap->data, Ap->offset / elsize, lda);
+      err = gpublas_hger(o, m, n, (float)alpha, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize, Ap->data, Ap->offset / elsize, lda);
     break;
   case GA_FLOAT:
-    err = blas->sger(o, m, n, (float)alpha, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize, Ap->data, Ap->offset / elsize, lda);
+    err = gpublas_sger(o, m, n, (float)alpha, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize, Ap->data, Ap->offset / elsize, lda);
     break;
   case GA_DOUBLE:
-    err = blas->dger(o, m, n, (double)alpha, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize, Ap->data, Ap->offset / elsize, lda);
+    err = gpublas_dger(o, m, n, (double)alpha, Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize, Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize, Ap->data, Ap->offset / elsize, lda);
     break;
   }
 
@@ -384,7 +363,6 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   GpuArray *Bp = B;
   GpuArray copyB;
   GpuArray *Cp = C;
-  gpuarray_blas_ops *blas;
   void *ctx;
   size_t elsize;
   size_t batchCount, m, n, k, lda, ldb, ldc;
@@ -509,14 +487,8 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
     goto cleanup;
   }
 
-  err = Ap->ops->property(NULL, Ap->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
-  if (err != GA_NO_ERROR)
-    goto cleanup;
-  err = Ap->ops->property(ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS, &blas);
-  if (err != GA_NO_ERROR)
-    goto cleanup;
-
-  err = blas->setup(ctx);
+  ctx = gpudata_context(Ap->data);
+  err = gpublas_setup(ctx);
   if (err != GA_NO_ERROR)
     goto cleanup;
 
@@ -539,19 +511,26 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   }
 
   switch (C->typecode) {
+  case GA_HALF:
+    err = gpublas_hgemmBatch(o, transA, transB, m, n, k, (float)alpha,
+                             A_datas, A_offsets, lda,
+                             B_datas, B_offsets, ldb,
+                             (float)beta,
+                             C_datas, C_offsets, ldc, batchCount, 0);
+    break;
   case GA_FLOAT:
-    err = blas->sgemmBatch(o, transA, transB, m, n, k, (float)alpha,
-                           A_datas, A_offsets, lda,
-                           B_datas, B_offsets, ldb,
-                           (float)beta,
-                           C_datas, C_offsets, ldc, batchCount);
+    err = gpublas_sgemmBatch(o, transA, transB, m, n, k, (float)alpha,
+                             A_datas, A_offsets, lda,
+                             B_datas, B_offsets, ldb,
+                             (float)beta,
+                             C_datas, C_offsets, ldc, batchCount, 0);
     break;
   case GA_DOUBLE:
-    err = blas->dgemmBatch(o, transA, transB, m, n, k, (double)alpha,
-                           A_datas, A_offsets, lda,
-                           B_datas, B_offsets, ldb,
-                           (double)beta,
-                           C_datas, C_offsets, ldc, batchCount);
+    err = gpublas_dgemmBatch(o, transA, transB, m, n, k, (double)alpha,
+                             A_datas, A_offsets, lda,
+                             B_datas, B_offsets, ldb,
+                             (double)beta,
+                             C_datas, C_offsets, ldc, batchCount, 0);
     break;
   }
 

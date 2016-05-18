@@ -24,7 +24,13 @@ link_directories(${CHECK_LIBRARY_DIRS})
 
 set(LIBS ${LIBS} ${CHECK_LIBRARIES})
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CHECK_CFLAGS}")
+foreach(flag ${CHECK_C_FLAGS})
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${flag}")
+endforeach()
+
+foreach(flag ${CHECK_LDFLAGS_OTHER})
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${flag}")
+endforeach()
 
 include_directories(. ../src)
 
