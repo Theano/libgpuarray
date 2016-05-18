@@ -949,7 +949,7 @@ cdef class GpuContext:
             if err == GA_VALUE_ERROR:
                 raise get_exc(err), "No device %d"%(devno,)
             else:
-                raise get_exc(err), gpucontext_error(NULL, err) + ": " + str(devno)
+                raise get_exc(err), gpucontext_error(NULL, err).decode('utf-8') + ": " + str(devno)
 
     def __enter__(self):
         if cuda_enter == NULL:

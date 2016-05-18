@@ -31,6 +31,8 @@ gpucontext *gpucontext_init(const char *name, int dev, int flags, int *ret) {
   if (ops == NULL)
     FAIL(NULL, GA_INVALID_ERROR);
   res = ops->buffer_init(dev, flags, ret);
+  if (res == NULL)
+    return NULL;
   res->ops = ops;
   if (gpucontext_property(res, GA_CTX_PROP_BLAS_OPS, &res->blas_ops) != GA_NO_ERROR)
     res->blas_ops = NULL;
@@ -54,7 +56,7 @@ int gpucontext_property(gpucontext *ctx, int prop_id, void *res) {
 }
 
 const char *gpucontext_error(gpucontext *ctx, int err) {
-  if (err == GA_IMPL_ERROR)
+  if (err == GA_IMPL_ERROR && ctx != NULL)
     return ctx->ops->ctx_error(ctx);
   else
     return gpuarray_error_str(err);
