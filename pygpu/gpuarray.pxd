@@ -104,7 +104,7 @@ cdef extern from "gpuarray/buffer.h":
 
     cdef enum ga_usefl:
         GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF,
-        GA_USE_BINARY, GA_USE_PTX, GA_USE_CUDA, GA_USE_OPENCL
+        GA_USE_BINARY, GA_USE_CUDA, GA_USE_OPENCL
 
 cdef extern from "gpuarray/kernel.h":
     ctypedef struct _GpuKernel "GpuKernel":

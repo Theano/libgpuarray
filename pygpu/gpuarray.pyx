@@ -1897,7 +1897,7 @@ cdef class GpuKernel:
     def __cinit__(self, source, name, types, GpuContext context=None,
                   cluda=True, have_double=False, have_small=False,
                   have_complex=False, have_half=False, binary=False,
-                  ptx=False, cuda=False, opencl=False, *a, **kwa):
+                  cuda=False, opencl=False, *a, **kwa):
         cdef const char *s[1]
         cdef size_t l
         cdef unsigned int numargs
@@ -1922,8 +1922,6 @@ cdef class GpuKernel:
             flags |= GA_USE_HALF
         if binary:
             flags |= GA_USE_BINARY
-        if ptx:
-            flags |= GA_USE_PTX
         if cuda:
             flags |= GA_USE_CUDA
         if opencl:
