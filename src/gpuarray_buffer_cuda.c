@@ -38,6 +38,18 @@ static int cuda_records(gpudata *, int, CUstream);
 static int detect_arch(const char *prefix, char *ret, CUresult *err);
 static gpudata *new_gpudata(cuda_context *ctx, CUdeviceptr ptr, size_t size);
 
+static int strb_eq(void *_k1, void *_k2) {
+  strb *k1 = (strb *)_k1;
+  strb *k2 = (strb *)_k2;
+  return (k1->l == k2->l &&
+          memcmp(k1->s, k2->s, k1->l) == 0);
+}
+
+static uint32_t strb_hash(void *_k) {
+  strb *k = (strb *)_k;
+  return XXH32(k->s, k->l, 42);
+}
+
 cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   cuda_context *res;
   void *p;
@@ -63,6 +75,11 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   if (err != CUDA_SUCCESS) {
     goto fail_mem_stream;
   }
+  res->kernel_cache = cache_twoq(64, 128, 64, 8, strb_eq, strb_hash,
+                                 (cache_freek_fn)strb_free,
+                                 (cache_freev_fn)cuda_freekernel);
+  if (res->kernel_cache == NULL)
+    goto fail_cache;
   err = cuMemAllocHost(&p, 16);
   if (err != CUDA_SUCCESS) {
     goto fail_errbuf;
@@ -80,6 +97,8 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
  fail_end:
   cuMemFreeHost(p);
  fail_errbuf:
+  cache_destroy(res->kernel_cache);
+ fail_cache:
   cuStreamDestroy(res->mem_s);
  fail_mem_stream:
   cuStreamDestroy(res->s);
@@ -117,6 +136,7 @@ static void cuda_free_ctx(cuda_context *ctx) {
       cuMemFree(curr->ptr);
       deallocate(curr);
     }
+    cache_destroy(ctx->kernel_cache);
 
     if (!(ctx->flags & DONTFREE)) {
 #if CUDA_VERSION < 7000
@@ -775,49 +795,6 @@ static int detect_arch(const char *prefix, char *ret, CUresult *err) {
   return GA_NO_ERROR;
 }
 
-static cache *compile_cache = NULL;
-
-typedef struct _srckey {
-  const char *src;
-  size_t len;
-  char arch[64];
-} srckey;
-
-static void src_free(void *_k) {
-  srckey *k = (srckey *)_k;
-  free((void *)k->src);
-  free(k);
-}
-
-static int src_eq(void *_k1, void *_k2) {
-  srckey *k1 = (srckey *)_k1;
-  srckey *k2 = (srckey *)_k2;
-  return (k1->len == k2->len &&
-          strcmp(k1->arch, k2->arch) == 0 &&
-          memcmp(k1->src, k2->src, k1->len) == 0);
-}
-
-static uint32_t src_hash(void *_k) {
-  srckey *k = (srckey *)_k;
-  XXH32_state_t h;
-  /* seed is an arbitrary, but fixed value */
-  XXH32_reset(&h, 42);
-  XXH32_update(&h, (void *)k->src, k->len);
-  XXH32_update(&h, (void *)k->arch, sizeof(k->arch));
-  return XXH32_digest(&h);
-}
-
-typedef struct _binval {
-  void *bin;
-  size_t len;
-} binval;
-
-static void bin_free(void *_v) {
-  binval *v = (binval *)_v;
-  free(v->bin);
-  free(v);
-}
-
 #ifdef WITH_NVRTC
 
 #include <nvrtc.h>
@@ -1066,15 +1043,12 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
                                  char **err_str) {
     cuda_context *ctx = (cuda_context *)c;
     strb sb = STRB_STATIC_INIT;
+    strb *psb;
     char *bin, *log = NULL;
-    srckey k, *ak;
-    binval *av;
     gpukernel *res;
     size_t bin_len = 0, log_len = 0;
     CUdevice dev;
     unsigned int i;
-    int ptx_mode = 0;
-    int binary_mode = 0;
     int major, minor;
 
     if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
@@ -1119,13 +1093,7 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
     }
     // GA_USE_HALF should always work
 
-    if (flags & GA_USE_PTX) {
-      ptx_mode = 1;
-    } else if (flags & GA_USE_BINARY) {
-      binary_mode = 1;
-    }
-
-    if (binary_mode) {
+    if (flags & GA_USE_BINARY) {
       bin = memdup(strings[0], lengths[0]);
       bin_len = lengths[0];
       if (bin == NULL) {
@@ -1157,85 +1125,43 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
         FAIL(NULL, GA_MEMORY_ERROR);
       }
 
-      if (ptx_mode) {
-        bin = sb.s;
-        bin_len = sb.l;
-      } else {
-        bin = NULL;
-        if (compile_cache != NULL) {
-          k.src = sb.s;
-          k.len = sb.l;
-          memcpy(k.arch, ctx->bin_id, sizeof(ctx->bin_id));
-          av = cache_get(compile_cache, &k);
-          if (av != NULL) {
-            bin = memdup(av->bin, av->len);
-            bin_len = av->len;
-          }
-        }
-        if (bin == NULL) {
-          bin = call_compiler(sb.s, sb.l, ctx->bin_id, &bin_len,
-                              &log, &log_len, ret);
-        }
-        if (bin == NULL) {
-          if (err_str != NULL) {
-            strb debug_msg = STRB_STATIC_INIT;
+      res = (gpukernel *)cache_get(ctx->kernel_cache, &sb);
+      if (res != NULL) {
+        res->refcnt++;
+        return res;
+      }
+      bin = call_compiler(sb.s, sb.l, ctx->bin_id, &bin_len,
+                          &log, &log_len, ret);
+      if (bin == NULL) {
+        if (err_str != NULL) {
+          strb debug_msg = STRB_STATIC_INIT;
 
-            // We're substituting debug_msg for a string with this first line:
-            strb_appends(&debug_msg, "CUDA kernel build failure ::\n");
+          // We're substituting debug_msg for a string with this first line:
+          strb_appends(&debug_msg, "CUDA kernel build failure ::\n");
 
-            /* Delete the final NUL */
-            sb.l--;
-            gpukernel_source_with_line_numbers(1, (const char **)&sb.s,
-                                               &sb.l, &debug_msg);
+          /* Delete the final NUL */
+          sb.l--;
+          gpukernel_source_with_line_numbers(1, (const char **)&sb.s,
+                                             &sb.l, &debug_msg);
 
-            if (log != NULL) {
-              strb_appends(&debug_msg, "\nCompiler log:\n");
-              strb_appendn(&debug_msg, log, log_len);
-              free(log);
-            }
-            *err_str = strb_cstr(&debug_msg);
-            // *err_str will be free()d by the caller (see docs in kernel.h)
+          if (log != NULL) {
+            strb_appends(&debug_msg, "\nCompiler log:\n");
+            strb_appendn(&debug_msg, log, log_len);
+            free(log);
           }
-          strb_clear(&sb);
-          cuda_exit(ctx);
-          return NULL;
+          *err_str = strb_cstr(&debug_msg);
+          // *err_str will be free()d by the caller (see docs in kernel.h)
         }
-        if (compile_cache == NULL)
-          compile_cache = cache_twoq(64, 128, 64, 8, src_eq, src_hash,
-				     src_free, bin_free);
-        if (compile_cache != NULL) {
-          ak = malloc(sizeof(*ak));
-          av = malloc(sizeof(*av));
-          if (ak == NULL || av == NULL) {
-            free(ak);
-            free(av);
-            goto done;
-          }
-          ak->src = memdup(sb.s, sb.l);
-          if (ak->src == NULL) {
-            free(ak);
-            free(av);
-            goto done;
-          }
-          ak->len = sb.l;
-          memmove(ak->arch, ctx->bin_id, sizeof(ctx->bin_id));
-          av->len = bin_len;
-          av->bin = memdup(bin, bin_len);
-          if (av->bin == NULL) {
-            src_free(ak);
-            free(av);
-            goto done;
-          }
-          cache_add(compile_cache, ak, av);
-        }
-      done:
         strb_clear(&sb);
+        cuda_exit(ctx);
+        return NULL;
       }
     }
 
     res = calloc(1, sizeof(*res));
     if (res == NULL) {
       free(bin);
+      strb_clear(&sb);
       cuda_exit(ctx);
       FAIL(NULL, GA_SYS_ERROR);
     }
@@ -1248,6 +1174,7 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
     res->types = calloc(argcount, sizeof(int));
     if (res->types == NULL) {
       _cuda_freekernel(res);
+      strb_clear(&sb);
       cuda_exit(ctx);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
@@ -1255,6 +1182,7 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
     res->args = calloc(argcount, sizeof(void *));
     if (res->args == NULL) {
       _cuda_freekernel(res);
+      strb_clear(&sb);
       cuda_exit(ctx);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
@@ -1263,6 +1191,7 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
 
     if (ctx->err != CUDA_SUCCESS) {
       _cuda_freekernel(res);
+      strb_clear(&sb);
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
@@ -1270,6 +1199,7 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
     ctx->err = cuModuleGetFunction(&res->k, res->m, fname);
     if (ctx->err != CUDA_SUCCESS) {
       _cuda_freekernel(res);
+      strb_clear(&sb);
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
@@ -1278,6 +1208,17 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
     ctx->refcnt++;
     cuda_exit(ctx);
     TAG_KER(res);
+    psb = memdup(&sb, sizeof(strb));
+    if (psb == NULL) {
+      cuda_freekernel(res);
+      strb_clear(&sb);
+      FAIL(NULL, GA_MEMORY_ERROR);
+    }
+    if (cache_add(ctx->kernel_cache, psb, res) != 0) {
+      FAIL(NULL, GA_MEMORY_ERROR);
+    }
+    /* One of the refs is for the cache */
+    res->refcnt++;
     return res;
 }
 
