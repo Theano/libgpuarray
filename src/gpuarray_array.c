@@ -578,6 +578,7 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
   tv.nd = a->nd;
   tv.dimensions = a->dimensions;
   tv.strides = strs;
+  /* THis could be optiomized by setting the right flags */
   tv.flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
   err = ga_extcopy(a, &tv);
   free(strs);
@@ -1010,6 +1011,7 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
   res_off = r->offset;
   res_dims = r->dimensions;
   res_flags = r->flags;
+  /* This could be optimized by setting the right flags */
   r->flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
   for (i = 0; i < n; i++) {
     r->dimensions = as[i]->dimensions;
