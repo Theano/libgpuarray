@@ -578,7 +578,7 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
   tv.nd = a->nd;
   tv.dimensions = a->dimensions;
   tv.strides = strs;
-  /* THis could be optiomized by setting the right flags */
+  /* This could be optiomized by setting the right flags */
   tv.flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
   err = ga_extcopy(a, &tv);
   free(strs);
