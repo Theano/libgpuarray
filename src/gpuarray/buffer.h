@@ -741,6 +741,8 @@ typedef enum _ga_usefl {
   GA_USE_HALF =       0x10,
   /**
    * The source code passed is actually a kernel binary.
+   *
+   * For the cuda backend this can also be a PTX module.
    */
   GA_USE_BINARY =     0x20,
   /* If you add a new flag, don't forget to update both
