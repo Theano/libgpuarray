@@ -20,3 +20,4 @@ distribute*tar.gz
 pygpu/*.c
 pygpu/*.h
 src/private_config.h
+Makefile.conf
