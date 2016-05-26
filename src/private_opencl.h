@@ -35,23 +35,21 @@
 #endif
 
 typedef struct _cl_ctx {
-#ifdef DEBUG
-  char tag[8];
-#endif
+  GPUCONTEXT_HEAD;
   cl_context ctx;
   cl_command_queue q;
   char *exts;
-  void *blas_handle;
-  gpudata *errbuf;
   cl_int err;
-  unsigned int refcnt;
-  char bin_id[64];
 } cl_ctx;
+
+STATIC_ASSERT(sizeof(cl_ctx) <= sizeof(gpucontext), sizeof_struct_gpucontext_cl);
 
 struct _gpudata {
   cl_mem buf;
-  cl_event ev;
   cl_ctx *ctx;
+  /* Don't change anyhting above this without checking
+     struct _partial_gpudata */
+  cl_event ev;
   unsigned int refcnt;
 #ifdef DEBUG
   char tag[8];
@@ -59,23 +57,22 @@ struct _gpudata {
 };
 
 struct _gpukernel {
-#ifdef DEBUG
-  char tag[8];
-#endif
+  cl_ctx *ctx; /* Keep the context first */
   cl_kernel k;
   cl_event ev;
   cl_event **evr;
-  cl_ctx *ctx;
   int *types;
   unsigned int argcount;
   unsigned int refcnt;
   cl_uint num_ev;
+#ifdef DEBUG
+  char tag[8];
+#endif
 };
 
 GPUARRAY_LOCAL cl_ctx *cl_make_ctx(cl_context ctx);
-GPUARRAY_LOCAL cl_context cl_get_ctx(void *ctx);
-GPUARRAY_LOCAL cl_command_queue cl_get_stream(void *ctx);
-GPUARRAY_LOCAL gpudata *cl_make_buf(void *c, cl_mem buf);
+GPUARRAY_LOCAL cl_command_queue cl_get_stream(gpucontext *ctx);
+GPUARRAY_LOCAL gpudata *cl_make_buf(gpucontext *c, cl_mem buf);
 GPUARRAY_LOCAL cl_mem cl_get_buf(gpudata *g);
 
 #endif

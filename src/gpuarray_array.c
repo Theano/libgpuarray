@@ -19,51 +19,78 @@
 #include "gpuarray/util.h"
 
 #include "util/strb.h"
+#include "util/xxhash.h"
 
-/*
- * Returns the boundaries of an array.
- *
- * This function works on virtual addresses where 0 is the start of
- * the gpu buffer and `offset` is the address of the first (0, ..., 0)
- * element of the array.  If you do not pass offset correctly, this
- * function will most likely overflow and return garbage results.
- *
- * On exit `start` holds the lowest (virtual) address ever touched by
- * the array and `end` holds the highest (virtual) address touched.
- * If you want the size of the memory region (to copy the data) you
- * need to add the size of one element to `end - start`.
- */
-static void ga_boundaries(size_t *start, size_t *end, size_t offset,
-                          unsigned int nd, size_t *dims, ssize_t *strs) {
-  unsigned int i;
-  *start = offset;
-  *end = offset;
+struct extcopy_args {
+  int itype;
+  int otype;
+};
 
-  for (i = 0; i < nd; i++) {
-    if (dims[i] == 0) {
-      *start = *end = offset;
-      break;
-    }
+static int extcopy_eq(cache_key_t _k1, cache_key_t _k2) {
+  struct extcopy_args *k1 = _k1;
+  struct extcopy_args *k2 = _k2;
+  return k1->itype == k2->itype && k1->otype == k2->otype;
+}
 
-    if (strs[i] < 0)
-      *start += (dims[i] - 1) * strs[i];
-    else
-      *end += (dims[i] - 1) * strs[i];
+static void extcopy_free(cache_key_t k) {
+  free(k);
+}
+
+static uint32_t extcopy_hash(cache_key_t k) {
+  return XXH32(k, sizeof(struct extcopy_args), 42);
+}
+
+static int ga_extcopy(GpuArray *dst, const GpuArray *src) {
+  struct extcopy_args a, *aa;
+  gpucontext *ctx = gpudata_context(dst->data);
+  GpuElemwise *k = NULL;
+  void *args[2];
+
+  if (ctx != gpudata_context(src->data))
+    return GA_INVALID_ERROR;
+
+  a.itype = src->typecode;
+  a.otype = dst->typecode;
+
+  if (ctx->extcopy_cache != NULL)
+    k = cache_get(ctx->extcopy_cache, &a);
+  if (k == NULL) {
+    gpuelemwise_arg gargs[2];
+    gargs[0].name = "src";
+    gargs[0].typecode = src->typecode;
+    gargs[0].flags = GE_READ;
+    gargs[1].name = "dst";
+    gargs[1].typecode = dst->typecode;
+    gargs[1].flags = GE_WRITE;
+    k = GpuElemwise_new(ctx, "", "dst = src", 2, gargs, 0, 0);
+    if (k == NULL)
+      return GA_MISC_ERROR;
+    aa = memdup(&a, sizeof(a));
+    if (aa == NULL)
+      return GA_MEMORY_ERROR;
+    if (ctx->extcopy_cache == NULL)
+      ctx->extcopy_cache = cache_twoq(4, 8, 8, 2, extcopy_eq, extcopy_hash,
+                                      extcopy_free,
+                                      (cache_freev_fn)GpuElemwise_free);
+    if (ctx->extcopy_cache == NULL)
+      return GA_MISC_ERROR;
+    if (cache_add(ctx->extcopy_cache, aa, k) != 0)
+      return GA_MISC_ERROR;
   }
+  args[0] = (void *)src;
+  args[1] = (void *)dst;
+  return GpuElemwise_call(k, args, GE_BROADCAST);
 }
 
 /* Value below which a size_t multiplication will never overflow. */
 #define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
 
-int GpuArray_empty(GpuArray *a, const gpuarray_buffer_ops *ops, void *ctx,
+int GpuArray_empty(GpuArray *a, gpucontext *ctx,
 		   int typecode, unsigned int nd, const size_t *dims,
                    ga_order ord) {
   size_t size = gpuarray_get_elsize(typecode);
   unsigned int i;
   int res = GA_NO_ERROR;
-
-  if (ops == NULL)
-    return GA_INVALID_ERROR;
 
   if (ord == GA_ANY_ORDER)
     ord = GA_C_ORDER;
@@ -80,8 +107,7 @@ int GpuArray_empty(GpuArray *a, const gpuarray_buffer_ops *ops, void *ctx,
     size *= d;
   }
 
-  a->ops = ops;
-  a->data = a->ops->buffer_alloc(ctx, size, NULL, 0, &res);
+  a->data = gpudata_alloc(ctx, size, NULL, 0, &res);
   if (a->data == NULL) return res;
   a->nd = nd;
   a->offset = 0;
@@ -124,30 +150,28 @@ int GpuArray_empty(GpuArray *a, const gpuarray_buffer_ops *ops, void *ctx,
   return GA_NO_ERROR;
 }
 
-int GpuArray_zeros(GpuArray *a, const gpuarray_buffer_ops *ops, void *ctx,
+int GpuArray_zeros(GpuArray *a, gpucontext *ctx,
                    int typecode, unsigned int nd, const size_t *dims,
                    ga_order ord) {
   int err;
-  err = GpuArray_empty(a, ops, ctx, typecode, nd, dims, ord);
+  err = GpuArray_empty(a, ctx, typecode, nd, dims, ord);
   if (err != GA_NO_ERROR)
     return err;
-  err = a->ops->buffer_memset(a->data, a->offset, 0);
+  err = gpudata_memset(a->data, a->offset, 0);
   if (err != GA_NO_ERROR) {
     GpuArray_clear(a);
   }
   return err;
 }
 
-int GpuArray_fromdata(GpuArray *a, const gpuarray_buffer_ops *ops,
-                      gpudata *data, size_t offset, int typecode,
+int GpuArray_fromdata(GpuArray *a, gpudata *data, size_t offset, int typecode,
                       unsigned int nd, const size_t *dims,
                       const ssize_t *strides, int writeable) {
   if (gpuarray_get_type(typecode)->typecode != typecode)
     return GA_VALUE_ERROR;
-  a->ops = ops;
   assert(data != NULL);
   a->data = data;
-  ops->buffer_retain(a->data);
+  gpudata_retain(a->data);
   a->nd = nd;
   a->offset = offset;
   a->typecode = typecode;
@@ -168,9 +192,8 @@ int GpuArray_fromdata(GpuArray *a, const gpuarray_buffer_ops *ops,
   return GA_NO_ERROR;
 }
 
-int GpuArray_copy_from_host(GpuArray *a, const gpuarray_buffer_ops *ops,
-                            void *ctx, void *buf, int typecode,
-                            unsigned int nd, const size_t *dims,
+int GpuArray_copy_from_host(GpuArray *a, gpucontext *ctx, void *buf,
+                            int typecode, unsigned int nd, const size_t *dims,
                             const ssize_t *strides) {
   char *base = (char *)buf;
   size_t offset = 0;
@@ -194,18 +217,17 @@ int GpuArray_copy_from_host(GpuArray *a, const gpuarray_buffer_ops *ops,
   offset = (char *)buf - base;
   size += offset;
 
-  b = ops->buffer_alloc(ctx, size, base, GA_BUFFER_INIT, &err);
+  b = gpudata_alloc(ctx, size, base, GA_BUFFER_INIT, &err);
   if (b == NULL) return err;
 
-  err = GpuArray_fromdata(a, ops, b, offset, typecode, nd, dims, strides, 1);
-  ops->buffer_release(b);
+  err = GpuArray_fromdata(a, b, offset, typecode, nd, dims, strides, 1);
+  gpudata_release(b);
   return err;
 }
 
 int GpuArray_view(GpuArray *v, const GpuArray *a) {
-  v->ops = a->ops;
   v->data = a->data;
-  v->ops->buffer_retain(a->data);
+  gpudata_retain(a->data);
   v->nd = a->nd;
   v->offset = a->offset;
   v->typecode = a->typecode;
@@ -222,7 +244,7 @@ int GpuArray_view(GpuArray *v, const GpuArray *a) {
 }
 
 int GpuArray_sync(GpuArray *a) {
-  return a->ops->buffer_sync(a->data);
+  return gpudata_sync(a->data);
 }
 
 int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
@@ -308,8 +330,7 @@ int GpuArray_index(GpuArray *r, const GpuArray *a, const ssize_t *starts,
   return err;
 }
 
-static int gen_take1_kernel(GpuKernel *k, const gpuarray_buffer_ops *ops,
-                            void *ctx, char **err_str,
+static int gen_take1_kernel(GpuKernel *k, gpucontext *ctx, char **err_str,
                             GpuArray *a, const GpuArray *v,
                             const GpuArray *ind, int addr32) {
   strb sb = STRB_STATIC_INIT;
@@ -392,7 +413,7 @@ static int gen_take1_kernel(GpuKernel *k, const gpuarray_buffer_ops *ops,
     goto bail;
   }
   flags |= gpuarray_type_flags(a->typecode, v->typecode, GA_BYTE, -1);
-  res = GpuKernel_init(k, ops, ctx, 1, (const char **)&sb.s, &sb.l, "take1",
+  res = GpuKernel_init(k, ctx, 1, (const char **)&sb.s, &sb.l, "take1",
                        nargs, atypes, flags, err_str);
 bail:
   free(atypes);
@@ -413,9 +434,6 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
   unsigned int j;
   int err, kerr = 0;
   int addr32 = 0;
-
-  if (a->ops != v->ops || a->ops != i->ops)
-    return GA_INVALID_ERROR;
 
   if (!GpuArray_ISWRITEABLE(a))
     return GA_INVALID_ERROR;
@@ -446,11 +464,11 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
     addr32 = 1;
   }
 
-  err = v->ops->property(NULL, v->data, NULL, GA_CTX_PROP_ERRBUF, &errbuf);
+  err = gpudata_property(v->data, GA_CTX_PROP_ERRBUF, &errbuf);
   if (err != GA_NO_ERROR)
     return err;
 
-  err = gen_take1_kernel(&k, a->ops, GpuArray_context(a),
+  err = gen_take1_kernel(&k, GpuArray_context(a),
 #if DEBUG
                          &errstr,
 #else
@@ -471,7 +489,7 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
     goto out;
 
   /* This may not be the best scheduling, but it's good enough */
-  err = k.ops->property(NULL, NULL, k.k, GA_KERNEL_PROP_PREFLSIZE, &pl);
+  err = gpukernel_property(k.k, GA_KERNEL_PROP_PREFLSIZE, &pl);
   ls[0] = ls[1] / pl;
   ls[1] = pl;
   if (n[1] > n[0]) {
@@ -496,12 +514,12 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
 
   err = GpuKernel_call(&k, 2, ls, gs, 0, NULL);
   if (check_error && err == GA_NO_ERROR) {
-    err = v->ops->buffer_read(&kerr, errbuf, 0, sizeof(int));
+    err = gpudata_read(&kerr, errbuf, 0, sizeof(int));
     if (err == GA_NO_ERROR && kerr != 0) {
       err = GA_VALUE_ERROR;
       kerr = 0;
       /* We suppose this will not fail */
-      v->ops->buffer_write(errbuf, 0, &kerr, sizeof(int));
+      gpudata_write(errbuf, 0, &kerr, sizeof(int));
     }
   }
 
@@ -511,18 +529,16 @@ out:
 }
 
 int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
-  unsigned int i;
-  unsigned int off;
-  int err = GA_NO_ERROR;
+  GpuArray tv;
   size_t sz;
   ssize_t *strs;
+  unsigned int i, off;
+  int err = GA_NO_ERROR;
   int simple_move = 1;
 
   if (a->nd < v->nd)
     return GA_VALUE_ERROR;
 
-  if (a->ops != v->ops)
-    return GA_INVALID_ERROR;
   if (!GpuArray_ISWRITEABLE(a))
     return GA_VALUE_ERROR;
   if (!GpuArray_ISALIGNED(v) || !GpuArray_ISALIGNED(a))
@@ -545,7 +561,7 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
       a->nd == v->nd) {
     sz = gpuarray_get_elsize(a->typecode);
     for (i = 0; i < a->nd; i++) sz *= a->dimensions[i];
-    return a->ops->buffer_move(a->data, a->offset, v->data, v->offset, sz);
+    return gpudata_move(a->data, a->offset, v->data, v->offset, sz);
   }
 
   strs = calloc(a->nd, sizeof(ssize_t));
@@ -558,9 +574,13 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
     }
   }
 
-  err = a->ops->buffer_extcopy(v->data, v->offset, a->data, a->offset,
-			       v->typecode, a->typecode, a->nd, a->dimensions,
-			       strs, a->nd, a->dimensions, a->strides);
+  memcpy(&tv, v, sizeof(GpuArray));
+  tv.nd = a->nd;
+  tv.dimensions = a->dimensions;
+  tv.strides = strs;
+  /* This could be optiomized by setting the right flags */
+  tv.flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
+  err = ga_extcopy(a, &tv);
   free(strs);
   return err;
 }
@@ -794,30 +814,26 @@ int GpuArray_transpose_inplace(GpuArray *a, const unsigned int *new_axes) {
 
 void GpuArray_clear(GpuArray *a) {
   if (a->data)
-    a->ops->buffer_release(a->data);
+    gpudata_release(a->data);
   free(a->dimensions);
   free(a->strides);
   memset(a, 0, sizeof(*a));
 }
 
 int GpuArray_share(const GpuArray *a, const GpuArray *b) {
-  if (a->ops != b->ops || a->data != b->data) return 0;
+  if (a->data != b->data) return 0;
   /* XXX: redefine buffer_share to mean: is it possible to share?
           and use offset to make sure */
-  return a->ops->buffer_share(a->data, b->data, NULL);
+  return gpudata_share(a->data, b->data, NULL);
 }
 
-void *GpuArray_context(const GpuArray *a) {
-  void *res = NULL;
-  (void)a->ops->property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &res);
-  return res;
+gpucontext *GpuArray_context(const GpuArray *a) {
+  return gpudata_context(a->data);
 }
 
 int GpuArray_move(GpuArray *dst, const GpuArray *src) {
   size_t sz;
   unsigned int i;
-  if (dst->ops != src->ops)
-    return GA_INVALID_ERROR;
   if (!GpuArray_ISWRITEABLE(dst))
     return GA_VALUE_ERROR;
   if (!GpuArray_ISALIGNED(src) || !GpuArray_ISALIGNED(dst))
@@ -831,15 +847,11 @@ int GpuArray_move(GpuArray *dst, const GpuArray *src) {
   if (!GpuArray_ISONESEGMENT(dst) || !GpuArray_ISONESEGMENT(src) ||
       GpuArray_ISFORTRAN(dst) != GpuArray_ISFORTRAN(src) ||
       dst->typecode != src->typecode) {
-    return dst->ops->buffer_extcopy(src->data, src->offset, dst->data,
-                                    dst->offset, src->typecode, dst->typecode,
-                                    src->nd, src->dimensions, src->strides,
-                                    dst->nd, dst->dimensions, dst->strides);
+    return ga_extcopy(dst, src);
   }
   sz = gpuarray_get_elsize(dst->typecode);
   for (i = 0; i < dst->nd; i++) sz *= dst->dimensions[i];
-  return dst->ops->buffer_move(dst->data, dst->offset, src->data, src->offset,
-                               sz);
+  return gpudata_move(dst->data, dst->offset, src->data, src->offset, sz);
 }
 
 int GpuArray_write(GpuArray *dst, const void *src, size_t src_sz) {
@@ -847,24 +859,24 @@ int GpuArray_write(GpuArray *dst, const void *src, size_t src_sz) {
     return GA_VALUE_ERROR;
   if (!GpuArray_ISONESEGMENT(dst))
     return GA_UNSUPPORTED_ERROR;
-  return dst->ops->buffer_write(dst->data, dst->offset, src, src_sz);
+  return gpudata_write(dst->data, dst->offset, src, src_sz);
 }
 
 int GpuArray_read(void *dst, size_t dst_sz, const GpuArray *src) {
   if (!GpuArray_ISONESEGMENT(src))
     return GA_UNSUPPORTED_ERROR;
-  return src->ops->buffer_read(dst, src->data, src->offset, dst_sz);
+  return gpudata_read(dst, src->data, src->offset, dst_sz);
 }
 
 int GpuArray_memset(GpuArray *a, int data) {
   if (!GpuArray_ISONESEGMENT(a))
     return GA_UNSUPPORTED_ERROR;
-  return a->ops->buffer_memset(a->data, a->offset, data);
+  return gpudata_memset(a->data, a->offset, data);
 }
 
 int GpuArray_copy(GpuArray *res, const GpuArray *a, ga_order order) {
   int err;
-  err = GpuArray_empty(res, a->ops, GpuArray_context(a), a->typecode,
+  err = GpuArray_empty(res, GpuArray_context(a), a->typecode,
                        a->nd, a->dimensions, order);
   if (err != GA_NO_ERROR) return err;
   err = GpuArray_move(res, a);
@@ -873,25 +885,22 @@ int GpuArray_copy(GpuArray *res, const GpuArray *a, ga_order order) {
   return err;
 }
 
-int GpuArray_transfer(GpuArray *res, const GpuArray *a, void *new_ctx,
-                      const gpuarray_buffer_ops *new_ops, int may_share) {
-  size_t start, end;
-  gpudata *tmp;
-  int err;
+int GpuArray_transfer(GpuArray *res, const GpuArray *a) {
+  size_t sz;
+  unsigned int i;
 
-  ga_boundaries(&start, &end, a->offset, a->nd, a->dimensions, a->strides);
-  end += GpuArray_ITEMSIZE(a);
+  if (!GpuArray_ISONESEGMENT(res))
+    return GA_UNSUPPORTED_ERROR;
+  if (!GpuArray_ISONESEGMENT(a))
+    return GA_UNSUPPORTED_ERROR;
 
-  tmp = gpuarray_buffer_transfer(a->data, start, end - start,
-                                GpuArray_context(a), a->ops,
-                                new_ctx, new_ops, may_share, &err);
-  if (tmp == NULL)
-    return err;
+  if (res->typecode != a->typecode)
+    return GA_UNSUPPORTED_ERROR;
 
-  err = GpuArray_fromdata(res, new_ops, tmp, a->offset - start, a->typecode,
-			  a->nd, a->dimensions, a->strides, 1);
-  new_ops->buffer_release(tmp);
-  return err;
+  sz = gpuarray_get_elsize(a->typecode);
+  for (i = 0; i < a->nd; i++) sz *= a->dimensions[i];
+
+ return gpudata_transfer(res->data, res->offset, a->data, a->offset, sz);
 }
 
 int GpuArray_split(GpuArray **rs, const GpuArray *a, size_t n, size_t *p,
@@ -945,10 +954,10 @@ int GpuArray_split(GpuArray **rs, const GpuArray *a, size_t n, size_t *p,
 
 int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
                          unsigned int axis, int restype) {
-  size_t *dims;
-  size_t i;
-  size_t res_off;
+  size_t *dims, *res_dims;
+  size_t i, res_off;
   unsigned int p;
+  int res_flags;
   int err = GA_NO_ERROR;
 
   if (axis >= as[0]->nd)
@@ -992,7 +1001,7 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
     return err;
   }
 
-  err = GpuArray_empty(r, as[0]->ops, GpuArray_context(as[0]), restype,
+  err = GpuArray_empty(r, GpuArray_context(as[0]), restype,
                        as[0]->nd, dims, GA_ANY_ORDER);
   free(dims);
   if (err != GA_NO_ERROR) {
@@ -1000,16 +1009,20 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
   }
 
   res_off = r->offset;
+  res_dims = r->dimensions;
+  res_flags = r->flags;
+  /* This could be optimized by setting the right flags */
+  r->flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
   for (i = 0; i < n; i++) {
-    err = r->ops->buffer_extcopy(as[i]->data, as[i]->offset, r->data,
-                                 res_off, as[i]->typecode, r->typecode,
-                                 as[i]->nd, as[i]->dimensions,
-                                 as[i]->strides, r->nd, as[i]->dimensions,
-                                 r->strides);
+    r->dimensions = as[i]->dimensions;
+    err = ga_extcopy(r, as[i]);
     if (err != GA_NO_ERROR)
       goto fail;
-    res_off += r->strides[axis] * as[i]->dimensions[axis];
+    r->offset += r->strides[axis] * as[i]->dimensions[axis];
   }
+  r->offset = res_off;
+  r->dimensions = res_dims;
+  r->flags = res_flags;
 
   return GA_NO_ERROR;
  fail:
@@ -1018,22 +1031,15 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
 }
 
 const char *GpuArray_error(const GpuArray *a, int err) {
-  void *ctx;
-  int err2 = a->ops->property(NULL, a->data, NULL, GA_BUFFER_PROP_CTX, &ctx);
-  if (err2 != GA_NO_ERROR) {
-    /* If CUDA refuses to work after any kind of error in kernels
-       there is not much we can do about it. */
-    return gpuarray_error_str(err);
-  }
-  return Gpu_error(a->ops, ctx, err);
+  return gpucontext_error(gpudata_context(a->data), err);
 }
 
 void GpuArray_fprintf(FILE *fd, const GpuArray *a) {
   unsigned int i;
   int comma = 0;
 
-  fprintf(fd, "GpuNdArray <%p, data: %p (%p), ops: %p> nd=%d\n",
-          a, a->data, *((void **)a->data), a->ops, a->nd);
+  fprintf(fd, "GpuNdArray <%p, data: %p (%p)> nd=%d\n",
+          a, a->data, *((void **)a->data), a->nd);
   fprintf(fd, "\tdims: %p, str: %p\n", a->dimensions, a->strides);
   fprintf(fd, "\tITEMSIZE: %zd\n", GpuArray_ITEMSIZE(a));
   fprintf(fd, "\tTYPECODE: %d\n", a->typecode);

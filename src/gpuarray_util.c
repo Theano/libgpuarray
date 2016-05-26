@@ -13,7 +13,7 @@
  * phase. Once we go stable, this will move to 0 and go up from
  * there.
  */
-const int gpuarray_api_major = -9998;
+const int gpuarray_api_major = -9997;
 const int gpuarray_api_minor = 0;
 
 static gpuarray_type **custom_types = NULL;

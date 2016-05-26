@@ -7,7 +7,6 @@
 #include <stdlib.h>
 
 extern void *ctx;
-extern const gpuarray_buffer_ops *ops;
 
 void setup(void);
 void teardown(void);
@@ -32,13 +31,13 @@ START_TEST(test_take1_ok)
   ssize_t indexes[12];
   size_t dims[3];
 
-  ga_assert_ok(GpuArray_empty(&base, ops, ctx, GA_UINT, 1, data_dims,
+  ga_assert_ok(GpuArray_empty(&base, ctx, GA_UINT, 1, data_dims,
                               GA_C_ORDER));
   ga_assert_ok(GpuArray_write(&base, data, sizeof(data)));
   dims[0] = 12;
-  ga_assert_ok(GpuArray_empty(&idx, ops, ctx, GA_SSIZE, 1, dims, GA_C_ORDER));
+  ga_assert_ok(GpuArray_empty(&idx, ctx, GA_SSIZE, 1, dims, GA_C_ORDER));
   dims[1] = 6;
-  ga_assert_ok(GpuArray_empty(&res, ops, ctx, GA_UINT, 2, dims, GA_C_ORDER));
+  ga_assert_ok(GpuArray_empty(&res, ctx, GA_UINT, 2, dims, GA_C_ORDER));
 
   /* test v[[1, 0]] on 1d (4) */
   indexes[0] = 1;
@@ -250,6 +249,7 @@ Suite *get_suite(void) {
   Suite *s = suite_create("array");
   TCase *tc = tcase_create("take1");
   tcase_add_checked_fixture(tc, setup, teardown);
+  tcase_set_timeout(tc, 8.0);
   tcase_add_test(tc, test_take1_ok);
   suite_add_tcase(s, tc);
   return s;

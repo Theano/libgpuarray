@@ -41,25 +41,19 @@
 /* Keep in sync with the copy in gpuarray/extension.h */
 #define DONTFREE 0x10000000
 
-#define BIN_ID_LEN 12
-
 typedef struct _cuda_context {
-#ifdef DEBUG
-  char tag[8];
-#endif
+  GPUCONTEXT_HEAD;
   CUcontext ctx;
   CUresult err;
   CUstream s;
   CUstream mem_s;
-  void *blas_handle;
-  gpudata *errbuf;
-  cache *extcopy_cache;
-  char bin_id[BIN_ID_LEN];
-  unsigned int refcnt;
-  int flags;
-  unsigned int enter;
   gpudata *freeblocks;
+  cache *kernel_cache;
+  unsigned int enter;
 } cuda_context;
+
+STATIC_ASSERT(sizeof(cuda_context) <= sizeof(gpucontext), sizeof_struct_gpucontext_cuda);
+
 
 /*
  * About freeblocks.
@@ -82,27 +76,28 @@ typedef struct _cuda_context {
 #define ARCH_PREFIX "sm_"
 #endif
 
-GPUARRAY_LOCAL void *cuda_make_ctx(CUcontext ctx, int flags);
-GPUARRAY_LOCAL CUcontext cuda_get_ctx(void *ctx);
-GPUARRAY_LOCAL CUstream cuda_get_stream(void *ctx);
+GPUARRAY_LOCAL cuda_context *cuda_make_ctx(CUcontext ctx, int flags);
+GPUARRAY_LOCAL CUstream cuda_get_stream(cuda_context *ctx);
 GPUARRAY_LOCAL void cuda_enter(cuda_context *ctx);
 GPUARRAY_LOCAL void cuda_exit(cuda_context *ctx);
 
 struct _gpudata {
   CUdeviceptr ptr;
+  cuda_context *ctx;
+  /* Don't change anything abovbe this without checking
+     struct _partial_gpudata */
   CUevent rev;
   CUevent wev;
-  size_t sz;
-  cuda_context *ctx;
-  gpudata *next;
-  int flags;
   unsigned int refcnt;
+  int flags;
+  size_t sz;
+  gpudata *next;
 #ifdef DEBUG
   char tag[8];
 #endif
 };
 
-GPUARRAY_LOCAL gpudata *cuda_make_buf(void *c, CUdeviceptr p, size_t sz);
+GPUARRAY_LOCAL gpudata *cuda_make_buf(cuda_context *c, CUdeviceptr p, size_t sz);
 GPUARRAY_LOCAL CUdeviceptr cuda_get_ptr(gpudata *g);
 GPUARRAY_LOCAL size_t cuda_get_sz(gpudata *g);
 GPUARRAY_LOCAL int cuda_wait(gpudata *, int);
@@ -119,10 +114,7 @@ GPUARRAY_LOCAL int cuda_record(gpudata *, int);
 #define CUDA_MAPPED_PTR 0x80000
 
 struct _gpukernel {
-#ifdef DEBUG
-  char tag[8];
-#endif
-  cuda_context *ctx;
+  cuda_context *ctx; /* Keep the context first */
   CUmodule m;
   CUfunction k;
   void **args;
@@ -131,6 +123,9 @@ struct _gpukernel {
   int *types;
   unsigned int argcount;
   unsigned int refcnt;
+#ifdef DEBUG
+  char tag[8];
+#endif
 };
 
 #endif

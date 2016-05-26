@@ -1,3 +1,5 @@
+#include <assert.h>
+
 #include <gpuarray/elemwise.h>
 #include <gpuarray/array.h>
 #include <gpuarray/error.h>
@@ -16,14 +18,19 @@ struct _GpuElemwise {
   GpuKernel *k_basic_32;
   size_t *dims;
   ssize_t **strides;
-  unsigned int n;
   unsigned int nd;
+  unsigned int n; /* Number of arguments */
+  unsigned int narray; /* Number of array arguments */
   int flags;
 };
 
 #define GEN_ADDR32 0x1
 
 #define is_array(a) (ISCLR((a).flags, GE_SCALAR))
+
+static inline int k_initialized(GpuKernel *k) {
+  return k->k != NULL;
+}
 
 static inline const char *ctype(int typecode) {
   return gpuarray_get_type(typecode)->cluda_name;
@@ -72,13 +79,48 @@ static void free_args(unsigned int n, gpuelemwise_arg *args) {
   free(args);
 }
 
-static int gen_elemwise_basic_kernel(GpuKernel *k,
-                                     const gpuarray_buffer_ops *ops,
-                                     void *ctx, char **err_str,
+#define MUL_NO_OVERFLOW ((size_t)1 << (sizeof(size_t) * 4))
+
+static int reallocaz(void **p, size_t elsz, size_t old, size_t new) {
+  char *res;
+
+  assert(old <= new);
+
+  if ((new >= MUL_NO_OVERFLOW || elsz >= MUL_NO_OVERFLOW) &&
+      new > 0 && SIZE_MAX / new < elsz) {
+    return 1;
+  }
+  res = realloc(*p, elsz*new);
+  if (res == NULL) return 1;
+  memset(res + (elsz*old), 0, elsz*(new-old));
+  *p = (void *)res;
+  return 0;
+}
+
+static int ge_grow(GpuElemwise *ge, unsigned int nd) {
+  unsigned int i;
+
+  assert(nd > ge->nd);
+
+  if (reallocaz((void **)&ge->k_basic, sizeof(GpuKernel), ge->nd, nd) ||
+      reallocaz((void **)&ge->k_basic_32, sizeof(GpuKernel), ge->nd, nd) ||
+      reallocaz((void **)&ge->dims, sizeof(size_t), ge->nd, nd))
+    return 1;
+  for (i = 0; i < ge->narray; i++) {
+    if (reallocaz((void **)&ge->strides[i], sizeof(ssize_t), ge->nd, nd))
+      return 1;
+  }
+  ge->nd = nd;
+  return 0;
+}
+
+static int gen_elemwise_basic_kernel(GpuKernel *k, gpucontext *ctx,
+                                     char **err_str,
                                      const char *preamble,
                                      const char *expr,
-                                     unsigned int nd,
-                                     unsigned int n, gpuelemwise_arg *args,
+                                     unsigned int nd, /* Number of dims */
+                                     unsigned int n, /* Length of args */
+                                     gpuelemwise_arg *args,
                                      int gen_flags) {
   strb sb = STRB_STATIC_INIT;
   unsigned int i, _i, j;
@@ -181,7 +223,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
     goto bail;
   }
 
-  res = GpuKernel_init(k, ops, ctx, 1, (const char **)&sb.s, &sb.l, "elem",
+  res = GpuKernel_init(k, ctx, 1, (const char **)&sb.s, &sb.l, "elem",
                        p, ktypes, flags, err_str);
  bail:
   free(ktypes);
@@ -190,7 +232,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k,
 }
 
 static ssize_t **strides_array(unsigned int num, unsigned int nd) {
-  ssize_t **res = calloc(num, sizeof(ssize_t *) + 1);
+  ssize_t **res = calloc(num, sizeof(ssize_t *));
   unsigned int i;
 
   if (res == NULL) return NULL;
@@ -214,7 +256,7 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
                        ssize_t ***_strides, int *_call32) {
   size_t n;
   GpuArray *a = NULL, *v;
-  unsigned int i, j, p, num_arrays = 0, nd = 0;
+  unsigned int i, j, p, num_arrays = 0, nd = 0, nnd;
   int call32 = 1;
 
   /* Go through the list and grab some info */
@@ -233,11 +275,16 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
   if (a == NULL)
     return GA_VALUE_ERROR;
 
-  if (nd > ge->nd)
-    return GA_VALUE_ERROR;
+  /* Check if we need to grow the internal buffers */
+  if (nd > ge->nd) {
+    nnd = ge->nd * 2;
+    while (nd > nnd) nnd *= 2;
+    if (ge_grow(ge, nnd))
+      return GA_MEMORY_ERROR;
+  }
 
-  /* Now we know that there is at least one array argument and that
-     all array arguments have the same number of dimensions */
+  /* Now we know that all array arguments have the same number of
+     dimensions */
 
   /* And copy their initial values in */
   memcpy(ge->dims, a->dimensions, nd*sizeof(size_t));
@@ -318,6 +365,14 @@ static int call_basic(GpuElemwise *ge, void **args, size_t n, unsigned int nd,
   else
     k = &ge->k_basic[nd-1];
 
+  if (!k_initialized(k)) {
+    err = gen_elemwise_basic_kernel(k, GpuKernel_context(&ge->k_contig), NULL,
+                                    ge->preamble, ge->expr, nd, ge->n,
+                                    ge->args, call32 ? GEN_ADDR32 : 0);
+    if (err != GA_NO_ERROR)
+      return err;
+  }
+
   err = GpuKernel_setarg(k, p++, &n);
   if (err != GA_NO_ERROR) goto error;
 
@@ -352,8 +407,7 @@ static int call_basic(GpuElemwise *ge, void **args, size_t n, unsigned int nd,
 }
 
 static int gen_elemwise_contig_kernel(GpuKernel *k,
-                                      const gpuarray_buffer_ops *ops,
-                                      void *ctx, char **err_str,
+                                      gpucontext *ctx, char **err_str,
                                       const char *preamble,
                                       const char *expr,
                                       unsigned int n,
@@ -430,7 +484,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
   if (strb_error(&sb))
     goto bail;
 
-  res = GpuKernel_init(k, ops, ctx, 1, (const char **)&sb.s, &sb.l, "elem",
+  res = GpuKernel_init(k, ctx, 1, (const char **)&sb.s, &sb.l, "elem",
                        p, ktypes, flags, err_str);
  bail:
   strb_clear(&sb);
@@ -495,7 +549,7 @@ static int call_contig(GpuElemwise *ge, void **args, size_t n) {
   return GpuKernel_call(&ge->k_contig, 1, &ls, &gs, 0, NULL);
 }
 
-GpuElemwise *GpuElemwise_new(const gpuarray_buffer_ops *ops, void * ctx,
+GpuElemwise *GpuElemwise_new(gpucontext *ctx,
                              const char *preamble, const char *expr,
                              unsigned int n, gpuelemwise_arg *args,
                              unsigned int nd, int flags) {
@@ -524,37 +578,45 @@ GpuElemwise *GpuElemwise_new(const gpuarray_buffer_ops *ops, void * ctx,
   if (res->args == NULL)
     goto fail_args;
 
-  res->nd = nd;
-  res->dims = calloc(nd, sizeof(size_t));
+  /* Count the arrays in the arguements */
+  res->narray = 0;
+  for (i = 0; i < res->n; i++)
+    if (is_array(res->args[i])) res->narray++;
+
+  res->nd = 16;
+  while (res->nd < nd) res->nd *= 2;
+  res->dims = calloc(res->nd, sizeof(size_t));
   if (res->dims == NULL)
     goto fail_dims;
-  res->strides = strides_array(n, nd);
+  res->strides = strides_array(res->narray, res->nd);
   if (res->strides == NULL)
     goto fail_strides;
-  res->k_basic = calloc(nd, sizeof(GpuKernel));
+  res->k_basic = calloc(res->nd, sizeof(GpuKernel));
   if (res->k_basic == NULL)
     goto fail_basicl;
 
-  res->k_basic_32 = calloc(nd, sizeof(GpuKernel));
+  res->k_basic_32 = calloc(res->nd, sizeof(GpuKernel));
   if (res->k_basic_32 == NULL)
     goto fail_basic32l;
 
-  ret = gen_elemwise_contig_kernel(&res->k_contig, ops, ctx, NULL,
+  ret = gen_elemwise_contig_kernel(&res->k_contig, ctx, NULL,
                                    res->preamble, res->expr,
                                    res->n, res->args);
   if (ret != GA_NO_ERROR)
     goto fail_contig;
 
-  for (i = 0; i < nd; i++) {
-    ret = gen_elemwise_basic_kernel(&res->k_basic[i], ops, ctx, NULL,
-                                    res->preamble, res->expr,
-                                    i+1, res->n, res->args, 0);
-    if (ret != GA_NO_ERROR)
-      goto fail_basic_gen;
+  if (ISCLR(flags, GE_NOADDR64)) {
+    for (i = 0; i < nd; i++) {
+      ret = gen_elemwise_basic_kernel(&res->k_basic[i], ctx, NULL,
+                                      res->preamble, res->expr,
+                                      i+1, res->n, res->args, 0);
+      if (ret != GA_NO_ERROR)
+        goto fail_basic_gen;
+    }
   }
 
   for (i = 0; i < nd; i++) {
-    ret = gen_elemwise_basic_kernel(&res->k_basic_32[i], ops, ctx, NULL,
+    ret = gen_elemwise_basic_kernel(&res->k_basic_32[i], ctx, NULL,
                                     res->preamble, res->expr,
                                     i+1, res->n, res->args, GEN_ADDR32);
     if (ret != GA_NO_ERROR)
@@ -569,8 +631,10 @@ fail_basic_gen32:
   }
   i = nd;
 fail_basic_gen:
-  for (; i > 0; i--) {
-    GpuKernel_clear(&res->k_basic[i-1]);
+  if (ISCLR(flags, GE_NOADDR64)) {
+    for (; i > 0; i--) {
+      GpuKernel_clear(&res->k_basic[i-1]);
+    }
   }
   GpuKernel_clear(&res->k_contig);
  fail_contig:
@@ -598,9 +662,14 @@ fail_basic_gen:
 void GpuElemwise_free(GpuElemwise *ge) {
   unsigned int i;
   for (i = 0; i < ge->nd; i++) {
-    GpuKernel_clear(&ge->k_basic[i]);
-    GpuKernel_clear(&ge->k_basic_32[i]);
-    free(ge->strides[i]);
+    if (k_initialized(&ge->k_basic_32[i]))
+      GpuKernel_clear(&ge->k_basic_32[i]);
+    if (k_initialized(&ge->k_basic[i]))
+      GpuKernel_clear(&ge->k_basic[i]);
+  }
+  for (i = 0; i < ge->narray; i++) {
+    if (ge->strides != NULL)
+      free(ge->strides[i]);
   }
   GpuKernel_clear(&ge->k_contig);
   free_args(ge->n, ge->args);
