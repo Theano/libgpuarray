@@ -1943,9 +1943,9 @@ cdef class GpuKernel:
                     _types[i] = GA_BUFFER
                 else:
                     _types[i] = dtype_to_typecode(types[i])
-                self.callbuf[i] = malloc(gpuarray_get_elsize(_types[i]))
-                if self.callbuf[i] == NULL:
-                    raise MemoryError
+                    self.callbuf[i] = malloc(gpuarray_get_elsize(_types[i]))
+                    if self.callbuf[i] == NULL:
+                        raise MemoryError
             kernel_init(self, self.context.ctx, 1, s, &l,
                         name, numargs, _types, flags)
         finally:
