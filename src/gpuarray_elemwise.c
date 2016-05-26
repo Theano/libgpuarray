@@ -10,18 +10,18 @@
 #include "util/strb.h"
 
 struct _GpuElemwise {
-  const char *expr;
-  const char *preamble;
-  gpuelemwise_arg *args;
-  GpuKernel k_contig;
-  GpuKernel *k_basic;
-  GpuKernel *k_basic_32;
-  size_t *dims;
-  ssize_t **strides;
-  unsigned int nd;
+  const char *expr; /* Expression code (to be able to build kernels on-demand) */
+  const char *preamble; /* Preamble code */
+  gpuelemwise_arg *args; /* Argument descriptors */
+  GpuKernel k_contig; /* Contiguous kernel */
+  GpuKernel *k_basic; /* Normal basic kernels */
+  GpuKernel *k_basic_32; /* 32-bit address basic kernels */
+  size_t *dims; /* Preallocated shape buffer for dimension collapsing */
+  ssize_t **strides; /* Preallocated strides buffer for dimension collapsing */
+  unsigned int nd; /* Current maximum number of dimensions allocated */
   unsigned int n; /* Number of arguments */
   unsigned int narray; /* Number of array arguments */
-  int flags;
+  int flags; /* Flags for the operation (none at the moment */
 };
 
 #define GEN_ADDR32      0x1
@@ -78,8 +78,9 @@ static gpuelemwise_arg *copy_args(unsigned int n, gpuelemwise_arg *a) {
 static void free_args(unsigned int n, gpuelemwise_arg *args) {
   unsigned int i;
 
-  for (i = 0; i < n; i++)
-    clear_arg(&args[i]);
+  if (args != NULL)
+    for (i = 0; i < n; i++)
+      clear_arg(&args[i]);
   free(args);
 }
 
@@ -592,43 +593,41 @@ GpuElemwise *GpuElemwise_new(gpucontext *ctx,
   if (res == NULL) return NULL;
 
   res->flags = flags;
+  res->nd = 8;
+  res->n = n;
 
   res->expr = strdup(expr);
   if (res->expr == NULL)
-    goto fail_expr;
-  if (preamble == NULL) {
-    res->preamble = NULL;
-  } else {
+    goto fail;
+  if (preamble != NULL) {
     res->preamble = strdup(preamble);
     if (res->preamble == NULL)
-      goto fail_preamble;
+      goto fail;
   }
 
-  res->n = n;
   res->args = copy_args(n, args);
   if (res->args == NULL)
-    goto fail_args;
+    goto fail;
 
   /* Count the arrays in the arguements */
   res->narray = 0;
   for (i = 0; i < res->n; i++)
     if (is_array(res->args[i])) res->narray++;
 
-  res->nd = 16;
   while (res->nd < nd) res->nd *= 2;
   res->dims = calloc(res->nd, sizeof(size_t));
   if (res->dims == NULL)
-    goto fail_dims;
+    goto fail;
   res->strides = strides_array(res->narray, res->nd);
   if (res->strides == NULL)
-    goto fail_strides;
+    goto fail;
   res->k_basic = calloc(res->nd, sizeof(GpuKernel));
   if (res->k_basic == NULL)
-    goto fail_basicl;
+    goto fail;
 
   res->k_basic_32 = calloc(res->nd, sizeof(GpuKernel));
   if (res->k_basic_32 == NULL)
-    goto fail_basic32l;
+    goto fail;
 
   ret = gen_elemwise_contig_kernel(&res->k_contig, ctx,
 #ifdef DEBUG
@@ -645,7 +644,7 @@ GpuElemwise *GpuElemwise_new(gpucontext *ctx,
       fprintf(stderr, "%s\n", errstr);
     free(errstr);
 #endif
-    goto fail_contig;
+    goto fail;
   }
 
   if (ISCLR(flags, GE_NOADDR64)) {
@@ -665,7 +664,7 @@ GpuElemwise *GpuElemwise_new(gpucontext *ctx,
           fprintf(stderr, "%s\n", errstr);
         free(errstr);
 #endif
-        goto fail_basic_gen;
+        goto fail;
       }
     }
   }
@@ -686,43 +685,14 @@ GpuElemwise *GpuElemwise_new(gpucontext *ctx,
         fprintf(stderr, "%s\n", errstr);
       free(errstr);
 #endif
-      goto fail_basic_gen32;
+      goto fail;
     }
   }
 
   return res;
 
-fail_basic_gen32:
-  for (; i > 0; i--) {
-    GpuKernel_clear(&res->k_basic_32[i-1]);
-  }
-  i = nd;
-fail_basic_gen:
-  if (ISCLR(flags, GE_NOADDR64)) {
-    for (; i > 0; i--) {
-      GpuKernel_clear(&res->k_basic[i-1]);
-    }
-  }
-  GpuKernel_clear(&res->k_contig);
- fail_contig:
-  free(res->k_basic_32);
- fail_basic32l:
-  free(res->k_basic);
- fail_basicl:
-  for (i = 0; i < nd; i++) {
-    free(res->strides[i]);
-  }
-  free(res->strides);
- fail_strides:
-  free(res->dims);
- fail_dims:
-  free_args(res->n, res->args);
- fail_args:
-  free((void *)res->preamble);
- fail_preamble:
-  free((void *)res->expr);
- fail_expr:
-  free(res);
+ fail:
+  GpuElemwise_free(res);
   return NULL;
 }
 
@@ -734,11 +704,12 @@ void GpuElemwise_free(GpuElemwise *ge) {
     if (k_initialized(&ge->k_basic[i]))
       GpuKernel_clear(&ge->k_basic[i]);
   }
-  for (i = 0; i < ge->narray; i++) {
-    if (ge->strides != NULL)
+  if (ge->strides != NULL)
+    for (i = 0; i < ge->narray; i++) {
       free(ge->strides[i]);
-  }
-  GpuKernel_clear(&ge->k_contig);
+    }
+  if (k_initialized(&ge->k_contig))
+    GpuKernel_clear(&ge->k_contig);
   free_args(ge->n, ge->args);
   free((void *)ge->preamble);
   free((void *)ge->expr);
