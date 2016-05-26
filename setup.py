@@ -92,6 +92,13 @@ exts = [Extension('pygpu.gpuarray',
                   libraries = ['gpuarray'],
                   library_dirs = library_dirs,
                   define_macros = [('GPUARRAY_SHARED', None)]
+                  ),
+        Extension('pygpu._elemwise',
+                  sources = ['pygpu/_elemwise.pyx'],
+                  include_dirs = include_dirs,
+                  libraries = ['gpuarray'],
+                  library_dirs = library_dirs,
+                  define_macros = [('GPUARRAY_SHARED', None)]
                   )]
 
 setup(name='pygpu',

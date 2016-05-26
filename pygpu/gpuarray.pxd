@@ -194,6 +194,8 @@ cdef extern from "gpuarray/extension.h":
     void *gpuarray_get_extension(const char *)
     cdef int GPUARRAY_CUDA_CTX_NOFREE
 
+cdef type get_exc(int errcode)
+
 cdef np.dtype dtype_to_npdtype(dtype)
 # If you change the api interface, you MUST increment either the minor
 # (if you add a function) or the major version (if you change
