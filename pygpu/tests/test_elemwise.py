@@ -9,7 +9,7 @@ from six import PY2
 from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
                       context, gen_gpuarray, check_meta_content)
 
-dtypes_test = ['float32', 'int32', 'uint64']
+dtypes_test = ['float32', 'int8', 'uint64']
 
 operators1 = [operator.neg, operator.pos, operator.abs]
 operators2 = [operator.add, operator.sub, operator.floordiv,
