@@ -589,7 +589,7 @@ GpuElemwise *GpuElemwise_new(gpucontext *ctx,
   unsigned int i;
   int ret;
 
-  res = malloc(sizeof(*res));
+  res = calloc(1, sizeof(*res));
   if (res == NULL) return NULL;
 
   res->flags = flags;

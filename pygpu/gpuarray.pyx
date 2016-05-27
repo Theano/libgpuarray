@@ -1889,8 +1889,24 @@ cdef class GpuKernel:
     limits of `k.maxlsize` and `ctx.maxgsize` or the call will fail.
     """
     def __dealloc__(self):
+        cdef unsigned int numargs
+        cdef int *types
+        cdef unsigned int i
+        cdef int res
+        # We need to do all of this at the C level to avoid touching
+        # python stuff that could be gone and to avoid exceptions
+        if self.k.k is not NULL:
+            res = gpukernel_property(self.k.k, GA_KERNEL_PROP_NUMARGS, &numargs)
+            if res != GA_NO_ERROR:
+                return
+            res = gpukernel_property(self.k.k, GA_KERNEL_PROP_TYPES, &types)
+            if res != GA_NO_ERROR:
+                return
+            for i in range(numargs):
+                if types[i] != GA_BUFFER:
+                    free(self.callbuf[i])
+            kernel_clear(self)
         free(self.callbuf)
-        kernel_clear(self)
 
     def __reduce__(self):
         raise RuntimeError, "Cannot pickle GpuKernel object"
