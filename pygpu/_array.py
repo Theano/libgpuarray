@@ -1,10 +1,9 @@
 from __future__ import division
 import numpy as np
 
-from .elemwise import elemwise1, elemwise2, ielemwise2, compare, ElemwiseKernel
+from .elemwise import elemwise1, elemwise2, ielemwise2, compare, arg, GpuElemwise, as_argument
 from .reduction import reduce1
 from .dtypes import dtype_to_ctype, get_np_obj, get_common_dtype
-from .tools import as_argument, ArrayArg
 from . import gpuarray
 
 
@@ -77,9 +76,9 @@ class ndgpuarray(gpuarray.GpuArray):
         np2 = get_np_obj(other)
         kw = {'broadcast': True}
         if self.dtype == np.float32 or np2.dtype == np.float32:
-            kw['op_tmpl'] = "a[i] = (float)a[i] / (float)%(b)s"
+            kw['op_tmpl'] = "a = (float)a / (float)b"
         if self.dtype == np.float64 or np2.dtype == np.float64:
-            kw['op_tmpl'] = "a[i] = (double)a[i] / (double)%(b)s"
+            kw['op_tmpl'] = "a = (double)a / (double)b"
         return ielemwise2(self, '/', other, **kw)
 
     # floordiv
@@ -87,23 +86,23 @@ class ndgpuarray(gpuarray.GpuArray):
         out_dtype = get_common_dtype(self, other, True)
         kw = {'broadcast': True}
         if out_dtype.kind == 'f':
-            kw['op_tmpl'] = "res[i] = floor((%(out_t)s)%(a)s / (%(out_t)s)%(b)s)"
+            kw['op_tmpl'] = "res = floor((%(out_t)s)a / (%(out_t)s)b)"
         return elemwise2(self, '/', other, self, odtype=out_dtype, **kw)
 
     def __rfloordiv__(self, other):
         out_dtype = get_common_dtype(other, self, True)
         kw = {'broadcast': True}
         if out_dtype.kind == 'f':
-            kw['op_tmpl'] = "res[i] = floor((%(out_t)s)%(a)s / (%(out_t)s)%(b)s)"
+            kw['op_tmpl'] = "res = floor((%(out_t)s)a / (%(out_t)s)b)"
         return elemwise2(other, '/', self, self, odtype=out_dtype, **kw)
 
     def __ifloordiv__(self, other):
         out_dtype = self.dtype
         kw = {'broadcast': True}
         if out_dtype == np.float32:
-            kw['op_tmpl'] = "a[i] = floor((float)a[i] / (float)%(b)s)"
+            kw['op_tmpl'] = "a = floor((float)a / (float)b)"
         if out_dtype == np.float64:
-            kw['op_tmpl'] = "a[i] = floor((double)a[i] / (double)%(b)s)"
+            kw['op_tmpl'] = "a = floor((double)a / (double)b)"
         return ielemwise2(self, '/', other, **kw)
 
     # mod
@@ -111,23 +110,23 @@ class ndgpuarray(gpuarray.GpuArray):
         out_dtype = get_common_dtype(self, other, True)
         kw = {'broadcast': True}
         if out_dtype.kind == 'f':
-            kw['op_tmpl'] = "res[i] = fmod((%(out_t)s)%(a)s, (%(out_t)s)%(b)s)"
+            kw['op_tmpl'] = "res = fmod((%(out_t)s)a, (%(out_t)s)b)"
         return elemwise2(self, '%', other, self, odtype=out_dtype, **kw)
 
     def __rmod__(self, other):
         out_dtype = get_common_dtype(other, self, True)
         kw = {'broadcast': True}
         if out_dtype.kind == 'f':
-            kw['op_tmpl'] = "res[i] = fmod((%(out_t)s)%(a)s, (%(out_t)s)%(b)s)"
+            kw['op_tmpl'] = "res = fmod((%(out_t)s)a, (%(out_t)s)b)"
         return elemwise2(other, '%', self, self, odtype=out_dtype, **kw)
 
     def __imod__(self, other):
         out_dtype = get_common_dtype(self, other, self.dtype == np.float64)
         kw = {'broadcast': True}
         if out_dtype == np.float32:
-            kw['op_tmpl'] = "a[i] = fmod((float)a[i], (float)%(b)s)"
+            kw['op_tmpl'] = "a = fmod((float)a, (float)b)"
         if out_dtype == np.float64:
-            kw['op_tmpl'] = "a[i] = fmod((double)a[i], (double)%(b)s)"
+            kw['op_tmpl'] = "a = fmod((double)a, (double)b)"
         return ielemwise2(self, '%', other, **kw)
 
     # divmod
@@ -136,24 +135,23 @@ class ndgpuarray(gpuarray.GpuArray):
             other = np.asarray(other)
         odtype = get_common_dtype(self, other, True)
 
-        a_arg = as_argument(self, 'a')
-        b_arg = as_argument(other, 'b')
-        args = [ArrayArg(odtype, 'div'), ArrayArg(odtype, 'mod'), a_arg, b_arg]
+        a_arg = as_argument(self, 'a', read=True)
+        b_arg = as_argument(other, 'b', read=True)
+        args = [arg('div', odtype, write=True), arg('mod', odtype, write=True), a_arg, b_arg]
 
         div = self._empty_like_me(dtype=odtype)
         mod = self._empty_like_me(dtype=odtype)
 
         if odtype.kind == 'f':
-            tmpl = "div[i] = floor((%(out_t)s)%(a)s / (%(out_t)s)%(b)s)," \
-                "mod[i] = fmod((%(out_t)s)%(a)s, (%(out_t)s)%(b)s)"
+            tmpl = "div = floor((%(out_t)s)a / (%(out_t)s)b)," \
+                "mod = fmod((%(out_t)s)a, (%(out_t)s)b)"
         else:
-            tmpl = "div[i] = (%(out_t)s)%(a)s / (%(out_t)s)%(b)s," \
-                "mod[i] = %(a)s %% %(b)s"
+            tmpl = "div = (%(out_t)s)a / (%(out_t)s)b," \
+                "mod = a %% b"
 
-        ksrc = tmpl % {'a': a_arg.expr(), 'b': b_arg.expr(),
-                       'out_t': dtype_to_ctype(odtype)}
+        ksrc = tmpl % {'out_t': dtype_to_ctype(odtype)}
 
-        k = ElemwiseKernel(self.context, args, ksrc)
+        k = GpuElemwise(self.context, ksrc, args)
         k(div, mod, self, other, broadcast=True)
         return (div, mod)
 
@@ -162,24 +160,23 @@ class ndgpuarray(gpuarray.GpuArray):
             other = np.asarray(other)
         odtype = get_common_dtype(other, self, True)
 
-        a_arg = as_argument(other, 'a')
-        b_arg = as_argument(self, 'b')
-        args = [ArrayArg(odtype, 'div'), ArrayArg(odtype, 'mod'), a_arg, b_arg]
+        a_arg = as_argument(other, 'a', read=True)
+        b_arg = as_argument(self, 'b', read=True)
+        args = [arg('div', odtype, write=True), arg('mod', odtype, write=True), a_arg, b_arg]
 
         div = self._empty_like_me(dtype=odtype)
         mod = self._empty_like_me(dtype=odtype)
 
         if odtype.kind == 'f':
-            tmpl = "div[i] = floor((%(out_t)s)%(a)s / (%(out_t)s)%(b)s)," \
-                "mod[i] = fmod((%(out_t)s)%(a)s, (%(out_t)s)%(b)s)"
+            tmpl = "div = floor((%(out_t)s)a / (%(out_t)s)b)," \
+                "mod = fmod((%(out_t)s)a, (%(out_t)s)b)"
         else:
-            tmpl = "div[i] = (%(out_t)s)%(a)s / (%(out_t)s)%(b)s," \
-                "mod[i] = %(a)s %% %(b)s"
+            tmpl = "div = (%(out_t)s)a / (%(out_t)s)b," \
+                "mod = a %% b"
 
-        ksrc = tmpl % {'a': a_arg.expr(), 'b': b_arg.expr(),
-                       'out_t': dtype_to_ctype(odtype)}
+        ksrc = tmpl % {'out_t': dtype_to_ctype(odtype)}
 
-        k = ElemwiseKernel(self.context, args, ksrc)
+        k = GpuElemwise(self.context, ksrc, args)
         k(div, mod, other, self, broadcast=True)
         return (div, mod)
 
@@ -193,12 +190,12 @@ class ndgpuarray(gpuarray.GpuArray):
         if self.dtype.kind == 'u':
             return self.copy()
         if self.dtype.kind == 'f':
-            oper = "res[i] = fabs(a[i])"
+            oper = "res = fabs(a)"
         elif self.dtype.itemsize < 4:
             # cuda 5.5 finds the c++ stdlib definition if we don't cast here.
-            oper = "res[i] = abs((int)a[i])"
+            oper = "res = abs((int)a)"
         else:
-            oper = "res[i] = abs(a[i])"
+            oper = "res = abs(a)"
         return elemwise1(self, None, oper=oper)
 
     # richcmp
@@ -230,8 +227,8 @@ class ndgpuarray(gpuarray.GpuArray):
     """
 Since these functions are untested (thus probably wrong), we disable them.
     def clip(self, a_min, a_max, out=None):
-        oper=('res[i] = a[i] > %(max)s ? %(max)s : '
-              '(a[i] < %(min)s ? %(min)s : a[i])' % dict(min=a_min, max=a_max))
+        oper=('res = a > %(max)s ? %(max)s : '
+              '(a < %(min)s ? %(min)s : a)' % dict(min=a_min, max=a_max))
         return elemwise1(self, '', oper=oper, out=out)
 
     def fill(self, value):

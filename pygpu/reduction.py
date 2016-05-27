@@ -1,12 +1,25 @@
 import math
+import re
 
 from mako.template import Template
 
 import numpy
 
 from . import gpuarray
-from .tools import ArrayArg, check_args, prod, lru_cache
-from .elemwise import parse_c_args, massage_op
+from .tools import ScalarArg, ArrayArg, check_args, prod, lru_cache
+from .dtypes import parse_c_arg_backend
+
+
+def parse_c_args(arguments):
+    return tuple(parse_c_arg_backend(arg, ScalarArg, ArrayArg)
+                 for arg in arguments.split(','))
+
+
+INDEX_RE = re.compile('([a-zA-Z_][a-zA-Z0-9_]*)\[i\]')
+
+
+def massage_op(operation):
+    return INDEX_RE.sub('\g<1>[0]', operation)
 
 
 def _ceil_log2(x):
