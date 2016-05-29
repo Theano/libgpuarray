@@ -441,11 +441,25 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
 
   err = cublasSgemmEx(((blas_handle *)ctx->blas_handle)->h,
                       convT(transA), convT(transB), M, N, K,
-                      &alpha,
-                      ((uint16_t *)A->ptr) + offA, CUBLAS_DATA_HALF, lda,
-                      ((uint16_t *)B->ptr) + offB, CUBLAS_DATA_HALF, ldb,
-                      &beta,
-                      ((uint16_t *)C->ptr) + offC, CUBLAS_DATA_HALF, ldc);
+                      &alpha, ((uint16_t *)A->ptr) + offA,
+#if CUDA_VERSION >= 8000
+                      CUDA_R_16F,
+#else
+                      CUBLAS_DATA_HALF,
+#endif
+                      lda, ((uint16_t *)B->ptr) + offB,
+#if CUDA_VERSION >= 8000
+                      CUDA_R_16F,
+#else
+                      CUBLAS_DATA_HALF,
+#endif
+                      ldb, &beta, ((uint16_t *)C->ptr) + offC,
+#if CUDA_VERSION >= 8000
+                      CUDA_R_16F,
+#else
+                      CUBLAS_DATA_HALF,
+#endif
+                      ldc);
   if (err != CUBLAS_STATUS_SUCCESS) {
     cuda_exit(ctx);
     if (err == CUBLAS_STATUS_ARCH_MISMATCH)
