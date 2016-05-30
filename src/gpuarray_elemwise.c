@@ -729,10 +729,12 @@ int GpuElemwise_call(GpuElemwise *ge, void **args, int flags) {
 
   err = check_contig(ge, args, &n, &contig);
   if (err == GA_NO_ERROR && contig) {
+    if (n == 0) return GA_NO_ERROR;
     return call_contig(ge, args, n);
   }
   err = check_basic(ge, args, flags, &n, &nd, &dims, &strides, &call32);
   if (err == GA_NO_ERROR) {
+    if (n == 0) return GA_NO_ERROR;
     return call_basic(ge, args, n, nd, dims, strides, call32);
   }
   return err;
