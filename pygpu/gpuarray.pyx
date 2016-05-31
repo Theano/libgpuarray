@@ -9,8 +9,8 @@ from cpython cimport Py_INCREF, PyNumber_Index
 from cpython.object cimport Py_EQ, Py_NE
 
 def api_version():
-    # major, minor
-    return (gpuarray_api_major, gpuarray_api_minor)
+    # major, minor, py
+    return (gpuarray_api_major, gpuarray_api_minor, 0)
 
 np.import_array()
 
