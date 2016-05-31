@@ -582,6 +582,9 @@ GpuElemwise *GpuElemwise_new(gpucontext *ctx,
                              unsigned int n, gpuelemwise_arg *args,
                              unsigned int nd, int flags) {
   GpuElemwise *res;
+#ifdef DEBUG
+  char *errstr = NULL;
+#endif
   unsigned int i;
   int ret;
 
@@ -627,31 +630,64 @@ GpuElemwise *GpuElemwise_new(gpucontext *ctx,
   if (res->k_basic_32 == NULL)
     goto fail_basic32l;
 
-  ret = gen_elemwise_contig_kernel(&res->k_contig, ctx, NULL,
+  ret = gen_elemwise_contig_kernel(&res->k_contig, ctx,
+#ifdef DEBUG
+                                   &errstr,
+#else
+                                   NULL,
+#endif
                                    res->preamble, res->expr,
                                    res->n, res->args,
                                    (res->flags & GE_CONVERT_F16));
-  if (ret != GA_NO_ERROR)
+  if (ret != GA_NO_ERROR) {
+#ifdef DEBUG
+    if (errstr != NULL)
+      fprintf(stderr, "%s\n", errstr);
+    free(errstr);
+#endif
     goto fail_contig;
+  }
 
   if (ISCLR(flags, GE_NOADDR64)) {
     for (i = 0; i < nd; i++) {
-      ret = gen_elemwise_basic_kernel(&res->k_basic[i], ctx, NULL,
+      ret = gen_elemwise_basic_kernel(&res->k_basic[i], ctx,
+#ifdef DEBUG
+                                      &errstr,
+#else
+                                      NULL,
+#endif
                                       res->preamble, res->expr,
                                       i+1, res->n, res->args,
                                       (res->flags & GE_CONVERT_F16));
-      if (ret != GA_NO_ERROR)
+      if (ret != GA_NO_ERROR) {
+#ifdef DEBUG
+        if (errstr != NULL)
+          fprintf(stderr, "%s\n", errstr);
+        free(errstr);
+#endif
         goto fail_basic_gen;
+      }
     }
   }
 
   for (i = 0; i < nd; i++) {
-    ret = gen_elemwise_basic_kernel(&res->k_basic_32[i], ctx, NULL,
+    ret = gen_elemwise_basic_kernel(&res->k_basic_32[i], ctx,
+#ifdef DEBUG
+                                    &errstr,
+#else
+                                    NULL,
+#endif
                                     res->preamble, res->expr,
                                     i+1, res->n, res->args,
                                     GEN_ADDR32 | (res->flags & GE_CONVERT_F16));
-    if (ret != GA_NO_ERROR)
+    if (ret != GA_NO_ERROR) {
+#ifdef DEBUG
+      if (errstr != NULL)
+        fprintf(stderr, "%s\n", errstr);
+      free(errstr);
+#endif
       goto fail_basic_gen32;
+    }
   }
 
   return res;
