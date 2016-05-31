@@ -24,7 +24,11 @@ struct _GpuElemwise {
   int flags;
 };
 
-#define GEN_ADDR32 0x1
+#define GEN_ADDR32      0x1
+#define GEN_CONVERT_F16 0x2
+
+/* This makes sure we have the same value for those flags since we use some shortcuts */
+STATIC_ASSERT(GEN_CONVERT_F16 == GE_CONVERT_F16, same_flags_value_elem1);
 
 #define is_array(a) (ISCLR((a).flags, GE_SCALAR))
 
@@ -202,10 +206,16 @@ static int gen_elemwise_basic_kernel(GpuKernel *k, gpucontext *ctx,
   }
   for (j = 0; j < n; j++) {
     if (is_array(args[j])) {
-      strb_appendf(&sb, "%s %s;", ctype(args[j].typecode), args[j].name);
+      strb_appendf(&sb, "%s %s;", ctype(ISSET(gen_flags, GEN_CONVERT_F16) && args[j].typecode == GA_HALF ?
+                                        GA_FLOAT : args[j].typecode), args[j].name);
       if (ISSET(args[j].flags, GE_READ)) {
-        strb_appendf(&sb, "%s = *(GLOBAL_MEM %s *)(((GLOBAL_MEM char *)%s_data) + %s_p);\n",
-                     args[j].name, ctype(args[j].typecode), args[j].name, args[j].name);
+        if (args[j].typecode == GA_HALF && ISSET(gen_flags, GEN_CONVERT_F16)) {
+          strb_appendf(&sb, "%s = load_half((GLOBAL_MEM ga_half *)(((GLOBAL_MEM char *)%s_data) + %s_p));\n",
+                       args[j].name, args[j].name, args[j].name);
+        } else {
+          strb_appendf(&sb, "%s = *(GLOBAL_MEM %s *)(((GLOBAL_MEM char *)%s_data) + %s_p);\n",
+                       args[j].name, ctype(args[j].typecode), args[j].name, args[j].name);
+        }
       }
     }
   }
@@ -213,8 +223,13 @@ static int gen_elemwise_basic_kernel(GpuKernel *k, gpucontext *ctx,
   strb_appends(&sb, ";\n");
   for (j = 0; j < n; j++) {
     if (is_array(args[j]) && ISSET(args[j].flags, GE_WRITE)) {
-      strb_appendf(&sb, "*(GLOBAL_MEM %s *)(((GLOBAL_MEM char *)%s_data) + %s_p) = %s;\n",
-                   ctype(args[j].typecode), args[j].name, args[j].name, args[j].name);
+      if (args[j].typecode == GA_HALF && ISSET(gen_flags, GEN_CONVERT_F16)) {
+        strb_appendf(&sb, "store_half((GLOBAL_MEM ga_half *)(((GLOBAL_MEM char *)%s_data) + %s_p), %s);\n",
+                     args[j].name, args[j].name, args[j].name);
+      } else {
+        strb_appendf(&sb, "*(GLOBAL_MEM %s *)(((GLOBAL_MEM char *)%s_data) + %s_p) = %s;\n",
+                     ctype(args[j].typecode), args[j].name, args[j].name, args[j].name);
+      }
     }
   }
   strb_appends(&sb, "}\n}\n");
@@ -368,7 +383,8 @@ static int call_basic(GpuElemwise *ge, void **args, size_t n, unsigned int nd,
   if (!k_initialized(k)) {
     err = gen_elemwise_basic_kernel(k, GpuKernel_context(&ge->k_contig), NULL,
                                     ge->preamble, ge->expr, nd, ge->n,
-                                    ge->args, call32 ? GEN_ADDR32 : 0);
+                                    ge->args, ((call32 ? GEN_ADDR32 : 0) |
+                                               (ge->flags & GE_CONVERT_F16)));
     if (err != GA_NO_ERROR)
       return err;
   }
@@ -411,7 +427,8 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
                                       const char *preamble,
                                       const char *expr,
                                       unsigned int n,
-                                      gpuelemwise_arg *args) {
+                                      gpuelemwise_arg *args,
+                                      int gen_flags) {
   strb sb = STRB_STATIC_INIT;
   int *ktypes = NULL;
   unsigned int p;
@@ -465,9 +482,15 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
   strb_appends(&sb, "for (i = idx; i < n; i += numThreads) {\n");
   for (j = 0; j < n; j++) {
     if (is_array(args[j])) {
-      strb_appendf(&sb, "%s %s;\n", ctype(args[j].typecode), args[j].name);
-      if (ISSET(args[j].flags, GE_READ))
-        strb_appendf(&sb, "%s = %s_p[i];\n", args[j].name, args[j].name);
+      strb_appendf(&sb, "%s %s;\n", ctype(ISSET(gen_flags, GEN_CONVERT_F16) && args[j].typecode == GA_HALF ?
+                                          GA_FLOAT : args[j].typecode), args[j].name);
+      if (ISSET(args[j].flags, GE_READ)) {
+        if (args[j].typecode == GA_HALF && ISSET(gen_flags, GEN_CONVERT_F16)) {
+          strb_appendf(&sb, "%s = load_half(&%s_p[i]);\n", args[j].name, args[j].name);
+        } else {
+          strb_appendf(&sb, "%s = %s_p[i];\n", args[j].name, args[j].name);
+        }
+      }
     }
   }
   strb_appends(&sb, expr);
@@ -475,8 +498,13 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
 
   for (j = 0; j < n; j++) {
     if (is_array(args[j])) {
-      if (ISSET(args[j].flags, GE_WRITE))
-        strb_appendf(&sb, "%s_p[i] = %s;\n", args[j].name, args[j].name);
+      if (ISSET(args[j].flags, GE_WRITE)) {
+        if (args[j].typecode == GA_HALF && ISSET(gen_flags, GEN_CONVERT_F16)) {
+          strb_appendf(&sb, "store_half(&%s_p[i], %s);\n", args[j].name, args[j].name);
+        } else {
+          strb_appendf(&sb, "%s_p[i] = %s;\n", args[j].name, args[j].name);
+        }
+      }
     }
   }
   strb_appends(&sb, "}\n}\n");
@@ -601,7 +629,8 @@ GpuElemwise *GpuElemwise_new(gpucontext *ctx,
 
   ret = gen_elemwise_contig_kernel(&res->k_contig, ctx, NULL,
                                    res->preamble, res->expr,
-                                   res->n, res->args);
+                                   res->n, res->args,
+                                   (res->flags & GE_CONVERT_F16));
   if (ret != GA_NO_ERROR)
     goto fail_contig;
 
@@ -609,7 +638,8 @@ GpuElemwise *GpuElemwise_new(gpucontext *ctx,
     for (i = 0; i < nd; i++) {
       ret = gen_elemwise_basic_kernel(&res->k_basic[i], ctx, NULL,
                                       res->preamble, res->expr,
-                                      i+1, res->n, res->args, 0);
+                                      i+1, res->n, res->args,
+                                      (res->flags & GE_CONVERT_F16));
       if (ret != GA_NO_ERROR)
         goto fail_basic_gen;
     }
@@ -618,7 +648,8 @@ GpuElemwise *GpuElemwise_new(gpucontext *ctx,
   for (i = 0; i < nd; i++) {
     ret = gen_elemwise_basic_kernel(&res->k_basic_32[i], ctx, NULL,
                                     res->preamble, res->expr,
-                                    i+1, res->n, res->args, GEN_ADDR32);
+                                    i+1, res->n, res->args,
+                                    GEN_ADDR32 | (res->flags & GE_CONVERT_F16));
     if (ret != GA_NO_ERROR)
       goto fail_basic_gen32;
   }
