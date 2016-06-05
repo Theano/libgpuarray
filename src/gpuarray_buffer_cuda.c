@@ -128,6 +128,7 @@ static void cuda_free_ctx(cuda_context *ctx) {
     cuMemFreeHost((void *)ctx->errbuf->ptr);
     deallocate(ctx->errbuf);
 
+    cuStreamDestroy(ctx->mem_s);
     cuStreamDestroy(ctx->s);
 
     /* Clear out the freelist */
