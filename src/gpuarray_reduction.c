@@ -6,9 +6,7 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <stddef.h>
-#if !defined(_MSC_VER) || _MSC_VER < 1600
-#include <stdint.h>
-#endif
+#include "gpuarray/config.h"
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -23,7 +21,7 @@
 
 
 /* Datatypes */
-struct GEN_KERNEL_CTX{
+struct gen_kernel_ctx{
 	int         numIdx;
 	const int*  isReduced;
 	int         numRedIdx;
@@ -31,7 +29,7 @@ struct GEN_KERNEL_CTX{
 	const char* dstMaxType;
 	const char* dstArgmaxType;
 };
-typedef struct GEN_KERNEL_CTX GEN_KERNEL_CTX;
+typedef struct gen_kernel_ctx gen_kernel_ctx;
 
 
 
@@ -43,13 +41,13 @@ static char* genkernel_maxandargmax (const int       numIdx,
                                      const char*     dstMaxType,
                                      const char*     dstArgmaxType);
 static void  appendKernel           (strb*           s,
-                                     GEN_KERNEL_CTX* ctx);
+                                     gen_kernel_ctx* ctx);
 static void  appendTypedefs         (strb*           s,
-                                     GEN_KERNEL_CTX* ctx);
+                                     gen_kernel_ctx* ctx);
 static void  appendPrototype        (strb*           s,
-                                     GEN_KERNEL_CTX* ctx);
+                                     gen_kernel_ctx* ctx);
 static void  appendIndexDeclarations(strb*           s,
-                                     GEN_KERNEL_CTX* ctx);
+                                     gen_kernel_ctx* ctx);
 static void  appendIdxes            (strb*           s,
                                      const char*     prologue,
                                      const char*     prefix,
@@ -58,17 +56,17 @@ static void  appendIdxes            (strb*           s,
                                      const char*     suffix,
                                      const char*     epilogue);
 static void  appendRangeCalculations(strb*           s,
-                                     GEN_KERNEL_CTX* ctx);
+                                     gen_kernel_ctx* ctx);
 static void  appendLoops            (strb*           s,
-                                     GEN_KERNEL_CTX* ctx);
+                                     gen_kernel_ctx* ctx);
 static void  appendLoopMacroDefs    (strb*           s,
-                                     GEN_KERNEL_CTX* ctx);
+                                     gen_kernel_ctx* ctx);
 static void  appendLoopOuter        (strb*           s,
-                                     GEN_KERNEL_CTX* ctx);
+                                     gen_kernel_ctx* ctx);
 static void  appendLoopInner        (strb*           s,
-                                     GEN_KERNEL_CTX* ctx);
+                                     gen_kernel_ctx* ctx);
 static void  appendLoopMacroUndefs  (strb*           s,
-                                     GEN_KERNEL_CTX* ctx);
+                                     gen_kernel_ctx* ctx);
 static void  scheduleMaxAndArgmax   (size_t*         blockSize,
                                      size_t*         gridSize,
                                      const GpuArray* src,
@@ -108,7 +106,7 @@ GPUARRAY_PUBLIC int GpuArray_maxandargmax(GpuArray*       dstMax,
 	 */
 	
 	const char*  dstMaxType      = gpuarray_get_type(src->typecode) -> cluda_name;
-	const char*  dstArgmaxType   = gpuarray_get_type(GA_LONG)       -> cluda_name;
+	const char*  dstArgmaxType   = gpuarray_get_type(GA_SIZE)       -> cluda_name;
 	const char*  s               = genkernel_maxandargmax(src->nd,
 	                                                      isReduced,
 	                                                      dstMaxType,
@@ -117,14 +115,14 @@ GPUARRAY_PUBLIC int GpuArray_maxandargmax(GpuArray*       dstMax,
 	
 	/* Compile it */
 	const int    ARG_TYPECODE[8] = {
-		GA_POINTER, /* src */
-		GA_POINTER, /* srcSteps */
-		GA_POINTER, /* srcSize */
-		GA_POINTER, /* numBlk */
-		GA_POINTER, /* dstMax */
-		GA_POINTER, /* dstMaxSteps */
-		GA_POINTER, /* dstArgmax */
-		GA_POINTER  /* dstArgmaxSteps */
+		GA_BUFFER, /* src */
+		GA_BUFFER, /* srcSteps */
+		GA_BUFFER, /* srcSize */
+		GA_BUFFER, /* numBlk */
+		GA_BUFFER, /* dstMax */
+		GA_BUFFER, /* dstMaxSteps */
+		GA_BUFFER, /* dstArgmax */
+		GA_BUFFER  /* dstArgmaxSteps */
 	};
 	const size_t l = strlen(s);
 	GpuKernel kernel;
@@ -166,7 +164,7 @@ static char* genkernel_maxandargmax(const int       numIdx,
                                     const char*     dstMaxType,
                                     const char*     dstArgmaxType){
 	/* Obtain the parameters of the reduction. */
-	GEN_KERNEL_CTX ctx;
+	gen_kernel_ctx ctx;
 	ctx.numIdx        = numIdx;
 	ctx.isReduced     = isReduced;
 	ctx.numRedIdx     = getRdxIdx(ctx.numIdx, ctx.isReduced);
@@ -174,30 +172,14 @@ static char* genkernel_maxandargmax(const int       numIdx,
 	ctx.dstMaxType    = dstMaxType;
 	ctx.dstArgmaxType = dstArgmaxType;
 	
-	/**
-	 * Allocate string buffer.
-	 */
-	
-	strb* s = strb_alloc(5*1024);
-	if(!s){return NULL;}
-	
-	/**
-	 * Generate kernel
-	 */
-	
-	appendKernel(s, &ctx);
-	
-	/**
-	 * Return the kernel.
-	 */
-	
-	char* kernelSource = strb_cstr(s);
-	strb_free(s);
-	return kernelSource;
+	strb s = STRB_STATIC_INIT;
+	strb_ensure(&s, 5*1024);
+	appendKernel(&s, &ctx);
+	return strb_cstr(&s);
 }
 
 static void  appendKernel           (strb*           s,
-                                     GEN_KERNEL_CTX* ctx){
+                                     gen_kernel_ctx* ctx){
 	appendTypedefs         (s, ctx);
 	appendPrototype        (s, ctx);
 	strb_appends           (s, "{\n");
@@ -207,7 +189,7 @@ static void  appendKernel           (strb*           s,
 	strb_appends           (s, "}\n");
 }
 static void  appendTypedefs         (strb*           s,
-                                     GEN_KERNEL_CTX* ctx){
+                                     gen_kernel_ctx* ctx){
 	strb_appends(s, "/* Typedefs */\n");
 	strb_appendf(s, "typedef %s     T;/* The type of the array being processed. */\n", ctx->dstMaxType);
 	strb_appendf(s, "typedef %s     X;/* Index type: signed 32/64-bit. */\n",          ctx->dstArgmaxType);
@@ -216,18 +198,18 @@ static void  appendTypedefs         (strb*           s,
 	strb_appends(s, "\n");
 }
 static void  appendPrototype        (strb*           s,
-                                     GEN_KERNEL_CTX* ctx){
-	strb_appends(s, "__global__ void maxandargmax(const T*        src,\n");
-	strb_appends(s, "                             const X*        srcSteps,\n");
-	strb_appends(s, "                             const X*        srcSize,\n");
-	strb_appends(s, "                             const X*        blkNum,\n");
-	strb_appends(s, "                             T*              dstMax,\n");
-	strb_appends(s, "                             const X*        dstMaxSteps,\n");
-	strb_appends(s, "                             X*              dstArgmax,\n");
-	strb_appends(s, "                             const X*        dstArgmaxSteps)");
+                                     gen_kernel_ctx* ctx){
+	strb_appends(s, "KERNEL void maxandargmax(const T*        src,\n");
+	strb_appends(s, "                         const X*        srcSteps,\n");
+	strb_appends(s, "                         const X*        srcSize,\n");
+	strb_appends(s, "                         const X*        blkNum,\n");
+	strb_appends(s, "                         T*              dstMax,\n");
+	strb_appends(s, "                         const X*        dstMaxSteps,\n");
+	strb_appends(s, "                         X*              dstArgmax,\n");
+	strb_appends(s, "                         const X*        dstArgmaxSteps)");
 }
 static void  appendIndexDeclarations(strb*           s,
-                                     GEN_KERNEL_CTX* ctx){
+                                     gen_kernel_ctx* ctx){
 	strb_appends(s, "\t/* GPU kernel coordinates. Always 3D. */\n");
 	
 	strb_appends(s, "\tX bi0 = blockIdx.x,  bi1 = blockIdx.y,  bi2 = blockIdx.z;\n");
@@ -272,7 +254,7 @@ static void  appendIdxes            (strb*           s,
 	strb_appends(s, epilogue);
 }
 static void  appendRangeCalculations(strb*           s,
-                                     GEN_KERNEL_CTX* ctx){
+                                     gen_kernel_ctx* ctx){
 	int i;
 	
 	strb_appends(s, "\t/* Compute ranges for this thread. */\n");
@@ -333,7 +315,7 @@ static void  appendRangeCalculations(strb*           s,
 	strb_appends(s, "\t\n");
 }
 static void  appendLoops            (strb*           s,
-                                     GEN_KERNEL_CTX* ctx){
+                                     gen_kernel_ctx* ctx){
 	strb_appends(s, "\t/**\n");
 	strb_appends(s, "\t * FREE LOOPS.\n");
 	strb_appends(s, "\t */\n");
@@ -344,7 +326,7 @@ static void  appendLoops            (strb*           s,
 	appendLoopMacroUndefs(s, ctx);
 }
 static void  appendLoopMacroDefs    (strb*           s,
-                                     GEN_KERNEL_CTX* ctx){
+                                     gen_kernel_ctx* ctx){
 	int i;
 	
 	/**
@@ -400,7 +382,7 @@ static void  appendLoopMacroDefs    (strb*           s,
 	strb_appends(s, "0]\n");
 }
 static void  appendLoopOuter        (strb*           s,
-                                     GEN_KERNEL_CTX* ctx){
+                                     gen_kernel_ctx* ctx){
 	int i;
 	
 	/**
@@ -426,7 +408,7 @@ static void  appendLoopOuter        (strb*           s,
 	}
 }
 static void  appendLoopInner        (strb*           s,
-                                     GEN_KERNEL_CTX* ctx){
+                                     gen_kernel_ctx* ctx){
 	int i;
 	
 	/**
@@ -490,7 +472,7 @@ static void  appendLoopInner        (strb*           s,
 	appendIdxes (s, "\tDSTAINDEXER(", "i", 0, ctx->numFreeIdx, "", ") = maxI;\n");
 }
 static void  appendLoopMacroUndefs  (strb*           s,
-                                     GEN_KERNEL_CTX* ctx){
+                                     gen_kernel_ctx* ctx){
 	strb_appends(s, "\t#undef FOROVER\n");
 	strb_appends(s, "\t#undef ESCAPE\n");
 	strb_appends(s, "\t#undef SRCINDEXER\n");
