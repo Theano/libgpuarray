@@ -12,7 +12,7 @@ void setup(void);
 void teardown(void);
 
 #define ga_assert_ok(e) ck_assert_int_eq(e, GA_NO_ERROR)
-/* float 16 table */
+/* float 16 table (0 through 10) */
 static const uint16_t F16[10] = {0x0000, 0x3c00, 0x4000, 0x4200, 0x4400, 0x4500, 0x4600, 0x4700, 0x4800, 0x4880};
 
 
