@@ -282,6 +282,15 @@ cdef int array_index(GpuArray r, GpuArray a, const ssize_t *starts,
     if err != GA_NO_ERROR:
         raise get_exc(err), GpuArray_error(&a.ga, err)
 
+cdef int array_take1(GpuArray r, GpuArray a, GpuArray i,
+                     int check_err) except -1:
+    cdef int err
+    err = GpuArray_take1(&r.ga, &a.ga, &i.ga, check_err)
+    if err != GA_NO_ERROR:
+        if err == GA_VALUE_ERROR:
+            raise IndexError, "Index out of bounds"
+        raise get_exc(err), GpuArray_error(&v.ga, err)
+
 cdef int array_setarray(GpuArray v, GpuArray a) except -1:
     cdef int err
     err = GpuArray_setarray(&v.ga, &a.ga)
@@ -1694,6 +1703,20 @@ cdef class GpuArray:
                                    context=self.context)
 
         array_setarray(tmp, gv)
+
+    def take1(self, GpuArray idx):
+        cdef GpuArray res
+        cdef size_t odim
+        if idx.ga.nd != 1:
+            raise ValueError, "Expected index with nd=1"
+        odim = self.ga.dimensions[0]
+        try:
+            self.ga.dimensions[0] = idx.ga.dimensions[0]
+            res = pygpu_empty_like(self, GA_C_ORDER, -1)
+        finally:
+            self.ga.dimensions[0] = odim
+        array_take1(res, self, idx, 1)
+        return res
 
     def __hash__(self):
         raise TypeError, "unhashable type '%s'" % (self.__class__,)
