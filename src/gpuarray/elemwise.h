@@ -114,6 +114,11 @@ GPUARRAY_PUBLIC GpuElemwise *GpuElemwise_new(gpucontext *ctx,
 #define GE_NOADDR64    0x0001
 
 /**
+ * Convert float16 inputs to float32 for computation.
+ */
+#define GE_CONVERT_F16 0x0002
+
+/**
  * @}
  */
 
