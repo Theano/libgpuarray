@@ -13,8 +13,9 @@ try:
 except Exception:
     # for devel version
     raise
-    def cythonize(arg):
-        return arg
+    def cythonize(args):
+        for arg in args:
+            arg.sources = [(s[:-3] + 'c' if s.endswith('.pyx') else s) for s in arg.sources]
 
 # clang gives an error if passed -mno-fused-madd
 # (and I don't even understand why it's passed in the first place)
@@ -64,13 +65,6 @@ for i in reversed(to_del):
 
 del to_del
 
-if have_cython:
-    srcs = ['pygpu/gpuarray.pyx']
-    blas_src = ['pygpu/blas.pyx']
-else:
-    srcs = ['pygpu/gpuarray.c']
-    blas_src = ['pygpu/blas.c']
-
 include_dirs = [np.get_include()]
 library_dirs = []
 if sys.platform == 'win32':
@@ -86,14 +80,21 @@ if sys.platform == 'win32':
     
     
 exts = [Extension('pygpu.gpuarray',
-                  sources = srcs,
+                  sources = ['pygpu/gpuarray.pyx'],
                   include_dirs = include_dirs,
                   libraries = ['gpuarray'],
                   library_dirs = library_dirs,
                   define_macros = [('GPUARRAY_SHARED', None)]
                   ),
         Extension('pygpu.blas',
-                  sources = blas_src,
+                  sources = ['pygpu/blas.pyx'],
+                  include_dirs = include_dirs,
+                  libraries = ['gpuarray'],
+                  library_dirs = library_dirs,
+                  define_macros = [('GPUARRAY_SHARED', None)]
+                  ),
+        Extension('pygpu._elemwise',
+                  sources = ['pygpu/_elemwise.pyx'],
                   include_dirs = include_dirs,
                   libraries = ['gpuarray'],
                   library_dirs = library_dirs,

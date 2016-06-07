@@ -139,6 +139,52 @@ START_TEST(test_contig_f16)
 END_TEST
 
 
+START_TEST(test_contig_0)
+{
+  GpuArray a;
+  GpuArray b;
+  GpuArray c;
+
+  GpuElemwise *ge;
+
+ size_t dims[1];
+
+  gpuelemwise_arg args[3] = {{0}};
+  void *rargs[3];
+
+  dims[0] = 0;
+
+  ga_assert_ok(GpuArray_empty(&a, ctx, GA_UINT, 1, dims, GA_C_ORDER));
+
+  ga_assert_ok(GpuArray_empty(&b, ctx, GA_UINT, 1, dims, GA_C_ORDER));
+
+  ga_assert_ok(GpuArray_empty(&c, ctx, GA_UINT, 1, dims, GA_C_ORDER));
+
+  args[0].name = "a";
+  args[0].typecode = GA_UINT;
+  args[0].flags = GE_READ;
+
+  args[1].name = "b";
+  args[1].typecode = GA_UINT;
+  args[1].flags = GE_READ;
+
+  args[2].name = "c";
+  args[2].typecode = GA_UINT;
+  args[2].flags = GE_WRITE;
+
+  ge = GpuElemwise_new(ctx, "", "c = a + b", 3, args, 1, 0);
+
+  ck_assert_ptr_ne(ge, NULL);
+
+  rargs[0] = &a;
+  rargs[1] = &b;
+  rargs[2] = &c;
+
+  ga_assert_ok(GpuElemwise_call(ge, rargs, GE_NOCOLLAPSE));
+}
+END_TEST
+
+
 START_TEST(test_basic_simple)
 {
   GpuArray a;
@@ -259,6 +305,72 @@ START_TEST(test_basic_f16)
   ck_assert_int_eq(data3[0], F16[5]);
   ck_assert_int_eq(data3[1], F16[7]);
   ck_assert_int_eq(data3[2], F16[9]);
+}
+END_TEST
+
+
+START_TEST(test_basic_offset)
+{
+  GpuArray a;
+  GpuArray b;
+  GpuArray c;
+
+  GpuElemwise *ge;
+
+  static const uint32_t data1[3] = {1, 2, 3};
+  static const uint32_t data2[3] = {4, 5, 6};
+  uint32_t data3[3] = {0};
+
+  size_t dims[2];
+
+  gpuelemwise_arg args[3] = {{0}};
+  void *rargs[3];
+
+  dims[0] = 1;
+  dims[1] = 6;
+
+  ga_assert_ok(GpuArray_empty(&a, ctx, GA_UINT, 2, dims, GA_C_ORDER));
+
+  /* Simulate indexing */
+  a.offset = 12;
+  a.dimensions[1] = 3;
+
+  ga_assert_ok(GpuArray_write(&a, data1, sizeof(data1)));
+
+  dims[1] = 3;
+
+  ga_assert_ok(GpuArray_empty(&b, ctx, GA_UINT, 2, dims, GA_F_ORDER));
+  ga_assert_ok(GpuArray_write(&b, data2, sizeof(data2)));
+
+  ga_assert_ok(GpuArray_empty(&c, ctx, GA_UINT, 2, dims, GA_C_ORDER));
+
+  args[0].name = "a";
+  args[0].typecode = GA_UINT;
+  args[0].flags = GE_READ;
+
+  args[1].name = "b";
+  args[1].typecode = GA_UINT;
+  args[1].flags = GE_READ;
+
+  args[2].name = "c";
+  args[2].typecode = GA_UINT;
+  args[2].flags = GE_WRITE;
+
+  ge = GpuElemwise_new(ctx, "", "c = a + b", 3, args, 2, 0);
+
+  ck_assert_ptr_ne(ge, NULL);
+
+  rargs[0] = &a;
+  rargs[1] = &b;
+  rargs[2] = &c;
+
+  ga_assert_ok(GpuElemwise_call(ge, rargs, GE_NOCOLLAPSE));
+
+  ga_assert_ok(GpuArray_read(data3, sizeof(data3), &c));
+
+  ck_assert_int_eq(data3[0], 5);
+  ck_assert_int_eq(data3[1], 7);
+  ck_assert_int_eq(data3[2], 9);
 }
 END_TEST
 
@@ -458,6 +570,7 @@ START_TEST(test_basic_collapse)
 }
 END_TEST
 
+
 START_TEST(test_basic_neg_strides)
 {
   GpuArray a;
@@ -528,6 +641,54 @@ START_TEST(test_basic_neg_strides)
 }
 END_TEST
 
+
+START_TEST(test_basic_0)
+{
+  GpuArray a;
+  GpuArray b;
+  GpuArray c;
+
+  GpuElemwise *ge;
+
+  size_t dims[2];
+
+  gpuelemwise_arg args[3] = {{0}};
+  void *rargs[3];
+
+  dims[0] = 0;
+  dims[1] = 3;
+
+  ga_assert_ok(GpuArray_empty(&a, ctx, GA_UINT, 2, dims, GA_C_ORDER));
+
+  ga_assert_ok(GpuArray_empty(&b, ctx, GA_UINT, 2, dims, GA_F_ORDER));
+
+  ga_assert_ok(GpuArray_empty(&c, ctx, GA_UINT, 2, dims, GA_C_ORDER));
+
+  args[0].name = "a";
+  args[0].typecode = GA_UINT;
+  args[0].flags = GE_READ;
+
+  args[1].name = "b";
+  args[1].typecode = GA_UINT;
+  args[1].flags = GE_READ;
+
+  args[2].name = "c";
+  args[2].typecode = GA_UINT;
+  args[2].flags = GE_WRITE;
+
+  ge = GpuElemwise_new(ctx, "", "c = a + b", 3, args, 2, 0);
+
+  ck_assert_ptr_ne(ge, NULL);
+
+  rargs[0] = &a;
+  rargs[1] = &b;
+  rargs[2] = &c;
+
+  ga_assert_ok(GpuElemwise_call(ge, rargs, 0));
+}
+END_TEST
+
+
 Suite *get_suite(void) {
   Suite *s = suite_create("elemwise");
   TCase *tc = tcase_create("contig");
@@ -535,16 +696,19 @@ Suite *get_suite(void) {
   tcase_add_checked_fixture(tc, setup, teardown);
   tcase_add_test(tc, test_contig_simple);
   tcase_add_test(tc, test_contig_f16);
+  tcase_add_test(tc, test_contig_0);
   suite_add_tcase(s, tc);
   tc = tcase_create("basic");
   tcase_set_timeout(tc, 8.0);
   tcase_add_checked_fixture(tc, setup, teardown);
   tcase_add_test(tc, test_basic_simple);
   tcase_add_test(tc, test_basic_f16);
+  tcase_add_test(tc, test_basic_offset);
   tcase_add_test(tc, test_basic_remove1);
   tcase_add_test(tc, test_basic_broadcast);
   tcase_add_test(tc, test_basic_collapse);
   tcase_add_test(tc, test_basic_neg_strides);
+  tcase_add_test(tc, test_basic_0);
   suite_add_tcase(s, tc);
   return s;
 }

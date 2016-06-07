@@ -9,8 +9,8 @@ from cpython cimport Py_INCREF, PyNumber_Index
 from cpython.object cimport Py_EQ, Py_NE
 
 def api_version():
-    # major, minor
-    return (gpuarray_api_major, gpuarray_api_minor)
+    # major, minor, py
+    return (gpuarray_api_major, gpuarray_api_minor, 0)
 
 np.import_array()
 
@@ -1889,8 +1889,24 @@ cdef class GpuKernel:
     limits of `k.maxlsize` and `ctx.maxgsize` or the call will fail.
     """
     def __dealloc__(self):
+        cdef unsigned int numargs
+        cdef int *types
+        cdef unsigned int i
+        cdef int res
+        # We need to do all of this at the C level to avoid touching
+        # python stuff that could be gone and to avoid exceptions
+        if self.k.k is not NULL:
+            res = gpukernel_property(self.k.k, GA_KERNEL_PROP_NUMARGS, &numargs)
+            if res != GA_NO_ERROR:
+                return
+            res = gpukernel_property(self.k.k, GA_KERNEL_PROP_TYPES, &types)
+            if res != GA_NO_ERROR:
+                return
+            for i in range(numargs):
+                if types[i] != GA_BUFFER:
+                    free(self.callbuf[i])
+            kernel_clear(self)
         free(self.callbuf)
-        kernel_clear(self)
 
     def __reduce__(self):
         raise RuntimeError, "Cannot pickle GpuKernel object"
@@ -1943,9 +1959,9 @@ cdef class GpuKernel:
                     _types[i] = GA_BUFFER
                 else:
                     _types[i] = dtype_to_typecode(types[i])
-                self.callbuf[i] = malloc(gpuarray_get_elsize(_types[i]))
-                if self.callbuf[i] == NULL:
-                    raise MemoryError
+                    self.callbuf[i] = malloc(gpuarray_get_elsize(_types[i]))
+                    if self.callbuf[i] == NULL:
+                        raise MemoryError
             kernel_init(self, self.context.ctx, 1, s, &l,
                         name, numargs, _types, flags)
         finally:
