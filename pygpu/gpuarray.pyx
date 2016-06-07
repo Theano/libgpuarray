@@ -1498,7 +1498,8 @@ cdef class GpuArray:
         r = pygpu_empty(self.ga.nd, self.ga.dimensions, self.ga.typecode,
                         GA_C_ORDER if GpuArray_IS_C_CONTIGUOUS(&self.ga) else GA_F_ORDER,
                         new_ctx, None)
-        return pygpu_transfer(self, new_ctx)
+        pygpu_transfer(r, self)  # Will raise an error if needed
+        return r
 
     def __copy__(self):
         return pygpu_copy(self, GA_C_ORDER)
