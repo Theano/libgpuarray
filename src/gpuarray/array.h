@@ -607,6 +607,78 @@ GPUARRAY_PUBLIC void GpuArray_fprintf(FILE *fd, const GpuArray *a);
 
 GPUARRAY_PUBLIC int GpuArray_fdump(FILE *fd, const GpuArray *a);
 
+/************************************************************************************
+*                         multi-gpu collectives interface                          *
+************************************************************************************/
+
+/**
+ * \brief TODO
+ * \param src [const GpuArray*] TODO
+ * \param dest [GpuArray*] TODO
+ * \param count [int] TODO
+ * \param typecode [int] TODO
+ * \param opcode [int] TODO
+ * \param root [int] TODO
+ * \param comm [gpucomm*] TODO
+ * \return int TODO
+ */
+GPUARRAY_PUBLIC int GpuArray_reduce(const GpuArray* src, GpuArray* dest,
+                                    int count, int typecode, int opcode,
+                                    int root, gpucomm* comm);
+
+/**
+ * \brief TODO
+ * \param src [const GpuArray*] TODO
+ * \param dest [GpuArray*] TODO
+ * \param count [int] TODO
+ * \param typecode [int] TODO
+ * \param opcode [int] TODO
+ * \param comm [gpucomm*] TODO
+ * \return int TODO
+ */
+GPUARRAY_PUBLIC int GpuArray_all_reduce(const GpuArray* src, GpuArray* dest,
+                                        int count, int typecode, int opcode,
+                                        gpucomm* comm);
+
+/**
+ * \brief TODO
+ * \param src [const GpuArray*] TODO
+ * \param dest [GpuArray*] TODO
+ * \param count [int] TODO
+ * \param typecode [int] TODO
+ * \param opcode [int] TODO
+ * \param comm [gpucomm*] TODO
+ * \return int TODO
+ */
+GPUARRAY_PUBLIC int GpuArray_reduce_scatter(const GpuArray* src, GpuArray* dest,
+                                            int count, int typecode, int opcode,
+                                            gpucomm* comm);
+
+/**
+ * \brief TODO
+ * \param array [GpuArray*] TODO
+ * \param count [int] TODO
+ * \param typecode [int] TODO
+ * \param root [int] TODO
+ * \param comm [gpucomm*] TODO
+ * \return int TODO
+ */
+GPUARRAY_PUBLIC int GpuArray_broadcast(GpuArray* array, int count, int typecode,
+                                       int root, gpucomm* comm);
+
+/**
+ * \brief TODO
+ * \param src [const GpuArray*] TODO
+ * \param dest [GpuArray*] TODO
+ * \param count [int] TODO
+ * \param typecode [int] TODO
+ * \param comm [gpucomm*] TODO
+ * \return int TODO
+ */
+GPUARRAY_PUBLIC int GpuArray_all_gather(const GpuArray* src, GpuArray* dest,
+                                        int count, int typecode,
+                                        gpucomm* comm);
+
 #ifdef __cplusplus
 }
 #endif
