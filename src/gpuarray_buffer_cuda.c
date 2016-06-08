@@ -185,6 +185,7 @@ static gpudata *new_gpudata(cuda_context *ctx, CUdeviceptr ptr, size_t size) {
   res->sz = size;
 
   res->flags = 0;
+  res->ls = NULL;
 
   cuda_enter(ctx);
 
@@ -602,7 +603,12 @@ static int cuda_share(gpudata *a, gpudata *b, int *ret) {
 
 static int cuda_waits(gpudata *a, int flags, CUstream s) {
   ASSERT_BUF(a);
-  /* If others are only reads, no need to wait */
+
+  /* If the last stream to touch this buffer is the same, we don't
+   * need to wait for anything. */
+  if (a->ls == s)
+    return GA_NO_ERROR;
+
   cuda_enter(a->ctx);
   if (flags & CUDA_WAIT_READ) {
     /* We wait for writes that happened before since multiple reads at
@@ -637,6 +643,7 @@ static int cuda_records(gpudata *a, int flags, CUstream s) {
   if (flags & CUDA_WAIT_WRITE)
     a->ctx->err = cuEventRecord(a->wev, s);
   cuda_exit(a->ctx);
+  a->ls = s;
   return GA_NO_ERROR;
 }
 

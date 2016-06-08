@@ -88,6 +88,7 @@ struct _gpudata {
      struct _partial_gpudata */
   CUevent rev;
   CUevent wev;
+  CUstream ls; /* last stream used */
   unsigned int refcnt;
   int flags;
   size_t sz;
