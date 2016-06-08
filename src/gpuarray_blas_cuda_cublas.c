@@ -30,6 +30,7 @@ typedef struct _blas_handle {
   GpuKernel dgemvBH_T_a1_b1_small;
   GpuKernel sgerBH_gen_small;
   GpuKernel dgerBH_gen_small;
+  cublasStatus_t err;
 } blas_handle;
 
 static const char *code_sgemvBH_N_a1_b1_small =                         \
@@ -175,6 +176,8 @@ static int setup(gpucontext *c) {
   if (handle == NULL)
     return GA_MEMORY_ERROR;
 
+  handle->err = CUBLAS_STATUS_SUCCESS;
+
   cuda_enter(ctx);
   err = cublasCreate(&handle->h);
   if (err != CUBLAS_STATUS_SUCCESS) {
@@ -273,6 +276,39 @@ static void teardown(gpucontext *c) {
   cuda_exit(ctx);
   free(ctx->blas_handle);
   ctx->blas_handle = NULL;
+}
+
+static const char *error(gpucontext *c) {
+  cuda_context *ctx = (cuda_context *)c;
+  blas_handle *handle = (blas_handle *)ctx->blas_handle;
+
+  if (handle != NULL) {
+    switch (handle->err) {
+    case CUBLAS_STATUS_SUCCESS:
+      return "(cublas) Operation completed successfully.";
+    case CUBLAS_STATUS_NOT_INITIALIZED:
+      return "(cublas) Library not initialized.";
+    case CUBLAS_STATUS_ALLOC_FAILED:
+      return "(cublas) GPU ressource allocation failed.";
+    case CUBLAS_STATUS_INVALID_VALUE:
+      return "(cublas) Invalid value.";
+    case CUBLAS_STATUS_ARCH_MISMATCH:
+      return "(cublas) Operation not supported by device.";
+    case CUBLAS_STATUS_MAPPING_ERROR:
+      return "(cublas) Mapping error.";
+    case CUBLAS_STATUS_EXECUTION_FAILED:
+      return "(cublas) Execution failed.";
+    case CUBLAS_STATUS_INTERNAL_ERROR:
+      return "(cublas) Internal error.";
+    case CUBLAS_STATUS_NOT_SUPPORTED:
+      return "(cublas) Unsupported functionality.";
+    case CUBLAS_STATUS_LICENSE_ERROR:
+      return "(cublas) License error.";
+    default:
+      return "(cublas) Unknown error.";
+    }
+  }
+  return "Blas handle not initialized, API error.";
 }
 
 static int sgemm(cb_order order, cb_transpose transA, cb_transpose transB,
@@ -1478,6 +1514,7 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
 GPUARRAY_LOCAL gpuarray_blas_ops cublas_ops = {
   setup,
   teardown,
+  error,
   hgemv, /* TODO */
   sgemv,
   dgemv,

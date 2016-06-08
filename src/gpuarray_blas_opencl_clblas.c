@@ -56,6 +56,10 @@ static void teardown(gpucontext *ctx) {
     clblasTeardown();
 }
 
+static const char *error(gpucontext *ctx) {
+  return "(clblas) error in blas call, no details for now.";
+}
+
 #define ARRAY_INIT(A)                           \
   if (A->ev != NULL)                            \
     evl[num_ev++] = A->ev
@@ -395,6 +399,7 @@ static int dger(cb_order order, size_t M, size_t N, double alpha,
 GPUARRAY_LOCAL gpuarray_blas_ops clblas_ops = {
   setup,
   teardown,
+  error,
   hgemv, /* TODO */
   sgemv,
   dgemv,

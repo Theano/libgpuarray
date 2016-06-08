@@ -13,6 +13,12 @@ void gpublas_teardown(gpucontext *ctx) {
     return ctx->blas_ops->teardown(ctx);
 }
 
+const char *gpublas_error(gpucontext *ctx) {
+  if (ctx->blas_ops != NULL)
+    return ctx->blas_ops->error(ctx);
+  return "No blas ops available, API error.";
+}
+
 int gpublas_hgemv(cb_order order, cb_transpose transA,
                   size_t M, size_t N, float alpha,
                   gpudata *A, size_t offA, size_t lda,
