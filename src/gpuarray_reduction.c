@@ -212,9 +212,9 @@ static void  appendIndexDeclarations(strb*           s,
                                      gen_kernel_ctx* ctx){
 	strb_appends(s, "\t/* GPU kernel coordinates. Always 3D. */\n");
 	
-	strb_appends(s, "\tX bi0 = blockIdx.x,  bi1 = blockIdx.y,  bi2 = blockIdx.z;\n");
-	strb_appends(s, "\tX bd0 = blockDim.x,  bd1 = blockDim.y,  bd2 = blockDim.z;\n");
-	strb_appends(s, "\tX ti0 = threadIdx.x, ti1 = threadIdx.y, ti2 = threadIdx.z;\n");
+	strb_appends(s, "\tX bi0 = GID_0,   bi1 = GID_1,   bi2 = GID_2;\n");
+	strb_appends(s, "\tX bd0 = LDIM_0,  bd1 = LDIM_1,  bd2 = LDIM_2;\n");
+	strb_appends(s, "\tX ti0 = LID_0,   ti1 = LID_1,   ti2 = LID_2;\n");
 	
 	strb_appends(s, "\t\n");
 	strb_appends(s, "\t\n");
