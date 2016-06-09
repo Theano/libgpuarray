@@ -498,9 +498,9 @@ cdef GpuContext pygpu_init(dev, int flags):
         raise ValueError, "Unknown device format:" + dev
     return GpuContext(kind, devnum, flags)
 
-def init(dev, sched='default', disable_alloc_cache=False):
+def init(dev, sched='default', disable_alloc_cache=False, single_stream=False):
     """
-    init(dev, opt='default', disable_alloc_cache=False)
+    init(dev, opt='default', disable_alloc_cache=False, single_stream=False)
 
     Creates a context from a device specifier.
 
@@ -510,6 +510,8 @@ def init(dev, sched='default', disable_alloc_cache=False):
     :type sched: {'default', 'single', 'multi'}
     :param disable_alloc_cache: disable allocation cache (if any)
     :type disable_alloc_cache: bool
+    :param single_stream: enable single stream mode
+    :type single_stream: bool
     :rtype: GpuContext
 
     Device specifiers are composed of the type string and the device
@@ -535,8 +537,8 @@ def init(dev, sched='default', disable_alloc_cache=False):
     expected_version = -9997
     if gpuarray_api_major != expected_version or gpuarray_api_minor < 0:
         raise RuntimeError(
-            "Pygpu was expecting libgpuarray version %d, but %d is available "
-            " Recompile it to avoid problems.",
+            "Pygpu was expecting libgpuarray version %d, but %d is available. "
+            "Recompile it to avoid problems.",
             expected_version, gpuarray_api_major)
     if sched == 'single':
         flags |= GA_CTX_SINGLE_THREAD
@@ -546,6 +548,8 @@ def init(dev, sched='default', disable_alloc_cache=False):
         raise TypeError('unexpected value for parameter sched: %s' % (sched,))
     if disable_alloc_cache:
         flags |= GA_CTX_DISABLE_ALLOCATION_CACHE
+    if single_stream:
+        flags |= GA_CTX_SINGLE_STREAM
     return pygpu_init(dev, flags)
 
 def zeros(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
