@@ -100,6 +100,12 @@ def ielemwise2_ops_array(op, dtype1, dtype2, shape):
     assert numpy.allclose(out_c, numpy.asarray(out_g), atol=1e-6)
 
 
+def test_elemwise_f16():
+    yield elemwise1_ops_array, operator.neg, 'float16'
+    yield elemwise2_ops_array, operator.add, 'float16', 'float16', (50,)
+    yield ielemwise2_ops_array, operator.iadd, 'float16', 'float16', (50,)
+
+
 def test_elemwise2_ops_mixed():
     for op in operators2:
         for dtype in dtypes_test:

@@ -68,6 +68,8 @@ def elemwise2(a, op, b, ary, odtype=None, oper=None,
         res = ary._empty_like_me(dtype=odtype)
 
     if oper is None:
+        if convert_f16 and odtype == 'float16':
+            odtype = numpy.dtype('float32')
         oper = op_tmpl % {'op': op, 'out_t': dtype_to_ctype(odtype)}
 
     k = GpuElemwise(ary.context, oper, args, convert_f16=convert_f16)
