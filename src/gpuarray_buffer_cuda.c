@@ -449,8 +449,7 @@ static int extract(gpudata *curr, gpudata *prev, size_t size) {
     split->next = curr->next;
     curr->next = NULL;
     /* Make sure we don't start using the split buffer too soon */
-    cuda_wait(curr, CUDA_WAIT_ALL);
-    cuda_record(split, CUDA_WAIT_ALL);
+    cuda_records(split, CUDA_WAIT_ALL, curr->ls);
     next = split;
     curr->sz = size;
   }
@@ -563,8 +562,8 @@ static void cuda_free(gpudata *d) {
       if (!(d->flags & CUDA_HEAD_ALLOC) &&
             prev != NULL && prev->ptr + prev->sz == d->ptr) {
         prev->sz = prev->sz + d->sz;
-        cuda_wait(d, CUDA_WAIT_ALL);
-        cuda_record(prev, CUDA_WAIT_ALL);
+        cuda_waits(d, CUDA_WAIT_ALL, prev->ls);
+        cuda_records(prev, CUDA_WAIT_ALL, prev->ls);
         deallocate(d);
         d = prev;
       } else if (prev != NULL) {
