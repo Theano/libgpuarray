@@ -52,7 +52,7 @@ static cl_device_id get_dev(cl_context ctx, int *ret) {
   return res;
 }
 
-cl_ctx *cl_make_ctx(cl_context ctx) {
+cl_ctx *cl_make_ctx(cl_context ctx, int flags) {
   cl_ctx *res;
   cl_device_id id;
   cl_command_queue_properties qprop;
@@ -90,9 +90,10 @@ cl_ctx *cl_make_ctx(cl_context ctx) {
   res->refcnt = 1;
   res->exts = NULL;
   res->blas_handle = NULL;
-  res->q = clCreateCommandQueue(ctx, id,
-				qprop&CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE,
-				&err);
+  res->q = clCreateCommandQueue(
+    ctx, id,
+    ISSET(flags, GA_CTX_SINGLE_STREAM) ? 0 : qprop&CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE,
+    &err);
   if (res->q == NULL) {
     free(res);
     return NULL;
@@ -370,7 +371,7 @@ static gpucontext *cl_init(int devno, int flags, int *ret) {
   ctx = clCreateContext(props, 1, &d, errcb, NULL, &err);
   CHKFAIL(NULL);
 
-  res = cl_make_ctx(ctx);
+  res = cl_make_ctx(ctx, flags);
   clReleaseContext(ctx);
   if (res == NULL) FAIL(NULL, GA_IMPL_ERROR);  // can also be a sys_error
   return (gpucontext *)res;

@@ -37,13 +37,13 @@ def cl_wrap_ctx(size_t ptr):
     Wrap an existing OpenCL context (the cl_context struct) into a
     GpuContext class.
     """
-    cdef gpucontext *(*cl_make_ctx)(void *)
+    cdef gpucontext *(*cl_make_ctx)(void *, int)
     cdef GpuContext res
-    cl_make_ctx = <gpucontext *(*)(void *)>gpuarray_get_extension("cl_make_ctx")
+    cl_make_ctx = <gpucontext *(*)(void *, int)>gpuarray_get_extension("cl_make_ctx")
     if cl_make_ctx == NULL:
         raise RuntimeError, "cl_make_ctx extension is absent"
     res = GpuContext.__new__(GpuContext)
-    res.ctx = cl_make_ctx(<void *>ptr)
+    res.ctx = cl_make_ctx(<void *>ptr, 0)
     if res.ctx == NULL:
         raise RuntimeError, "cl_make_ctx call failed"
     return res

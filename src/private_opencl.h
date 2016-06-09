@@ -70,7 +70,7 @@ struct _gpukernel {
 #endif
 };
 
-GPUARRAY_LOCAL cl_ctx *cl_make_ctx(cl_context ctx);
+GPUARRAY_LOCAL cl_ctx *cl_make_ctx(cl_context ctx, int flags);
 GPUARRAY_LOCAL cl_command_queue cl_get_stream(gpucontext *ctx);
 GPUARRAY_LOCAL gpudata *cl_make_buf(gpucontext *c, cl_mem buf);
 GPUARRAY_LOCAL cl_mem cl_get_buf(gpudata *g);

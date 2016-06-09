@@ -71,9 +71,13 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   if (err != CUDA_SUCCESS) {
     goto fail_stream;
   }
-  err = cuStreamCreate(&res->mem_s, CU_STREAM_NON_BLOCKING);
-  if (err != CUDA_SUCCESS) {
-    goto fail_mem_stream;
+  if (ISSET(res->flags, GA_CTX_SINGLE_STREAM)) {
+    res->mem_s = res->s;
+  } else {
+    err = cuStreamCreate(&res->mem_s, 0);
+    if (err != CUDA_SUCCESS) {
+      goto fail_mem_stream;
+    }
   }
   res->kernel_cache = cache_twoq(64, 128, 64, 8, strb_eq, strb_hash,
                                  (cache_freek_fn)strb_free,
@@ -99,7 +103,8 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
  fail_errbuf:
   cache_destroy(res->kernel_cache);
  fail_cache:
-  cuStreamDestroy(res->mem_s);
+  if (ISCLR(res->flags, GA_CTX_SINGLE_STREAM))
+    cuStreamDestroy(res->mem_s);
  fail_mem_stream:
   cuStreamDestroy(res->s);
  fail_stream:
@@ -128,7 +133,8 @@ static void cuda_free_ctx(cuda_context *ctx) {
     cuMemFreeHost((void *)ctx->errbuf->ptr);
     deallocate(ctx->errbuf);
 
-    cuStreamDestroy(ctx->mem_s);
+    if (ISCLR(ctx->flags, GA_CTX_SINGLE_STREAM))
+      cuStreamDestroy(ctx->mem_s);
     cuStreamDestroy(ctx->s);
 
     /* Clear out the freelist */
@@ -314,7 +320,7 @@ static cuda_context *do_init(CUdevice dev, int flags, int *ret) {
     err = cuCtxPushCurrent(ctx);
     CHKFAIL(NULL);
 #endif
-    res = cuda_make_ctx(ctx, 0);
+    res = cuda_make_ctx(ctx, flags);
     if (res == NULL) {
 #if CUDA_VERSION < 7000
       cuCtxDestroy(ctx);
@@ -323,7 +329,6 @@ static cuda_context *do_init(CUdevice dev, int flags, int *ret) {
 #endif
       FAIL(NULL, GA_IMPL_ERROR);
     }
-    res->flags |= flags;
     /* Don't leave the context on the thread stack */
     cuCtxPopCurrent(NULL);
 
@@ -603,6 +608,9 @@ static int cuda_share(gpudata *a, gpudata *b, int *ret) {
 static int cuda_waits(gpudata *a, int flags, CUstream s) {
   ASSERT_BUF(a);
 
+  if (ISSET(a->ctx->flags, GA_CTX_SINGLE_STREAM))
+    return GA_NO_ERROR;
+
   /* If the last stream to touch this buffer is the same, we don't
    * need to wait for anything. */
   if (a->ls == s)
@@ -636,6 +644,8 @@ int cuda_wait(gpudata *a, int flags) {
 
 static int cuda_records(gpudata *a, int flags, CUstream s) {
   ASSERT_BUF(a);
+  if (ISSET(a->ctx->flags, GA_CTX_SINGLE_STREAM))
+    return GA_NO_ERROR;
   cuda_enter(a->ctx);
   if (flags & CUDA_WAIT_READ)
     a->ctx->err = cuEventRecord(a->rev, s);
