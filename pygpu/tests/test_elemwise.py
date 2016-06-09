@@ -2,12 +2,10 @@ import operator
 import numpy
 
 from pygpu import gpuarray, ndgpuarray as elemary
-from pygpu.tools import check_args, ArrayArg, ScalarArg
 
 from six import PY2
 
-from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
-                      context, gen_gpuarray, check_meta_content)
+from .support import (guard_devsup, context, gen_gpuarray, check_meta_content)
 
 dtypes_test = ['float32', 'int8', 'uint64']
 
@@ -94,9 +92,6 @@ def ielemwise2_ops_array(op, dtype1, dtype2, shape):
     out_g = op(ag, bg)
 
     assert out_g is ag
-    atol = None
-    if dtype1 == "float32" or dtype2 == "float32":
-        atol = 1e-6
     assert numpy.allclose(out_c, numpy.asarray(out_g), atol=1e-6)
 
 
@@ -225,9 +220,9 @@ def test_elemwise_bool():
         exc = e
     assert exc is not None
     a = gpuarray.zeros((1,), context=context)
-    assert bool(a) == False
+    assert not bool(a)
     a = gpuarray.zeros((), context=context)
-    assert bool(a) == False
+    assert not bool(a)
 
 
 def test_broadcast():
