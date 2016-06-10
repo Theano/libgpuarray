@@ -6,6 +6,7 @@
 #else
 #include <cuda.h>
 #endif
+#include <ncch.h>
 
 #include <cache.h>
 
@@ -127,6 +128,12 @@ struct _gpukernel {
 #ifdef DEBUG
   char tag[8];
 #endif
+};
+
+struct _gpucomm {
+  cuda_context* ctx;  // Keep the context first
+  ncclComm_t c;
+  ncclUniqueId id;
 };
 
 #endif

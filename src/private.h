@@ -203,8 +203,8 @@ struct _gpuarray_blas_ops {
 };
 
 struct _gpuarray_comm_ops {
-  gpucomm* (*comm_new)(gpucontext* ctx, const char* clique_id,
-                       int ndev, int rank, int* res);
+  int (*comm_new)(gpucomm* comm, gpucontext* ctx, const char* clique_id,
+                  int ndev, int rank, int* res);
   void (*comm_free)(gpucomm* comm);
   const char* (*comm_error)(gpucontext* ctx);
   const char* (*generate_clique_id)(int* res);

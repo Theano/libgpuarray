@@ -24,6 +24,9 @@ struct _gpucomm;
 
 typedef struct _gpucomm gpucomm;
 
+/**
+ * Enum for reduce ops of gpucomm
+ */
 enum _gpucomm_reduce_ops {
   GA_SUM = 0,
   GA_PROD = 1,
@@ -40,8 +43,8 @@ enum _gpucomm_reduce_ops {
  * \param res [int*] TODO
  * \return gpucomm* TODO
  */
-GPUARRAY_PUBLIC gpucomm* gpucomm_new(gpucontext* ctx, const char* clique_id,
-                                     int ndev, int rank, int* res);
+GPUARRAY_PUBLIC int gpucomm_new(gpucomm* comm, gpucontext* ctx,
+                                const char* clique_id, int ndev, int rank, int* res);
 
 /**
  * \brief TODO
@@ -61,6 +64,13 @@ GPUARRAY_PUBLIC const char* gpucomm_error(gpucomm* comm, int err);
 // Mby check if err is GA_COMM_ERROR and if it is then call
 // ctx->comm_ops->comm_error(ctx) else call gpucontext_error(ctx, err)
 // same for gpublas for GA_BLAS_ERROR??
+
+/**
+ * \brief TODO
+ * \param comm [gpucomm*] TODO
+ * \return gpucontext* TODO
+ */
+GPUARRAY_PUBLIC gpucontext* gpucomm_context(gpucomm* comm);
 
 /**
  * \brief TODO
