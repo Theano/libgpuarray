@@ -500,7 +500,7 @@ cdef GpuContext pygpu_init(dev, int flags):
 
 def init(dev, sched='default', disable_alloc_cache=False, single_stream=False):
     """
-    init(dev, opt='default', disable_alloc_cache=False, single_stream=False)
+    init(dev, sched='default', disable_alloc_cache=False, single_stream=False)
 
     Creates a context from a device specifier.
 
