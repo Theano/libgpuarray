@@ -43,14 +43,6 @@ struct _gpukernel;
  */
 typedef struct _gpukernel gpukernel;
 
-struct _gpucomm;
-
-/**
- * Opaque struct for communicator data.
- */
-typedef struct _gpucomm gpucomm;
-
-
 /**
  * Create a context on the specified device.
  *
@@ -122,7 +114,7 @@ GPUARRAY_PUBLIC gpucontext *gpucontext_init(const char *name, int dev,
  */
 
 /**
- * Derefence a context.
+ * Dereference a context.
  *
  * This removes a reference to the context and as soon as the
  * reference count drops to zero the context is destroyed.  The
@@ -775,48 +767,6 @@ typedef enum _ga_usefl {
    */
   GA_USE_OPENCL =   0x4000,
 } ga_usefl;
-
-/************************************************************************************
-*                         multi-gpu communicator interface                         *
-************************************************************************************/
-
-/**
- * \brief Creates a new communicator (multi process version)
- * \param clique_id [const char*] TODO
- * \param ndev [int] TODO
- * \param rank [int] TODO
- * \param res [int*] TODO
- * \return gpucomm* TODO
- */
-GPUARRAY_PUBLIC gpucomm* gpucomm_init(const char* clique_id, int ndev, int rank,
-                                      int* res);
-
-/**
- * \brief Frees resources associated with communicator object.
- * \param comm [gpucomm*] TODO
- * \return void TODO
- */
-GPUARRAY_PUBLIC void gpucomm_destroy(gpucomm* comm);
-
-/**
- * \brief Returns nice error message.
- * \param comm [gpucomm*] TODO
- * \param err [int] TODO
- * \return const char* TODO
- */
-GPUARRAY_PUBLIC const char* gpucomm_error(gpucomm* comm, int err);
-
-// TODO cuda extension:
-// 1. ncclGetUniqueId
-// 2. ncclCommCount (below mby ops in gpucomm struct?!)
-// 3. ncclCommUserRank
-// 4. ncclCommCuDevice
-
-// TODO cuda private:
-// ??
-// TODO cuda impl:
-// functions in buffer, cuda buffer and cuda array
-// adapter for typecode and opcode to nccl enums
 
 #ifdef __cplusplus
 }
