@@ -90,7 +90,7 @@ GPUARRAY_PUBLIC gpucontext *gpucontext_init(const char *name, int dev,
 #define GA_CTX_SINGLE_THREAD 0x02
 
 /**
- * Perform all operations in the order they appear.
+ * Allocate a single stream per context, performing all operations in order.
  *
  * This will remove any attempt at exploiting parallelism in the
  * underlying device by performing unrelated operations concurrently
@@ -98,7 +98,7 @@ GPUARRAY_PUBLIC gpucontext *gpucontext_init(const char *name, int dev,
  *
  * This can help performance by removing the small cost paid for each
  * operation to keep everything coherent in the face of parallelism.
- * It can also hinder performance by doing everything one after the other.
+ * It can also hinder performance by not exploiting concurrency.
  */
 #define GA_CTX_SINGLE_STREAM 0x4
 

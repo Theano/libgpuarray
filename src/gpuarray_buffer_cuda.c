@@ -67,6 +67,8 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   if (detect_arch(ARCH_PREFIX, res->bin_id, &err)) {
     goto fail_stream;
   }
+  /* Don't add the nonblocking flags to help usage with other
+     libraries that may do stuff on the NULL stream */
   err = cuStreamCreate(&res->s, 0);
   if (err != CUDA_SUCCESS) {
     goto fail_stream;
@@ -74,6 +76,8 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   if (ISSET(res->flags, GA_CTX_SINGLE_STREAM)) {
     res->mem_s = res->s;
   } else {
+    /* Don't add the nonblocking flags to help usage with other
+       libraries that may do stuff on the NULL stream */
     err = cuStreamCreate(&res->mem_s, 0);
     if (err != CUDA_SUCCESS) {
       goto fail_mem_stream;
