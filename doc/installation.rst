@@ -24,7 +24,7 @@ Requirements
  - (optional) libcheck (check_) to run the C tests.
  - (optional) python (python_) for the python bindings.
  - (optional) mako (mako_) for development or running the python bindings.
- - (optional) Cython >= 0.19 (cython_) for the python bindings.
+ - (optional) Cython >= 0.21 (cython_) for the python bindings.
  - (optional) nosetests (nosetests_) to run the python tests.
 
 .. note::
