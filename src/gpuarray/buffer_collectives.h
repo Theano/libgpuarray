@@ -24,7 +24,12 @@ struct _gpucomm;
 
 typedef struct _gpucomm gpucomm;
 
-// TODO add enum of gpucomm_reduce_ops
+enum _gpucomm_reduce_ops {
+  GA_SUM = 0,
+  GA_PROD = 1,
+  GA_MAX = 2,
+  GA_MIN = 3
+};
 
 /**
  * \brief TODO
@@ -57,11 +62,36 @@ GPUARRAY_PUBLIC const char* gpucomm_error(gpucomm* comm, int err);
 // ctx->comm_ops->comm_error(ctx) else call gpucontext_error(ctx, err)
 // same for gpublas for GA_BLAS_ERROR??
 
-// TODO gpucomm
-// 1. ncclGetUniqueId (bla bla)
-// 2. ncclCommCount (exposed through comm_ops to gpucomm)
-// 3. ncclCommUserRank (exposed though comm_ops to gpucomm)
-// 4. ncclCommCuDevice (propably not in comm_ops)
+/**
+ * \brief TODO
+ * \param res [int*] TODO
+ * \return const char* TODO
+ */
+GPUARRAY_PUBLIC const char* gpucomm_gen_clique_id(int* res);
+
+/**
+ * \brief TODO
+ * \param comm [const gpucomm*] TODO
+ * \param count [int*] TODO
+ * \return int TODO
+ */
+GPUARRAY_PUBLIC int gpucomm_get_count(const gpucomm* comm, int* count);
+
+/**
+ * \brief TODO
+ * \param comm [const gpucomm*] TODO
+ * \param device [int*] TODO
+ * \return int TODO
+ */
+GPUARRAY_PUBLIC int gpucomm_get_device(const gpucomm* comm, int* device);
+
+/**
+ * \brief TODO
+ * \param comm [const gpucomm*] TODO
+ * \param rank [int*] TODO
+ * \return int TODO
+ */
+GPUARRAY_PUBLIC int gpucomm_get_rank(const gpucomm* comm, int* rank);
 
 // TODO private and cuda_private
 // TODO cuda impl:
@@ -72,7 +102,9 @@ GPUARRAY_PUBLIC const char* gpucomm_error(gpucomm* comm, int err);
 /**
  * \brief TODO
  * \param src [const gpudata*] TODO
+ * \param offsrc [size_t] TODO
  * \param dest [gpudata*] TODO
+ * \param offdest [size_t] TODO
  * \param count [int] TODO
  * \param typecode [int] TODO
  * \param opcode [int] TODO
@@ -80,62 +112,74 @@ GPUARRAY_PUBLIC const char* gpucomm_error(gpucomm* comm, int err);
  * \param comm [gpucomm*] TODO
  * \return int TODO
  */
-GPUARRAY_PUBLIC int gpucomm_reduce(const gpudata* src, gpudata* dest,
-                                    int count, int typecode, int opcode,
-                                    int root, gpucomm* comm);
+GPUARRAY_PUBLIC int gpucomm_reduce(const gpudata* src, size_t offsrc,
+                                   gpudata* dest, size_t offdest,
+                                   int count, int typecode, int opcode,
+                                   int root, gpucomm* comm);
 
 /**
  * \brief TODO
  * \param src [const gpudata*] TODO
+ * \param offsrc [size_t] TODO
  * \param dest [gpudata*] TODO
+ * \param offdest [size_t] TODO
  * \param count [int] TODO
  * \param typecode [int] TODO
  * \param opcode [int] TODO
  * \param comm [gpucomm*] TODO
  * \return int TODO
  */
-GPUARRAY_PUBLIC int gpucomm_all_reduce(const gpudata* src, gpudata* dest,
-                                        int count, int typecode, int opcode,
-                                        gpucomm* comm);
+GPUARRAY_PUBLIC int gpucomm_all_reduce(const gpudata* src, size_t offsrc,
+                                       gpudata* dest, size_t offdest,
+                                       int count, int typecode, int opcode,
+                                       gpucomm* comm);
 
 /**
  * \brief TODO
  * \param src [const gpudata*] TODO
+ * \param offsrc [size_t] TODO
  * \param dest [gpudata*] TODO
+ * \param offdest [size_t] TODO
  * \param count [int] TODO
  * \param typecode [int] TODO
  * \param opcode [int] TODO
  * \param comm [gpucomm*] TODO
  * \return int TODO
  */
-GPUARRAY_PUBLIC int gpucomm_reduce_scatter(const gpudata* src, gpudata* dest,
-                                            int count, int typecode, int opcode,
-                                            gpucomm* comm);
+GPUARRAY_PUBLIC int gpucomm_reduce_scatter(const gpudata* src, size_t offsrc,
+                                           gpudata* dest, size_t offdest,
+                                           int count, int typecode, int opcode,
+                                           gpucomm* comm);
 
 /**
  * \brief TODO
  * \param array [gpudata*] TODO
+ * \param offset [size_t] TODO
  * \param count [int] TODO
  * \param typecode [int] TODO
  * \param root [int] TODO
  * \param comm [gpucomm*] TODO
  * \return int TODO
  */
-GPUARRAY_PUBLIC int gpucomm_broadcast(gpudata* array, int count, int typecode,
-                                       int root, gpucomm* comm);
+GPUARRAY_PUBLIC int gpucomm_broadcast(gpudata* array, size_t offset,
+                                      int count, int typecode,
+                                      int root, gpucomm* comm);
 
 /**
  * \brief TODO
  * \param src [const gpudata*] TODO
+ * \param offsrc [size_t] TODO
  * \param dest [gpudata*] TODO
+ * \param offdest [size_t] TODO
  * \param count [int] TODO
  * \param typecode [int] TODO
  * \param comm [gpucomm*] TODO
  * \return int TODO
  */
-GPUARRAY_PUBLIC int gpucomm_all_gather(const gpudata* src, gpudata* dest,
-                                        int count, int typecode,
-                                        gpucomm* comm);
+GPUARRAY_PUBLIC int gpucomm_all_gather(const gpudata* src, size_t offsrc,
+                                       gpudata* dest, size_t offdest,
+                                       int count, int typecode,
+                                       gpucomm* comm);
 
 #ifdef __cplusplus
 }
