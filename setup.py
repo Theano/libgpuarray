@@ -5,9 +5,9 @@ have_cython = False
 
 try:
     import Cython
-    if Cython.__version__ < '0.19':
+    if Cython.__version__ < '0.21':
         raise Exception('cython is too old or not installed '
-                        '(at least 0.19 required)')
+                        '(at least 0.21 required)')
     from Cython.Build import cythonize
     have_cython = True
 except Exception:
