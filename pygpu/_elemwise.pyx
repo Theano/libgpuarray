@@ -36,6 +36,8 @@ cdef extern from "gpuarray/elemwise.h":
     int GpuElemwise_call(_GpuElemwise *ge, void **args, int flags)
 
     cdef int GE_NOADDR64
+    cdef int GE_CONVERT_F16
+
     cdef int GE_BROADCAST
     cdef int GE_NOCOLLAPSE
 
@@ -86,7 +88,7 @@ cdef class GpuElemwise:
     cdef unsigned int n
 
     def __cinit__(self, GpuContext ctx, expr, args, unsigned int nd=0,
-                  preamble=b""):
+                  preamble=b"", bint convert_f16=False):
         cdef gpuelemwise_arg *_args;
         cdef unsigned int i
         cdef arg aa
@@ -125,7 +127,8 @@ cdef class GpuElemwise:
                     self.types[i] = GA_BUFFER
 
             self.ge = GpuElemwise_new(ctx.ctx, preamble, expr, self.n,
-                                      _args, nd, 0)
+                                      _args, nd,
+                                      GE_CONVERT_F16 if convert_f16 else 0)
         finally:
             free(_args)
         if self.ge is NULL:

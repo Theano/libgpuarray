@@ -20,7 +20,8 @@ def as_argument(o, name, read=False, write=False):
                read=read, write=write)
 
 
-def elemwise1(a, op, oper=None, op_tmpl="res = %(op)sa", out=None):
+def elemwise1(a, op, oper=None, op_tmpl="res = %(op)sa", out=None,
+              convert_f16=True):
     args = (as_argument(a, 'res', write=True), as_argument(a, 'a', read=True))
     if out is None:
         res = a._empty_like_me()
@@ -30,14 +31,14 @@ def elemwise1(a, op, oper=None, op_tmpl="res = %(op)sa", out=None):
     if oper is None:
         oper = op_tmpl % {'op': op}
 
-    k = GpuElemwise(a.context, oper, args)
+    k = GpuElemwise(a.context, oper, args, convert_f16=convert_f16)
     k(res, a)
     return res
 
 
 def elemwise2(a, op, b, ary, odtype=None, oper=None,
               op_tmpl="res = (%(out_t)s)a %(op)s (%(out_t)s)b",
-              broadcast=False):
+              broadcast=False, convert_f16=True):
     ndim_extend = True
     if not isinstance(a, gpuarray.GpuArray):
         a = numpy.asarray(a)
@@ -67,15 +68,17 @@ def elemwise2(a, op, b, ary, odtype=None, oper=None,
         res = ary._empty_like_me(dtype=odtype)
 
     if oper is None:
+        if convert_f16 and odtype == 'float16':
+            odtype = numpy.dtype('float32')
         oper = op_tmpl % {'op': op, 'out_t': dtype_to_ctype(odtype)}
 
-    k = GpuElemwise(ary.context, oper, args)
+    k = GpuElemwise(ary.context, oper, args, convert_f16=convert_f16)
     k(res, a, b, broadcast=broadcast)
     return res
 
 
 def ielemwise2(a, op, b, oper=None, op_tmpl="a = a %(op)s b",
-               broadcast=False):
+               broadcast=False, convert_f16=True):
     if not isinstance(b, gpuarray.GpuArray):
         b = numpy.asarray(b)
 
@@ -87,12 +90,12 @@ def ielemwise2(a, op, b, oper=None, op_tmpl="a = a %(op)s b",
     if oper is None:
         oper = op_tmpl % {'op': op}
 
-    k = GpuElemwise(a.context, oper, args)
+    k = GpuElemwise(a.context, oper, args, convert_f16=convert_f16)
     k(a, b, broadcast=broadcast)
     return a
 
 
-def compare(a, op, b, broadcast=False):
+def compare(a, op, b, broadcast=False, convert_f16=True):
     return elemwise2(a, op, b, a, odtype=numpy.dtype('bool'),
                      op_tmpl="res = (a %(op)s b)",
-                     broadcast=broadcast)
+                     broadcast=broadcast, convert_f16=convert_f16)
