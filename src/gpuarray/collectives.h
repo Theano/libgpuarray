@@ -78,8 +78,6 @@ GPUARRAY_PUBLIC int GpuArray_all_gather(const GpuArray* src, GpuArray* dest,
 // 4. AllGather: at least a restriction for 'total elems of dest' = ndev * 'total
 // elems of src'
 
-// TODO substitute int opcode with an enum opcode??
-
 #ifdef __cplusplus
 }
 #endif
