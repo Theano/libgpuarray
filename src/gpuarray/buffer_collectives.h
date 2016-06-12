@@ -34,6 +34,14 @@ enum _gpucomm_reduce_ops {
   GA_MIN = 3
 };
 
+#define GA_COMM_ID_BYTES 128  // sizeof(gpucommCliqueId)
+/**
+ * Dummy struct to define byte-array's length through a type
+ */
+typedef struct _gpucommCliqueId {
+  char internal[GA_COMM_ID_BYTES];
+} gpucommCliqueId;
+
 /**
  * \brief TODO
  * \param ctx [gpucontext*] TODO
