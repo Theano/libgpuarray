@@ -16,13 +16,14 @@ void comm_clear(gpucomm* comm)
 {
   cuda_ops.buffer_deinit((gpucontext*) comm->ctx);
   CLEAR(comm);
-  free((void*) comm);
+  free(comm);
 }
 
 static int comm_new(gpucomm** comm_ptr, gpucontext* ctx, gpucommCliqueId comm_id,
                     int ndev, int rank) {
   ASSERT_CTX(ctx);
-  gpucomm* comm = (gpucomm*) calloc(1, sizeof(gpucomm));
+  gpucomm* comm;
+  comm = calloc(1, sizeof(*comm));
   if (comm == NULL) {
     *comm_ptr = NULL;
     return GA_MEMORY_ERROR;
@@ -53,8 +54,25 @@ static void comm_free(gpucomm* comm) {
 
 static const char* comm_error(gpucontext* c) {
   cuda_context* ctx = (cuda_context*) c;
-  // find a way to concatenate a constact "(nccl) " infront
-  return ncclGetErrorString(ctx->nccl_err);
+  /* return "(nccl) " ncclGetErrorString(ctx->nccl_err); */
+  switch (ctx->nccl_err) {
+  case ncclSuccess                : return "(nccl) no error";
+  case ncclUnhandledCudaError     : return "(nccl) unhandled cuda error";
+  case ncclSystemError            : return "(nccl) system error";
+  case ncclInternalError          : return "(nccl) internal error";
+  case ncclInvalidDevicePointer   : return "(nccl) invalid device pointer";
+  case ncclInvalidRank            : return "(nccl) invalid rank";
+  case ncclUnsupportedDeviceCount : return "(nccl) unsupported device count";
+  case ncclDeviceNotFound         : return "(nccl) device not found";
+  case ncclInvalidDeviceIndex     : return "(nccl) invalid device index";
+  case ncclLibWrapperNotSet       : return "(nccl) lib wrapper not initialized";
+  case ncclCudaMallocFailed       : return "(nccl) cuda malloc failed";
+  case ncclRankMismatch           : return "(nccl) parameter mismatch between ranks";
+  case ncclInvalidArgument        : return "(nccl) invalid argument";
+  case ncclInvalidType            : return "(nccl) invalid data type";
+  case ncclInvalidOperation       : return "(nccl) invalid reduction operations";
+  }
+  return "(nccl) unknown result code";
 }
 
 static int generate_clique_id(gpucontext* ctx, gpucommCliqueId* cliqueId) {
