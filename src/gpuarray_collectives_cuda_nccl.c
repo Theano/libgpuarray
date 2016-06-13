@@ -95,6 +95,31 @@ static int get_rank(const gpucomm* comm, int* rank) {
   NCCL_CHKFAIL(comm->ctx);
 }
 
+inline ncclRedOp_t convert_reduce_op(int opcode) {
+  switch(opcode) {
+  case GA_SUM : return ncclSum;
+  case GA_PROD: return ncclProd;
+  case GA_MAX : return ncclMax;
+  case GA_MIN : return ncclMin;
+  }
+  return nccl_NUM_OPS;
+}
+
+inline ncclDataType_t convert_data_type(int typecode) {
+  switch(typecode) {
+  case GA_BYTE  : return ncclChar;
+  case GA_INT   : return ncclInt;
+#ifdef CUDA_HAS_HALF
+  case GA_HALF  : return ncclHalf;
+#endif  // CUDA_HAS_HALF
+  case GA_FLOAT : return ncclFloat;
+  case GA_DOUBLE: return ncclDouble;
+  case GA_LONG  : return ncclInt64;
+  case GA_ULONG : return ncclUint64;
+  }
+  return nccl_NUM_TYPES;
+}
+
 static int reduce(const gpudata* src, size_t offsrc,
                   gpudata* dest, size_t offdest,
                   int count, int typecode, int opcode,
