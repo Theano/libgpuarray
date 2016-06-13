@@ -96,14 +96,6 @@ GPUARRAY_PUBLIC int gpucomm_get_count(gpucomm* comm, int* count);
 /**
  * \brief TODO
  * \param comm [gpucomm*] TODO
- * \param device [int*] TODO
- * \return int TODO
- */
-GPUARRAY_PUBLIC int gpucomm_get_device(gpucomm* comm, int* device);
-
-/**
- * \brief TODO
- * \param comm [gpucomm*] TODO
  * \param rank [int*] TODO
  * \return int TODO
  */

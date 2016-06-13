@@ -44,22 +44,23 @@ static int comm_new(gpucomm** comm_ptr, gpucontext* ctx, gpucommCliqueId comm_id
 }
 
 static void comm_free(gpucomm* comm) {
+  ASSERT_COMM(comm);
   cuda_enter(comm->ctx);
   ncclCommDestroy(comm->c);
   cuda_exit(comm->ctx);
   comm_clear(comm);
 }
 
-static const char* comm_error(gpucontext* ctx) {
+static const char* comm_error(gpucontext* c) {
+  cuda_context* ctx = (cuda_context*) c;
+  // find a way to concatenate a constact "(nccl) " infront
+  return ncclGetErrorString(ctx->nccl_err);
 }
 
 static int generate_clique_id(gpucontext* ctx, gpucommCliqueId* cliqueId) {
 }
 
 static int get_count(const gpucomm* comm, int* count) {
-}
-
-static int get_device(const gpucomm* comm, int* device) {
 }
 
 static int get_rank(const gpucomm* comm, int* rank) {
@@ -99,7 +100,6 @@ GPUARRAY_LOCAL gpuarray_comm_ops nccl_ops = {
   comm_error,
   generate_clique_id,
   get_count,
-  get_device,
   get_rank,
   reduce,
   all_reduce,

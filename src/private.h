@@ -209,7 +209,6 @@ struct _gpuarray_comm_ops {
   const char* (*comm_error)(gpucontext* ctx);
   int (*generate_clique_id)(gpucontext* ctx, gpucommCliqueId* cliqueId);
   int (*get_count)(const gpucomm* comm, int* count);
-  int (*get_device)(const gpucomm* comm, int* device);
   int (*get_rank)(const gpucomm* comm, int* rank);
   // collective ops
   int (*reduce)(const gpudata* src, size_t offsrc,

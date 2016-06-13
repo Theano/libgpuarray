@@ -42,13 +42,6 @@ int gpucomm_get_count(gpucomm* comm, int* count) {
   return ctx->comm_ops->get_count(comm, count);
 }
 
-int gpucomm_get_device(gpucomm* comm, int* device) {
-  gpucontext* ctx = gpucomm_context(comm);
-  if (ctx->comm_ops == NULL)
-    return GA_COMM_ERROR;
-  return ctx->comm_ops->get_device(comm, device);
-}
-
 int gpucomm_get_rank(gpucomm* comm, int* rank) {
   gpucontext* ctx = gpucomm_context(comm);
   if (ctx->comm_ops == NULL)
