@@ -10,6 +10,10 @@
 #include "private.h"
 #include "private_cuda.h"
 
+#define NCCL_CHKFAIL(c)  { if ((c)->nccl_err != ncclSuccess) return GA_NO_ERROR; \
+                           return GA_COMM_ERROR; }
+
+
 extern const gpuarray_buffer_ops cuda_ops;
 
 void comm_clear(gpucomm* comm)
@@ -78,15 +82,17 @@ static const char* comm_error(gpucontext* c) {
 static int generate_clique_id(gpucontext* c, gpucommCliqueId* comm_id) {
   cuda_context* ctx = (cuda_context*) c;
   ctx->nccl_err = ncclGetUniqueId((ncclUniqueId*) comm_id);
-  if (ctx->nccl_err != ncclSuccess)
-    return GA_NO_ERROR;
-  return GA_COMM_ERROR;
+  NCCL_CHKFAIL(ctx);
 }
 
 static int get_count(const gpucomm* comm, int* count) {
+  comm->ctx->nccl_err = ncclCommCount(comm->c, count);
+  NCCL_CHKFAIL(comm->ctx);
 }
 
 static int get_rank(const gpucomm* comm, int* rank) {
+  comm->ctx->nccl_err = ncclCommUserRank(comm->c, rank);
+  NCCL_CHKFAIL(comm->ctx);
 }
 
 static int reduce(const gpudata* src, size_t offsrc,
