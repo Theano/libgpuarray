@@ -1,3 +1,6 @@
+#include <assert.h>
+#include <stdlib.h>
+
 #include <nccl.h>
 
 #include "gpuarray/buffer_collectives.h"
@@ -9,22 +12,42 @@
 
 extern const gpuarray_buffer_ops cuda_ops;
 
+void comm_clear(gpucomm* comm)
+{
+  cuda_ops.buffer_deinit((gpucontext*) comm->ctx);
+  CLEAR(comm);
+  free((void*) comm);
+}
+
 static int comm_new(gpucomm** comm_ptr, gpucontext* ctx, gpucommCliqueId comm_id,
                     int ndev, int rank) {
+  ASSERT_CTX(ctx);
   gpucomm* comm = (gpucomm*) calloc(1, sizeof(gpucomm));
-  if (comm == NULL)
+  if (comm == NULL) {
+    *comm_ptr = NULL;
     return GA_MEMORY_ERROR;
-  *comm_ptr = comm;
+  }
   comm->ctx = (cuda_context*) ctx;
   comm->ctx->refcnt++;  // So that ctx would not be destroyed before comm
+  cuda_enter(comm->ctx);
   comm->ctx->nccl_err = ncclCommInitRank(&comm->c, ndev,
                                          *((ncclUniqueId*)&comm_id), rank);
-  if (comm->ctx->nccl_err != ncclSuccess)
+  cuda_exit(comm->ctx);
+  TAG_COMM(comm);
+  if (comm->ctx->nccl_err != ncclSuccess) {
+    *comm_ptr = NULL;
+    comm_clear(comm);
     return GA_COMM_ERROR;
+  }
+  *comm_ptr = comm;
   return GA_NO_ERROR;
 }
 
 static void comm_free(gpucomm* comm) {
+  cuda_enter(comm->ctx);
+  ncclCommDestroy(comm->c);
+  cuda_exit(comm->ctx);
+  comm_clear(comm);
 }
 
 static const char* comm_error(gpucontext* ctx) {
