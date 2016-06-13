@@ -5,12 +5,12 @@
 #include "gpuarray/error.h"
 
 int gpucomm_new(gpucomm** comm, gpucontext* ctx,
-                gpucommCliqueId cliqueId, int ndev, int rank) {
+                gpucommCliqueId comm_id, int ndev, int rank) {
   if (ctx->comm_ops == NULL) {
     *comm = NULL;
     return GA_UNSUPPORTED_ERROR;
   }
-  return ctx->comm_ops->comm_new(comm, ctx, cliqueId, ndev, rank);
+  return ctx->comm_ops->comm_new(comm, ctx, comm_id, ndev, rank);
 }
 
 void gpucomm_free(gpucomm* comm) {
@@ -29,10 +29,10 @@ gpucontext* gpucomm_context(gpucomm* comm) {
   return ((partial_gpucomm*)comm)->ctx;
 }
 
-int gpucomm_gen_clique_id(gpucontext* ctx, gpucommCliqueId* cliqueId) {
+int gpucomm_gen_clique_id(gpucontext* ctx, gpucommCliqueId* comm_id) {
   if (ctx->comm_ops == NULL)
     return GA_COMM_ERROR;
-  return ctx->comm_ops->generate_clique_id(ctx, cliqueId);
+  return ctx->comm_ops->generate_clique_id(ctx, comm_id);
 }
 
 int gpucomm_get_count(gpucomm* comm, int* count) {

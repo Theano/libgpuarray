@@ -46,13 +46,13 @@ typedef struct _gpucommCliqueId {
  * \brief TODO
  * \param comm [gpucomm**] TODO
  * \param ctx [gpucontext*] TODO
- * \param cliqueId [gpucommCliqueId] TODO
+ * \param comm_id [gpucommCliqueId] TODO
  * \param ndev [int] TODO
  * \param rank [int] TODO
  * \return int TODO
  */
 GPUARRAY_PUBLIC int gpucomm_new(gpucomm** comm, gpucontext* ctx,
-                                gpucommCliqueId cliqueId, int ndev, int rank);
+                                gpucommCliqueId comm_id, int ndev, int rank);
 
 /**
  * \brief TODO
@@ -79,11 +79,11 @@ GPUARRAY_PUBLIC gpucontext* gpucomm_context(gpucomm* comm);
 /**
  * \brief TODO
  * \param ctx [gpucontext*] TODO
- * \param cliqueId [gpucommCliqueId*]
+ * \param comm_id [gpucommCliqueId*]
  * \return int TODO
  */
 GPUARRAY_PUBLIC int gpucomm_gen_clique_id(gpucontext* ctx,
-                                          gpucommCliqueId* cliqueId);
+                                          gpucommCliqueId* comm_id);
 
 /**
  * \brief TODO

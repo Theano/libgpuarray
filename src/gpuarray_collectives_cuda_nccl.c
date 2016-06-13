@@ -75,7 +75,12 @@ static const char* comm_error(gpucontext* c) {
   return "(nccl) unknown result code";
 }
 
-static int generate_clique_id(gpucontext* ctx, gpucommCliqueId* cliqueId) {
+static int generate_clique_id(gpucontext* c, gpucommCliqueId* comm_id) {
+  cuda_context* ctx = (cuda_context*) c;
+  ctx->nccl_err = ncclGetUniqueId((ncclUniqueId*) comm_id);
+  if (ctx->nccl_err != ncclSuccess)
+    return GA_NO_ERROR;
+  return GA_COMM_ERROR;
 }
 
 static int get_count(const gpucomm* comm, int* count) {
@@ -89,6 +94,7 @@ static int reduce(const gpudata* src, size_t offsrc,
                   int count, int typecode, int opcode,
                   int root, gpucomm* comm) {
 }
+
 static int all_reduce(const gpudata* src, size_t offsrc,
                       gpudata* dest, size_t offdest,
                       int count, int typecode, int opcode,
