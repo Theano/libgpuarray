@@ -14,7 +14,8 @@
 #include <gpuarray/types.h>
 #include <gpuarray/buffer.h>
 #include <gpuarray/buffer_blas.h>
-#include "gpuarray/buffer_collectives.h"
+#include <gpuarray/buffer_collectives.h>
+
 #include "util/strb.h"
 #include "cache.h"
 
@@ -36,8 +37,7 @@ struct _gpuarray_blas_ops;
 typedef struct _gpuarray_blas_ops gpuarray_blas_ops;
 
 struct _gpuarray_comm_ops;
-typedef struct _gpyarray_comm_ops gpuarray_comm_ops;
-// TODO define them
+typedef struct _gpuarray_comm_ops gpuarray_comm_ops;
 
 #define GPUCONTEXT_HEAD                         \
   const gpuarray_buffer_ops *ops;               \
@@ -54,7 +54,7 @@ typedef struct _gpyarray_comm_ops gpuarray_comm_ops;
 struct _gpucontext {
   GPUCONTEXT_HEAD;
   void *ctx_ptr;
-  void *private[7];
+  void *private[8];
 };
 
 /* The real gpudata struct is likely bigger but we only care about the
@@ -203,11 +203,11 @@ struct _gpuarray_blas_ops {
 };
 
 struct _gpuarray_comm_ops {
-  int (*comm_new)(gpucomm* comm, gpucontext* ctx, const char* clique_id,
-                  int ndev, int rank, int* res);
+  int (*comm_new)(gpucomm** comm, gpucontext* ctx, gpucommCliqueId clique_id,
+                  int ndev, int rank);
   void (*comm_free)(gpucomm* comm);
   const char* (*comm_error)(gpucontext* ctx);
-  const char* (*generate_clique_id)(int* res);
+  int (*generate_clique_id)(gpucontext* ctx, gpucommCliqueId* cliqueId);
   int (*get_count)(const gpucomm* comm, int* count);
   int (*get_device)(const gpucomm* comm, int* device);
   int (*get_rank)(const gpucomm* comm, int* rank);

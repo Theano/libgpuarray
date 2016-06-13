@@ -503,11 +503,14 @@ GPUARRAY_PUBLIC int gpukernel_binary(gpukernel *k, size_t *sz, void **obj);
 GPUARRAY_PUBLIC int gpukernel_property(gpukernel *k, int prop_id, void *res);
 
 GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
+
 /**
  * \defgroup props Properties
  * @{
  */
 /* Start at 1 for GA_CTX_PROP_ */
+#define GA_CTX_PROP_START    1
+
 /**
  * Get the device name for the context.
  *
@@ -647,8 +650,16 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
  */
 #define GA_CTX_PROP_MAXLSIZE2 17
 
+/**
+ * Get the vector of collective ops for the context.
+ *
+ * Type: `const gpuarray_comm_ops *`
+ */
+#define GA_CTX_PROP_COMM_OPS  18
 
 /* Start at 512 for GA_BUFFER_PROP_ */
+#define GA_BUFFER_PROP_START  512
+
 /**
  * Get the context in which this buffer was allocated.
  *
@@ -674,6 +685,8 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
 #define GA_BUFFER_PROP_SIZE  514
 
 /* Start at 1024 for GA_KERNEL_PROP_ */
+#define GA_KERNEL_PROP_START     1024
+
 /**
  * Get the context for which this kernel was compiled.
  *

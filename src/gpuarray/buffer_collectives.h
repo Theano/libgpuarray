@@ -1,8 +1,8 @@
 #ifndef GPUARRAY_BUFFER_COLLECTIVES_H
 #define GPUARRAY_BUFFER_COLLECTIVES_H
 
-#include <gpuarray/config.h>
-#include <gpuarray/buffer.h>
+#include "gpuarray/config.h"
+#include "gpuarray/buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,7 +31,7 @@ enum _gpucomm_reduce_ops {
   GA_SUM = 0,
   GA_PROD = 1,
   GA_MAX = 2,
-  GA_MIN = 3
+  GA_MIN = 3,
 };
 
 #define GA_COMM_ID_BYTES 128  // sizeof(gpucommCliqueId)
@@ -39,39 +39,35 @@ enum _gpucomm_reduce_ops {
  * Dummy struct to define byte-array's length through a type
  */
 typedef struct _gpucommCliqueId {
-  char internal[GA_COMM_ID_BYTES];
+  char (*internal)[][GA_COMM_ID_BYTES];
 } gpucommCliqueId;
 
 /**
  * \brief TODO
+ * \param comm [gpucomm**] TODO
  * \param ctx [gpucontext*] TODO
- * \param clique_id [const char*] TODO
+ * \param cliqueId [gpucommCliqueId] TODO
  * \param ndev [int] TODO
  * \param rank [int] TODO
- * \param res [int*] TODO
- * \return gpucomm* TODO
+ * \return int TODO
  */
-GPUARRAY_PUBLIC int gpucomm_new(gpucomm* comm, gpucontext* ctx,
-                                const char* clique_id, int ndev, int rank, int* res);
+GPUARRAY_PUBLIC int gpucomm_new(gpucomm** comm, gpucontext* ctx,
+                                gpucommCliqueId cliqueId, int ndev, int rank);
 
 /**
  * \brief TODO
  * \param comm [gpucomm*] TODO
- * \return void TODO
+ * \return int TODO
  */
-GPUARRAY_PUBLIC void gpucomm_free(gpucomm* comm);
+GPUARRAY_PUBLIC int gpucomm_free(gpucomm* comm);
 
 
 /**
- * \brief Returns nice error message.
- * \param comm [gpucomm*] TODO
- * \param err [int] TODO
+ * \brief Returns nice error message concerning collectives array and buffer API.
+ * \param ctx [gpucontext*] TODO
  * \return const char* TODO
  */
-GPUARRAY_PUBLIC const char* gpucomm_error(gpucomm* comm, int err);
-// Mby check if err is GA_COMM_ERROR and if it is then call
-// ctx->comm_ops->comm_error(ctx) else call gpucontext_error(ctx, err)
-// same for gpublas for GA_BLAS_ERROR??
+GPUARRAY_PUBLIC const char* gpucomm_error(gpucontext* ctx);
 
 /**
  * \brief TODO
@@ -82,41 +78,37 @@ GPUARRAY_PUBLIC gpucontext* gpucomm_context(gpucomm* comm);
 
 /**
  * \brief TODO
- * \param res [int*] TODO
- * \return const char* TODO
+ * \param ctx [gpucontext*] TODO
+ * \param cliqueId [gpucommCliqueId*]
+ * \return int TODO
  */
-GPUARRAY_PUBLIC const char* gpucomm_gen_clique_id(int* res);
+GPUARRAY_PUBLIC int gpucomm_gen_clique_id(gpucontext* ctx,
+                                          gpucommCliqueId* cliqueId);
 
 /**
  * \brief TODO
- * \param comm [const gpucomm*] TODO
+ * \param comm [gpucomm*] TODO
  * \param count [int*] TODO
  * \return int TODO
  */
-GPUARRAY_PUBLIC int gpucomm_get_count(const gpucomm* comm, int* count);
+GPUARRAY_PUBLIC int gpucomm_get_count(gpucomm* comm, int* count);
 
 /**
  * \brief TODO
- * \param comm [const gpucomm*] TODO
+ * \param comm [gpucomm*] TODO
  * \param device [int*] TODO
  * \return int TODO
  */
-GPUARRAY_PUBLIC int gpucomm_get_device(const gpucomm* comm, int* device);
+GPUARRAY_PUBLIC int gpucomm_get_device(gpucomm* comm, int* device);
 
 /**
  * \brief TODO
- * \param comm [const gpucomm*] TODO
+ * \param comm [gpucomm*] TODO
  * \param rank [int*] TODO
  * \return int TODO
  */
-GPUARRAY_PUBLIC int gpucomm_get_rank(const gpucomm* comm, int* rank);
+GPUARRAY_PUBLIC int gpucomm_get_rank(gpucomm* comm, int* rank);
 
-// TODO private and cuda_private
-// TODO cuda impl:
-// functions in buffer, cuda buffer and cuda array
-// adapter for typecode and opcode to nccl enums
-
-// TODO redeclare below to add gpudata array metadata
 /**
  * \brief TODO
  * \param src [const gpudata*] TODO
