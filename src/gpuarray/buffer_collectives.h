@@ -39,7 +39,7 @@ enum _gpucomm_reduce_ops {
  * Dummy struct to define byte-array's length through a type
  */
 typedef struct _gpucommCliqueId {
-  char (*internal)[][GA_COMM_ID_BYTES];
+  char internal[GA_COMM_ID_BYTES];
 } gpucommCliqueId;
 
 /**
