@@ -509,8 +509,6 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
  * @{
  */
 /* Start at 1 for GA_CTX_PROP_ */
-#define GA_CTX_PROP_START    1
-
 /**
  * Get the device name for the context.
  *
