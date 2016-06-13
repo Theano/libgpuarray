@@ -57,9 +57,9 @@ GPUARRAY_PUBLIC int gpucomm_new(gpucomm** comm, gpucontext* ctx,
 /**
  * \brief TODO
  * \param comm [gpucomm*] TODO
- * \return int TODO
+ * \return void TODO
  */
-GPUARRAY_PUBLIC int gpucomm_free(gpucomm* comm);
+GPUARRAY_PUBLIC void gpucomm_free(gpucomm* comm);
 
 
 /**

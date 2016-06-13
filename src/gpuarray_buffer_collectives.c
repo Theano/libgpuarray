@@ -13,12 +13,10 @@ int gpucomm_new(gpucomm** comm, gpucontext* ctx,
   return ctx->comm_ops->comm_new(comm, ctx, cliqueId, ndev, rank);
 }
 
-int gpucomm_free(gpucomm* comm) {
+void gpucomm_free(gpucomm* comm) {
   gpucontext* ctx = gpucomm_context(comm);
-  if (ctx->comm_ops == NULL)
-    return GA_COMM_ERROR;
-  ctx->comm_ops->comm_free(comm);
-  return GA_NO_ERROR;
+  if (ctx->comm_ops != NULL)
+    ctx->comm_ops->comm_free(comm);
 }
 
 const char* gpucomm_error(gpucontext* ctx) {
