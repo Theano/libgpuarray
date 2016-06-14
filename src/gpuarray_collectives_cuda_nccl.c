@@ -11,8 +11,21 @@
 #include "private.h"
 #include "private_cuda.h"
 
-#define NCCL_CHKFAIL(c)  { if ((c)->nccl_err != ncclSuccess) return GA_NO_ERROR; \
-                           return GA_COMM_ERROR; }
+#define NCCL_CHKFAIL(ctx) \
+do { \
+  if ((ctx)->nccl_err != ncclSuccess) \
+    return GA_NO_ERROR; \
+  return GA_COMM_ERROR; \
+} while (0)
+
+#define NCCL_EXIT_ON_ERROR(ctx, cmd) \
+do { \
+  (ctx)->nccl_err = (cmd); \
+  if ((ctx)->nccl_err != ncclSuccess) { \
+    cuda_exit((ctx)); \
+    return GA_COMM_ERROR; \
+  } \
+} while (0)
 
 #define GA_CHECK(cmd) \
 do { \
@@ -132,32 +145,56 @@ inline ncclDataType_t convert_data_type(int typecode) {
   return nccl_NUM_TYPES;
 }
 
+inline int check_reduce(const gpudata* src, size_t offsrc,
+                        gpudata* dest, size_t offdest,
+                        int count, int typecode, int opcode,
+                        gpucomm* comm, ncclRedOp_t* op, ncclDataType_t* datatype) {
+  // src, dest and comm must refer to the same context
+  if (src->ctx != comm->ctx)
+    return GA_VALUE_ERROR;
+  if (dest != NULL && dest->ctx != comm->ctx)
+    return GA_VALUE_ERROR;
+  // opcode must correspond to a valid ncclRedOp_t
+  *op = convert_reduce_op(opcode);
+  if (*op == nccl_NUM_OPS)
+    return GA_VALUE_ERROR;
+  // typecode must correspond to a valid ncclDataType_t
+  *datatype = convert_data_type(typecode);
+  if (*datatype == nccl_NUM_TYPES)
+    return GA_VALUE_ERROR;
+  // size to operate upon must be able to fit inside the gpudata (incl offsets)
+  size_t op_size = count * gpuarray_get_elsize(typecode);
+  if ((src->sz - offsrc) < op_size)
+    return GA_VALUE_ERROR;
+  if (dest != NULL && (dest->sz - offdest) < op_size)
+    return GA_VALUE_ERROR;
+  // offsets must not be larger than gpudata's size itself
+  // (else out of alloc-ed mem scope)
+  if (offsrc > src->sz)
+    return GA_VALUE_ERROR;
+  if (dest != NULL & offdest > dest->sz)
+    return GA_VALUE_ERROR;
+  return GA_NO_ERROR;
+}
+
 static int reduce(const gpudata* src, size_t offsrc,
                   gpudata* dest, size_t offdest,
                   int count, int typecode, int opcode,
                   int root, gpucomm* comm) {
+  ncclRedOp_t op;
+  ncclDataType_t datatype;
   ASSERT_BUF(src);
-  ASSERT_BUF(dest);
   ASSERT_COMM(comm);
-  // src, dest and comm must refer to the same context
-  if (src->ctx != dest->ctx || dest->ctx != comm->ctx)
-    return GA_VALUE_ERROR;
-  // opcode must correspond to a valid ncclRedOp_t
-  ncclRedOp_t op = convert_reduce_op(opcode);
-  if (op == nccl_NUM_OPS)
-    return GA_VALUE_ERROR;
-  // typecode must correspond to a valid ncclDataType_t
-  ncclDataType_t datatype = convert_data_type(typecode);
-  if (datatype == nccl_NUM_TYPES)
-    return GA_VALUE_ERROR;
-  // size to operate upon must be able to fit inside the gpudata (incl offsets)
-  size_t op_size = count * gpuarray_get_elsize(typecode);
-  if ((src->sz - offsrc) < op_size || (dest->sz - offdest) < op_size)
-    return GA_VALUE_ERROR;
-  // offsets must not be larger than gpudata's size itself
-  // (else out of alloc-ed mem scope)
-  if (offsrc > src->sz || offdest > dest->sz)
-    return GA_VALUE_ERROR;
+  gpudata* dst = NULL;
+  int rank = 0;
+  GA_CHECK(get_rank(comm, &rank));
+  if (rank == root) {
+    dst = dest;
+    ASSERT_BUF(dest);
+  }
+  GA_CHECK(check_reduce(src, offsrc, dst, offdest,
+                        count, typecode, opcode, comm,
+                        &op, &datatype));
 
   cuda_context* ctx = comm->ctx;
   cuda_enter(ctx);
@@ -165,20 +202,21 @@ static int reduce(const gpudata* src, size_t offsrc,
   // sync: wait till a write has finished (out of concurrent kernels)
   GA_CHECK(cuda_wait(src, CUDA_WAIT_READ));
   // sync: wait till a read/write has finished (out of concurrent kernels)
-  GA_CHECK(cuda_wait(dest, CUDA_WAIT_WRITE));
+  if (rank == root)
+    GA_CHECK(cuda_wait(dst, CUDA_WAIT_WRITE));
 
   // change stream of nccl ops to enable concurrency
-  ctx->nccl_err = ncclReduce(((void*) src->ptr) + offsrc,
-                             ((void*) dest->ptr) + offdest,
-                             count, datatype, op, comm->c, ctx->s);
-
-  if (ctx->nccl_err != ncclSuccess) {
-    cuda_exit(ctx);
-    return GA_COMM_ERROR;
-  }
+  if (rank == root)
+    NCCL_EXIT_ON_ERROR(ctx, ncclReduce(((void*) src->ptr) + offsrc,
+                                       ((void*) dst->ptr) + offdest,
+                                       count, datatype, op, root, comm->c, ctx->s));
+  else
+    NCCL_EXIT_ON_ERROR(ctx, ncclReduce(((void*) src->ptr) + offsrc, NULL,
+                                       count, datatype, op, root, comm->c, ctx->s));
 
   GA_CHECK(cuda_record(src, CUDA_WAIT_READ));
-  GA_CHECK(cuda_record(dest, CUDA_WAIT_WRITE));
+  if (rank == root)
+    GA_CHECK(cuda_record(dst, CUDA_WAIT_WRITE));
 
   cuda_exit(ctx);
 
