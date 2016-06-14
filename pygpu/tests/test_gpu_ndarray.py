@@ -12,7 +12,7 @@ import pygpu
 from pygpu.gpuarray import GpuArray, GpuContext, GpuKernel
 
 from .support import (guard_devsup, check_meta, check_flags, check_all,
-                      gen_gpuarray, context as ctx, dtypes_all,
+                      check_content, gen_gpuarray, context as ctx, dtypes_all,
                       dtypes_no_complex, skip_single_f)
 
 
@@ -606,6 +606,24 @@ def _cmpfV(x, *y):
         pass
     else:
         raise Exception("Did not generate value error")
+
+
+def test_take1():
+    yield do_take1, (4, 3), [2, 0], False
+    yield do_take1, (4, 3), [2, 0], True
+    yield do_take1, (12, 4, 3), [1, 1, 1, 1, 1, 2, 2, 3, 3, 0, 0, 9], False
+
+
+def do_take1(shp, idx, offseted):
+    c, g = gen_gpuarray(shp, dtype='float32', ctx=ctx, order='c')
+    ci = numpy.asarray(idx)
+    gi = pygpu.asarray(ci, context=ctx)
+
+    rc = c.take(ci, axis=0)
+    rg = g.take1(gi)
+
+    check_content(rg, rc)
+
 
 def test_flags():
     for fl in ['C', 'F', 'W', 'B', 'O', 'A', 'U', 'CA', 'FA', 'FNC', 'FORC',

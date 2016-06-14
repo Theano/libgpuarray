@@ -289,7 +289,7 @@ cdef int array_take1(GpuArray r, GpuArray a, GpuArray i,
     if err != GA_NO_ERROR:
         if err == GA_VALUE_ERROR:
             raise IndexError, "Index out of bounds"
-        raise get_exc(err), GpuArray_error(&v.ga, err)
+        raise get_exc(err), GpuArray_error(&r.ga, err)
 
 cdef int array_setarray(GpuArray v, GpuArray a) except -1:
     cdef int err
