@@ -203,12 +203,12 @@ static int reduce(const gpudata* src, size_t offsrc,
   GA_CHECK(cuda_wait(src, CUDA_WAIT_READ));
   // sync: wait till a read/write has finished (out of concurrent kernels)
   if (rank == root)
-    GA_CHECK(cuda_wait(dst, CUDA_WAIT_WRITE));
+    GA_CHECK(cuda_wait(dest, CUDA_WAIT_WRITE));
 
   // change stream of nccl ops to enable concurrency
   if (rank == root)
     NCCL_EXIT_ON_ERROR(ctx, ncclReduce(((void*) src->ptr) + offsrc,
-                                       ((void*) dst->ptr) + offdest,
+                                       ((void*) dest->ptr) + offdest,
                                        count, datatype, op, root, comm->c, ctx->s));
   else
     NCCL_EXIT_ON_ERROR(ctx, ncclReduce(((void*) src->ptr) + offsrc, NULL,
@@ -216,7 +216,7 @@ static int reduce(const gpudata* src, size_t offsrc,
 
   GA_CHECK(cuda_record(src, CUDA_WAIT_READ));
   if (rank == root)
-    GA_CHECK(cuda_record(dst, CUDA_WAIT_WRITE));
+    GA_CHECK(cuda_record(dest, CUDA_WAIT_WRITE));
 
   cuda_exit(ctx);
 
@@ -227,6 +227,34 @@ static int all_reduce(const gpudata* src, size_t offsrc,
                       gpudata* dest, size_t offdest,
                       int count, int typecode, int opcode,
                       gpucomm* comm) {
+  ncclRedOp_t op;
+  ncclDataType_t datatype;
+  ASSERT_BUF(src);
+  ASSERT_COMM(comm);
+  ASSERT_BUF(dest);
+  GA_CHECK(check_reduce(src, offsrc, dest, offdest,
+                        count, typecode, opcode, comm,
+                        &op, &datatype));
+
+  cuda_context* ctx = comm->ctx;
+  cuda_enter(ctx);
+
+  // sync: wait till a write has finished (out of concurrent kernels)
+  GA_CHECK(cuda_wait(src, CUDA_WAIT_READ));
+  // sync: wait till a read/write has finished (out of concurrent kernels)
+  GA_CHECK(cuda_wait(dest, CUDA_WAIT_WRITE));
+
+  // change stream of nccl ops to enable concurrency
+  NCCL_EXIT_ON_ERROR(ctx, ncclAllReduce(((void*) src->ptr) + offsrc,
+                                        ((void*) dest->ptr) + offdest,
+                                        count, datatype, op, comm->c, ctx->s));
+
+  GA_CHECK(cuda_record(src, CUDA_WAIT_READ));
+  GA_CHECK(cuda_record(dest, CUDA_WAIT_WRITE));
+
+  cuda_exit(ctx);
+
+  return GA_NO_ERROR;
 }
 
 static int reduce_scatter(const gpudata* src, size_t offsrc,
