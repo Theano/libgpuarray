@@ -49,13 +49,7 @@ int gpucomm_get_rank(gpucomm* comm, int* rank) {
   return ctx->comm_ops->get_rank(comm, rank);
 }
 
-// Should we add some checks to ensure that gpudata src and dest sizes suffice
-// for each op?
-// e.g. for reduce: that (src->sz - offsrc) > count * sizeof(typecode)
-// and (dest->sz - offdest) > count * sizeof(typecode)
-// mby this should be done in gpuarray_buffer_collectives_cuda.c where scope of
-// gpudata definition reaches.
-int gpucomm_reduce(const gpudata* src, size_t offsrc,
+int gpucomm_reduce(gpudata* src, size_t offsrc,
                    gpudata* dest, size_t offdest,
                    int count, int typecode, int opcode,
                    int root, gpucomm* comm) {
@@ -63,10 +57,10 @@ int gpucomm_reduce(const gpudata* src, size_t offsrc,
   if (ctx->comm_ops == NULL)
     return GA_COMM_ERROR;
   return ctx->comm_ops->reduce(src, offsrc, dest, offdest,
-                                     count, typecode, opcode, root, comm);
+                               count, typecode, opcode, root, comm);
 }
 
-int gpucomm_all_reduce(const gpudata* src, size_t offsrc,
+int gpucomm_all_reduce(gpudata* src, size_t offsrc,
                        gpudata* dest, size_t offdest,
                        int count, int typecode, int opcode,
                        gpucomm* comm) {
@@ -74,10 +68,10 @@ int gpucomm_all_reduce(const gpudata* src, size_t offsrc,
   if (ctx->comm_ops == NULL)
     return GA_COMM_ERROR;
   return ctx->comm_ops->all_reduce(src, offsrc, dest, offdest,
-                                         count, typecode, opcode, comm);
+                                   count, typecode, opcode, comm);
 }
 
-int gpucomm_reduce_scatter(const gpudata* src, size_t offsrc,
+int gpucomm_reduce_scatter(gpudata* src, size_t offsrc,
                            gpudata* dest, size_t offdest,
                            int count, int typecode, int opcode,
                            gpucomm* comm) {
@@ -85,7 +79,7 @@ int gpucomm_reduce_scatter(const gpudata* src, size_t offsrc,
   if (ctx->comm_ops == NULL)
     return GA_COMM_ERROR;
   return ctx->comm_ops->reduce_scatter(src, offsrc, dest, offdest,
-                                             count, typecode, opcode, comm);
+                                       count, typecode, opcode, comm);
 }
 
 int gpucomm_broadcast(gpudata* array, size_t offset,
@@ -95,10 +89,10 @@ int gpucomm_broadcast(gpudata* array, size_t offset,
   if (ctx->comm_ops == NULL)
     return GA_COMM_ERROR;
   return ctx->comm_ops->broadcast(array, offset,
-                                        count, typecode, root, comm);
+                                  count, typecode, root, comm);
 }
 
-int gpucomm_all_gather(const gpudata* src, size_t offsrc,
+int gpucomm_all_gather(gpudata* src, size_t offsrc,
                        gpudata* dest, size_t offdest,
                        int count, int typecode,
                        gpucomm* comm) {
@@ -106,5 +100,5 @@ int gpucomm_all_gather(const gpudata* src, size_t offsrc,
   if (ctx->comm_ops == NULL)
     return GA_COMM_ERROR;
   return ctx->comm_ops->all_gather(src, offsrc, dest, offdest,
-                                         count, typecode, comm);
+                                   count, typecode, comm);
 }

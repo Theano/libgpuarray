@@ -103,7 +103,7 @@ GPUARRAY_PUBLIC int gpucomm_get_rank(gpucomm* comm, int* rank);
 
 /**
  * \brief TODO
- * \param src [const gpudata*] TODO
+ * \param src [gpudata*] TODO
  * \param offsrc [size_t] TODO
  * \param dest [gpudata*] TODO
  * \param offdest [size_t] TODO
@@ -114,14 +114,14 @@ GPUARRAY_PUBLIC int gpucomm_get_rank(gpucomm* comm, int* rank);
  * \param comm [gpucomm*] TODO
  * \return int TODO
  */
-GPUARRAY_PUBLIC int gpucomm_reduce(const gpudata* src, size_t offsrc,
+GPUARRAY_PUBLIC int gpucomm_reduce(gpudata* src, size_t offsrc,
                                    gpudata* dest, size_t offdest,
                                    int count, int typecode, int opcode,
                                    int root, gpucomm* comm);
 
 /**
  * \brief TODO
- * \param src [const gpudata*] TODO
+ * \param src [gpudata*] TODO
  * \param offsrc [size_t] TODO
  * \param dest [gpudata*] TODO
  * \param offdest [size_t] TODO
@@ -131,14 +131,14 @@ GPUARRAY_PUBLIC int gpucomm_reduce(const gpudata* src, size_t offsrc,
  * \param comm [gpucomm*] TODO
  * \return int TODO
  */
-GPUARRAY_PUBLIC int gpucomm_all_reduce(const gpudata* src, size_t offsrc,
+GPUARRAY_PUBLIC int gpucomm_all_reduce(gpudata* src, size_t offsrc,
                                        gpudata* dest, size_t offdest,
                                        int count, int typecode, int opcode,
                                        gpucomm* comm);
 
 /**
  * \brief TODO
- * \param src [const gpudata*] TODO
+ * \param src [gpudata*] TODO
  * \param offsrc [size_t] TODO
  * \param dest [gpudata*] TODO
  * \param offdest [size_t] TODO
@@ -148,7 +148,7 @@ GPUARRAY_PUBLIC int gpucomm_all_reduce(const gpudata* src, size_t offsrc,
  * \param comm [gpucomm*] TODO
  * \return int TODO
  */
-GPUARRAY_PUBLIC int gpucomm_reduce_scatter(const gpudata* src, size_t offsrc,
+GPUARRAY_PUBLIC int gpucomm_reduce_scatter(gpudata* src, size_t offsrc,
                                            gpudata* dest, size_t offdest,
                                            int count, int typecode, int opcode,
                                            gpucomm* comm);
@@ -169,7 +169,7 @@ GPUARRAY_PUBLIC int gpucomm_broadcast(gpudata* array, size_t offset,
 
 /**
  * \brief TODO
- * \param src [const gpudata*] TODO
+ * \param src [gpudata*] TODO
  * \param offsrc [size_t] TODO
  * \param dest [gpudata*] TODO
  * \param offdest [size_t] TODO
@@ -178,7 +178,7 @@ GPUARRAY_PUBLIC int gpucomm_broadcast(gpudata* array, size_t offset,
  * \param comm [gpucomm*] TODO
  * \return int TODO
  */
-GPUARRAY_PUBLIC int gpucomm_all_gather(const gpudata* src, size_t offsrc,
+GPUARRAY_PUBLIC int gpucomm_all_gather(gpudata* src, size_t offsrc,
                                        gpudata* dest, size_t offdest,
                                        int count, int typecode,
                                        gpucomm* comm);

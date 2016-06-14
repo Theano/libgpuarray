@@ -54,7 +54,7 @@ typedef struct _gpuarray_comm_ops gpuarray_comm_ops;
 struct _gpucontext {
   GPUCONTEXT_HEAD;
   void *ctx_ptr;
-  void *private[8];
+  void *private[7];
 };
 
 /* The real gpudata struct is likely bigger but we only care about the
@@ -211,22 +211,22 @@ struct _gpuarray_comm_ops {
   int (*get_count)(const gpucomm* comm, int* count);
   int (*get_rank)(const gpucomm* comm, int* rank);
   // collective ops
-  int (*reduce)(const gpudata* src, size_t offsrc,
+  int (*reduce)(gpudata* src, size_t offsrc,
                 gpudata* dest, size_t offdest,
                 int count, int typecode, int opcode,
                 int root, gpucomm* comm);
-  int (*all_reduce)(const gpudata* src, size_t offsrc,
+  int (*all_reduce)(gpudata* src, size_t offsrc,
                     gpudata* dest, size_t offdest,
                     int count, int typecode, int opcode,
                     gpucomm* comm);
-  int (*reduce_scatter)(const gpudata* src, size_t offsrc,
+  int (*reduce_scatter)(gpudata* src, size_t offsrc,
                         gpudata* dest, size_t offdest,
                         int count, int typecode, int opcode,
                         gpucomm* comm);
   int (*broadcast)(gpudata* array, size_t offset,
                    int count, int typecode,
                    int root, gpucomm* comm);
-  int (*all_gather)(const gpudata* src, size_t offsrc,
+  int (*all_gather)(gpudata* src, size_t offsrc,
                     gpudata* dest, size_t offdest,
                     int count, int typecode,
                     gpucomm* comm);
