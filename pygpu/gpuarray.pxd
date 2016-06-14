@@ -162,6 +162,7 @@ cdef extern from "gpuarray/array.h":
     int GpuArray_sync(_GpuArray *a) nogil
     int GpuArray_index(_GpuArray *r, _GpuArray *a, const ssize_t *starts,
                        const ssize_t *stops, const ssize_t *steps)
+    int GpuArray_take1(_GpuArray *r, _GpuArray *a, _GpuArray *i, int check_err)
     int GpuArray_setarray(_GpuArray *v, _GpuArray *a)
     int GpuArray_reshape(_GpuArray *res, _GpuArray *a, unsigned int nd,
                          const size_t *newdims, ga_order ord, int nocopy)
@@ -225,6 +226,8 @@ cdef int array_view(GpuArray v, GpuArray a) except -1
 cdef int array_sync(GpuArray a) except -1
 cdef int array_index(GpuArray r, GpuArray a, const ssize_t *starts,
                      const ssize_t *stops, const ssize_t *steps) except -1
+cdef int array_take1(GpuArray r, GpuArray a, GpuArray i,
+                     int check_err) except -1
 cdef int array_setarray(GpuArray v, GpuArray a) except -1
 cdef int array_reshape(GpuArray res, GpuArray a, unsigned int nd,
                        const size_t *newdims, ga_order ord,
