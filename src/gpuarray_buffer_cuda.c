@@ -67,13 +67,21 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   if (detect_arch(ARCH_PREFIX, res->bin_id, &err)) {
     goto fail_stream;
   }
+  /* Don't add the nonblocking flags to help usage with other
+     libraries that may do stuff on the NULL stream */
   err = cuStreamCreate(&res->s, 0);
   if (err != CUDA_SUCCESS) {
     goto fail_stream;
   }
-  err = cuStreamCreate(&res->mem_s, CU_STREAM_NON_BLOCKING);
-  if (err != CUDA_SUCCESS) {
-    goto fail_mem_stream;
+  if (ISSET(res->flags, GA_CTX_SINGLE_STREAM)) {
+    res->mem_s = res->s;
+  } else {
+    /* Don't add the nonblocking flags to help usage with other
+       libraries that may do stuff on the NULL stream */
+    err = cuStreamCreate(&res->mem_s, 0);
+    if (err != CUDA_SUCCESS) {
+      goto fail_mem_stream;
+    }
   }
   res->kernel_cache = cache_twoq(64, 128, 64, 8, strb_eq, strb_hash,
                                  (cache_freek_fn)strb_free,
@@ -99,7 +107,8 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
  fail_errbuf:
   cache_destroy(res->kernel_cache);
  fail_cache:
-  cuStreamDestroy(res->mem_s);
+  if (ISCLR(res->flags, GA_CTX_SINGLE_STREAM))
+    cuStreamDestroy(res->mem_s);
  fail_mem_stream:
   cuStreamDestroy(res->s);
  fail_stream:
@@ -128,7 +137,8 @@ static void cuda_free_ctx(cuda_context *ctx) {
     cuMemFreeHost((void *)ctx->errbuf->ptr);
     deallocate(ctx->errbuf);
 
-    cuStreamDestroy(ctx->mem_s);
+    if (ISCLR(ctx->flags, GA_CTX_SINGLE_STREAM))
+      cuStreamDestroy(ctx->mem_s);
     cuStreamDestroy(ctx->s);
 
     /* Clear out the freelist */
@@ -185,6 +195,7 @@ static gpudata *new_gpudata(cuda_context *ctx, CUdeviceptr ptr, size_t size) {
   res->sz = size;
 
   res->flags = 0;
+  res->ls = NULL;
 
   cuda_enter(ctx);
 
@@ -313,7 +324,7 @@ static cuda_context *do_init(CUdevice dev, int flags, int *ret) {
     err = cuCtxPushCurrent(ctx);
     CHKFAIL(NULL);
 #endif
-    res = cuda_make_ctx(ctx, 0);
+    res = cuda_make_ctx(ctx, flags);
     if (res == NULL) {
 #if CUDA_VERSION < 7000
       cuCtxDestroy(ctx);
@@ -322,7 +333,6 @@ static cuda_context *do_init(CUdevice dev, int flags, int *ret) {
 #endif
       FAIL(NULL, GA_IMPL_ERROR);
     }
-    res->flags |= flags;
     /* Don't leave the context on the thread stack */
     cuCtxPopCurrent(NULL);
 
@@ -448,8 +458,7 @@ static int extract(gpudata *curr, gpudata *prev, size_t size) {
     split->next = curr->next;
     curr->next = NULL;
     /* Make sure we don't start using the split buffer too soon */
-    cuda_wait(curr, CUDA_WAIT_ALL);
-    cuda_record(split, CUDA_WAIT_ALL);
+    cuda_records(split, CUDA_WAIT_ALL, curr->ls);
     next = split;
     curr->sz = size;
   }
@@ -562,8 +571,8 @@ static void cuda_free(gpudata *d) {
       if (!(d->flags & CUDA_HEAD_ALLOC) &&
             prev != NULL && prev->ptr + prev->sz == d->ptr) {
         prev->sz = prev->sz + d->sz;
-        cuda_wait(d, CUDA_WAIT_ALL);
-        cuda_record(prev, CUDA_WAIT_ALL);
+        cuda_waits(d, CUDA_WAIT_ALL, prev->ls);
+        cuda_records(prev, CUDA_WAIT_ALL, prev->ls);
         deallocate(d);
         d = prev;
       } else if (prev != NULL) {
@@ -602,7 +611,15 @@ static int cuda_share(gpudata *a, gpudata *b, int *ret) {
 
 static int cuda_waits(gpudata *a, int flags, CUstream s) {
   ASSERT_BUF(a);
-  /* If others are only reads, no need to wait */
+
+  if (ISSET(a->ctx->flags, GA_CTX_SINGLE_STREAM))
+    return GA_NO_ERROR;
+
+  /* If the last stream to touch this buffer is the same, we don't
+   * need to wait for anything. */
+  if (a->ls == s)
+    return GA_NO_ERROR;
+
   cuda_enter(a->ctx);
   if (flags & CUDA_WAIT_READ) {
     /* We wait for writes that happened before since multiple reads at
@@ -631,12 +648,15 @@ int cuda_wait(gpudata *a, int flags) {
 
 static int cuda_records(gpudata *a, int flags, CUstream s) {
   ASSERT_BUF(a);
+  if (ISSET(a->ctx->flags, GA_CTX_SINGLE_STREAM))
+    return GA_NO_ERROR;
   cuda_enter(a->ctx);
   if (flags & CUDA_WAIT_READ)
     a->ctx->err = cuEventRecord(a->rev, s);
   if (flags & CUDA_WAIT_WRITE)
     a->ctx->err = cuEventRecord(a->wev, s);
   cuda_exit(a->ctx);
+  a->ls = s;
   return GA_NO_ERROR;
 }
 

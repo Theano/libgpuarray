@@ -81,6 +81,7 @@ cdef extern from "gpuarray/buffer.h":
     int GA_CTX_DEFAULT
     int GA_CTX_MULTI_THREAD
     int GA_CTX_SINGLE_THREAD
+    int GA_CTX_SINGLE_STREAM
     int GA_CTX_DISABLE_ALLOCATION_CACHE
 
     int GA_CTX_PROP_DEVNAME

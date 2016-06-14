@@ -37,13 +37,13 @@ def cl_wrap_ctx(size_t ptr):
     Wrap an existing OpenCL context (the cl_context struct) into a
     GpuContext class.
     """
-    cdef gpucontext *(*cl_make_ctx)(void *)
+    cdef gpucontext *(*cl_make_ctx)(void *, int)
     cdef GpuContext res
-    cl_make_ctx = <gpucontext *(*)(void *)>gpuarray_get_extension("cl_make_ctx")
+    cl_make_ctx = <gpucontext *(*)(void *, int)>gpuarray_get_extension("cl_make_ctx")
     if cl_make_ctx == NULL:
         raise RuntimeError, "cl_make_ctx extension is absent"
     res = GpuContext.__new__(GpuContext)
-    res.ctx = cl_make_ctx(<void *>ptr)
+    res.ctx = cl_make_ctx(<void *>ptr, 0)
     if res.ctx == NULL:
         raise RuntimeError, "cl_make_ctx call failed"
     return res
@@ -498,9 +498,9 @@ cdef GpuContext pygpu_init(dev, int flags):
         raise ValueError, "Unknown device format:" + dev
     return GpuContext(kind, devnum, flags)
 
-def init(dev, sched='default', disable_alloc_cache=False):
+def init(dev, sched='default', disable_alloc_cache=False, single_stream=False):
     """
-    init(dev, opt='default', disable_alloc_cache=False)
+    init(dev, sched='default', disable_alloc_cache=False, single_stream=False)
 
     Creates a context from a device specifier.
 
@@ -510,6 +510,8 @@ def init(dev, sched='default', disable_alloc_cache=False):
     :type sched: {'default', 'single', 'multi'}
     :param disable_alloc_cache: disable allocation cache (if any)
     :type disable_alloc_cache: bool
+    :param single_stream: enable single stream mode
+    :type single_stream: bool
     :rtype: GpuContext
 
     Device specifiers are composed of the type string and the device
@@ -535,8 +537,8 @@ def init(dev, sched='default', disable_alloc_cache=False):
     expected_version = -9997
     if gpuarray_api_major != expected_version or gpuarray_api_minor < 0:
         raise RuntimeError(
-            "Pygpu was expecting libgpuarray version %d, but %d is available "
-            " Recompile it to avoid problems.",
+            "Pygpu was expecting libgpuarray version %d, but %d is available. "
+            "Recompile it to avoid problems.",
             expected_version, gpuarray_api_major)
     if sched == 'single':
         flags |= GA_CTX_SINGLE_THREAD
@@ -546,6 +548,8 @@ def init(dev, sched='default', disable_alloc_cache=False):
         raise TypeError('unexpected value for parameter sched: %s' % (sched,))
     if disable_alloc_cache:
         flags |= GA_CTX_DISABLE_ALLOCATION_CACHE
+    if single_stream:
+        flags |= GA_CTX_SINGLE_STREAM
     return pygpu_init(dev, flags)
 
 def zeros(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
