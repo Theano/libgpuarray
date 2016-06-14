@@ -145,23 +145,27 @@ inline ncclDataType_t convert_data_type(int typecode) {
   return nccl_NUM_TYPES;
 }
 
-inline int check_reduce(const gpudata* src, size_t offsrc,
-                        gpudata* dest, size_t offdest,
-                        int count, int typecode, int opcode,
-                        gpucomm* comm, ncclRedOp_t* op, ncclDataType_t* datatype) {
+inline int check_restrictions(const gpudata* src, size_t offsrc,
+                              gpudata* dest, size_t offdest,
+                              int count, int typecode, int opcode, gpucomm* comm,
+                              ncclDataType_t* datatype, ncclRedOp_t* op) {
   // src, dest and comm must refer to the same context
   if (src->ctx != comm->ctx)
     return GA_VALUE_ERROR;
   if (dest != NULL && dest->ctx != comm->ctx)
     return GA_VALUE_ERROR;
-  // opcode must correspond to a valid ncclRedOp_t
-  *op = convert_reduce_op(opcode);
-  if (*op == nccl_NUM_OPS)
-    return GA_VALUE_ERROR;
   // typecode must correspond to a valid ncclDataType_t
-  *datatype = convert_data_type(typecode);
-  if (*datatype == nccl_NUM_TYPES)
-    return GA_VALUE_ERROR;
+  if (datatype != NULL) {
+    *datatype = convert_data_type(typecode);
+    if (*datatype == nccl_NUM_TYPES)
+      return GA_VALUE_ERROR;
+  }
+  // opcode must correspond to a valid ncclRedOp_t
+  if (op != NULL) {
+    *op = convert_reduce_op(opcode);
+    if (*op == nccl_NUM_OPS)
+      return GA_VALUE_ERROR;
+  }
   // size to operate upon must be able to fit inside the gpudata (incl offsets)
   size_t op_size = count * gpuarray_get_elsize(typecode);
   if ((src->sz - offsrc) < op_size)
@@ -192,9 +196,9 @@ static int reduce(const gpudata* src, size_t offsrc,
     dst = dest;
     ASSERT_BUF(dest);
   }
-  GA_CHECK(check_reduce(src, offsrc, dst, offdest,
-                        count, typecode, opcode, comm,
-                        &op, &datatype));
+  GA_CHECK(check_restrictions(src, offsrc, dst, offdest,
+                              count, typecode, opcode, comm,
+                              &datatype, &op));
 
   cuda_context* ctx = comm->ctx;
   cuda_enter(ctx);
@@ -232,9 +236,9 @@ static int all_reduce(const gpudata* src, size_t offsrc,
   ASSERT_BUF(src);
   ASSERT_COMM(comm);
   ASSERT_BUF(dest);
-  GA_CHECK(check_reduce(src, offsrc, dest, offdest,
-                        count, typecode, opcode, comm,
-                        &op, &datatype));
+  GA_CHECK(check_restrictions(src, offsrc, dest, offdest,
+                              count, typecode, opcode, comm,
+                              &datatype, &op));
 
   cuda_context* ctx = comm->ctx;
   cuda_enter(ctx);
@@ -261,16 +265,16 @@ static int reduce_scatter(const gpudata* src, size_t offsrc,
                           gpudata* dest, size_t offdest,
                           int count, int typecode, int opcode,
                           gpucomm* comm) {
-  ncclRedOp_t op;
-  ncclDataType_t datatype;
   ASSERT_BUF(src);
   ASSERT_COMM(comm);
   ASSERT_BUF(dest);
+  ncclRedOp_t op;
+  ncclDataType_t datatype;
   int ndev = 0;
   GA_CHECK(get_count(comm, &ndev));
-  GA_CHECK(check_reduce(src, offsrc, NULL, 0,
-                        count * ndev, typecode, opcode, comm,
-                        &op, &datatype));
+  GA_CHECK(check_restrictions(src, offsrc, NULL, 0,
+                              count * ndev, typecode, opcode, comm,
+                              &datatype, &op));
   if (dest->ctx != comm->ctx)
     return GA_VALUE_ERROR;
   size_t resc_size = count * gpuarray_get_elsize(typecode);
@@ -303,6 +307,29 @@ static int reduce_scatter(const gpudata* src, size_t offsrc,
 static int broadcast(gpudata* array, size_t offset,
                      int count, int typecode,
                      int root, gpucomm* comm) {
+  ASSERT_BUF(src);
+  ASSERT_COMM(comm);
+  ASSERT_BUF(dest);
+  ncclDataType_t datatype;
+  GA_CHECK(check_restrictions(array, offset, NULL, 0,
+                              count, typecode, 0, comm,
+                              &datatype, NULL));
+
+  cuda_context* ctx = comm->ctx;
+  cuda_enter(ctx);
+
+  // sync: wait till a write has finished (out of concurrent kernels)
+  GA_CHECK(cuda_wait(array, CUDA_WAIT_READ));
+
+  // change stream of nccl ops to enable concurrency
+  NCCL_EXIT_ON_ERROR(ctx, ncclBcast(((void*) array->ptr) + offset,
+                                    count, datatype, root, comm->c, ctx->s));
+
+  GA_CHECK(cuda_record(array, CUDA_WAIT_READ));
+
+  cuda_exit(ctx);
+
+  return GA_NO_ERROR;
 }
 
 static int all_gather(const gpudata* src, size_t offsrc,
