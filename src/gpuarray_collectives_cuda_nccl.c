@@ -336,6 +336,42 @@ static int all_gather(const gpudata* src, size_t offsrc,
                       gpudata* dest, size_t offdest,
                       int count, int typecode,
                       gpucomm* comm) {
+  ASSERT_BUF(src);
+  ASSERT_COMM(comm);
+  ASSERT_BUF(dest);
+  ncclDataType_t datatype;
+  GA_CHECK(check_restrictions(src, offsrc, NULL, 0,
+                              count , typecode, 0, comm,
+                              &datatype, NULL));
+  if (dest->ctx != comm->ctx)
+    return GA_VALUE_ERROR;
+  int ndev = 0;
+  GA_CHECK(get_count(comm, &ndev));
+  size_t resc_size = ndev * count * gpuarray_get_elsize(typecode);
+  if ((dest->sz - offdest) < resc_size)
+    return GA_VALUE_ERROR;
+  if (offdest > dest->sz)
+    return GA_VALUE_ERROR;
+
+  cuda_context* ctx = comm->ctx;
+  cuda_enter(ctx);
+
+  // sync: wait till a write has finished (out of concurrent kernels)
+  GA_CHECK(cuda_wait(src, CUDA_WAIT_READ));
+  // sync: wait till a read/write has finished (out of concurrent kernels)
+  GA_CHECK(cuda_wait(dest, CUDA_WAIT_WRITE));
+
+  // change stream of nccl ops to enable concurrency
+  NCCL_EXIT_ON_ERROR(ctx, ncclAllGather(((void*) src->ptr) + offsrc, count,
+                                        datatype, ((void*) dest->ptr) + offdest,
+                                        comm->c, ctx->s));
+
+  GA_CHECK(cuda_record(src, CUDA_WAIT_READ));
+  GA_CHECK(cuda_record(dest, CUDA_WAIT_WRITE));
+
+  cuda_exit(ctx);
+
+  return GA_NO_ERROR;
 }
 
 GPUARRAY_LOCAL gpuarray_comm_ops nccl_ops = {
