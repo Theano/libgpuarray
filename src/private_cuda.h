@@ -7,12 +7,6 @@
 #include <cuda.h>
 #endif
 
-#define WITH_CUDA_NCCL
-
-#ifdef WITH_CUDA_NCCL
-#include <nccl.h>
-#endif  // WITH_CUDA_NCCL
-
 #include <cache.h>
 
 #include "private.h"
@@ -61,9 +55,6 @@ typedef struct _cuda_context {
   gpudata *freeblocks;
   cache *kernel_cache;
   unsigned int enter;
-#ifdef WITH_CUDA_NCCL
-  ncclResult_t nccl_err;
-#endif  // WITH_CUDA_NCCL
 } cuda_context;
 
 STATIC_ASSERT(sizeof(cuda_context) <= sizeof(gpucontext), sizeof_struct_gpucontext_cuda);
@@ -138,16 +129,6 @@ struct _gpukernel {
   int *types;
   unsigned int argcount;
   unsigned int refcnt;
-#ifdef DEBUG
-  char tag[8];
-#endif
-};
-
-struct _gpucomm {
-  cuda_context* ctx;  // Start after the context
-#ifdef WITH_CUDA_NCCL
-  ncclComm_t c;
-#endif  // WITH_CUDA_NCCL
 #ifdef DEBUG
   char tag[8];
 #endif

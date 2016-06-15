@@ -21,12 +21,12 @@ void gpucomm_free(gpucomm* comm) {
 
 const char* gpucomm_error(gpucontext* ctx) {
   if (ctx->comm_ops != NULL)
-      return ctx->comm_ops->comm_error(ctx);
+      return ctx->comm_error;
   return "No collective ops available, API error. Is a collectives library installed?";
 }
 
 gpucontext* gpucomm_context(gpucomm* comm) {
-  return ((partial_gpucomm*)comm)->ctx;
+  return ((partial_gpucomm*) comm)->ctx;
 }
 
 int gpucomm_gen_clique_id(gpucontext* ctx, gpucommCliqueId* comm_id) {

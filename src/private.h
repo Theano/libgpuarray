@@ -44,6 +44,7 @@ typedef struct _gpuarray_comm_ops gpuarray_comm_ops;
   const gpuarray_blas_ops *blas_ops;            \
   const gpuarray_comm_ops *comm_ops;            \
   void *blas_handle;                            \
+  const char* comm_error;                       \
   unsigned int refcnt;                          \
   int flags;                                    \
   struct _gpudata *errbuf;                      \
@@ -206,7 +207,6 @@ struct _gpuarray_comm_ops {
   int (*comm_new)(gpucomm** comm, gpucontext* ctx, gpucommCliqueId comm_id,
                   int ndev, int rank);
   void (*comm_free)(gpucomm* comm);
-  const char* (*comm_error)(gpucontext* ctx);
   int (*generate_clique_id)(gpucontext* ctx, gpucommCliqueId* comm_id);
   int (*get_count)(const gpucomm* comm, int* count);
   int (*get_rank)(const gpucomm* comm, int* rank);

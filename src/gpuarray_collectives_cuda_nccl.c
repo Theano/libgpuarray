@@ -11,20 +11,29 @@
 #include "private.h"
 #include "private_cuda.h"
 
-#define NCCL_CHKFAIL(ctx) \
+
+static const char* nccl_success_error = ncclGetErrorString(ncclSuccess);
+
+#define NCCL_CHKFAIL(ctx, cmd) \
 do { \
-  if ((ctx)->nccl_err != ncclSuccess) \
+  ncclResult_t nccl_err = (cmd); \
+  if (nccl_err != ncclSuccess) { \
+    (ctx)->comm_error = ncclGetErrorString(nccl_err); \
     return GA_COMM_ERROR; \
+  } \
+  (ctx)->comm_error = nccl_success_error; \
   return GA_NO_ERROR; \
 } while (0)
 
 #define NCCL_EXIT_ON_ERROR(ctx, cmd) \
 do { \
-  (ctx)->nccl_err = (cmd); \
-  if ((ctx)->nccl_err != ncclSuccess) { \
+  ncclResult_t nccl_err = (cmd); \
+  if (nccl_err != ncclSuccess) { \
     cuda_exit((ctx)); \
+    (ctx)->comm_error = ncclGetErrorString(nccl_err); \
     return GA_COMM_ERROR; \
   } \
+  (ctx)->comm_error = nccl_success_error; \
 } while (0)
 
 #define GA_CHECK(cmd) \
@@ -43,8 +52,22 @@ do { \
   } \
 } while (0)
 
-
 extern const gpuarray_buffer_ops cuda_ops;
+
+/**
+ * Definition of struct _gpucomm
+ *
+ * Done here in order to avoid ifdefs concerning nccl's existance in core code.
+ *
+ * \note This must be the only "module" which manages the definition's contents.
+ */
+struct _gpucomm {
+  cuda_context* ctx;  // Start after the context
+  ncclComm_t c;
+#ifdef DEBUG
+  char tag[8];
+#endif
+};
 
 static void comm_clear(gpucomm* comm)
 {
@@ -65,16 +88,18 @@ static int comm_new(gpucomm** comm_ptr, gpucontext* ctx, gpucommCliqueId comm_id
   comm->ctx = (cuda_context*) ctx;
   comm->ctx->refcnt++;  // So that ctx would not be destroyed before comm
   cuda_enter(comm->ctx);
-  comm->ctx->nccl_err = ncclCommInitRank(&comm->c, ndev,
-                                         *((ncclUniqueId*)&comm_id), rank);
+  ncclResult_t nccl_err = ncclCommInitRank(&comm->c, ndev,
+                                           *((ncclUniqueId*) &comm_id), rank);
   cuda_exit(comm->ctx);
   TAG_COMM(comm);
-  if (comm->ctx->nccl_err != ncclSuccess) {
+  if (nccl_err != ncclSuccess) {
     *comm_ptr = NULL;
     comm_clear(comm);
+    ctx->comm_error = ncclGetErrorString(nccl_err);
     return GA_COMM_ERROR;
   }
   *comm_ptr = comm;
+  ctx->comm_error = nccl_success_error;
   return GA_NO_ERROR;
 }
 
@@ -86,29 +111,19 @@ static void comm_free(gpucomm* comm) {
   comm_clear(comm);
 }
 
-static const char* comm_error(gpucontext* c) {
-  ASSERT_CTX(c);
-  cuda_context* ctx = (cuda_context*) c;
-  return ncclGetErrorString(ctx->nccl_err);
-}
-
 static int generate_clique_id(gpucontext* c, gpucommCliqueId* comm_id) {
   ASSERT_CTX(c);
-  cuda_context* ctx = (cuda_context*) c;
-  ctx->nccl_err = ncclGetUniqueId((ncclUniqueId*) comm_id);
-  NCCL_CHKFAIL(ctx);
+  NCCL_CHKFAIL(c, ncclGetUniqueId((ncclUniqueId*) comm_id));
 }
 
 static int get_count(const gpucomm* comm, int* count) {
   ASSERT_COMM(comm);
-  comm->ctx->nccl_err = ncclCommCount(comm->c, count);
-  NCCL_CHKFAIL(comm->ctx);
+  NCCL_CHKFAIL(comm->ctx, ncclCommCount(comm->c, count));
 }
 
 static int get_rank(const gpucomm* comm, int* rank) {
   ASSERT_COMM(comm);
-  comm->ctx->nccl_err = ncclCommUserRank(comm->c, rank);
-  NCCL_CHKFAIL(comm->ctx);
+  NCCL_CHKFAIL(comm->ctx, ncclCommUserRank(comm->c, rank));
 }
 
 static inline ncclRedOp_t convert_reduce_op(int opcode) {
@@ -364,7 +379,6 @@ static int all_gather(gpudata* src, size_t offsrc,
 GPUARRAY_LOCAL gpuarray_comm_ops nccl_ops = {
   comm_new,
   comm_free,
-  comm_error,
   generate_clique_id,
   get_count,
   get_rank,
