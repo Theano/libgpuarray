@@ -1352,7 +1352,7 @@ static int cuda_transfer(gpudata *dst, size_t dstoff,
 
   cuda_enter(dst->ctx);
   /* Make sure we have a rev for the source */
-  cuda_record(src, CUDA_WAIT_READ|CUDA_WAIT_FORCE, src->ctx->mem_s);
+  cuda_records(src, CUDA_WAIT_READ|CUDA_WAIT_FORCE, src->ctx->mem_s);
   /* Make the destination stream wait for it */
   cuda_waits(src, CUDA_WAIT_READ|CUDA_WAIT_FORCE, dst->ctx->mem_s);
 
