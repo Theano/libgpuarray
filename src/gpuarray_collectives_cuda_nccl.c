@@ -12,8 +12,15 @@
 #include "private.h"
 #include "private_cuda.h"
 
+/**
+ * Points to error message constant string of `ncclSuccess`
+ */
 static const char* nccl_success_error = ncclGetErrorString(ncclSuccess);
 
+/**
+ * Execute `cmd` and return appropriate code. Save a describing error message in
+ * context.
+ */
 #define NCCL_CHKFAIL(ctx, cmd)                         \
   do {                                                 \
     ncclResult_t nccl_err = (cmd);                     \
@@ -25,6 +32,10 @@ static const char* nccl_success_error = ncclGetErrorString(ncclSuccess);
     return GA_NO_ERROR;                                \
   } while (0)
 
+/**
+ * Execute `cmd` and check for failure. Save a describing error message in
+ * context. Exit from context and return \ref GA_COMM_ERROR if nccl does not succeed.
+ */
 #define NCCL_EXIT_ON_ERROR(ctx, cmd)                   \
   do {                                                 \
     ncclResult_t nccl_err = (cmd);                     \
@@ -36,7 +47,7 @@ static const char* nccl_success_error = ncclGetErrorString(ncclSuccess);
     (ctx)->error_msg = nccl_success_error;             \
   } while (0)
 
-extern const gpuarray_buffer_ops cuda_ops;
+extern const gpuarray_buffer_ops cuda_ops;  //!< Link wrapped cuda core operations
 
 /**
  * Definition of struct _gpucomm
@@ -53,6 +64,9 @@ struct _gpucomm {
 #endif
 };
 
+/**
+ * \brief Helper function to dereference a `comm`'s context and free memory
+ */
 static void comm_clear(gpucomm* comm)
 {
   cuda_ops.buffer_deinit((gpucontext*)comm->ctx);
@@ -60,25 +74,28 @@ static void comm_clear(gpucomm* comm)
   free(comm);
 }
 
+/**
+ * \brief NCCL implementation of \ref gpucomm_new.
+ */
 static int comm_new(gpucomm** comm_ptr, gpucontext* ctx, gpucommCliqueId comm_id,
                     int ndev, int rank)
 {
   ASSERT_CTX(ctx);
   gpucomm* comm;
-  comm = calloc(1, sizeof(*comm));
+  comm = calloc(1, sizeof(*comm));  // Allocate memory
   if (comm == NULL) {
-    *comm_ptr = NULL;
+    *comm_ptr = NULL;  // Set to NULL if failed
     return GA_MEMORY_ERROR;
   }
-  comm->ctx = (cuda_context*)ctx;
-  comm->ctx->refcnt++;  // So that ctx would not be destroyed before comm
-  cuda_enter(comm->ctx);
+  comm->ctx = (cuda_context*)ctx;  // convert to underlying cuda context
+  comm->ctx->refcnt++;  // So that context would not be destroyed before communicator
+  cuda_enter(comm->ctx);  // Use device
   ncclResult_t nccl_err =
       ncclCommInitRank(&comm->c, ndev, *((ncclUniqueId*)&comm_id), rank);
   cuda_exit(comm->ctx);
   TAG_COMM(comm);
   if (nccl_err != ncclSuccess) {
-    *comm_ptr = NULL;
+    *comm_ptr = NULL;  // Set to NULL if failed
     comm_clear(comm);
     ctx->error_msg = ncclGetErrorString(nccl_err);
     return GA_COMM_ERROR;
@@ -88,6 +105,9 @@ static int comm_new(gpucomm** comm_ptr, gpucontext* ctx, gpucommCliqueId comm_id
   return GA_NO_ERROR;
 }
 
+/**
+ * \brief NCCL implementation of \ref gpucomm_free.
+ */
 static void comm_free(gpucomm* comm)
 {
   ASSERT_COMM(comm);
@@ -97,24 +117,39 @@ static void comm_free(gpucomm* comm)
   comm_clear(comm);
 }
 
+/**
+ * \brief NCCL implementation of \ref gpucomm_gen_clique_id.
+ */
 static int generate_clique_id(gpucontext* c, gpucommCliqueId* comm_id)
 {
   ASSERT_CTX(c);
   NCCL_CHKFAIL(c, ncclGetUniqueId((ncclUniqueId*)comm_id));
 }
 
+/**
+ * \brief NCCL implementation of \ref gpucomm_get_count.
+ */
 static int get_count(const gpucomm* comm, int* gpucount)
 {
   ASSERT_COMM(comm);
   NCCL_CHKFAIL(comm->ctx, ncclCommCount(comm->c, gpucount));
 }
 
+/**
+ * \brief NCCL implementation of \ref gpucomm_get_rank.
+ */
 static int get_rank(const gpucomm* comm, int* rank)
 {
   ASSERT_COMM(comm);
   NCCL_CHKFAIL(comm->ctx, ncclCommUserRank(comm->c, rank));
 }
 
+/**
+ * \brief Helper function to try to convert \ref enum _gpucomm_reduce_ops to \ref
+ * ncclRedOp_t.
+ *
+ * If invalid, return `nccl_NUM_OPS`.
+ */
 static inline ncclRedOp_t convert_reduce_op(int opcode)
 {
   switch (opcode) {
@@ -126,6 +161,12 @@ static inline ncclRedOp_t convert_reduce_op(int opcode)
   return nccl_NUM_OPS;
 }
 
+/**
+ * \brief Helper function to try to convert \ref enum GPUARRAY_TYPES to \ref
+ * ncclDataType_t.
+ *
+ * If invalid, return `nccl_NUM_TYPES`.
+ */
 static inline ncclDataType_t convert_data_type(int typecode)
 {
   switch (typecode) {
@@ -142,6 +183,10 @@ static inline ncclDataType_t convert_data_type(int typecode)
   return nccl_NUM_TYPES;
 }
 
+/**
+ * \brief Helper function to check for restrictions on `gpudata` to be used in nccl
+ * collective operations.
+ */
 static inline int check_restrictions(gpudata* src, size_t offsrc, gpudata* dest,
                                      size_t offdest, size_t count, int typecode,
                                      int opcode, gpucomm* comm,
@@ -181,6 +226,9 @@ static inline int check_restrictions(gpudata* src, size_t offsrc, gpudata* dest,
   return GA_NO_ERROR;
 }
 
+/**
+ * \brief NCCL implementation of \ref gpucomm_reduce.
+ */
 static int reduce(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
                   size_t count, int typecode, int opcode, int root, gpucomm* comm)
 {
@@ -225,6 +273,9 @@ static int reduce(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
   return GA_NO_ERROR;
 }
 
+/**
+ * \brief NCCL implementation of \ref gpucomm_all_reduce.
+ */
 static int all_reduce(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
                       size_t count, int typecode, int opcode, gpucomm* comm)
 {
@@ -257,6 +308,9 @@ static int all_reduce(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest
   return GA_NO_ERROR;
 }
 
+/**
+ * \brief NCCL implementation of \ref gpucomm_reduce_scatter.
+ */
 static int reduce_scatter(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
                           size_t count, int typecode, int opcode, gpucomm* comm)
 {
@@ -297,6 +351,9 @@ static int reduce_scatter(gpudata* src, size_t offsrc, gpudata* dest, size_t off
   return GA_NO_ERROR;
 }
 
+/**
+ * \brief NCCL implementation of \ref gpucomm_broadcast.
+ */
 static int broadcast(gpudata* array, size_t offset, size_t count, int typecode,
                      int root, gpucomm* comm)
 {
@@ -324,6 +381,9 @@ static int broadcast(gpudata* array, size_t offset, size_t count, int typecode,
   return GA_NO_ERROR;
 }
 
+/**
+ * \brief NCCL implementation of \ref gpucomm_all_gather.
+ */
 static int all_gather(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
                       size_t count, int typecode, gpucomm* comm)
 {
@@ -363,6 +423,10 @@ static int all_gather(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest
   return GA_NO_ERROR;
 }
 
+/**
+ * Instance of `gpuarray_comm_ops` which contains NCCL implementations. To be linked
+ * in \ref gpuarray_buffer_cuda.c, in order to fill a /ref gpucontext's comm_ops.
+ */
 GPUARRAY_LOCAL gpuarray_comm_ops nccl_ops = {
     comm_new, comm_free,  generate_clique_id, get_count, get_rank,
     reduce,   all_reduce, reduce_scatter,     broadcast, all_gather};
