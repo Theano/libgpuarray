@@ -1497,7 +1497,7 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
 #else
     *((void **)res) = NULL;
     return GA_DEVSUP_ERROR;
-#endif
+#endif  // WITH_CUDA_CUBLAS
 
   case GA_CTX_PROP_COMM_OPS:
 #ifdef WITH_CUDA_NCCL

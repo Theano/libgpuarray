@@ -19,6 +19,17 @@ extern "C" {
 /**
  * \brief TODO
  * \param src [const GpuArray*] TODO
+ * \param opcode [int] TODO
+ * \param root [int] TODO
+ * \param comm [gpucomm*] TODO
+ * \return int TODO
+ */
+GPUARRAY_PUBLIC int GpuArray_reduce_from(const GpuArray* src, int opcode, int root,
+                                         gpucomm* comm);
+
+/**
+ * \brief TODO
+ * \param src [const GpuArray*] TODO
  * \param dest [GpuArray*] TODO
  * \param opcode [int] TODO
  * \param root [int] TODO

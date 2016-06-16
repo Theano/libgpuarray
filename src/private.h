@@ -14,7 +14,6 @@
 #include <gpuarray/types.h>
 #include <gpuarray/buffer.h>
 #include <gpuarray/buffer_blas.h>
-#include <gpuarray/buffer_collectives.h>
 
 #include "util/strb.h"
 #include "cache.h"
@@ -267,6 +266,22 @@ GPUARRAY_LOCAL void gpukernel_source_with_line_numbers(unsigned int count,
 
 #define FLSET(v, fl) (v |= (fl))
 #define FLCLR(v, fl) (v &= ~(fl))
+
+#define GA_CHECK(cmd)       \
+  do {                      \
+    int err = (cmd);        \
+    if (err != GA_NO_ERROR) \
+      return err;           \
+  } while (0)
+
+#define GA_EXIT_ON_ERROR(ctx, cmd) \
+  do {                             \
+    int err = (cmd);               \
+    if (err != GA_NO_ERROR) {      \
+      cuda_exit((ctx));            \
+      return err;                  \
+    }                              \
+  } while (0)
 
 #ifdef __cplusplus
 }

@@ -35,22 +35,6 @@ static const char* nccl_success_error = ncclGetErrorString(ncclSuccess);
     (ctx)->error_msg = nccl_success_error;             \
   } while (0)
 
-#define GA_CHECK(cmd)       \
-  do {                      \
-    int err = (cmd);        \
-    if (err != GA_NO_ERROR) \
-      return err;           \
-  } while (0)
-
-#define GA_EXIT_ON_ERROR(ctx, cmd) \
-  do {                             \
-    int err = (cmd);               \
-    if (err != GA_NO_ERROR) {      \
-      cuda_exit((ctx));            \
-      return err;                  \
-    }                              \
-  } while (0)
-
 extern const gpuarray_buffer_ops cuda_ops;
 
 /**
@@ -171,13 +155,13 @@ static inline int check_restrictions(gpudata* src, size_t offsrc, gpudata* dest,
   if (datatype != NULL) {
     *datatype = convert_data_type(typecode);
     if (*datatype == nccl_NUM_TYPES)
-      return GA_VALUE_ERROR;
+      return GA_INVALID_ERROR;
   }
   // opcode must correspond to a valid ncclRedOp_t
   if (op != NULL) {
     *op = convert_reduce_op(opcode);
     if (*op == nccl_NUM_OPS)
-      return GA_VALUE_ERROR;
+      return GA_INVALID_ERROR;
   }
   // size to operate upon must be able to fit inside the gpudata (incl offsets)
   size_t op_size = count * gpuarray_get_elsize(typecode);
