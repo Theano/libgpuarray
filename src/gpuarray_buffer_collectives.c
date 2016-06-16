@@ -37,12 +37,12 @@ int gpucomm_gen_clique_id(gpucontext* ctx, gpucommCliqueId* comm_id)
   return ctx->comm_ops->generate_clique_id(ctx, comm_id);
 }
 
-int gpucomm_get_count(gpucomm* comm, int* count)
+int gpucomm_get_count(gpucomm* comm, int* gpucount)
 {
   gpucontext* ctx = gpucomm_context(comm);
   if (ctx->comm_ops == NULL)
     return GA_COMM_ERROR;
-  return ctx->comm_ops->get_count(comm, count);
+  return ctx->comm_ops->get_count(comm, gpucount);
 }
 
 int gpucomm_get_rank(gpucomm* comm, int* rank)
@@ -54,7 +54,7 @@ int gpucomm_get_rank(gpucomm* comm, int* rank)
 }
 
 int gpucomm_reduce(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
-                   int count, int typecode, int opcode, int root, gpucomm* comm)
+                   size_t count, int typecode, int opcode, int root, gpucomm* comm)
 {
   gpucontext* ctx = gpucomm_context(comm);
   if (ctx->comm_ops == NULL)
@@ -64,7 +64,7 @@ int gpucomm_reduce(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
 }
 
 int gpucomm_all_reduce(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
-                       int count, int typecode, int opcode, gpucomm* comm)
+                       size_t count, int typecode, int opcode, gpucomm* comm)
 {
   gpucontext* ctx = gpucomm_context(comm);
   if (ctx->comm_ops == NULL)
@@ -74,7 +74,7 @@ int gpucomm_all_reduce(gpudata* src, size_t offsrc, gpudata* dest, size_t offdes
 }
 
 int gpucomm_reduce_scatter(gpudata* src, size_t offsrc, gpudata* dest,
-                           size_t offdest, int count, int typecode, int opcode,
+                           size_t offdest, size_t count, int typecode, int opcode,
                            gpucomm* comm)
 {
   gpucontext* ctx = gpucomm_context(comm);
@@ -84,7 +84,7 @@ int gpucomm_reduce_scatter(gpudata* src, size_t offsrc, gpudata* dest,
                                        opcode, comm);
 }
 
-int gpucomm_broadcast(gpudata* array, size_t offset, int count, int typecode,
+int gpucomm_broadcast(gpudata* array, size_t offset, size_t count, int typecode,
                       int root, gpucomm* comm)
 {
   gpucontext* ctx = gpucomm_context(comm);
@@ -94,7 +94,7 @@ int gpucomm_broadcast(gpudata* array, size_t offset, int count, int typecode,
 }
 
 int gpucomm_all_gather(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
-                       int count, int typecode, gpucomm* comm)
+                       size_t count, int typecode, gpucomm* comm)
 {
   gpucontext* ctx = gpucomm_context(comm);
   if (ctx->comm_ops == NULL)

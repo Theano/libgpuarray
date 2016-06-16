@@ -212,22 +212,22 @@ struct _gpuarray_comm_ops {
   // collective ops
   int (*reduce)(gpudata* src, size_t offsrc,
                 gpudata* dest, size_t offdest,
-                int count, int typecode, int opcode,
+                size_t count, int typecode, int opcode,
                 int root, gpucomm* comm);
   int (*all_reduce)(gpudata* src, size_t offsrc,
                     gpudata* dest, size_t offdest,
-                    int count, int typecode, int opcode,
+                    size_t count, int typecode, int opcode,
                     gpucomm* comm);
   int (*reduce_scatter)(gpudata* src, size_t offsrc,
                         gpudata* dest, size_t offdest,
-                        int count, int typecode, int opcode,
+                        size_t count, int typecode, int opcode,
                         gpucomm* comm);
   int (*broadcast)(gpudata* array, size_t offset,
-                   int count, int typecode,
+                   size_t count, int typecode,
                    int root, gpucomm* comm);
   int (*all_gather)(gpudata* src, size_t offsrc,
                     gpudata* dest, size_t offdest,
-                    int count, int typecode,
+                    size_t count, int typecode,
                     gpucomm* comm);
 };
 

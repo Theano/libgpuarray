@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <limits.h>
 #include <stdlib.h>
 
 #include <nccl.h>
@@ -102,10 +103,10 @@ static int generate_clique_id(gpucontext* c, gpucommCliqueId* comm_id)
   NCCL_CHKFAIL(c, ncclGetUniqueId((ncclUniqueId*)comm_id));
 }
 
-static int get_count(const gpucomm* comm, int* count)
+static int get_count(const gpucomm* comm, int* gpucount)
 {
   ASSERT_COMM(comm);
-  NCCL_CHKFAIL(comm->ctx, ncclCommCount(comm->c, count));
+  NCCL_CHKFAIL(comm->ctx, ncclCommCount(comm->c, gpucount));
 }
 
 static int get_rank(const gpucomm* comm, int* rank)
@@ -142,10 +143,14 @@ static inline ncclDataType_t convert_data_type(int typecode)
 }
 
 static inline int check_restrictions(gpudata* src, size_t offsrc, gpudata* dest,
-                                     size_t offdest, int count, int typecode,
+                                     size_t offdest, size_t count, int typecode,
                                      int opcode, gpucomm* comm,
                                      ncclDataType_t* datatype, ncclRedOp_t* op)
 {
+  // Check if count is larger than INT_MAX
+  // TODO remove whenif nccl adapts to size_t
+  if (count > INT_MAX)
+    return GA_VALUE_ERROR;
   // src, dest and comm must refer to the same context
   if (src->ctx != comm->ctx)
     return GA_VALUE_ERROR;
@@ -177,7 +182,7 @@ static inline int check_restrictions(gpudata* src, size_t offsrc, gpudata* dest,
 }
 
 static int reduce(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
-                  int count, int typecode, int opcode, int root, gpucomm* comm)
+                  size_t count, int typecode, int opcode, int root, gpucomm* comm)
 {
   ncclRedOp_t op;
   ncclDataType_t datatype;
@@ -221,7 +226,7 @@ static int reduce(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
 }
 
 static int all_reduce(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
-                      int count, int typecode, int opcode, gpucomm* comm)
+                      size_t count, int typecode, int opcode, gpucomm* comm)
 {
   ncclRedOp_t op;
   ncclDataType_t datatype;
@@ -253,7 +258,7 @@ static int all_reduce(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest
 }
 
 static int reduce_scatter(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
-                          int count, int typecode, int opcode, gpucomm* comm)
+                          size_t count, int typecode, int opcode, gpucomm* comm)
 {
   ASSERT_BUF(src);
   ASSERT_COMM(comm);
@@ -292,7 +297,7 @@ static int reduce_scatter(gpudata* src, size_t offsrc, gpudata* dest, size_t off
   return GA_NO_ERROR;
 }
 
-static int broadcast(gpudata* array, size_t offset, int count, int typecode,
+static int broadcast(gpudata* array, size_t offset, size_t count, int typecode,
                      int root, gpucomm* comm)
 {
   ASSERT_BUF(src);
@@ -320,7 +325,7 @@ static int broadcast(gpudata* array, size_t offset, int count, int typecode,
 }
 
 static int all_gather(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
-                      int count, int typecode, gpucomm* comm)
+                      size_t count, int typecode, gpucomm* comm)
 {
   ASSERT_BUF(src);
   ASSERT_COMM(comm);
