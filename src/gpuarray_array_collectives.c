@@ -5,6 +5,9 @@
 
 #include "private.h"
 
+/**
+ * \brief Finds total number of elements contained in `array`.
+ */
 static inline int find_total_elems(const GpuArray* array)
 {
   unsigned int i;
@@ -13,6 +16,15 @@ static inline int find_total_elems(const GpuArray* array)
   return (int)total_elems;
 }
 
+/**
+ * \brief Checks if `src` and `dest` arrays are appropriate to participate in a
+ * collective operation.
+ *
+ * Checks to see if they contain the appropriate number of elements, if they are
+ * properly aligned (contiguous) and writeable (for `dest`) and if they contain
+ * elements of the same datatype. It returns the number of elements of the array with
+ * the less length.
+ */
 static inline int check_gpuarrays(int times_src, const GpuArray* src, int times_dest,
                                   const GpuArray* dest, int* count)
 {
