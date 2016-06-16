@@ -108,7 +108,6 @@ GPUARRAY_LOCAL int cuda_record(gpudata *, int);
 #define CUDA_WAIT_READ  0x10000
 #define CUDA_WAIT_WRITE 0x20000
 #define CUDA_WAIT_FORCE 0x40000
-#define CUDA_WAIT_MASK  0x70000
 
 #define CUDA_WAIT_ALL   (CUDA_WAIT_READ|CUDA_WAIT_WRITE)
 

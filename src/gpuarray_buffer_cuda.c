@@ -1347,9 +1347,18 @@ static int cuda_transfer(gpudata *dst, size_t dstoff,
   ASSERT_BUF(src);
   ASSERT_BUF(dst);
 
+  /* The forced synchronization are there because they are required
+     for proper inter-device correctness. */
+
   cuda_enter(dst->ctx);
-  cuda_waits(src, CUDA_WAIT_READ, dst->ctx->mem_s);
+  /* Make sure we have a rev for the source */
+  cuda_record(src, CUDA_WAIT_READ|CUDA_WAIT_FORCE, src->ctx->mem_s);
+  /* Make the destination stream wait for it */
+  cuda_waits(src, CUDA_WAIT_READ|CUDA_WAIT_FORCE, dst->ctx->mem_s);
+
+  /* Also wait on the destination buffer */
   cuda_waits(dst, CUDA_WAIT_WRITE, dst->ctx->mem_s);
+
   dst->ctx->err = cuMemcpyPeerAsync(dst->ptr+dstoff, dst->ctx->ctx,
                                     src->ptr+srcoff, src->ctx->ctx,
                                     sz, dst->ctx->mem_s);
@@ -1358,14 +1367,11 @@ static int cuda_transfer(gpudata *dst, size_t dstoff,
     return GA_IMPL_ERROR;
   }
 
-  /* The first two are forced since they are required for proper
-     inter-device synchronization so there are done even if
-     GA_CTX_SINGLE_STREAM is set */
-
   /* This records the event in dst->wev */
   cuda_records(dst, CUDA_WAIT_WRITE|CUDA_WAIT_FORCE, dst->ctx->mem_s);
   /* This makes the source stream wait on the wev of dst */
   cuda_waits(dst, CUDA_WAIT_WRITE|CUDA_WAIT_FORCE, src->ctx->mem_s);
+
   /* This records the event on src->rev */
   cuda_records(src, CUDA_WAIT_READ, src->ctx->mem_s);
 
