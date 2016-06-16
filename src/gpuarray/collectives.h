@@ -1,9 +1,9 @@
 #ifndef GPUARRAY_COLLECTIVES_H
 #define GPUARRAY_COLLECTIVES_H
 
-#include <gpuarray/config.h>
 #include <gpuarray/array.h>
 #include <gpuarray/buffer_collectives.h>
+#include <gpuarray/config.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,8 +25,8 @@ extern "C" {
  * \param comm [gpucomm*] TODO
  * \return int TODO
  */
-GPUARRAY_PUBLIC int GpuArray_reduce(const GpuArray* src, GpuArray* dest,
-                                    int opcode, int root, gpucomm* comm);
+GPUARRAY_PUBLIC int GpuArray_reduce(const GpuArray* src, GpuArray* dest, int opcode,
+                                    int root, gpucomm* comm);
 
 /**
  * \brief TODO

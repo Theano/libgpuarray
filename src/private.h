@@ -44,7 +44,7 @@ typedef struct _gpuarray_comm_ops gpuarray_comm_ops;
   const gpuarray_blas_ops *blas_ops;            \
   const gpuarray_comm_ops *comm_ops;            \
   void *blas_handle;                            \
-  const char* comm_error;                       \
+  const char* error_msg;                        \
   unsigned int refcnt;                          \
   int flags;                                    \
   struct _gpudata *errbuf;                      \
