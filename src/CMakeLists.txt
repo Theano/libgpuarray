@@ -4,6 +4,7 @@ set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
 
 find_package(CUDA)
 find_package(OpenCL)
+find_package(NCCL)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
@@ -40,8 +41,10 @@ gpuarray_error.c
 gpuarray_util.c
 gpuarray_buffer.c
 gpuarray_buffer_blas.c
+gpuarray_buffer_collectives.c
 gpuarray_array.c
 gpuarray_array_blas.c
+gpuarray_array_collectives.c
 gpuarray_kernel.c
 gpuarray_extension.c
 gpuarray_elemwise.c
@@ -102,6 +105,14 @@ if (CUDA_FOUND)
   if (CUBLAS_SGEMMEX)
     add_definitions(-DHAVE_CUBLAS_SGEMMEX)
   endif()
+
+  if (NCCL_FOUND)
+    message("Building with NCCL")
+    add_definitions(-DWITH_CUDA_NCCL)
+    set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_collectives_cuda_nccl.c)
+    include_directories("${NCCL_INCLUDE_DIR}")
+    set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES} ${NCCL_LIBRARY})
+  endif()
 endif()
 
 if(OPENCL_FOUND)
@@ -136,7 +147,11 @@ add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
 
 if(CUDA_FOUND)
   target_link_libraries(gpuarray ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
-  target_link_libraries(gpuarray-static ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARY})
+  target_link_libraries(gpuarray-static ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
+  if (NCCL_FOUND)
+    target_link_libraries(gpuarray ${NCCL_LIBRARY})
+    target_link_libraries(gpuarray-static ${NCCL_LIBRARY})
+  endif()
 endif()
 
 if(OPENCL_FOUND)
@@ -151,8 +166,10 @@ endif()
 SET(headers
   gpuarray/array.h
   gpuarray/blas.h
+  gpuarray/collectives.h
   gpuarray/buffer.h
   gpuarray/buffer_blas.h
+  gpuarray_buffer_collectives.c
   gpuarray/config.h
   gpuarray/elemwise.h
   gpuarray/error.h

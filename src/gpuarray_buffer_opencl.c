@@ -1161,7 +1161,8 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
 #endif
 
   case GA_CTX_PROP_COMM_OPS:
-    // Complete in the future if a multi-gpu collectives API for opencl appears
+    // TODO Complete in the future whenif a multi-gpu collectives API for
+    // opencl appears
     *((void **)res) = NULL;
     return GA_DEVSUP_ERROR;
 
