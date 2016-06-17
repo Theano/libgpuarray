@@ -1,8 +1,8 @@
 #ifndef GPUARRAY_BUFFER_COLLECTIVES_H
 #define GPUARRAY_BUFFER_COLLECTIVES_H
 
-#include "gpuarray/buffer.h"
-#include "gpuarray/config.h"
+#include <gpuarray/buffer.h>
+#include <gpuarray/config.h>
 
 #ifdef __cplusplus
 extern "C" {
