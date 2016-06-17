@@ -14,6 +14,7 @@
 #include <gpuarray/types.h>
 #include <gpuarray/buffer.h>
 #include <gpuarray/buffer_blas.h>
+#include <gpuarray/buffer_collectives.h>
 
 #include "util/strb.h"
 #include "cache.h"

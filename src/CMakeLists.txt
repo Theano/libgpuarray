@@ -4,7 +4,6 @@ set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
 
 find_package(CUDA)
 find_package(OpenCL)
-find_package(NCCL)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
@@ -106,6 +105,7 @@ if (CUDA_FOUND)
     add_definitions(-DHAVE_CUBLAS_SGEMMEX)
   endif()
 
+  find_package(NCCL)
   if (NCCL_FOUND)
     message("Building with NCCL")
     add_definitions(-DWITH_CUDA_NCCL)

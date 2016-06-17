@@ -13,9 +13,9 @@
 #include "private_cuda.h"
 
 /**
- * Points to error message constant string of `ncclSuccess`
+ * Fetches error message constant string of `ncclSuccess`
  */
-static const char* nccl_success_error = ncclGetErrorString(ncclSuccess);
+#define NCCL_SUCCESS_ERROR ncclGetErrorString(ncclSuccess)
 
 /**
  * Execute `cmd` and return appropriate code. Save a describing error message in
@@ -28,7 +28,7 @@ static const char* nccl_success_error = ncclGetErrorString(ncclSuccess);
       (ctx)->error_msg = ncclGetErrorString(nccl_err); \
       return GA_COMM_ERROR;                            \
     }                                                  \
-    (ctx)->error_msg = nccl_success_error;             \
+    (ctx)->error_msg = NCCL_SUCCESS_ERROR;             \
     return GA_NO_ERROR;                                \
   } while (0)
 
@@ -44,7 +44,7 @@ static const char* nccl_success_error = ncclGetErrorString(ncclSuccess);
       (ctx)->error_msg = ncclGetErrorString(nccl_err); \
       return GA_COMM_ERROR;                            \
     }                                                  \
-    (ctx)->error_msg = nccl_success_error;             \
+    (ctx)->error_msg = NCCL_SUCCESS_ERROR;             \
   } while (0)
 
 extern const gpuarray_buffer_ops cuda_ops;  //!< Link wrapped cuda core operations
@@ -101,7 +101,7 @@ static int comm_new(gpucomm** comm_ptr, gpucontext* ctx, gpucommCliqueId comm_id
     return GA_COMM_ERROR;
   }
   *comm_ptr = comm;
-  ctx->error_msg = nccl_success_error;
+  ctx->error_msg = NCCL_SUCCESS_ERROR;
   return GA_NO_ERROR;
 }
 
@@ -222,7 +222,7 @@ static inline int check_restrictions(gpudata* src, size_t offsrc, gpudata* dest,
   // offsets must not be larger than gpudata's size itself
   // (else out of alloc-ed mem scope)
   assert(!(offsrc > src->sz));
-  assert(!(dest != NULL & offdest > dest->sz));
+  assert(!(dest != NULL && offdest > dest->sz));
   return GA_NO_ERROR;
 }
 
@@ -357,9 +357,8 @@ static int reduce_scatter(gpudata* src, size_t offsrc, gpudata* dest, size_t off
 static int broadcast(gpudata* array, size_t offset, size_t count, int typecode,
                      int root, gpucomm* comm)
 {
-  ASSERT_BUF(src);
+  ASSERT_BUF(array);
   ASSERT_COMM(comm);
-  ASSERT_BUF(dest);
   ncclDataType_t datatype;
   GA_CHECK(check_restrictions(array, offset, NULL, 0, count, typecode, 0, comm,
                               &datatype, NULL));
