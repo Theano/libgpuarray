@@ -1,6 +1,7 @@
 enable_testing()
 
 find_package(PkgConfig)
+find_package(MPI)
 
 pkg_search_module(CHECK check)
 
