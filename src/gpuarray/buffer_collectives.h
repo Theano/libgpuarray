@@ -50,7 +50,7 @@ typedef struct _gpucommCliqueId {
  * information)
  * \param comm_id [gpucommCliqueId] id unique to communicators consisting a world
  * \param ndev [int] number of communicators/devices participating in the world
- * \param rank [int] user-defined rank of `comm` in the world
+ * \param rank [int] user-defined rank, from 0 to `ndev`-1, of `comm` in the world
  * \note `rank` is defined to be unique for each new `comm` participating in the same
  * world.
  * \note Must be called in parallel by all separate new `comm`, which will consist a
