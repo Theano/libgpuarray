@@ -17,13 +17,13 @@ int main(int argc, char *argv[])
   MPI_Comm_size(MPI_COMM_WORLD, &comm_ndev);
   MPI_Comm_rank(MPI_COMM_WORLD, &comm_nrank);
 
-  if (argc < size) {
-    if (rank == 0)
+  if (argc < comm_ndev) {
+    if (comm_rank == 0)
       printf("Usage : %s <GPU list per rank>\n", argv[0]);
     exit(1);
   }
 
-  dev_name = argv[rank + 1];  // Set a gpu for this process.
+  dev_name = argv[comm_rank + 1];  // Set a gpu for this process.
 #endif  // TEST_COLLECTIVES
 
   int number_failed;

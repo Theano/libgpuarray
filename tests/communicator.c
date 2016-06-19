@@ -32,12 +32,12 @@ void setup_comm(void)
   gpucommCliqueId comm_id;
   err = gpucomm_gen_clique_id(ctx, &comm_id);
   // Has successfully got a unique comm id.
-  ck_assert_int_ne(err, GA_NO_ERROR);
+  ck_assert_int_eq(err, GA_NO_ERROR);
 
   MPI_Bcast(&comm_id, GA_COMM_ID_BYTES, MPI_CHAR, 0, MPI_COMM_WORLD);
   err = gpucomm_new(&comm, ctx, comm_id, comm_ndev, comm_rank % comm_ndev);
   // Has successfully created a new gpucomm.
-  ck_assert_int_ne(err, GA_NO_ERROR);
+  ck_assert_int_eq(err, GA_NO_ERROR);
   ck_assert_ptr_ne(comm, NULL);
 }
 
