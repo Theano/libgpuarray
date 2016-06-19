@@ -59,6 +59,8 @@ add_executable(check_buffer main.c device.c check_buffer.c)
 target_link_libraries(check_buffer ${LIBS} gpuarray)
 add_test(test_buffer ${CMAKE_CURRENT_BINARY_DIR}/check_buffer)
 
+# TODO Add tests 1. Only build execs (to find compilation errs)
+# 2. Run in servers with multi-process/gpu
 ELSE(CHECK_FOUND)
 
 MESSAGE("Tests disabled because Check was not found")
