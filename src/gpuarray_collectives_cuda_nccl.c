@@ -195,7 +195,7 @@ static inline int check_restrictions(gpudata* src, size_t offsrc, gpudata* dest,
   // Check if count is larger than INT_MAX
   // TODO remove whenif nccl adapts to size_t
   if (count > INT_MAX)
-    return GA_VALUE_ERROR;
+    return GA_UNSUPPORTED_ERROR;
   // src, dest and comm must refer to the same context
   if (src->ctx != comm->ctx)
     return GA_VALUE_ERROR;
