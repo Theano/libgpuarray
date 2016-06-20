@@ -1,12 +1,15 @@
 #include <stdlib.h>
+#ifdef TEST_COLLECTIVES
+#include <stdio.h>
+#endif  // TEST_COLLECTIVES
 
 #include <check.h>
 #ifdef TEST_COLLECTIVES
 #include <mpi.h>
 
-extern char *dev_name;
 extern int comm_ndev;
 extern int comm_rank;
+extern char *dev_name;
 #endif  // TEST_COLLECTIVES
 extern Suite *get_suite(void);
 
@@ -15,7 +18,7 @@ int main(int argc, char *argv[])
 #ifdef TEST_COLLECTIVES
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &comm_ndev);
-  MPI_Comm_rank(MPI_COMM_WORLD, &comm_nrank);
+  MPI_Comm_rank(MPI_COMM_WORLD, &comm_rank);
 
   if (argc < comm_ndev) {
     if (comm_rank == 0)

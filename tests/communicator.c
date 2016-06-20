@@ -1,22 +1,18 @@
-#include <limits.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include <check.h>
 #include <mpi.h>
 
 #include "gpuarray/buffer.h"
+#include "gpuarray/buffer_collectives.h"
 #include "gpuarray/error.h"
-#include "./../src/gpuarray/buffer_collectives.h"
 
 extern gpucontext* ctx;
-gpucomm* comm;
 int comm_ndev;  //!< number of devices in the comm
 int comm_rank;  //!< comm's rank in the world
 // (for the tests it's the same as process rank in MPI_COMM_WORLD)
+gpucomm* comm;
 
-void setup(void);
-void teardown(void);
+extern void setup(void);
+extern void teardown(void);
 
 /**
  * \brief Setup for `check_buffer_collectives.c` and `check_collectives.c`.
@@ -46,4 +42,3 @@ void teardown_comm(void)
   gpucomm_free(comm);
   teardown();
 }
-

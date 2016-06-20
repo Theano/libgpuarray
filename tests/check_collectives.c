@@ -5,10 +5,10 @@
 #include <check.h>
 #include <mpi.h>
 
-#include "../src/gpuarray/buffer_collectives.h"
-#include "../src/gpuarray/collectives.h"
 #include "gpuarray/array.h"
 #include "gpuarray/buffer.h"
+#include "gpuarray/buffer_collectives.h"
+#include "gpuarray/collectives.h"
 #include "gpuarray/error.h"
 #include "gpuarray/types.h"
 
@@ -27,17 +27,30 @@ extern void teardown_comm(void);
 
 #define STR(x) _STR(x)
 #define _STR(x) #x
-#define ABS_DIFF(a, b) fabs((double)(b - a))
-#define MAX_ABS_DIFF(A, B, N, res)               \
-  do {                                           \
-    res = 0;                                     \
-    double locdelta;                             \
-    int loci;                                    \
-    for (loci = 0; loci < (N); ++loci) {         \
-      locdelta = ABS_DIFF((A)[loci], (B)[loci]); \
-      if (locdelta > res)                        \
-        res = locdelta;                          \
-    }                                            \
+#define COUNT_ERRORS(A, B, M, N, res)           \
+  do {                                          \
+    res = 0;                                    \
+    int loci, locj;                             \
+    for (loci = 0; loci < (M); ++loci) {        \
+      for (locj = 0; locj < (N); ++locj) {      \
+        if ((A)[loci][locj] != (B)[loci][locj]) \
+          res++;                                \
+      }                                         \
+    }                                           \
+  } while (0)
+
+#include <stdio.h>
+#define PRINT(ar)                  \
+  do {                             \
+    printf("%s\n", STR(ar));       \
+    int i, j;                      \
+    for (i = 0; i < ROWS; ++i) {   \
+      for (j = 0; j < COLS; ++j) { \
+        printf("%d ", ar[i][j]);   \
+      }                            \
+      printf("\n");                \
+    }                              \
+    printf("\n");                  \
   } while (0)
 
 /************************************************************************************
@@ -46,15 +59,15 @@ extern void teardown_comm(void);
 
 #define INIT_ARRAYS(inrows, incols, outrows, outcols)                        \
   int(*A)[(incols)];                                                         \
-  A = (int(*)[(incols)])malloc(sizeof(*A) * (inrows));                       \
+  A = (int(*)[(incols)])calloc((inrows), sizeof(*A));                        \
   if (A == NULL)                                                             \
     ck_abort_msg("system memory allocation failed");                         \
   int(*RES)[(outcols)];                                                      \
-  RES = (int(*)[(outcols)])malloc(sizeof(*RES) * (outrows));                 \
+  RES = (int(*)[(outcols)])calloc((outrows), sizeof(*RES));                  \
   if (RES == NULL)                                                           \
     ck_abort_msg("system memory allocation failed");                         \
   int(*EXP)[(outcols)];                                                      \
-  EXP = (int(*)[(outcols)])malloc(sizeof(*EXP) * (outrows));                 \
+  EXP = (int(*)[(outcols)])calloc((outrows), sizeof(*EXP));                  \
   if (EXP == NULL)                                                           \
     ck_abort_msg("system memory allocation failed");                         \
   size_t indims[ND];                                                         \
@@ -70,7 +83,7 @@ extern void teardown_comm(void);
   size_t i, j;                                                               \
   for (i = 0; i < indims[0]; ++i)                                            \
     for (j = 0; j < indims[1]; ++j)                                          \
-      A[i][j] = comm_rank + 1;                                               \
+      A[i][j] = comm_rank + 2;                                               \
                                                                              \
   int err;                                                                   \
   GpuArray Adev;                                                             \
@@ -114,8 +127,9 @@ START_TEST(test_GpuArray_reduce)
     err = GpuArray_read(RES, outsize, &RESdev);
     ck_assert_int_eq(err, GA_NO_ERROR);
     int res;
-    MAX_ABS_DIFF(RES, EXP, ROWS * COLS, res);
-    ck_assert_msg(res == 0, "GpuArray_reduce with %s op produced max abs err %f",
+    COUNT_ERRORS(RES, EXP, ROWS, COLS, res);
+    ck_assert_msg(res == 0,
+                  "GpuArray_reduce with %s op produced errors in %d places",
                   STR(GA_SUM), res);
   }
 
@@ -142,8 +156,9 @@ START_TEST(test_GpuArray_all_reduce)
   err = GpuArray_read(RES, outsize, &RESdev);
   ck_assert_int_eq(err, GA_NO_ERROR);
   int res;
-  MAX_ABS_DIFF(RES, EXP, ROWS * COLS, res);
-  ck_assert_msg(res == 0, "GpuArray_all_reduce with %s op produced max abs err %f",
+  COUNT_ERRORS(RES, EXP, ROWS, COLS, res);
+  ck_assert_msg(res == 0,
+                "GpuArray_all_reduce with %s op produced errors in %d places",
                 STR(GA_SUM), res);
 
   DESTROY_ARRAYS();
@@ -168,7 +183,7 @@ START_TEST(test_GpuArray_reduce_scatter)
   int* recvcounts = (int*)malloc(comm_ndev * sizeof(int));
   if (recvcounts == NULL)
     ck_abort_msg("system memory allocation failed");
-  for (i = 0; i < size_t(comm_ndev); ++i)
+  for (i = 0; i < (size_t)comm_ndev; ++i)
     recvcounts[i] = ROWS * COLS / comm_ndev;
   err = MPI_Reduce_scatter(A, EXP, recvcounts, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
   free(recvcounts);
@@ -177,9 +192,9 @@ START_TEST(test_GpuArray_reduce_scatter)
   err = GpuArray_read(RES, outsize, &RESdev);
   ck_assert_int_eq(err, GA_NO_ERROR);
   int res;
-  MAX_ABS_DIFF(RES, EXP, ROWS * COLS / comm_ndev, res);
+  COUNT_ERRORS(RES, EXP, ROWS / comm_ndev, COLS, res);
   ck_assert_msg(res == 0,
-                "GpuArray_reduce_scatter with %s op produced max abs err %f",
+                "GpuArray_reduce_scatter with %s op produced errors in %d places",
                 STR(GA_SUM), res);
 
   DESTROY_ARRAYS();
@@ -195,7 +210,7 @@ START_TEST(test_GpuArray_broadcast)
 
   for (i = 0; i < indims[0]; ++i)
     for (j = 0; j < indims[1]; ++j)
-      EXP[i][j] = comm_rank + 1;
+      EXP[i][j] = A[i][j];
 
   err = GpuArray_broadcast(&Adev, ROOT_RANK, comm);
   ck_assert_int_eq(err, GA_NO_ERROR);
@@ -207,8 +222,8 @@ START_TEST(test_GpuArray_broadcast)
   err = GpuArray_read(RES, outsize, &Adev);
   ck_assert_int_eq(err, GA_NO_ERROR);
   int res;
-  MAX_ABS_DIFF(RES, EXP, ROWS * COLS, res);
-  ck_assert_msg(res == 0, "GpuArray_broadcast produced max abs err %f", res);
+  COUNT_ERRORS(RES, EXP, ROWS, COLS, res);
+  ck_assert_msg(res == 0, "GpuArray_broadcast produced errors in %d places", res);
 
   DESTROY_ARRAYS();
 }
@@ -236,8 +251,8 @@ START_TEST(test_GpuArray_all_gather)
   err = GpuArray_read(RES, outsize, &RESdev);
   ck_assert_int_eq(err, GA_NO_ERROR);
   int res;
-  MAX_ABS_DIFF(RES, EXP, ROWS * COLS, res);
-  ck_assert_msg(res == 0, "GpuArray_all_gather produced max abs err %f", res);
+  COUNT_ERRORS(RES, EXP, ROWS, COLS, res);
+  ck_assert_msg(res == 0, "GpuArray_all_gather produced errors in %d places", res);
 
   DESTROY_ARRAYS();
 }

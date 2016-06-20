@@ -1,7 +1,6 @@
 enable_testing()
 
 find_package(PkgConfig)
-find_package(MPI)
 
 pkg_search_module(CHECK check)
 
@@ -59,8 +58,44 @@ add_executable(check_buffer main.c device.c check_buffer.c)
 target_link_libraries(check_buffer ${LIBS} gpuarray)
 add_test(test_buffer ${CMAKE_CURRENT_BINARY_DIR}/check_buffer)
 
-# TODO Add tests 1. Only build execs (to find compilation errs)
-# 2. Run in servers with multi-process/gpu
+if(BUILD_WITH_COLLECTIVES)
+
+  find_package(MPI)
+
+  if(MPI_C_FOUND)
+
+    include_directories(${MPI_C_INCLUDE_PATH})
+
+    add_executable(check_buffer_collectives
+                   main.c device.c communicator.c check_buffer_collectives.c)
+    target_link_libraries(check_buffer_collectives ${LIBS} ${MPI_C_LIBRARIES} gpuarray)
+
+    add_executable(check_collectives
+                   main.c device.c communicator.c check_collectives.c)
+    target_link_libraries(check_collectives ${LIBS} ${MPI_C_LIBRARIES} gpuarray)
+
+    set_target_properties(check_buffer_collectives check_collectives PROPERTIES
+                          COMPILE_DEFINITIONS TEST_COLLECTIVES
+                          COMPILE_FLAGS "${MPI_C_COMPILE_FLAGS}"
+                          LINK_FLAGS "${MPI_C_LINK_FLAGS}")
+
+    message("${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} $ENV{NUM_DEVS} ${MPIEXEC_PREFLAGS} ${CMAKE_CURRENT_BINARY_DIR}/check_buffer_collectives ${MPIEXEC_POSTFLAGS} $ENV{DEV_NAMES}")
+    add_test(NAME test_buffer_collectives
+      COMMAND ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} $ENV{NUM_DEVS}
+              ${MPIEXEC_PREFLAGS} ${CMAKE_CURRENT_BINARY_DIR}/check_buffer_collectives ${MPIEXEC_POSTFLAGS} $ENV{DEV_NAMES})
+    add_test(NAME test_collectives
+      COMMAND ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} $ENV{NUM_DEVS}
+              ${MPIEXEC_PREFLAGS} ${CMAKE_CURRENT_BINARY_DIR}/check_collectives ${MPIEXEC_POSTFLAGS} $ENV{DEV_NAMES})
+
+  else(MPI_C_FOUND)
+
+    message(WARNING "Cannot find MPI")
+    message(WARNING "Checks on collectives and buffer_collectives will not be built or performed.")
+
+  endif(MPI_C_FOUND)
+
+endif(BUILD_WITH_COLLECTIVES)
+
 ELSE(CHECK_FOUND)
 
 MESSAGE("Tests disabled because Check was not found")
