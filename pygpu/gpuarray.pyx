@@ -1733,7 +1733,7 @@ cdef class GpuArray:
         if sz == 1:
             return bool(numpy.asarray(self))
         else:
-            raise ValueError, "Thruth value of array with more than one element is ambiguous"
+            raise ValueError, "Truth value of array with more than one element is ambiguous"
 
     property shape:
         "shape of this ndarray (tuple)"

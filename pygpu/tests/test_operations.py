@@ -13,6 +13,14 @@ def test_array_split():
     for pc, pg in zip(rc, rg):
         numpy.testing.assert_allclose(pc, numpy.asarray(pg))
 
+    xc, xg = gen_gpuarray((8,), 'float32', ctx=context)
+    rc = numpy.array_split(xc, 3, axis=-1)
+    rg = pygpu.array_split(xg, 3, axis=-1)
+
+    assert len(rc) == len(rg)
+    for pc, pg in zip(rc, rg):
+        numpy.testing.assert_allclose(pc, numpy.asarray(pg))
+
 def test_split():
     for spl in (3, [3, 5, 6, 10]):
         yield xsplit, '', (9,), spl
@@ -47,6 +55,11 @@ def test_concatenate():
 
     rc = numpy.concatenate((ac, bc.T), axis=1)
     rg = pygpu.concatenate((ag, bg.T), axis=1)
+
+    numpy.testing.assert_allclose(rc, numpy.asarray(rg))
+
+    rc = numpy.concatenate((ac, bc.T), axis=-1)
+    rg = pygpu.concatenate((ag, bg.T), axis=-1)
 
     numpy.testing.assert_allclose(rc, numpy.asarray(rg))
 
