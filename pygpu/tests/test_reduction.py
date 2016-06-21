@@ -51,6 +51,29 @@ def test_red_big_array():
         yield red_array_sum, 'float32', (2000, 30, 100), redux
 
 
+def test_red_broadcast():
+    from pygpu.tools import as_argument
+
+    dtype = float
+    xshape = (5, 10, 15)
+    yshape = (1, 10, 15)
+    redux = [False, True, False]
+
+    nx, gx = gen_gpuarray(xshape, dtype, ctx=context)
+    ny, gy = gen_gpuarray(yshape, dtype, ctx=context)
+
+    nz = nx*ny
+    axes = [i for i in range(len(redux)) if redux[i]]
+    axes.reverse()
+    # numpy.sum doesn't support multiple axis before 1.7.0
+    for ax in axes:
+        nz = numpy.apply_along_axis(sum, ax, nz).astype(dtype)
+
+    args = [as_argument(gx, 'a'), as_argument(gy, 'b')]
+    gz = ReductionKernel(context, dtype, "0", "a+b", redux, map_expr="a[i]*b[i]", arguments=args)(gx, gy, broadcast=True)
+
+    assert numpy.allclose(nz, numpy.asarray(gz))
+
 def test_reduction_ops():
     for axis in [None, 0, 1]:
         for op in ['all', 'any']:
