@@ -81,6 +81,8 @@ def array_split(ary, indices_or_sections, axis=0):
     except TypeError:
         if axis < 0:
             axis += ary.ndim
+        if axis < 0:
+            raise ValueError('axis out of bounds')
         nsec = int(indices_or_sections)
         if nsec <= 0:
             raise ValueError('number of sections must be larger than 0.')
@@ -121,6 +123,8 @@ def concatenate(arys, axis=0, context=None):
                          "impossible")
     if axis < 0:
         axis += arys[0].ndim
+    if axis < 0:
+        raise ValueError('axis out of bounds')
     al = [asarray(a, context=context) for a in arys]
     if context is None:
         context = al[0].context
