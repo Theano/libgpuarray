@@ -15,7 +15,7 @@ Debug:
 	mkdir Debug
 
 Debug/Makefile: Debug config
-ifndef INSTALL_DIR
+ifndef INSTALL_PREFIX
 	(cd Debug && cmake .. -DCMAKE_BUILD_TYPE=Debug)
 else
 	(cd Debug && cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$(INSTALL_PREFIX))
@@ -28,7 +28,7 @@ Release:
 	mkdir Release
 
 Release/Makefile: Release config
-ifndef INSTALL_DIR
+ifndef INSTALL_PREFIX
 	(cd Release && cmake .. -DCMAKE_BUILD_TYPE=Release)
 else
 	(cd Release && cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$(INSTALL_PREFIX))
