@@ -21,8 +21,13 @@ enable_testing()
 include_directories(${CHECK_INCLUDE_DIRS})
 link_directories(${CHECK_LIBRARY_DIRS})
 
-list(APPEND CMAKE_C_FLAGS ${CHECK_C_FLAGS})
-list(APPEND CMAKE_EXE_LINKER_FLAGS ${CHECK_LDFLAGS_OTHER})
+foreach(flag ${CHECK_C_FLAGS})
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${flag}")
+endforeach()
+
+foreach(flag ${CHECK_LDFLAGS_OTHER})
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${flag}")
+endforeach()
 
 include_directories("${CMAKE_SOURCE_DIR}/src")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")

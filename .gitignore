@@ -1,4 +1,6 @@
 build
+Debug
+Release
 lib
 .*.sw[po]
 *~
