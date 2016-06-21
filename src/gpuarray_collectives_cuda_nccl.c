@@ -13,11 +13,6 @@
 #include "private_cuda.h"
 
 /**
- * Fetches error message constant string of `ncclSuccess`
- */
-#define NCCL_SUCCESS_ERROR ncclGetErrorString(ncclSuccess)
-
-/**
  * Execute `cmd` and return appropriate code. Save a describing error message in
  * context.
  */
@@ -28,7 +23,6 @@
       (ctx)->error_msg = ncclGetErrorString(nccl_err); \
       return GA_COMM_ERROR;                            \
     }                                                  \
-    (ctx)->error_msg = NCCL_SUCCESS_ERROR;             \
     return GA_NO_ERROR;                                \
   } while (0)
 
@@ -45,7 +39,6 @@
       (ctx)->error_msg = ncclGetErrorString(nccl_err); \
       return GA_COMM_ERROR;                            \
     }                                                  \
-    (ctx)->error_msg = NCCL_SUCCESS_ERROR;             \
   } while (0)
 
 extern const gpuarray_buffer_ops
@@ -102,7 +95,6 @@ static int comm_new(gpucomm** comm_ptr, gpucontext* ctx,
     return GA_COMM_ERROR;
   }
   *comm_ptr = comm;
-  ctx->error_msg = NCCL_SUCCESS_ERROR;
   return GA_NO_ERROR;
 }
 
