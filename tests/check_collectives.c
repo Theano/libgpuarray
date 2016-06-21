@@ -39,23 +39,9 @@ extern void teardown_comm(void);
     }                                           \
   } while (0)
 
-#include <stdio.h>
-#define PRINT(ar)                  \
-  do {                             \
-    printf("%s\n", STR(ar));       \
-    int i, j;                      \
-    for (i = 0; i < ROWS; ++i) {   \
-      for (j = 0; j < COLS; ++j) { \
-        printf("%d ", ar[i][j]);   \
-      }                            \
-      printf("\n");                \
-    }                              \
-    printf("\n");                  \
-  } while (0)
-
-/************************************************************************************
-*                  Test array functions for collective operations                  *
-************************************************************************************/
+/*******************************************************************************
+*               Test array functions for collective operations                *
+*******************************************************************************/
 
 #define INIT_ARRAYS(inrows, incols, outrows, outcols)                        \
   int(*A)[(incols)];                                                         \
@@ -104,8 +90,7 @@ extern void teardown_comm(void);
  * \note Untested for `not proper element count` , `not agreeing typecode`, `not
  * aligned`.
  */
-START_TEST(test_GpuArray_reduce)
-{
+START_TEST(test_GpuArray_reduce) {
   INIT_ARRAYS(ROWS, COLS, ROWS, COLS);
 
   if (comm_rank == ROOT_RANK) {
@@ -113,14 +98,14 @@ START_TEST(test_GpuArray_reduce)
     ck_assert_int_eq(err, GA_NO_ERROR);
     GpuArray_sync(&RESdev);
     GpuArray_sync(&Adev);
-  }
-  else {
+  } else {
     err = GpuArray_reduce_from(&Adev, GA_SUM, ROOT_RANK, comm);
     ck_assert_int_eq(err, GA_NO_ERROR);
     GpuArray_sync(&Adev);
   }
 
-  err = MPI_Reduce(A, EXP, ROWS * COLS, MPI_INT, MPI_SUM, ROOT_RANK, MPI_COMM_WORLD);
+  err = MPI_Reduce(A, EXP, ROWS * COLS, MPI_INT, MPI_SUM, ROOT_RANK,
+                   MPI_COMM_WORLD);
   ck_assert_msg(err == MPI_SUCCESS, "openmpi error: cannot produced expected");
 
   if (comm_rank == ROOT_RANK) {
@@ -138,11 +123,11 @@ START_TEST(test_GpuArray_reduce)
 END_TEST
 
 /**
- * \note Untested for: `not proper element count` , `not agreeing typecode`, `not
+ * \note Untested for: `not proper element count` , `not agreeing typecode`,
+ * `not
  * aligned`.
  */
-START_TEST(test_GpuArray_all_reduce)
-{
+START_TEST(test_GpuArray_all_reduce) {
   INIT_ARRAYS(ROWS, COLS, ROWS, COLS);
 
   err = GpuArray_all_reduce(&Adev, &RESdev, GA_SUM, comm);
@@ -169,9 +154,9 @@ END_TEST
  * \note Untested for `not proper element count` , `not agreeing typecode`, `not
  * aligned`.
  */
-START_TEST(test_GpuArray_reduce_scatter)
-{
-  // In order for C contiguous arrays to be combined/split successfully they should
+START_TEST(test_GpuArray_reduce_scatter) {
+  // In order for C contiguous arrays to be combined/split successfully they
+  // should
   // split along the smallest axis (the one with the bigger stride).
   INIT_ARRAYS(ROWS, COLS, ROWS / comm_ndev, COLS);
 
@@ -185,7 +170,8 @@ START_TEST(test_GpuArray_reduce_scatter)
     ck_abort_msg("system memory allocation failed");
   for (i = 0; i < (size_t)comm_ndev; ++i)
     recvcounts[i] = ROWS * COLS / comm_ndev;
-  err = MPI_Reduce_scatter(A, EXP, recvcounts, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+  err =
+      MPI_Reduce_scatter(A, EXP, recvcounts, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
   free(recvcounts);
   ck_assert_msg(err == MPI_SUCCESS, "openmpi error: cannot produced expected");
 
@@ -193,9 +179,10 @@ START_TEST(test_GpuArray_reduce_scatter)
   ck_assert_int_eq(err, GA_NO_ERROR);
   int res;
   COUNT_ERRORS(RES, EXP, ROWS / comm_ndev, COLS, res);
-  ck_assert_msg(res == 0,
-                "GpuArray_reduce_scatter with %s op produced errors in %d places",
-                STR(GA_SUM), res);
+  ck_assert_msg(
+      res == 0,
+      "GpuArray_reduce_scatter with %s op produced errors in %d places",
+      STR(GA_SUM), res);
 
   DESTROY_ARRAYS();
 }
@@ -204,8 +191,7 @@ END_TEST
 /**
  * \note Untested for `not aligned`.
  */
-START_TEST(test_GpuArray_broadcast)
-{
+START_TEST(test_GpuArray_broadcast) {
   INIT_ARRAYS(ROWS, COLS, ROWS, COLS);
 
   for (i = 0; i < indims[0]; ++i)
@@ -223,7 +209,8 @@ START_TEST(test_GpuArray_broadcast)
   ck_assert_int_eq(err, GA_NO_ERROR);
   int res;
   COUNT_ERRORS(RES, EXP, ROWS, COLS, res);
-  ck_assert_msg(res == 0, "GpuArray_broadcast produced errors in %d places", res);
+  ck_assert_msg(res == 0, "GpuArray_broadcast produced errors in %d places",
+                res);
 
   DESTROY_ARRAYS();
 }
@@ -233,9 +220,9 @@ END_TEST
  * \note Untested for `not proper element count` , `not agreeing typecode`, `not
  * aligned`.
  */
-START_TEST(test_GpuArray_all_gather)
-{
-  // In order for C contiguous arrays to be combined/split successfully they should
+START_TEST(test_GpuArray_all_gather) {
+  // In order for C contiguous arrays to be combined/split successfully they
+  // should
   // split along the smallest axis (the one with the bigger stride).
   INIT_ARRAYS(ROWS / comm_ndev, COLS, ROWS, COLS);
 
@@ -244,22 +231,22 @@ START_TEST(test_GpuArray_all_gather)
   GpuArray_sync(&RESdev);
   GpuArray_sync(&Adev);
 
-  err = MPI_Allgather(A, ROWS * COLS / comm_ndev, MPI_INT, EXP, ROWS * COLS, MPI_INT,
-                      MPI_COMM_WORLD);
+  err = MPI_Allgather(A, ROWS * COLS / comm_ndev, MPI_INT, EXP, ROWS * COLS,
+                      MPI_INT, MPI_COMM_WORLD);
   ck_assert_msg(err == MPI_SUCCESS, "openmpi error: cannot produced expected");
 
   err = GpuArray_read(RES, outsize, &RESdev);
   ck_assert_int_eq(err, GA_NO_ERROR);
   int res;
   COUNT_ERRORS(RES, EXP, ROWS, COLS, res);
-  ck_assert_msg(res == 0, "GpuArray_all_gather produced errors in %d places", res);
+  ck_assert_msg(res == 0, "GpuArray_all_gather produced errors in %d places",
+                res);
 
   DESTROY_ARRAYS();
 }
 END_TEST
 
-Suite* get_suite(void)
-{
+Suite* get_suite(void) {
   Suite* s = suite_create("collectives");
   TCase* tc = tcase_create("API");
   tcase_add_checked_fixture(tc, setup_comm, teardown_comm);

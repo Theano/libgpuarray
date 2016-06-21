@@ -11,9 +11,9 @@ extern "C" {
 }
 #endif  // CONFUSE_EMACS
 
-/************************************************************************************
-*                      multi-gpu collectives buffer interface                      *
-************************************************************************************/
+/*******************************************************************************
+*                   Multi-gpu collectives buffer interface                    *
+*******************************************************************************/
 
 /**
  * Multi-gpu communicator structure.
@@ -46,14 +46,19 @@ typedef struct _gpucommCliqueId {
 /**
  * \brief Create a new gpu communicator instance.
  * \param comm [gpucomm**] pointer to get a new gpu communicator
- * \param ctx [gpucontext*] gpu context in which `comm` will be used (contains device
+ * \param ctx [gpucontext*] gpu context in which `comm` will be used (contains
+ * device
  * information)
- * \param comm_id [gpucommCliqueId] id unique to communicators consisting a world
+ * \param comm_id [gpucommCliqueId] id unique to communicators consisting a
+ * world
  * \param ndev [int] number of communicators/devices participating in the world
- * \param rank [int] user-defined rank, from 0 to `ndev`-1, of `comm` in the world
- * \note `rank` is defined to be unique for each new `comm` participating in the same
+ * \param rank [int] user-defined rank, from 0 to `ndev`-1, of `comm` in the
+ * world
+ * \note `rank` is defined to be unique for each new `comm` participating in the
+ * same
  * world.
- * \note Must be called in parallel by all separate new `comm`, which will consist a
+ * \note Must be called in parallel by all separate new `comm`, which will
+ * consist a
  * new world (failing will lead to deadlock).
  * \return int error code, \ref GA_NO_ERROR if success
  */
@@ -88,7 +93,8 @@ GPUARRAY_PUBLIC gpucontext* gpucomm_context(gpucomm* comm);
  * \note Id is guaranteed to be unique across callers in a single host.
  * \return int error code, \ref GA_NO_ERROR if success
  */
-GPUARRAY_PUBLIC int gpucomm_gen_clique_id(gpucontext* ctx, gpucommCliqueId* comm_id);
+GPUARRAY_PUBLIC int gpucomm_gen_clique_id(gpucontext* ctx,
+                                          gpucommCliqueId* comm_id);
 
 /**
  * \brief Returns total number of device/communicators participating in `comm`'s
@@ -100,7 +106,8 @@ GPUARRAY_PUBLIC int gpucomm_gen_clique_id(gpucontext* ctx, gpucommCliqueId* comm
 GPUARRAY_PUBLIC int gpucomm_get_count(gpucomm* comm, int* gpucount);
 
 /**
- * \brief Returns rank of `comm` inside its world as defined by user upon creation.
+ * \brief Returns rank of `comm` inside its world as defined by user upon
+ * creation.
  * \param comm [gpucomm*] gpu communicator
  * \param rank [int*] pointer to `comm`'s rank
  * \return int error code, \ref GA_NO_ERROR if success
@@ -111,16 +118,20 @@ GPUARRAY_PUBLIC int gpucomm_get_rank(gpucomm* comm, int* rank);
  * \brief Reduce collective operation for ranks in a communicator world [buffer
  * level].
  * \param src [gpudata*] data in device's buffer to be reduced
- * \param offsrc [size_t] memory offset after which data is saved in buffer `src`
+ * \param offsrc [size_t] memory offset after which data is saved in buffer
+ * `src`
  * \param dest [gpudata*] data in device's buffer to collect result
- * \param offdest [size_t] memory offset after which data will be saved in buffer
+ * \param offdest [size_t] memory offset after which data will be saved in
+ * buffer
  * `dest`
  * \param count [size_t] number of elements to be reduced in each array
- * \param typecode [int] code for elements' data type, see \ref enum GPUARRAY_TYPES
+ * \param typecode [int] code for elements' data type, see \ref enum
+ * GPUARRAY_TYPES
  * \param opcode [int] reduce operation code, see \ref enum _gpucomm_reduce_ops
  * \param root [int] rank in `comm` which will collect result
  * \param comm [gpucomm*] gpu communicator
- * \note Non root ranks can call this, using a NULL `dest`. In this case, `offdest`
+ * \note Non root ranks can call this, using a NULL `dest`. In this case,
+ * `offdest`
  * will not be used.
  * \note Must be called separately for each rank in `comm`.
  * \return int error code, \ref GA_NO_ERROR if success
@@ -130,42 +141,53 @@ GPUARRAY_PUBLIC int gpucomm_reduce(gpudata* src, size_t offsrc, gpudata* dest,
                                    int opcode, int root, gpucomm* comm);
 
 /**
- * \brief AllReduce collective operation for ranks in a communicator world [buffer
+ * \brief AllReduce collective operation for ranks in a communicator world
+ * [buffer
  * level].
  *
- * Reduces data pointed by `src` using op operation and leaves identical copies of
+ * Reduces data pointed by `src` using op operation and leaves identical copies
+ * of
  * result in data pointed by `dest` on each rank of `comm`.
  *
  * \param src [gpudata*] data in device's buffer to be reduced
- * \param offsrc [size_t] memory offset after which data is saved in buffer `src`
+ * \param offsrc [size_t] memory offset after which data is saved in buffer
+ * `src`
  * \param dest [gpudata*] data in device's buffer to collect result
- * \param offdest [size_t] memory offset after which data will be saved in buffer
+ * \param offdest [size_t] memory offset after which data will be saved in
+ * buffer
  * `dest`
  * \param count [size_t] number of elements to be reduced in each array
- * \param typecode [int] code for elements' data type, see \ref enum GPUARRAY_TYPES
+ * \param typecode [int] code for elements' data type, see \ref enum
+ * GPUARRAY_TYPES
  * \param opcode [int] reduce operation code, see \ref enum _gpucomm_reduce_ops
  * \param comm [gpucomm*] gpu communicator
  * \note Must be called separately for each rank in `comm`.
  * \return int error code, \ref GA_NO_ERROR if success
  */
-GPUARRAY_PUBLIC int gpucomm_all_reduce(gpudata* src, size_t offsrc, gpudata* dest,
-                                       size_t offdest, size_t count, int typecode,
-                                       int opcode, gpucomm* comm);
+GPUARRAY_PUBLIC int gpucomm_all_reduce(gpudata* src, size_t offsrc,
+                                       gpudata* dest, size_t offdest,
+                                       size_t count, int typecode, int opcode,
+                                       gpucomm* comm);
 
 /**
  * \brief ReduceScatter collective operation for ranks in a communicator world
  * [buffer level].
  *
- * Reduces data pointed by `src` using `opcode` operation and leaves reduced result
- * scattered over data pointed by `dest` in the user-defined rank order in `comm`.
+ * Reduces data pointed by `src` using `opcode` operation and leaves reduced
+ * result
+ * scattered over data pointed by `dest` in the user-defined rank order in
+ * `comm`.
  *
  * \param src [gpudata*] data in device's buffer to be reduced
- * \param offsrc [size_t] memory offset after which data is saved in buffer `src`
+ * \param offsrc [size_t] memory offset after which data is saved in buffer
+ * `src`
  * \param dest [gpudata*] data in device's buffer to collect scattered result
- * \param offdest [size_t] memory offset after which data will be saved in buffer
+ * \param offdest [size_t] memory offset after which data will be saved in
+ * buffer
  * `dest`
  * \param count [size_t] number of elements to be contained in result `dest`
- * \param typecode [int] code for elements' data type, see \ref enum GPUARRAY_TYPES
+ * \param typecode [int] code for elements' data type, see \ref enum
+ * GPUARRAY_TYPES
  * \param opcode [int] reduce operation code, see \ref enum _gpucomm_reduce_ops
  * \param comm [gpucomm*] gpu communicator
  * \note Must be called separately for each rank in `comm`.
@@ -173,11 +195,12 @@ GPUARRAY_PUBLIC int gpucomm_all_reduce(gpudata* src, size_t offsrc, gpudata* des
  */
 GPUARRAY_PUBLIC int gpucomm_reduce_scatter(gpudata* src, size_t offsrc,
                                            gpudata* dest, size_t offdest,
-                                           size_t count, int typecode, int opcode,
-                                           gpucomm* comm);
+                                           size_t count, int typecode,
+                                           int opcode, gpucomm* comm);
 
 /**
- * \brief Broadcast collective operation for ranks in a communicator world [buffer
+ * \brief Broadcast collective operation for ranks in a communicator world
+ * [buffer
  * level].
  *
  * Copies data pointed by `array` to all ranks in `comm`.
@@ -185,33 +208,39 @@ GPUARRAY_PUBLIC int gpucomm_reduce_scatter(gpudata* src, size_t offsrc,
  * \param array [gpudata*] data in device's buffer to get copied or be received
  * \param offset [size_t] memory offset after which data in `array` begin
  * \param count [size_t] number of elements to be contained in `array`
- * \param typecode [int] code for elements' data type, see \ref enum GPUARRAY_TYPES
+ * \param typecode [int] code for elements' data type, see \ref enum
+ * GPUARRAY_TYPES
  * \param root [int] rank in `comm` which broadcasts its array
  * \param comm [gpucomm*] gpu communicator
  * \note Must be called separately for each rank in `comm`.
  * \return int error code, \ref GA_NO_ERROR if success
  */
-GPUARRAY_PUBLIC int gpucomm_broadcast(gpudata* array, size_t offset, size_t count,
-                                      int typecode, int root, gpucomm* comm);
+GPUARRAY_PUBLIC int gpucomm_broadcast(gpudata* array, size_t offset,
+                                      size_t count, int typecode, int root,
+                                      gpucomm* comm);
 
 /**
  * \brief AllGather collective operation for ranks in a communicator world.
  *
- * Each rank receives all data pointed by `src` of every rank in the user-defined
+ * Each rank receives all data pointed by `src` of every rank in the
+ * user-defined
  * rank order in `comm`.
  *
  * \param src [gpudata*] data in device's buffer to be gathered
  * \param offsrc [size_t] memory offset after which data in `src` begin
  * \param dest [gpudata*] data in device's buffer to gather from all ranks
  * \param offdest [size_t] memory offset after which data in `dest` begin
- * \param count [size_t] number of elements to be gathered from each rank in `src`
- * \param typecode [int] code for elements' data type, see \ref enum GPUARRAY_TYPES
+ * \param count [size_t] number of elements to be gathered from each rank in
+ * `src`
+ * \param typecode [int] code for elements' data type, see \ref enum
+ * GPUARRAY_TYPES
  * \param comm [gpucomm*] gpu communicator
  * \note Must be called separately for each rank in `comm`.
  * \return int error code, \ref GA_NO_ERROR if success
  */
-GPUARRAY_PUBLIC int gpucomm_all_gather(gpudata* src, size_t offsrc, gpudata* dest,
-                                       size_t offdest, size_t count, int typecode,
+GPUARRAY_PUBLIC int gpucomm_all_gather(gpudata* src, size_t offsrc,
+                                       gpudata* dest, size_t offdest,
+                                       size_t count, int typecode,
                                        gpucomm* comm);
 
 #ifdef __cplusplus

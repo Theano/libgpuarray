@@ -1,10 +1,11 @@
-#include <check.h>
-#include <gpuarray/util.h>
-#include <gpuarray/buffer.h>
 #include <stdlib.h>
 
-START_TEST(test_register_type)
-{
+#include <check.h>
+
+#include "gpuarray/buffer.h"
+#include "gpuarray/util.h"
+
+START_TEST(test_register_type) {
   int tcode;
   gpuarray_type *t = malloc(sizeof(*t));
   ck_assert(t != NULL);
@@ -20,15 +21,15 @@ START_TEST(test_register_type)
 }
 END_TEST
 
-START_TEST(test_type_flags)
-{
+START_TEST(test_type_flags) {
   ck_assert_int_eq(gpuarray_type_flags(-1), 0);
   ck_assert_int_eq(gpuarray_type_flags(GA_FLOAT, -1), 0);
   ck_assert_int_eq(gpuarray_type_flags(GA_DOUBLE, -1), GA_USE_DOUBLE);
   ck_assert_int_eq(gpuarray_type_flags(GA_CFLOAT, -1), GA_USE_COMPLEX);
   ck_assert_int_eq(gpuarray_type_flags(GA_CDOUBLE, -1),
                    GA_USE_DOUBLE|GA_USE_COMPLEX);
-  ck_assert_int_eq(gpuarray_type_flags(GA_HALF, -1), GA_USE_HALF|GA_USE_SMALL);
+  ck_assert_int_eq(gpuarray_type_flags(GA_HALF, -1),
+                   GA_USE_HALF|GA_USE_SMALL);
   ck_assert_int_eq(gpuarray_type_flags(GA_BYTE, -1), GA_USE_SMALL);
   ck_assert_int_eq(gpuarray_type_flags(GA_SHORT, GA_DOUBLE, -1),
                    GA_USE_SMALL|GA_USE_DOUBLE);
@@ -37,8 +38,7 @@ START_TEST(test_type_flags)
 }
 END_TEST
 
-START_TEST(test_elemwise_collapse)
-{
+START_TEST(test_elemwise_collapse) {
   size_t dims[3];
   ssize_t *strs[2];
   ssize_t _strs0[3];

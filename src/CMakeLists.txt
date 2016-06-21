@@ -38,7 +38,7 @@ macro (set_rel var)
   endif()
 endmacro()
 
-set_rel(GPUARRAY_SRC
+set(_GPUARRAY_SRC
 cache/lru.c
 cache/twoq.c
 gpuarray_types.c
@@ -63,11 +63,11 @@ if(UNIX)
 endif()
 
 if(NOT HAVE_STRL)
-  set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_strl.c)
+  list(APPEND _GPUARRAY_SRC gpuarray_strl.c)
 endif()
 
 if(NOT HAVE_MKSTEMP)
-  set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_mkstemp.c)
+  list(APPEND _GPUARRAY_SRC gpuarray_mkstemp.c)
 endif()
 
 if (CUDA_FOUND)
@@ -90,11 +90,11 @@ if (CUDA_FOUND)
     FIND_LIBRARY(CUDADRV_LIBRARY CUDA)
     FIND_PATH(CUDADRV_INCLUDE CUDA/cuda.h)
     # this is somewhat a hack, but otherwise cublas_v2.h isn't found
-    set(CUDADRV_INCLUDE "${CUDADRV_INCLUDE}" "${CUDA_TOOLKIT_INCLUDE}")
+    set(CUDADRV_INCLUDE ${CUDADRV_INCLUDE} ${CUDA_TOOLKIT_INCLUDE})
   endif()
   if(NOT CUDADRV_LIBRARY)
-    SET(CUDADRV_LIBRARY ${CUDA_CUDA_LIBRARY})
-    SET(CUDADRV_INCLUDE ${CUDA_TOOLKIT_INCLUDE})
+    set(CUDADRV_LIBRARY ${CUDA_CUDA_LIBRARY})
+    set(CUDADRV_INCLUDE ${CUDA_TOOLKIT_INCLUDE})
   endif()
 
   find_cuda_helper_libs(nvrtc)
@@ -104,17 +104,17 @@ if (CUDA_FOUND)
     add_definitions(-DWITH_NVRTC)
     set(CUDADRV_LIBRARY ${CUDADRV_LIBRARY} ${CUDA_nvrtc_LIBRARY})
   else()
-    add_definitions(-DNVCC_BIN="${CUDA_NVCC_EXECUTABLE}")
+    add_definitions(-DNVCC_BIN=${CUDA_NVCC_EXECUTABLE})
   endif()
 
-  set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_buffer_cuda.c)
+  list(APPEND _GPUARRAY_SRC gpuarray_buffer_cuda.c)
   add_definitions(-DWITH_CUDA)
-  include_directories("${CUDADRV_INCLUDE}")
+  include_directories(${CUDADRV_INCLUDE})
 
   set(BUILD_WITH_BLAS 1 PARENT_SCOPE)
-  set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_blas_cuda_cublas.c)
+  list(APPEND _GPUARRAY_SRC gpuarray_blas_cuda_cublas.c)
   add_definitions(-DWITH_CUDA_CUBLAS)
-  set(CMAKE_REQUIRED_LIBRARIES ${CUDA_CUBLAS_LIBRARIES})
+
   check_function_exists(cublasSgemmEx CUBLAS_SGEMMEX)
   if (CUBLAS_SGEMMEX)
     add_definitions(-DHAVE_CUBLAS_SGEMMEX)
@@ -124,23 +124,22 @@ if (CUDA_FOUND)
     message(STATUS "Building with NCCL")
     set(BUILD_WITH_COLLECTIVES 1 PARENT_SCOPE)
     add_definitions(-DWITH_CUDA_NCCL)
-    set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_collectives_cuda_nccl.c)
-    include_directories("${NCCL_INCLUDE_DIR}")
-    set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES} ${NCCL_LIBRARY})
+    list(APPEND _GPUARRAY_SRC gpuarray_collectives_cuda_nccl.c)
+    include_directories(${NCCL_INCLUDE_DIR})
   endif()
 endif()
 
 if(OPENCL_FOUND)
-  set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_buffer_opencl.c)
+  list(APPEND _GPUARRAY_SRC gpuarray_buffer_opencl.c)
   add_definitions(-DWITH_OPENCL)
-  include_directories("${OPENCL_INCLUDE_DIRS}")
+  include_directories(${OPENCL_INCLUDE_DIRS})
 
   if(CLBLAS_FOUND)
     message(STATUS "Building with CLBLAS")
     set(BUILD_WITH_BLAS 1 PARENT_SCOPE)
-    set(GPUARRAY_SRC ${GPUARRAY_SRC} gpuarray_blas_opencl_clblas.c)
+    list(APPEND _GPUARRAY_SRC gpuarray_blas_opencl_clblas.c)
     add_definitions(-DWITH_OPENCL_CLBLAS)
-    include_directories("${CLBLAS_INCLUDE_DIRS}")
+    include_directories(${CLBLAS_INCLUDE_DIRS})
   endif()
 endif()
 
@@ -151,7 +150,8 @@ configure_file(
 
 add_subdirectory(util)
 
-set(GPUARRAY_SRC ${GPUARRAY_SRC} ${UTIL_SRC})
+set_rel(GPUARRAY_SRC ${_GPUARRAY_SRC})
+list(APPEND GPUARRAY_SRC ${UTIL_SRC})
 
 add_library(gpuarray SHARED ${GPUARRAY_SRC})
 set_target_properties(gpuarray PROPERTIES
@@ -180,13 +180,13 @@ if(OPENCL_FOUND)
   endif()
 endif()
 
-SET(headers
+set(headers
   gpuarray/array.h
   gpuarray/blas.h
   gpuarray/collectives.h
   gpuarray/buffer.h
   gpuarray/buffer_blas.h
-  gpuarray_buffer_collectives.c
+  gpuarray/buffer_collectives.h
   gpuarray/config.h
   gpuarray/elemwise.h
   gpuarray/error.h
@@ -197,13 +197,13 @@ SET(headers
   gpuarray/util.h
 )
 
-INSTALL(FILES ${headers} DESTINATION include/gpuarray)
+install(FILES ${headers} DESTINATION include/gpuarray)
 
 if(NOT UNIX)
-  INSTALL(FILES gpuarray/wincompat/stdint.h DESTINATION include/gpuarray/wincompat)
+  install(FILES gpuarray/wincompat/stdint.h DESTINATION include/gpuarray/wincompat)
 endif()
 
-INSTALL(TARGETS gpuarray gpuarray-static
+install(TARGETS gpuarray gpuarray-static
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib

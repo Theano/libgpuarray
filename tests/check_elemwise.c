@@ -1,10 +1,10 @@
 #include <check.h>
 
-#include <gpuarray/buffer.h>
-#include <gpuarray/array.h>
-#include <gpuarray/elemwise.h>
-#include <gpuarray/error.h>
-#include <gpuarray/types.h>
+#include "gpuarray/array.h"
+#include "gpuarray/buffer.h"
+#include "gpuarray/elemwise.h"
+#include "gpuarray/error.h"
+#include "gpuarray/types.h"
 
 extern void *ctx;
 
@@ -13,12 +13,10 @@ void teardown(void);
 
 #define ga_assert_ok(e) ck_assert_int_eq(e, GA_NO_ERROR)
 /* float 16 table (0 through 10) */
-static const uint16_t F16[10] = {0x0000, 0x3c00, 0x4000, 0x4200, 0x4400, 0x4500, 0x4600, 0x4700, 0x4800, 0x4880};
+static const uint16_t F16[10] = {0x0000, 0x3c00, 0x4000, 0x4200, 0x4400,
+                                 0x4500, 0x4600, 0x4700, 0x4800, 0x4880};
 
-
-
-START_TEST(test_contig_simple)
-{
+START_TEST(test_contig_simple) {
   GpuArray a;
   GpuArray b;
   GpuArray c;
@@ -74,9 +72,7 @@ START_TEST(test_contig_simple)
 }
 END_TEST
 
-
-START_TEST(test_contig_f16)
-{
+START_TEST(test_contig_f16) {
   GpuArray a;
   GpuArray b;
   GpuArray c;
@@ -138,16 +134,14 @@ START_TEST(test_contig_f16)
 }
 END_TEST
 
-
-START_TEST(test_contig_0)
-{
+START_TEST(test_contig_0) {
   GpuArray a;
   GpuArray b;
   GpuArray c;
 
   GpuElemwise *ge;
 
- size_t dims[1];
+  size_t dims[1];
 
   gpuelemwise_arg args[3] = {{0}};
   void *rargs[3];
@@ -184,9 +178,7 @@ START_TEST(test_contig_0)
 }
 END_TEST
 
-
-START_TEST(test_basic_simple)
-{
+START_TEST(test_basic_simple) {
   GpuArray a;
   GpuArray b;
   GpuArray c;
@@ -243,9 +235,7 @@ START_TEST(test_basic_simple)
 }
 END_TEST
 
-
-START_TEST(test_basic_f16)
-{
+START_TEST(test_basic_f16) {
   GpuArray a;
   GpuArray b;
   GpuArray c;
@@ -308,9 +298,7 @@ START_TEST(test_basic_f16)
 }
 END_TEST
 
-
-START_TEST(test_basic_offset)
-{
+START_TEST(test_basic_offset) {
   GpuArray a;
   GpuArray b;
   GpuArray c;
@@ -374,9 +362,7 @@ START_TEST(test_basic_offset)
 }
 END_TEST
 
-
-START_TEST(test_basic_remove1)
-{
+START_TEST(test_basic_remove1) {
   GpuArray a;
   GpuArray b;
   GpuArray c;
@@ -438,9 +424,7 @@ START_TEST(test_basic_remove1)
 }
 END_TEST
 
-
-START_TEST(test_basic_broadcast)
-{
+START_TEST(test_basic_broadcast) {
   GpuArray a;
   GpuArray b;
   GpuArray c;
@@ -495,7 +479,7 @@ START_TEST(test_basic_broadcast)
 
   ck_assert_int_eq(GpuElemwise_call(ge, rargs, GE_NOCOLLAPSE), GA_VALUE_ERROR);
 
-  ga_assert_ok(GpuElemwise_call(ge, rargs, GE_NOCOLLAPSE|GE_BROADCAST));
+  ga_assert_ok(GpuElemwise_call(ge, rargs, GE_NOCOLLAPSE | GE_BROADCAST));
 
   ga_assert_ok(GpuArray_read(data3, sizeof(data3), &c));
 
@@ -508,9 +492,7 @@ START_TEST(test_basic_broadcast)
 }
 END_TEST
 
-
-START_TEST(test_basic_collapse)
-{
+START_TEST(test_basic_collapse) {
   GpuArray a;
   GpuArray b;
   GpuArray c;
@@ -570,9 +552,7 @@ START_TEST(test_basic_collapse)
 }
 END_TEST
 
-
-START_TEST(test_basic_neg_strides)
-{
+START_TEST(test_basic_neg_strides) {
   GpuArray a;
   GpuArray b;
   GpuArray c;
@@ -641,9 +621,7 @@ START_TEST(test_basic_neg_strides)
 }
 END_TEST
 
-
-START_TEST(test_basic_0)
-{
+START_TEST(test_basic_0) {
   GpuArray a;
   GpuArray b;
   GpuArray c;
@@ -688,7 +666,6 @@ START_TEST(test_basic_0)
 }
 END_TEST
 
-
 Suite *get_suite(void) {
   Suite *s = suite_create("elemwise");
   TCase *tc = tcase_create("contig");
@@ -712,5 +689,3 @@ Suite *get_suite(void) {
   suite_add_tcase(s, tc);
   return s;
 }
-
-

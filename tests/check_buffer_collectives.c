@@ -39,43 +39,29 @@ extern void teardown_comm(void);
 
 typedef unsigned long ulong;
 
-#include <stdio.h>
-#define PRINT(ar, N)               \
-  do {                             \
-    printf("%s\n", STR(ar));       \
-    int li;                        \
-    for (li = 0; li < (N); ++li) { \
-      printf("%f ", ar[li]);       \
-    }                              \
-    printf("\n");                  \
-    printf("\n");                  \
-  } while (0)
+/*******************************************************************************
+*                Test helper buffer functions for collectives                 *
+*******************************************************************************/
 
-/************************************************************************************
-*                   Test helper buffer functions for collectives                   *
-************************************************************************************/
-
-START_TEST(test_gpucomm_get_count)
-{
-  int gpucount, err;
+START_TEST(test_gpucomm_get_count) {
+  int gpucount = 0, err = 0;
   err = gpucomm_get_count(comm, &gpucount);
   ck_assert_int_eq(err, GA_NO_ERROR);
   ck_assert_int_eq(gpucount, comm_ndev);
 }
 END_TEST
 
-START_TEST(test_gpucomm_get_rank)
-{
-  int rank, err;
+START_TEST(test_gpucomm_get_rank) {
+  int rank = 0, err = 0;
   err = gpucomm_get_rank(comm, &rank);
   ck_assert_int_eq(err, GA_NO_ERROR);
   ck_assert_int_eq(rank, comm_rank);
 }
 END_TEST
 
-/************************************************************************************
-*                         Test buffer collective functions                         *
-************************************************************************************/
+/*******************************************************************************
+*                      Test buffer collective functions                       *
+*******************************************************************************/
 
 #define INIT_ARRAYS(insize, outsize)                              \
   int err;                                                        \
@@ -100,37 +86,39 @@ END_TEST
   gpudata_release(Adev); \
   gpudata_release(RESdev);
 
-#define TEST_REDUCE(systype, gatype, gaoptype, mpitype, mpioptype, epsilon)         \
-  do {                                                                              \
-    systype* A = (systype*)Av;                                                      \
-    systype* RES = (systype*)RESv;                                                  \
-    systype* EXP = (systype*)EXPv;                                                  \
-                                                                                    \
-    int i, count = SIZE / sizeof(systype);                                          \
-    for (i = 0; i < count; ++i)                                                     \
-      A[i] = comm_rank + 2;                                                         \
-    err = gpudata_write(Adev, 0, A, SIZE);                                          \
-    ck_assert_int_eq(err, GA_NO_ERROR);                                             \
-                                                                                    \
-    err = gpucomm_reduce(Adev, 0, RESdev, 0, count, gatype, gaoptype, ROOT_RANK,    \
-                         comm);                                                     \
-    ck_assert_int_eq(err, GA_NO_ERROR);                                             \
-    gpudata_sync(RESdev);                                                           \
-    gpudata_sync(Adev);                                                             \
-                                                                                    \
-    err = MPI_Reduce(A, EXP, count, mpitype, mpioptype, ROOT_RANK, MPI_COMM_WORLD); \
-    ck_assert_msg(err == MPI_SUCCESS, "openmpi error: cannot produced expected");   \
-                                                                                    \
-    if (comm_rank == ROOT_RANK) {                                                   \
-      err = gpudata_read(RES, RESdev, 0, SIZE);                                     \
-      ck_assert_int_eq(err, GA_NO_ERROR);                                           \
-      systype res;                                                                  \
-      MAX_ABS_DIFF(RES, EXP, count, res);                                           \
-      ck_assert_msg(                                                                \
-          res <= epsilon,                                                           \
-          "gpudata_reduce with %s type and %s op produced max abs err %f",          \
-          STR(gatype), STR(gaoptype), res);                                         \
-    }                                                                               \
+#define TEST_REDUCE(systype, gatype, gaoptype, mpitype, mpioptype, epsilon) \
+  do {                                                                      \
+    systype* A = (systype*)Av;                                              \
+    systype* RES = (systype*)RESv;                                          \
+    systype* EXP = (systype*)EXPv;                                          \
+                                                                            \
+    int i, count = SIZE / sizeof(systype);                                  \
+    for (i = 0; i < count; ++i)                                             \
+      A[i] = comm_rank + 2;                                                 \
+    err = gpudata_write(Adev, 0, A, SIZE);                                  \
+    ck_assert_int_eq(err, GA_NO_ERROR);                                     \
+                                                                            \
+    err = gpucomm_reduce(Adev, 0, RESdev, 0, count, gatype, gaoptype,       \
+                         ROOT_RANK, comm);                                  \
+    ck_assert_int_eq(err, GA_NO_ERROR);                                     \
+    gpudata_sync(RESdev);                                                   \
+    gpudata_sync(Adev);                                                     \
+                                                                            \
+    err = MPI_Reduce(A, EXP, count, mpitype, mpioptype, ROOT_RANK,          \
+                     MPI_COMM_WORLD);                                       \
+    ck_assert_msg(err == MPI_SUCCESS,                                       \
+                  "openmpi error: cannot produced expected");               \
+                                                                            \
+    if (comm_rank == ROOT_RANK) {                                           \
+      err = gpudata_read(RES, RESdev, 0, SIZE);                             \
+      ck_assert_int_eq(err, GA_NO_ERROR);                                   \
+      systype res;                                                          \
+      MAX_ABS_DIFF(RES, EXP, count, res);                                   \
+      ck_assert_msg(                                                        \
+          res <= epsilon,                                                   \
+          "gpudata_reduce with %s type and %s op produced max abs err %f",  \
+          STR(gatype), STR(gaoptype), res);                                 \
+    }                                                                       \
   } while (0)
 
 #define TEST_REDUCE_FAIL(count, gatype, gaoptype, offsrc, experror)            \
@@ -146,8 +134,7 @@ END_TEST
  * \note Untested for: `same context`, `dest offset`.
  * (because root has different behaviour than non root ranks)
  */
-START_TEST(test_gpucomm_reduce)
-{
+START_TEST(test_gpucomm_reduce) {
   INIT_ARRAYS(SIZE, SIZE);
 
   // Check successful cases
@@ -188,57 +175,60 @@ START_TEST(test_gpucomm_reduce)
                    GA_INVALID_ERROR);  //!< Bad operation type
   TEST_REDUCE_FAIL(SIZE / sizeof(int), GA_INT, GA_SUM, SIZE - sizeof(int),
                    GA_VALUE_ERROR);  //!< Bad src offset
-  /* TEST_REDUCE_FAIL((size_t)INT_MAX + 1, GA_INT, GA_SUM, 0,    */
-  /*                  GA_UNSUPPORTED_ERROR);  //!< Too big count */
+  TEST_REDUCE_FAIL((size_t)INT_MAX + 1, GA_INT, GA_SUM, 0,
+                   GA_UNSUPPORTED_ERROR);  //!< Too big count
 
   DESTROY_ARRAYS();
 }
 END_TEST
 
-#define TEST_ALL_REDUCE(systype, gatype, gaoptype, mpitype, mpioptype, epsilon)   \
-  do {                                                                            \
-    systype* A = (systype*)Av;                                                    \
-    systype* RES = (systype*)RESv;                                                \
-    systype* EXP = (systype*)EXPv;                                                \
-                                                                                  \
-    int i, count = SIZE / sizeof(systype);                                        \
-    for (i = 0; i < count; ++i)                                                   \
-      A[i] = comm_rank + 1;                                                       \
-    err = gpudata_write(Adev, 0, A, SIZE);                                        \
-    ck_assert_int_eq(err, GA_NO_ERROR);                                           \
-                                                                                  \
-    err = gpucomm_all_reduce(Adev, 0, RESdev, 0, count, gatype, gaoptype, comm);  \
-    ck_assert_int_eq(err, GA_NO_ERROR);                                           \
-    gpudata_sync(RESdev);                                                         \
-    gpudata_sync(Adev);                                                           \
-                                                                                  \
-    err = MPI_Allreduce(A, EXP, count, mpitype, mpioptype, MPI_COMM_WORLD);       \
-    ck_assert_msg(err == MPI_SUCCESS, "openmpi error: cannot produced expected"); \
-                                                                                  \
-    err = gpudata_read(RES, RESdev, 0, SIZE);                                     \
-    ck_assert_int_eq(err, GA_NO_ERROR);                                           \
-    systype res;                                                                  \
-    MAX_ABS_DIFF(RES, EXP, count, res);                                           \
-    ck_assert_msg(                                                                \
-        res <= epsilon,                                                           \
-        "gpudata_all_reduce with %s type and %s op produced max abs err %f",      \
-        STR(gatype), STR(gaoptype), res);                                         \
+#define TEST_ALL_REDUCE(systype, gatype, gaoptype, mpitype, mpioptype,         \
+                        epsilon)                                               \
+  do {                                                                         \
+    systype* A = (systype*)Av;                                                 \
+    systype* RES = (systype*)RESv;                                             \
+    systype* EXP = (systype*)EXPv;                                             \
+                                                                               \
+    int i, count = SIZE / sizeof(systype);                                     \
+    for (i = 0; i < count; ++i)                                                \
+      A[i] = comm_rank + 1;                                                    \
+    err = gpudata_write(Adev, 0, A, SIZE);                                     \
+    ck_assert_int_eq(err, GA_NO_ERROR);                                        \
+                                                                               \
+    err =                                                                      \
+        gpucomm_all_reduce(Adev, 0, RESdev, 0, count, gatype, gaoptype, comm); \
+    ck_assert_int_eq(err, GA_NO_ERROR);                                        \
+    gpudata_sync(RESdev);                                                      \
+    gpudata_sync(Adev);                                                        \
+                                                                               \
+    err = MPI_Allreduce(A, EXP, count, mpitype, mpioptype, MPI_COMM_WORLD);    \
+    ck_assert_msg(err == MPI_SUCCESS,                                          \
+                  "openmpi error: cannot produced expected");                  \
+                                                                               \
+    err = gpudata_read(RES, RESdev, 0, SIZE);                                  \
+    ck_assert_int_eq(err, GA_NO_ERROR);                                        \
+    systype res;                                                               \
+    MAX_ABS_DIFF(RES, EXP, count, res);                                        \
+    ck_assert_msg(                                                             \
+        res <= epsilon,                                                        \
+        "gpudata_all_reduce with %s type and %s op produced max abs err %f",   \
+        STR(gatype), STR(gaoptype), res);                                      \
   } while (0)
 
-#define TEST_ALL_REDUCE_FAIL(count, gatype, gaoptype, offsrc, offdest, experror) \
-  do {                                                                           \
-    err = gpucomm_all_reduce(Adev, (offsrc), RESdev, (offdest), (count), gatype, \
-                             gaoptype, comm);                                    \
-    ck_assert_int_eq(err, (experror));                                           \
-    gpudata_sync(RESdev);                                                        \
-    gpudata_sync(Adev);                                                          \
+#define TEST_ALL_REDUCE_FAIL(count, gatype, gaoptype, offsrc, offdest,   \
+                             experror)                                   \
+  do {                                                                   \
+    err = gpucomm_all_reduce(Adev, (offsrc), RESdev, (offdest), (count), \
+                             gatype, gaoptype, comm);                    \
+    ck_assert_int_eq(err, (experror));                                   \
+    gpudata_sync(RESdev);                                                \
+    gpudata_sync(Adev);                                                  \
   } while (0)
 
 /**
  * \note Untested for: `same context`
  */
-START_TEST(test_gpucomm_all_reduce)
-{
+START_TEST(test_gpucomm_all_reduce) {
   INIT_ARRAYS(SIZE, SIZE);
 
   // Check successful cases
@@ -277,54 +267,58 @@ START_TEST(test_gpucomm_all_reduce)
                        GA_INVALID_ERROR);  //!< Bad data type
   TEST_ALL_REDUCE_FAIL(SIZE / sizeof(int), GA_INT, -1, 0, 0,
                        GA_INVALID_ERROR);  //!< Bad operation type
-  TEST_ALL_REDUCE_FAIL(SIZE / sizeof(int), GA_INT, GA_SUM, SIZE - sizeof(int), 0,
+  TEST_ALL_REDUCE_FAIL(SIZE / sizeof(int), GA_INT, GA_SUM, SIZE - sizeof(int),
+                       0,
                        GA_VALUE_ERROR);  //!< Bad src offset
-  TEST_ALL_REDUCE_FAIL(SIZE / sizeof(int), GA_INT, GA_SUM, 0, SIZE - sizeof(int),
+  TEST_ALL_REDUCE_FAIL(SIZE / sizeof(int), GA_INT, GA_SUM, 0,
+                       SIZE - sizeof(int),
                        GA_VALUE_ERROR);  //!< Bad dest offset
-  /* TEST_ALL_REDUCE_FAIL((size_t)INT_MAX + 1, GA_INT, GA_SUM, 0, 0, */
-  /*                      GA_UNSUPPORTED_ERROR);  //!< Too big count */
+  TEST_ALL_REDUCE_FAIL((size_t)INT_MAX + 1, GA_INT, GA_SUM, 0, 0,
+                       GA_UNSUPPORTED_ERROR);  //!< Too big count
 
   DESTROY_ARRAYS();
 }
 END_TEST
 
-#define TEST_REDUCE_SCATTER(systype, gatype, gaoptype, mpitype, mpioptype, epsilon) \
-  do {                                                                              \
-    systype* A = (systype*)Av;                                                      \
-    systype* RES = (systype*)RESv;                                                  \
-    systype* EXP = (systype*)EXPv;                                                  \
-                                                                                    \
-    int i, count = SIZE / sizeof(systype);                                          \
-    for (i = 0; i < count; ++i)                                                     \
-      A[i] = comm_rank + 1;                                                         \
-    err = gpudata_write(Adev, 0, A, SIZE);                                          \
-    ck_assert_int_eq(err, GA_NO_ERROR);                                             \
-                                                                                    \
-    int recvcount = count / comm_ndev;                                              \
-    err = gpucomm_reduce_scatter(Adev, 0, RESdev, 0, recvcount, gatype, gaoptype,   \
-                                 comm);                                             \
-    ck_assert_int_eq(err, GA_NO_ERROR);                                             \
-    gpudata_sync(RESdev);                                                           \
-    gpudata_sync(Adev);                                                             \
-                                                                                    \
-    int* recvcounts = (int*)malloc(comm_ndev * sizeof(int));                        \
-    if (recvcounts == NULL)                                                         \
-      ck_abort_msg("system memory allocation failed");                              \
-    for (i = 0; i < comm_ndev; ++i)                                                 \
-      recvcounts[i] = recvcount;                                                    \
-    err =                                                                           \
-        MPI_Reduce_scatter(A, EXP, recvcounts, mpitype, mpioptype, MPI_COMM_WORLD); \
-    free(recvcounts);                                                               \
-    ck_assert_msg(err == MPI_SUCCESS, "openmpi error: cannot produced expected");   \
-                                                                                    \
-    err = gpudata_read(RES, RESdev, 0, SIZE / comm_ndev);                           \
-    ck_assert_int_eq(err, GA_NO_ERROR);                                             \
-    systype res;                                                                    \
-    MAX_ABS_DIFF(RES, EXP, recvcount, res);                                         \
-    ck_assert_msg(                                                                  \
-        res <= epsilon,                                                             \
-        "gpudata_reduce_scatter with %s type and %s op produced max abs err %f",    \
-        STR(gatype), STR(gaoptype), res);                                           \
+#define TEST_REDUCE_SCATTER(systype, gatype, gaoptype, mpitype, mpioptype,  \
+                            epsilon)                                        \
+  do {                                                                      \
+    systype* A = (systype*)Av;                                              \
+    systype* RES = (systype*)RESv;                                          \
+    systype* EXP = (systype*)EXPv;                                          \
+                                                                            \
+    int i, count = SIZE / sizeof(systype);                                  \
+    for (i = 0; i < count; ++i)                                             \
+      A[i] = comm_rank + 1;                                                 \
+    err = gpudata_write(Adev, 0, A, SIZE);                                  \
+    ck_assert_int_eq(err, GA_NO_ERROR);                                     \
+                                                                            \
+    int recvcount = count / comm_ndev;                                      \
+    err = gpucomm_reduce_scatter(Adev, 0, RESdev, 0, recvcount, gatype,     \
+                                 gaoptype, comm);                           \
+    ck_assert_int_eq(err, GA_NO_ERROR);                                     \
+    gpudata_sync(RESdev);                                                   \
+    gpudata_sync(Adev);                                                     \
+                                                                            \
+    int* recvcounts = (int*)malloc(comm_ndev * sizeof(int));                \
+    if (recvcounts == NULL)                                                 \
+      ck_abort_msg("system memory allocation failed");                      \
+    for (i = 0; i < comm_ndev; ++i)                                         \
+      recvcounts[i] = recvcount;                                            \
+    err = MPI_Reduce_scatter(A, EXP, recvcounts, mpitype, mpioptype,        \
+                             MPI_COMM_WORLD);                               \
+    free(recvcounts);                                                       \
+    ck_assert_msg(err == MPI_SUCCESS,                                       \
+                  "openmpi error: cannot produced expected");               \
+                                                                            \
+    err = gpudata_read(RES, RESdev, 0, SIZE / comm_ndev);                   \
+    ck_assert_int_eq(err, GA_NO_ERROR);                                     \
+    systype res;                                                            \
+    MAX_ABS_DIFF(RES, EXP, recvcount, res);                                 \
+    ck_assert_msg(res <= epsilon,                                           \
+                  "gpudata_reduce_scatter with %s type and %s op produced " \
+                  "max abs err %f",                                         \
+                  STR(gatype), STR(gaoptype), res);                         \
   } while (0)
 
 #define TEST_REDUCE_SCATTER_FAIL(count, gatype, gaoptype, offsrc, offdest,   \
@@ -340,8 +334,7 @@ END_TEST
 /**
  * \note Untested for: `same context`
  */
-START_TEST(test_gpucomm_reduce_scatter)
-{
+START_TEST(test_gpucomm_reduce_scatter) {
   INIT_ARRAYS(SIZE, SIZE / comm_ndev);
 
   // Check successful cases
@@ -386,54 +379,55 @@ START_TEST(test_gpucomm_reduce_scatter)
   TEST_REDUCE_SCATTER_FAIL(outcount, GA_INT, GA_SUM, 0,
                            SIZE / comm_ndev - sizeof(int),
                            GA_VALUE_ERROR);  //!< Bad dest offset
-  /* TEST_REDUCE_SCATTER_FAIL((size_t)INT_MAX + 1, GA_INT, GA_SUM, 0, 0, */
-  /*                          GA_UNSUPPORTED_ERROR);  //!< Too big count */
+  TEST_REDUCE_SCATTER_FAIL((size_t)INT_MAX + 1, GA_INT, GA_SUM, 0, 0,
+                           GA_UNSUPPORTED_ERROR);  //!< Too big count
 
   DESTROY_ARRAYS();
 }
 END_TEST
 
-#define TEST_BROADCAST(systype, gatype, mpitype, epsilon)                         \
-  do {                                                                            \
-    systype* RES = (systype*)RESv;                                                \
-    systype* EXP = (systype*)EXPv;                                                \
-                                                                                  \
-    int i, count = SIZE / sizeof(systype);                                        \
-    for (i = 0; i < count; ++i) {                                                 \
-      RES[i] = comm_rank + 1;                                                     \
-      EXP[i] = RES[i];                                                            \
-    }                                                                             \
-    err = gpudata_write(RESdev, 0, RES, SIZE);                                    \
-    ck_assert_int_eq(err, GA_NO_ERROR);                                           \
-                                                                                  \
-    err = gpucomm_broadcast(RESdev, 0, count, gatype, ROOT_RANK, comm);           \
-    ck_assert_int_eq(err, GA_NO_ERROR);                                           \
-    gpudata_sync(RESdev);                                                         \
-                                                                                  \
-    err = MPI_Bcast(EXP, count, mpitype, ROOT_RANK, MPI_COMM_WORLD);              \
-    ck_assert_msg(err == MPI_SUCCESS, "openmpi error: cannot produced expected"); \
-                                                                                  \
-    err = gpudata_read(RES, RESdev, 0, SIZE);                                     \
-    ck_assert_int_eq(err, GA_NO_ERROR);                                           \
-    systype res;                                                                  \
-    MAX_ABS_DIFF(RES, EXP, count, res);                                           \
-    ck_assert_msg(res <= epsilon,                                                 \
-                  "gpudata_broadcast with %s type produced max abs err %f",       \
-                  STR(gatype), res);                                              \
+#define TEST_BROADCAST(systype, gatype, mpitype, epsilon)                   \
+  do {                                                                      \
+    systype* RES = (systype*)RESv;                                          \
+    systype* EXP = (systype*)EXPv;                                          \
+                                                                            \
+    int i, count = SIZE / sizeof(systype);                                  \
+    for (i = 0; i < count; ++i) {                                           \
+      RES[i] = comm_rank + 1;                                               \
+      EXP[i] = RES[i];                                                      \
+    }                                                                       \
+    err = gpudata_write(RESdev, 0, RES, SIZE);                              \
+    ck_assert_int_eq(err, GA_NO_ERROR);                                     \
+                                                                            \
+    err = gpucomm_broadcast(RESdev, 0, count, gatype, ROOT_RANK, comm);     \
+    ck_assert_int_eq(err, GA_NO_ERROR);                                     \
+    gpudata_sync(RESdev);                                                   \
+                                                                            \
+    err = MPI_Bcast(EXP, count, mpitype, ROOT_RANK, MPI_COMM_WORLD);        \
+    ck_assert_msg(err == MPI_SUCCESS,                                       \
+                  "openmpi error: cannot produced expected");               \
+                                                                            \
+    err = gpudata_read(RES, RESdev, 0, SIZE);                               \
+    ck_assert_int_eq(err, GA_NO_ERROR);                                     \
+    systype res;                                                            \
+    MAX_ABS_DIFF(RES, EXP, count, res);                                     \
+    ck_assert_msg(res <= epsilon,                                           \
+                  "gpudata_broadcast with %s type produced max abs err %f", \
+                  STR(gatype), res);                                        \
   } while (0)
 
-#define TEST_BROADCAST_FAIL(count, gatype, offsrc, experror)                     \
-  do {                                                                           \
-    err = gpucomm_broadcast(RESdev, (offsrc), (count), gatype, ROOT_RANK, comm); \
-    ck_assert_int_eq(err, (experror));                                           \
-    gpudata_sync(RESdev);                                                        \
+#define TEST_BROADCAST_FAIL(count, gatype, offsrc, experror)                   \
+  do {                                                                         \
+    err =                                                                      \
+        gpucomm_broadcast(RESdev, (offsrc), (count), gatype, ROOT_RANK, comm); \
+    ck_assert_int_eq(err, (experror));                                         \
+    gpudata_sync(RESdev);                                                      \
   } while (0)
 
 /**
  * \note Untested for: `same context`
  */
-START_TEST(test_gpucomm_broadcast)
-{
+START_TEST(test_gpucomm_broadcast) {
   INIT_ARRAYS(SIZE, SIZE);
 
   // Check successful cases
@@ -449,58 +443,58 @@ START_TEST(test_gpucomm_broadcast)
                       GA_INVALID_ERROR);  //!< Bad data type
   TEST_BROADCAST_FAIL(SIZE / sizeof(int), GA_INT, SIZE - sizeof(int),
                       GA_VALUE_ERROR);  //!< Bad src offset
-  /* TEST_BROADCAST_FAIL((size_t)INT_MAX + 1, GA_INT, 0,            */
-  /*                     GA_UNSUPPORTED_ERROR);  //!< Too big count */
+  TEST_BROADCAST_FAIL((size_t)INT_MAX + 1, GA_INT, 0,
+                      GA_UNSUPPORTED_ERROR);  //!< Too big count
 
   DESTROY_ARRAYS();
 }
 END_TEST
 
-#define TEST_ALL_GATHER(systype, gatype, mpitype, epsilon)                         \
-  do {                                                                             \
-    systype* A = (systype*)Av;                                                     \
-    systype* RES = (systype*)RESv;                                                 \
-    systype* EXP = (systype*)EXPv;                                                 \
-                                                                                   \
-    int i, count = SIZE / sizeof(systype);                                         \
-    int sendcount = count / comm_ndev;                                             \
-    for (i = 0; i < sendcount; ++i)                                                \
-      A[i] = comm_rank + 1;                                                        \
-    err = gpudata_write(Adev, 0, A, SIZE / comm_ndev);                             \
-    ck_assert_int_eq(err, GA_NO_ERROR);                                            \
-                                                                                   \
-    err = gpucomm_all_gather(Adev, 0, RESdev, 0, sendcount, gatype, comm);         \
-    ck_assert_int_eq(err, GA_NO_ERROR);                                            \
-    gpudata_sync(RESdev);                                                          \
-    gpudata_sync(Adev);                                                            \
-                                                                                   \
-    err =                                                                          \
-        MPI_Allgather(A, sendcount, mpitype, EXP, count, mpitype, MPI_COMM_WORLD); \
-    ck_assert_msg(err == MPI_SUCCESS, "openmpi error: cannot produced expected");  \
-                                                                                   \
-    err = gpudata_read(RES, RESdev, 0, SIZE);                                      \
-    ck_assert_int_eq(err, GA_NO_ERROR);                                            \
-    systype res;                                                                   \
-    MAX_ABS_DIFF(RES, EXP, count, res);                                            \
-    ck_assert_msg(res <= epsilon,                                                  \
-                  "gpudata_all_gather with %s type produced max abs err %f",       \
-                  STR(gatype), res);                                               \
+#define TEST_ALL_GATHER(systype, gatype, mpitype, epsilon)                   \
+  do {                                                                       \
+    systype* A = (systype*)Av;                                               \
+    systype* RES = (systype*)RESv;                                           \
+    systype* EXP = (systype*)EXPv;                                           \
+                                                                             \
+    int i, count = SIZE / sizeof(systype);                                   \
+    int sendcount = count / comm_ndev;                                       \
+    for (i = 0; i < sendcount; ++i)                                          \
+      A[i] = comm_rank + 1;                                                  \
+    err = gpudata_write(Adev, 0, A, SIZE / comm_ndev);                       \
+    ck_assert_int_eq(err, GA_NO_ERROR);                                      \
+                                                                             \
+    err = gpucomm_all_gather(Adev, 0, RESdev, 0, sendcount, gatype, comm);   \
+    ck_assert_int_eq(err, GA_NO_ERROR);                                      \
+    gpudata_sync(RESdev);                                                    \
+    gpudata_sync(Adev);                                                      \
+                                                                             \
+    err = MPI_Allgather(A, sendcount, mpitype, EXP, count, mpitype,          \
+                        MPI_COMM_WORLD);                                     \
+    ck_assert_msg(err == MPI_SUCCESS,                                        \
+                  "openmpi error: cannot produced expected");                \
+                                                                             \
+    err = gpudata_read(RES, RESdev, 0, SIZE);                                \
+    ck_assert_int_eq(err, GA_NO_ERROR);                                      \
+    systype res;                                                             \
+    MAX_ABS_DIFF(RES, EXP, count, res);                                      \
+    ck_assert_msg(res <= epsilon,                                            \
+                  "gpudata_all_gather with %s type produced max abs err %f", \
+                  STR(gatype), res);                                         \
   } while (0)
 
-#define TEST_ALL_GATHER_FAIL(count, gatype, offsrc, offdest, experror)           \
-  do {                                                                           \
-    err = gpucomm_all_gather(Adev, (offsrc), RESdev, (offdest), (count), gatype, \
-                             comm);                                              \
-    ck_assert_int_eq(err, (experror));                                           \
-    gpudata_sync(RESdev);                                                        \
-    gpudata_sync(Adev);                                                          \
+#define TEST_ALL_GATHER_FAIL(count, gatype, offsrc, offdest, experror)   \
+  do {                                                                   \
+    err = gpucomm_all_gather(Adev, (offsrc), RESdev, (offdest), (count), \
+                             gatype, comm);                              \
+    ck_assert_int_eq(err, (experror));                                   \
+    gpudata_sync(RESdev);                                                \
+    gpudata_sync(Adev);                                                  \
   } while (0)
 
 /**
  * \note Untested for: `same context`
  */
-START_TEST(test_gpucomm_all_gather)
-{
+START_TEST(test_gpucomm_all_gather) {
   INIT_ARRAYS(SIZE / comm_ndev, SIZE);
 
   // Check successful cases
@@ -514,19 +508,18 @@ START_TEST(test_gpucomm_all_gather)
   // Check failure cases
   int incount = SIZE / sizeof(int) / comm_ndev;
   TEST_ALL_GATHER_FAIL(incount, -1, 0, 0, GA_INVALID_ERROR);  //!< Bad data type
-  /* TEST_ALL_GATHER_FAIL(incount, GA_INT, SIZE / comm_ndev - sizeof(int), 0, */
-  /*                      GA_INVALID_ERROR);  //!< Bad src offset             */
-  /* TEST_ALL_GATHER_FAIL(incount, GA_INT, 0, SIZE - sizeof(int),             */
-  /*                      GA_VALUE_ERROR);  //!< Bad dest offset              */
-  /* TEST_ALL_GATHER_FAIL((size_t)INT_MAX + 1, GA_INT, 0, 0,                  */
-  /*                      GA_UNSUPPORTED_ERROR);  //!< Too big count          */
+  TEST_ALL_GATHER_FAIL(incount, GA_INT, SIZE / comm_ndev - sizeof(int), 0,
+                       GA_VALUE_ERROR);  //!< Bad src offset
+  TEST_ALL_GATHER_FAIL(incount, GA_INT, 0, SIZE - sizeof(int),
+                       GA_VALUE_ERROR);  //!< Bad dest offset
+  TEST_ALL_GATHER_FAIL((size_t)INT_MAX + 1, GA_INT, 0, 0,
+                       GA_UNSUPPORTED_ERROR);  //!< Too big count
 
   DESTROY_ARRAYS();
 }
 END_TEST
 
-Suite* get_suite(void)
-{
+Suite* get_suite(void) {
   Suite* s = suite_create("buffer_collectives");
   TCase* tc = tcase_create("API");
   tcase_add_checked_fixture(tc, setup_comm, teardown_comm);

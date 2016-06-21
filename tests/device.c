@@ -4,7 +4,7 @@
 
 #include <check.h>
 
-#include <gpuarray/buffer.h>
+#include "gpuarray/buffer.h"
 
 char* dev_name = NULL;
 

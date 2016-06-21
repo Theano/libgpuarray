@@ -1,12 +1,10 @@
 #include <check.h>
-#include <stdio.h>
 
 #include "gpuarray/error.h"
 
-START_TEST(test_error_str)
-{
+START_TEST(test_error_str) {
   const char *msg;
-  
+
   msg = gpuarray_error_str(-1);
   ck_assert_str_eq(msg, "Unknown GA error");
   msg = gpuarray_error_str(99);
