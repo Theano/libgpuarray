@@ -32,6 +32,9 @@ int main(int argc, char *argv[])
   int number_failed;
   Suite *s = get_suite();
   SRunner *sr = srunner_create(s);
+#ifdef TEST_COLLECTIVES
+  srunner_set_fork_status(sr, CK_NOFORK);
+#endif  // TEST_COLLECTIVES
   srunner_run_all(sr, CK_VERBOSE);
   number_failed = srunner_ntests_failed(sr);
   srunner_free(sr);
