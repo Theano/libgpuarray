@@ -98,12 +98,12 @@ if(BUILD_WITH_COLLECTIVES)
       set(_DEV_NAMES cuda)
     endif()
 
-    add_test(NAME test_buffer_collectives
-      COMMAND ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${_NUM_DEVS}
-              ${MPIEXEC_PREFLAGS} ${CMAKE_CURRENT_BINARY_DIR}/check_buffer_collectives ${MPIEXEC_POSTFLAGS} ${_DEV_NAMES})
-    add_test(NAME test_collectives
-      COMMAND ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${_NUM_DEVS}
-              ${MPIEXEC_PREFLAGS} ${CMAKE_CURRENT_BINARY_DIR}/check_collectives ${MPIEXEC_POSTFLAGS} ${_DEV_NAMES})
+    # add_test(NAME test_buffer_collectives
+    #   COMMAND ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${_NUM_DEVS}
+    #           ${MPIEXEC_PREFLAGS} ${CMAKE_CURRENT_BINARY_DIR}/check_buffer_collectives ${MPIEXEC_POSTFLAGS} ${_DEV_NAMES})
+    # add_test(NAME test_collectives
+    #   COMMAND ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${_NUM_DEVS}
+    #           ${MPIEXEC_PREFLAGS} ${CMAKE_CURRENT_BINARY_DIR}/check_collectives ${MPIEXEC_POSTFLAGS} ${_DEV_NAMES})
 
   else(MPI_C_FOUND)
 

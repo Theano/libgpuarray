@@ -33,6 +33,8 @@ int main(int argc, char *argv[])
   Suite *s = get_suite();
   SRunner *sr = srunner_create(s);
 #ifdef TEST_COLLECTIVES
+  // Check by default forks to another (non mpi registered) process in order to
+  // run tests. Using MPI inside tests means we must disable this.
   srunner_set_fork_status(sr, CK_NOFORK);
 #endif  // TEST_COLLECTIVES
   srunner_run_all(sr, CK_VERBOSE);

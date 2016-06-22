@@ -231,8 +231,8 @@ START_TEST(test_GpuArray_all_gather) {
   GpuArray_sync(&RESdev);
   GpuArray_sync(&Adev);
 
-  err = MPI_Allgather(A, ROWS * COLS / comm_ndev, MPI_INT, EXP, ROWS * COLS,
-                      MPI_INT, MPI_COMM_WORLD);
+  err = MPI_Allgather(A, ROWS * COLS / comm_ndev, MPI_INT, EXP,
+                      ROWS * COLS / comm_ndev, MPI_INT, MPI_COMM_WORLD);
   ck_assert_msg(err == MPI_SUCCESS, "openmpi error: cannot produced expected");
 
   err = GpuArray_read(RES, outsize, &RESdev);
