@@ -538,6 +538,11 @@ TEST_ALL_GATHER_FAIL(elemcount, (size_t)INT_MAX + 1, GA_INT, 0, 0,
 Suite* get_suite(void) {
   Suite* s = suite_create("buffer_collectives_API");
 
+  TCase* helps = tcase_create("test_helpers");
+  tcase_add_unchecked_fixture(helps, setup_comm, teardown_comm);
+  tcase_add_test(helps, test_gpucomm_get_count);
+  tcase_add_test(helps, test_gpucomm_get_rank);
+
   TCase* reds = tcase_create("test_reduce");
   tcase_add_unchecked_fixture(reds, setup_comm, teardown_comm);
   tcase_add_test(reds, test_gpucomm_reduce_INT_SUM);
@@ -673,6 +678,7 @@ Suite* get_suite(void) {
   tcase_add_test(agatf, test_gpucomm_all_gather_fail_dest_offset);
   tcase_add_test(agatf, test_gpucomm_all_gather_fail_elemcount);
 
+  suite_add_tcase(s, helps);
   suite_add_tcase(s, reds);
   suite_add_tcase(s, redf);
   suite_add_tcase(s, areds);

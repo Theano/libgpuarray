@@ -16,46 +16,46 @@ Debug:
 
 Debug/Makefile: Debug config
 ifndef INSTALL_PREFIX
-	cd Debug && NUM_DEVS=${NUM_DEVS} DEV_NAMES=${DEV_NAMES} cmake .. -DCMAKE_BUILD_TYPE=Debug
+	(cd Debug && NUM_DEVS=${NUM_DEVS} DEV_NAMES=${DEV_NAMES} cmake .. -DCMAKE_BUILD_TYPE=Debug)
 else
-	cd Debug && NUM_DEVS=${NUM_DEVS} DEV_NAMES=${DEV_NAMES} cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$(INSTALL_PREFIX)
+	(cd Debug && NUM_DEVS=${NUM_DEVS} DEV_NAMES=${DEV_NAMES} cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$(INSTALL_PREFIX))
 endif
 
 debugc: Debug/Makefile
-	cd Debug && make
+	(cd Debug && make)
 
 test-debugc: debugc
 ifndef DEVICE
-	cd Debug && make test
+	(cd Debug && make test)
 else
-	cd Debug && DEVICE=${DEVICE} make test
+	(cd Debug && DEVICE=${DEVICE} make test)
 endif
 
-install-debugc: test-debugc
-	cd Debug && ${SUDO} make install
+install-debugc: debugc
+	(cd Debug && ${SUDO} make install)
 
 Release:
 	mkdir Release
 
 Release/Makefile: Release config
 ifndef INSTALL_PREFIX
-	cd Release && NUM_DEVS=${NUM_DEVS} DEV_NAMES=${DEV_NAMES} cmake .. -DCMAKE_BUILD_TYPE=Release
+	(cd Release && NUM_DEVS=${NUM_DEVS} DEV_NAMES=${DEV_NAMES} cmake .. -DCMAKE_BUILD_TYPE=Release)
 else
-	cd Release && NUM_DEVS=${NUM_DEVS} DEV_NAMES=${DEV_NAMES} cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$(INSTALL_PREFIX)
+	(cd Release && NUM_DEVS=${NUM_DEVS} DEV_NAMES=${DEV_NAMES} cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$(INSTALL_PREFIX))
 endif
 
 relc: Release/Makefile
-	cd Release && make
+	(cd Release && make)
 
 test-relc: relc
 ifndef DEVICE
-	cd Release && make test
+	(cd Release && make test)
 else
-	cd Release && DEVICE=${DEVICE} make test
+	(cd Release && DEVICE=${DEVICE} make test)
 endif
 
-install-relc: test-relc
-	cd Release && ${SUDO} make install
+install-relc: relc
+	(cd Release && ${SUDO} make install)
 
 py: config
 	python setup.py build_ext --inplace
