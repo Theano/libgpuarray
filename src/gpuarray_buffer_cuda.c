@@ -712,7 +712,10 @@ static int cuda_read(void *dst, gpudata *src, size_t srcoff, size_t sz) {
     cuda_enter(ctx);
 
     if (src->flags & CUDA_MAPPED_PTR) {
-      ctx->err = cuEventSynchronize(src->wev);
+      if (ISSET(ctx->flags, GA_CTX_SINGLE_STREAM))
+        ctx->err = cuStreamSynchronize(ctx->s);
+      else
+        ctx->err = cuEventSynchronize(src->wev);
       if (ctx->err != CUDA_SUCCESS) {
         cuda_exit(ctx);
         return GA_IMPL_ERROR;
@@ -746,7 +749,10 @@ static int cuda_write(gpudata *dst, size_t dstoff, const void *src,
     cuda_enter(ctx);
 
     if (dst->flags & CUDA_MAPPED_PTR) {
-      ctx->err = cuEventSynchronize(dst->rev);
+      if (ISSET(ctx->flags, GA_CTX_SINGLE_STREAM))
+        ctx->err = cuStreamSynchronize(ctx->s);
+      else
+        ctx->err = cuEventSynchronize(dst->rev);
       if (ctx->err != CUDA_SUCCESS) {
         cuda_exit(ctx);
         return GA_IMPL_ERROR;
