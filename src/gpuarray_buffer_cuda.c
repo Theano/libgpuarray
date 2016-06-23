@@ -612,13 +612,16 @@ static int cuda_share(gpudata *a, gpudata *b, int *ret) {
 static int cuda_waits(gpudata *a, int flags, CUstream s) {
   ASSERT_BUF(a);
 
-  if (ISSET(a->ctx->flags, GA_CTX_SINGLE_STREAM))
-    return GA_NO_ERROR;
+  /* Never skip the wait if CUDA_WAIT_FORCE */
+  if (ISCLR(flags, CUDA_WAIT_FORCE)) {
+    if (ISSET(a->ctx->flags, GA_CTX_SINGLE_STREAM))
+      return GA_NO_ERROR;
 
-  /* If the last stream to touch this buffer is the same, we don't
-   * need to wait for anything. */
-  if (a->ls == s)
-    return GA_NO_ERROR;
+    /* If the last stream to touch this buffer is the same, we don't
+     * need to wait for anything. */
+    if (a->ls == s)
+      return GA_NO_ERROR;
+  }
 
   cuda_enter(a->ctx);
   if (flags & CUDA_WAIT_READ) {
@@ -648,7 +651,8 @@ int cuda_wait(gpudata *a, int flags) {
 
 static int cuda_records(gpudata *a, int flags, CUstream s) {
   ASSERT_BUF(a);
-  if (ISSET(a->ctx->flags, GA_CTX_SINGLE_STREAM))
+  if (ISCLR(flags, CUDA_WAIT_FORCE) &&
+      ISSET(a->ctx->flags, GA_CTX_SINGLE_STREAM))
     return GA_NO_ERROR;
   cuda_enter(a->ctx);
   if (flags & CUDA_WAIT_READ)
@@ -1343,9 +1347,18 @@ static int cuda_transfer(gpudata *dst, size_t dstoff,
   ASSERT_BUF(src);
   ASSERT_BUF(dst);
 
+  /* The forced synchronization are there because they are required
+     for proper inter-device correctness. */
+
   cuda_enter(dst->ctx);
-  cuda_waits(src, CUDA_WAIT_READ, dst->ctx->mem_s);
+  /* Make sure we have a rev for the source */
+  cuda_records(src, CUDA_WAIT_READ|CUDA_WAIT_FORCE, src->ctx->mem_s);
+  /* Make the destination stream wait for it */
+  cuda_waits(src, CUDA_WAIT_READ|CUDA_WAIT_FORCE, dst->ctx->mem_s);
+
+  /* Also wait on the destination buffer */
   cuda_waits(dst, CUDA_WAIT_WRITE, dst->ctx->mem_s);
+
   dst->ctx->err = cuMemcpyPeerAsync(dst->ptr+dstoff, dst->ctx->ctx,
                                     src->ptr+srcoff, src->ctx->ctx,
                                     sz, dst->ctx->mem_s);
@@ -1354,8 +1367,13 @@ static int cuda_transfer(gpudata *dst, size_t dstoff,
     return GA_IMPL_ERROR;
   }
 
-  cuda_records(dst, CUDA_WAIT_WRITE, dst->ctx->mem_s);
-  cuda_records(src, CUDA_WAIT_READ, dst->ctx->mem_s);
+  /* This records the event in dst->wev */
+  cuda_records(dst, CUDA_WAIT_WRITE|CUDA_WAIT_FORCE, dst->ctx->mem_s);
+  /* This makes the source stream wait on the wev of dst */
+  cuda_waits(dst, CUDA_WAIT_WRITE|CUDA_WAIT_FORCE, src->ctx->mem_s);
+
+  /* This records the event on src->rev */
+  cuda_records(src, CUDA_WAIT_READ, src->ctx->mem_s);
 
   cuda_exit(dst->ctx);
   return GA_NO_ERROR;
