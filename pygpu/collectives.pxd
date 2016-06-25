@@ -38,16 +38,19 @@ cdef extern from "gpuarray/collectives.h":
     int GpuArray_broadcast(_GpuArray* array, int root, gpucomm* comm)
     int GpuArray_all_gather(const _GpuArray* src, _GpuArray* dest, gpucomm* comm)
 
+cdef api class GpuCommCliqueId [type PyGpuCliqueIdType, object PyGpuCliqueIdObject]:
+    cdef gpucommCliqueId comm_id
+    cdef readonly GpuContext context
+
 cdef api class GpuComm [type PyGpuCommType, object PyGpuCommObject]:
     cdef gpucomm* c
-    cdef gpucommCliqueId comm_id
     cdef readonly GpuContext context
     # cdef object __weakref__
 
-cdef int comm_new(GpuComm comm, gpucontext* ctx, gpucommCliqueId comm_id,
-                  int ndev, int rank) except -1
+cdef int comm_new(GpuComm comm, GpuCommCliqueId comm_id, int ndev,
+                  int rank) except -1
 cdef gpucontext* comm_context(GpuComm comm) except NULL
-cdef int comm_generate_id(gpucontext* ctx, gpucommCliqueId* comm_id) except -1
+cdef int comm_generate_id(GpuCommCliqueId comm_id) except -1
 cdef int comm_get_count(GpuComm comm, int* gpucount) except -1
 cdef int comm_get_rank(GpuComm comm, int* gpurank) except -1
 cdef int comm_reduce_from(GpuComm comm, GpuArray src, int opcode,
