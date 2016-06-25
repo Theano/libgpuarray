@@ -60,7 +60,7 @@ cdef extern from "gpuarray/error.h":
         GA_NO_ERROR, GA_MEMORY_ERROR, GA_VALUE_ERROR, GA_IMPL_ERROR,
         GA_INVALID_ERROR, GA_UNSUPPORTED_ERROR, GA_SYS_ERROR, GA_RUN_ERROR,
         GA_DEVSUP_ERROR, GA_READONLY_ERROR, GA_WRITEONLY_ERROR, GA_BLAS_ERROR,
-        GA_UNALIGNED_ERROR, GA_COPY_ERROR
+        GA_UNALIGNED_ERROR, GA_COPY_ERROR, GA_COMM_ERROR
 
 cdef extern from "gpuarray/buffer.h":
     ctypedef struct gpucontext:
