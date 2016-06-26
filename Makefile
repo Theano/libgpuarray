@@ -1,4 +1,4 @@
-rel: relc py
+rel: install-relc py
 
 -include Makefile.conf
 
@@ -7,9 +7,9 @@ config: Makefile.conf
 Makefile.conf:
 	@[ ! -f Makefile.conf ] && cp Makefile.conf.tmpl Makefile.conf && echo "\n\n** Adjust the values in Makefile.conf for your system **\n\n" && exit 1
 
-debug: testc py
+debug: install-debugc py
 
-.PHONY: testc py debug relc rel config
+.PHONY: install-debugc py debug install-relc rel config
 
 Debug:
 	mkdir Debug
