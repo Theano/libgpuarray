@@ -1,15 +1,13 @@
 #include <check.h>
-#include <stdio.h>
 
+#include "gpuarray/error.h"
 #include "gpuarray/types.h"
 #include "gpuarray/util.h"
-#include "gpuarray/error.h"
 
 static gpuarray_type t;
 static gpuarray_type t2;
 
-START_TEST(test_register_type)
-{
+START_TEST(test_register_type) {
   int typecode;
   const gpuarray_type *pt, *pt2;
 
@@ -39,8 +37,7 @@ START_TEST(test_register_type)
 }
 END_TEST
 
-START_TEST(test_get_type)
-{
+START_TEST(test_get_type) {
   const gpuarray_type *pt;
 
   pt = gpuarray_get_type(0);
@@ -69,8 +66,7 @@ START_TEST(test_get_type)
 }
 END_TEST
 
-START_TEST(test_get_elsize)
-{
+START_TEST(test_get_elsize) {
   ck_assert(gpuarray_get_elsize(GA_INT) == 4);
   ck_assert(gpuarray_get_elsize(GA_DELIM) == 0);
 }

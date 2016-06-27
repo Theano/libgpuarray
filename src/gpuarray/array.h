@@ -424,7 +424,7 @@ GPUARRAY_PUBLIC int GpuArray_transpose_inplace(GpuArray *a,
                                               const unsigned int *new_axes);
 
 /**
- * Relase all device and host memory associated with `a`.
+ * Release all device and host memory associated with `a`.
  *
  * This function frees all host memory, and releases the device memory
  * if it is the owner. In case an array has views it is the
@@ -458,7 +458,7 @@ GPUARRAY_PUBLIC int GpuArray_share(const GpuArray *a, const GpuArray *b);
 GPUARRAY_PUBLIC gpucontext *GpuArray_context(const GpuArray *a);
 
 /**
- * Copies all the elements of and array to another.
+ * Copies all the elements of one array to another.
  *
  * The arrays `src` and `dst` must have the same size (total number of
  * elements) and be in the same context.

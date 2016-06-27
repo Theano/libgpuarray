@@ -1387,7 +1387,10 @@ static int cuda_transfer(gpudata *dst, size_t dstoff,
 
 #ifdef WITH_CUDA_CUBLAS
 extern gpuarray_blas_ops cublas_ops;
-#endif
+#endif  // WITH_CUDA_CUBLAS
+#ifdef WITH_CUDA_NCCL
+extern gpuarray_comm_ops nccl_ops;
+#endif  // WITH_CUDA_NCCL
 
 static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
                          void *res) {
@@ -1402,12 +1405,11 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     ASSERT_KER(k);
     ctx = k->ctx;
   }
-  /* I know that 512 and 1024 are magic numbers.
-     There is an indication in buffer.h, though. */
-  if (prop_id < 512) {
+
+  if (prop_id < GA_BUFFER_PROP_START) {
     if (ctx == NULL)
       return GA_VALUE_ERROR;
-  } else if (prop_id < 1024) {
+  } else if (prop_id < GA_KERNEL_PROP_START) {
     if (buf == NULL)
       return GA_VALUE_ERROR;
   } else {
@@ -1519,7 +1521,16 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
 #else
     *((void **)res) = NULL;
     return GA_DEVSUP_ERROR;
-#endif
+#endif  // WITH_CUDA_CUBLAS
+
+  case GA_CTX_PROP_COMM_OPS:
+#ifdef WITH_CUDA_NCCL
+      *((gpuarray_comm_ops**)res) = &nccl_ops;
+      return GA_NO_ERROR;
+#else
+      *((void**) res) = NULL;
+      return GA_DEVSUP_ERROR;
+#endif  // WITH_CUDA_NCCL
 
   case GA_CTX_PROP_BIN_ID:
     *((const char **)res) = ctx->bin_id;

@@ -4,7 +4,6 @@
 #  CLBLAS_FOUND - system has clBLAS
 #  CLBLAS_INCLUDE_DIRS - location of clBLAS.h
 #  CLBLAS_LIBRARIES - location of libclBLAS
-#  
 
 IF(CLBLAS_INCLUDE_DIRS)
   # Already in cache, be silent
@@ -13,7 +12,7 @@ ENDIF (CLBLAS_INCLUDE_DIRS)
 
 FIND_PATH(CLBLAS_ROOT_DIR
     NAMES include/clBLAS.h
-    HINTS /usr/local/ $ENV{CLBLAS_ROOT} 
+    HINTS /usr/local/ $ENV{CLBLAS_ROOT}
     DOC "clBLAS root directory.")
 
 FIND_PATH(_CLBLAS_INCLUDE_DIRS

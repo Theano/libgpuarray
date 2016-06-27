@@ -24,6 +24,11 @@ extern "C" {
 #endif
 struct _gpudata;
 
+/**
+ * Opaque struct for buffer data.
+ */
+typedef struct _gpudata gpudata;
+
 struct _gpucontext;
 
 /**
@@ -31,19 +36,12 @@ struct _gpucontext;
  */
 typedef struct _gpucontext gpucontext;
 
-
-/**
- * Opaque struct for buffer data.
- */
-typedef struct _gpudata gpudata;
-
 struct _gpukernel;
 
 /**
  * Opaque struct for kernel data.
  */
 typedef struct _gpukernel gpukernel;
-
 
 /**
  * Create a context on the specified device.
@@ -116,7 +114,7 @@ GPUARRAY_PUBLIC gpucontext *gpucontext_init(const char *name, int dev,
  */
 
 /**
- * Derefence a context.
+ * Dereference a context.
  *
  * This removes a reference to the context and as soon as the
  * reference count drops to zero the context is destroyed.  The
@@ -505,6 +503,7 @@ GPUARRAY_PUBLIC int gpukernel_binary(gpukernel *k, size_t *sz, void **obj);
 GPUARRAY_PUBLIC int gpukernel_property(gpukernel *k, int prop_id, void *res);
 
 GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
+
 /**
  * \defgroup props Properties
  * @{
@@ -649,8 +648,16 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
  */
 #define GA_CTX_PROP_MAXLSIZE2 17
 
+/**
+ * Get the vector of collective ops for the context.
+ *
+ * Type: `const gpuarray_comm_ops *`
+ */
+#define GA_CTX_PROP_COMM_OPS  18
 
 /* Start at 512 for GA_BUFFER_PROP_ */
+#define GA_BUFFER_PROP_START  512
+
 /**
  * Get the context in which this buffer was allocated.
  *
@@ -676,6 +683,8 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
 #define GA_BUFFER_PROP_SIZE  514
 
 /* Start at 1024 for GA_KERNEL_PROP_ */
+#define GA_KERNEL_PROP_START     1024
+
 /**
  * Get the context for which this kernel was compiled.
  *

@@ -2,6 +2,7 @@
 
 #include "gpuarray/buffer.h"
 #include "gpuarray/error.h"
+
 #include "private.h"
 
 extern void *ctx;
@@ -9,8 +10,7 @@ extern void *ctx;
 void setup(void);
 void teardown(void);
 
-START_TEST(test_gpu_error)
-{
+START_TEST(test_gpu_error) {
   const char *msg;
   msg = gpucontext_error(NULL, -1);
   msg = gpucontext_error(NULL, 99);
@@ -27,8 +27,7 @@ static unsigned int refcnt(gpudata *b) {
   return res;
 }
 
-START_TEST(test_buffer_alloc)
-{
+START_TEST(test_buffer_alloc) {
   gpudata *d;
 
   d = gpudata_alloc(ctx, 0, NULL, 0, NULL);
@@ -48,8 +47,7 @@ START_TEST(test_buffer_alloc)
 }
 END_TEST
 
-START_TEST(test_buffer_retain_release)
-{
+START_TEST(test_buffer_retain_release) {
   gpudata *d;
   gpudata *d2;
 
@@ -89,8 +87,7 @@ START_TEST(test_buffer_retain_release)
 }
 END_TEST
 
-START_TEST(test_buffer_share)
-{
+START_TEST(test_buffer_share) {
   gpudata *d;
   gpudata *d2;
 
@@ -104,8 +101,7 @@ START_TEST(test_buffer_share)
 }
 END_TEST
 
-START_TEST(test_buffer_read_write)
-{
+START_TEST(test_buffer_read_write) {
   const int32_t data[] = {0, 1, 2, 3, 4, 5, 6, 7};
   int32_t buf[nelems(data)];
   gpudata *d;
@@ -126,20 +122,21 @@ START_TEST(test_buffer_read_write)
   }
 
   memset(buf, 0, sizeof(data));
-  err = gpudata_read(buf, d, sizeof(int32_t), sizeof(data)-sizeof(int32_t));
+  err = gpudata_read(buf, d, sizeof(int32_t), sizeof(data) - sizeof(int32_t));
   ck_assert_int_eq(err, GA_NO_ERROR);
-  for (i = 0; i < nelems(data)-1; i++) {
-    ck_assert_int_eq(data[i+1], buf[i]);
+  for (i = 0; i < nelems(data) - 1; i++) {
+    ck_assert_int_eq(data[i + 1], buf[i]);
   }
 
-  err = gpudata_write(d, sizeof(int32_t)*2, data, sizeof(data)-(sizeof(int32_t)*2));
+  err = gpudata_write(d, sizeof(int32_t) * 2, data,
+                      sizeof(data) - (sizeof(int32_t) * 2));
   ck_assert_int_eq(err, GA_NO_ERROR);
 
   memset(buf, 0, sizeof(data));
   err = gpudata_read(buf, d, 0, sizeof(data));
   ck_assert_int_eq(err, GA_NO_ERROR);
-  for (i = 0; i < nelems(data)-2; i++) {
-    ck_assert_int_eq(data[i], buf[i+2]);
+  for (i = 0; i < nelems(data) - 2; i++) {
+    ck_assert_int_eq(data[i], buf[i + 2]);
   }
   for (i = 0; i < 2; i++) {
     ck_assert_int_eq(data[i], buf[i]);
@@ -148,8 +145,7 @@ START_TEST(test_buffer_read_write)
 }
 END_TEST
 
-START_TEST(test_buffer_move)
-{
+START_TEST(test_buffer_move) {
   const int32_t data[] = {0, 1, 2, 3, 4, 5, 6, 7};
   int32_t buf[nelems(data)];
   gpudata *d;
@@ -159,7 +155,7 @@ START_TEST(test_buffer_move)
 
   d = gpudata_alloc(ctx, sizeof(data), NULL, 0, NULL);
   ck_assert(d != NULL);
-  d2 = gpudata_alloc(ctx, sizeof(data)*2, NULL, 0, NULL);
+  d2 = gpudata_alloc(ctx, sizeof(data) * 2, NULL, 0, NULL);
   ck_assert(d2 != NULL);
 
   err = gpudata_write(d, 0, data, sizeof(data));
@@ -174,13 +170,14 @@ START_TEST(test_buffer_move)
     ck_assert_int_eq(buf[i], data[i]);
   }
 
-  err = gpudata_move(d2, 0, d, sizeof(uint32_t), sizeof(data)-sizeof(uint32_t));
+  err =
+      gpudata_move(d2, 0, d, sizeof(uint32_t), sizeof(data) - sizeof(uint32_t));
   ck_assert(err == GA_NO_ERROR);
 
   err = gpudata_read(buf, d2, 0, sizeof(data));
   ck_assert(err == GA_NO_ERROR);
-  for (i = 0; i < nelems(data)-1; i++) {
-    ck_assert_int_eq(buf[i], data[i+1]);
+  for (i = 0; i < nelems(data) - 1; i++) {
+    ck_assert_int_eq(buf[i], data[i + 1]);
   }
 
   gpudata_release(d);

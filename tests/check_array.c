@@ -1,10 +1,11 @@
-#include <check.h>
-#include <gpuarray/array.h>
-#include <gpuarray/error.h>
-#include <gpuarray/types.h>
-
 #include <limits.h>
 #include <stdlib.h>
+
+#include <check.h>
+
+#include "gpuarray/array.h"
+#include "gpuarray/error.h"
+#include "gpuarray/types.h"
 
 extern void *ctx;
 
@@ -13,9 +14,7 @@ void teardown(void);
 
 #define ga_assert_ok(e) ck_assert_int_eq(e, GA_NO_ERROR)
 
-
-START_TEST(test_take1_ok)
-{
+START_TEST(test_take1_ok) {
   GpuArray base;
   GpuArray idx;
   GpuArray res;
@@ -26,13 +25,12 @@ START_TEST(test_take1_ok)
                                      6,  7,  8,  9, 10, 11,
                                     12, 13, 14, 15, 16, 17,
                                     18, 19, 20, 21, 22, 23};
-  uint32_t buf[12*24];
+  uint32_t buf[12 * 24];
   static const size_t data_dims[1] = {24};
   ssize_t indexes[12];
   size_t dims[3];
 
-  ga_assert_ok(GpuArray_empty(&base, ctx, GA_UINT, 1, data_dims,
-                              GA_C_ORDER));
+  ga_assert_ok(GpuArray_empty(&base, ctx, GA_UINT, 1, data_dims, GA_C_ORDER));
   ga_assert_ok(GpuArray_write(&base, data, sizeof(data)));
   dims[0] = 12;
   ga_assert_ok(GpuArray_empty(&idx, ctx, GA_SSIZE, 1, dims, GA_C_ORDER));
@@ -143,23 +141,23 @@ START_TEST(test_take1_ok)
   dims[1] = 2;
   dims[2] = 3;
   ga_assert_ok(GpuArray_reshape_inplace(&vres, 3, dims, GA_C_ORDER));
-  
+
   ga_assert_ok(GpuArray_take1(&vres, &v, &vidx, 0));
   ga_assert_ok(GpuArray_read(buf, sizeof(uint32_t) * 72, &vres));
 
   /* 0 */
-  ck_assert(buf[ 0] == 18);
-  ck_assert(buf[ 1] == 19);
-  ck_assert(buf[ 2] == 20);
-  ck_assert(buf[ 3] == 21);
-  ck_assert(buf[ 4] == 22);
-  ck_assert(buf[ 5] == 23);
+  ck_assert(buf[0] == 18);
+  ck_assert(buf[1] == 19);
+  ck_assert(buf[2] == 20);
+  ck_assert(buf[3] == 21);
+  ck_assert(buf[4] == 22);
+  ck_assert(buf[5] == 23);
 
   /* 1 */
-  ck_assert(buf[ 6] == 18);
-  ck_assert(buf[ 7] == 19);
-  ck_assert(buf[ 8] == 20);
-  ck_assert(buf[ 9] == 21);
+  ck_assert(buf[6] == 18);
+  ck_assert(buf[7] == 19);
+  ck_assert(buf[8] == 20);
+  ck_assert(buf[9] == 21);
   ck_assert(buf[10] == 22);
   ck_assert(buf[11] == 23);
 

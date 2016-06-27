@@ -19,22 +19,27 @@
 #define CTX_TAG "cudactx "
 #define BUF_TAG "cudabuf "
 #define KER_TAG "cudakern"
+#define COMM_TAG "cudacomm"
 
 #define TAG_CTX(c) memcpy((c)->tag, CTX_TAG, 8)
 #define TAG_BUF(b) memcpy((b)->tag, BUF_TAG, 8)
 #define TAG_KER(k) memcpy((k)->tag, KER_TAG, 8)
+#define TAG_COMM(co) memcpy((co)->tag, COMM_TAG, 8)
 #define ASSERT_CTX(c) assert(memcmp((c)->tag, CTX_TAG, 8) == 0)
 #define ASSERT_BUF(b) assert(memcmp((b)->tag, BUF_TAG, 8) == 0)
 #define ASSERT_KER(k) assert(memcmp((k)->tag, KER_TAG, 8) == 0)
+#define ASSERT_COMM(co) assert(memcmp((co)->tag, COMM_TAG, 8) == 0)
 #define CLEAR(o) memset((o)->tag, 0, 8);
 
 #else
 #define TAG_CTX(c)
 #define TAG_BUF(b)
 #define TAG_KER(k)
+#define TAG_COMM(k)
 #define ASSERT_CTX(c)
 #define ASSERT_BUF(b)
 #define ASSERT_KER(k)
+#define ASSERT_COMM(k)
 #define CLEAR(o)
 #endif
 

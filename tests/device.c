@@ -4,17 +4,22 @@
 
 #include <check.h>
 
-#include <gpuarray/buffer.h>
+#include "gpuarray/buffer.h"
+
+char* dev_name = NULL;
 
 int get_env_dev(const char **name) {
-  char *dev;
+  char *dev = NULL;
   char *end;
   long no;
   int d;
-  if ((dev = getenv("GPUARRAY_TEST_DEVICE")) == NULL) {
-    if ((dev = getenv("DEVICE")) == NULL) {
-      *name = "opencl";
-      return 0; /* opencl0:0 */
+  dev = dev_name;
+  if (dev == NULL) {
+    if ((dev = getenv("GPUARRAY_TEST_DEVICE")) == NULL) {
+      if ((dev = getenv("DEVICE")) == NULL) {
+        *name = "opencl";
+        return 0; /* opencl0:0 */
+      }
     }
   }
   if (strncmp(dev, "cuda", 4) == 0) {

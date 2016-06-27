@@ -2,8 +2,10 @@
 #include <errno.h>
 #include <stdlib.h>
 
-#include <gpuarray/buffer.h>
-#include <gpuarray/error.h>
+#include "gpuarray/buffer.h"
+#include "gpuarray/buffer_collectives.h"
+#include "gpuarray/error.h"
+
 #include "private.h"
 
 #ifdef WITH_CUDA
@@ -37,6 +39,8 @@ gpucontext *gpucontext_init(const char *name, int dev, int flags, int *ret) {
   if (gpucontext_property(res, GA_CTX_PROP_BLAS_OPS, &res->blas_ops) != GA_NO_ERROR)
     res->blas_ops = NULL;
   res->blas_handle = NULL;
+  if (gpucontext_property(res, GA_CTX_PROP_COMM_OPS, &res->comm_ops) != GA_NO_ERROR)
+    res->comm_ops = NULL;
   res->extcopy_cache = NULL;
   return res;
 }
@@ -62,6 +66,8 @@ const char *gpucontext_error(gpucontext *ctx, int err) {
       return ctx->ops->ctx_error(ctx);
     case GA_BLAS_ERROR:
       return gpublas_error(ctx);
+    case GA_COMM_ERROR:
+      return gpucomm_error(ctx);
     }
   }
   return gpuarray_error_str(err);

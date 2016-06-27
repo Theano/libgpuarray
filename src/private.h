@@ -14,6 +14,8 @@
 #include <gpuarray/types.h>
 #include <gpuarray/buffer.h>
 #include <gpuarray/buffer_blas.h>
+#include <gpuarray/buffer_collectives.h>
+
 #include "util/strb.h"
 #include "cache.h"
 
@@ -34,10 +36,15 @@ typedef struct _gpuarray_buffer_ops gpuarray_buffer_ops;
 struct _gpuarray_blas_ops;
 typedef struct _gpuarray_blas_ops gpuarray_blas_ops;
 
+struct _gpuarray_comm_ops;
+typedef struct _gpuarray_comm_ops gpuarray_comm_ops;
+
 #define GPUCONTEXT_HEAD                         \
   const gpuarray_buffer_ops *ops;               \
   const gpuarray_blas_ops *blas_ops;            \
+  const gpuarray_comm_ops *comm_ops;            \
   void *blas_handle;                            \
+  const char* error_msg;                        \
   unsigned int refcnt;                          \
   int flags;                                    \
   struct _gpudata *errbuf;                      \
@@ -61,6 +68,10 @@ typedef struct _partial_gpudata {
 typedef struct _partial_gpukernel {
   gpucontext *ctx;
 } partial_gpukernel;
+
+typedef struct _partial_gpucomm {
+  gpucontext* ctx;
+} partial_gpucomm;
 
 struct _gpuarray_buffer_ops {
   gpucontext *(*buffer_init)(int dev, int flags, int *ret);
@@ -192,6 +203,35 @@ struct _gpuarray_blas_ops {
                    size_t batchCount, int flags);
 };
 
+struct _gpuarray_comm_ops {
+  int (*comm_new)(gpucomm** comm, gpucontext* ctx, gpucommCliqueId comm_id,
+                  int ndev, int rank);
+  void (*comm_free)(gpucomm* comm);
+  int (*generate_clique_id)(gpucontext* ctx, gpucommCliqueId* comm_id);
+  int (*get_count)(const gpucomm* comm, int* count);
+  int (*get_rank)(const gpucomm* comm, int* rank);
+  // collective ops
+  int (*reduce)(gpudata* src, size_t offsrc,
+                gpudata* dest, size_t offdest,
+                size_t count, int typecode, int opcode,
+                int root, gpucomm* comm);
+  int (*all_reduce)(gpudata* src, size_t offsrc,
+                    gpudata* dest, size_t offdest,
+                    size_t count, int typecode, int opcode,
+                    gpucomm* comm);
+  int (*reduce_scatter)(gpudata* src, size_t offsrc,
+                        gpudata* dest, size_t offdest,
+                        size_t count, int typecode, int opcode,
+                        gpucomm* comm);
+  int (*broadcast)(gpudata* array, size_t offset,
+                   size_t count, int typecode,
+                   int root, gpucomm* comm);
+  int (*all_gather)(gpudata* src, size_t offsrc,
+                    gpudata* dest, size_t offdest,
+                    size_t count, int typecode,
+                    gpucomm* comm);
+};
+
 #define STATIC_ASSERT(COND, MSG) typedef char static_assertion_##MSG[2*(!!(COND))-1]
 
 static inline void *memdup(const void *p, size_t s) {
@@ -227,6 +267,22 @@ GPUARRAY_LOCAL void gpukernel_source_with_line_numbers(unsigned int count,
 
 #define FLSET(v, fl) (v |= (fl))
 #define FLCLR(v, fl) (v &= ~(fl))
+
+#define GA_CHECK(cmd)       \
+  do {                      \
+    int err = (cmd);        \
+    if (err != GA_NO_ERROR) \
+      return err;           \
+  } while (0)
+
+#define GA_EXIT_ON_ERROR(ctx, cmd) \
+  do {                             \
+    int err = (cmd);               \
+    if (err != GA_NO_ERROR) {      \
+      cuda_exit((ctx));            \
+      return err;                  \
+    }                              \
+  } while (0)
 
 #ifdef __cplusplus
 }
