@@ -42,10 +42,14 @@ cdef api class GpuCommCliqueId [type PyGpuCliqueIdType, object PyGpuCliqueIdObje
     cdef gpucommCliqueId comm_id
     cdef readonly GpuContext context
 
+
 cdef api class GpuComm [type PyGpuCommType, object PyGpuCommObject]:
     cdef gpucomm* c
     cdef readonly GpuContext context
     # cdef object __weakref__
+
+
+cdef int to_reduce_opcode(op) except -1
 
 cdef gpucontext* comm_context(GpuComm comm) except NULL
 cdef int comm_generate_id(gpucontext* ctx, GpuCommCliqueId comm_id) except -1

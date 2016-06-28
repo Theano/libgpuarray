@@ -5,7 +5,7 @@ cdef class GpuCommCliqueId:
         self.context = ensure_context(context)
 
     property comm_id:
-        "Unique clique id to be used be each gpucomm in a group of devices"
+        "Unique clique id to be used by each GpuComm in a group of devices"
         def __get__(self):
             comm_generate_id(self.context.ctx, self)
             return self.comm_id.internal  # cast to python byte array/string
@@ -36,27 +36,67 @@ cdef class GpuComm:
             raise get_exc(err), gpucontext_error(self.context.ctx, err)
 
     def get_count(self):
-        pass
+        cdef int gpucount
+        comm_get_count(self, &gpucount)
+        return gpucount
 
     def get_rank(self):
-        pass
+        cdef int gpurank
+        comm_get_rank(self, &gpurank)
+        return gpurank
 
-    def reduce(self, GpuArray src, int opcode, GpuArray dest=None):
-        pass
+    def reduce(self, GpuArray src, op, GpuArray dest=None, int root=None):
+        if not dest:
+            if root:
+                return comm_reduce_from(self, src, to_reduce_opcode(op), root)
+            else:
+                return pygpu_make_reduced(self, src, to_reduce_opcode(op))
+        if not root:
+            comm_get_rank(self, &root)
+        return comm_reduce(self, src, dest, to_reduce_opcode(op), root)
 
-    def all_reduce(self, GpuArray src, int opcode, GpuArray dest=None):
-        pass
+    def all_reduce(self, GpuArray src, op, GpuArray dest=None):
+        if not dest:
+            return pygpu_make_all_reduced(self, src, to_reduce_opcode(op))
+        return comm_all_reduce(self, src, dest, to_reduce_opcode(op))
 
-    def reduce_scatter(self, GpuArray src, int opcode, GpuArray dest=None):
-        pass
+    def reduce_scatter(self, GpuArray src, op, GpuArray dest=None):
+        if not dest:
+            return pygpu_make_reduce_scattered(self, src, to_reduce_opcode(op))
+        return comm_reduce_scatter(self, src, dest, to_reduce_opcode(op))
 
-    def broadcast(self, Gpuarray array, int root):
-        pass
+    def broadcast(self, Gpuarray array, int root=None):
+        if not root:
+            comm_get_rank(self, &root)
+        return comm_broadcast(self, array, root)
 
     def all_gather(self, GpuArray src, GpuArray dest=None,
                    unsigned int nd_up=1):
-        pass
+        if not dest:
+            return pygpu_make_all_gathered(self, src, nd_up)
+        return comm_all_gather(self, src, dest)
 
+
+cdef dict TO_RED_OP = {
+    '+': GA_SUM,
+    "sum": GA_SUM,
+    "add": GA_SUM,
+    '*': GA_PROD,
+    "prod": GA_PROD,
+    "product": GA_PROD,
+    "max": GA_MAX,
+    "maximum": GA_MAX,
+    "min": GA_MIN,
+    "minimum": GA_MIN,
+    }
+
+cdef int to_reduce_opcode(op):
+    if isinstance(op, int):
+        return op
+    res = TO_RED_OP.get(op.lower())
+    if res:
+        return res
+    raise ValueError, "Invalid reduce operation"
 
 cdef gpucontext* comm_context(GpuComm comm) except NULL:
     cdef gpucontext* res
@@ -162,9 +202,11 @@ cdef api GpuArray pygpu_make_reduce_scattered(GpuComm comm, GpuArray src, int op
                 chosen_dim_size = src.ga.dimensions[0] / gpucount
                 if chosen_dim_size != 1:
                     dims[0] = chosen_dim_size
-                    dims[1:] = src.ga.dimensions[1:]
+                    for j in range(1, nd):
+                        dims[j] = src.ga.dimensions[j]
                 else:
-                    dims[0:] = src.ga.dimensions[1:]
+                    for j in range(nd - 1):
+                        dims[j] = src.ga.dimensions[1 + j]
                     nd -= 1
             else:
                 raise TypeError, "Source GpuArray cannot be split in %d c-contiguous arrays" % (gpucount)
@@ -172,7 +214,8 @@ cdef api GpuArray pygpu_make_reduce_scattered(GpuComm comm, GpuArray src, int op
             # Largest in index dimension has the largest stride
             if src.ga.dimensions[nd - 1] % gpucount == 0:
                 chosen_dim_size = src.ga.dimensions[nd - 1] / gpucount
-                dims[:nd - 1] = src.ga.dimensions[:nd - 1]
+                for j in range(nd - 1):
+                    dims[j] = src.ga.dimensions[j]
                 if chosen_dim_size != 1:
                     dims[nd - 1] = chosen_dim_size
                 else:
