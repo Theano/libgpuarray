@@ -47,10 +47,8 @@ cdef api class GpuComm [type PyGpuCommType, object PyGpuCommObject]:
     cdef readonly GpuContext context
     # cdef object __weakref__
 
-cdef int comm_new(GpuComm comm, GpuCommCliqueId comm_id, int ndev,
-                  int rank) except -1
 cdef gpucontext* comm_context(GpuComm comm) except NULL
-cdef int comm_generate_id(GpuCommCliqueId comm_id) except -1
+cdef int comm_generate_id(gpucontext* ctx, GpuCommCliqueId comm_id) except -1
 cdef int comm_get_count(GpuComm comm, int* gpucount) except -1
 cdef int comm_get_rank(GpuComm comm, int* gpurank) except -1
 cdef int comm_reduce_from(GpuComm comm, GpuArray src, int opcode,
@@ -64,10 +62,8 @@ cdef int comm_reduce_scatter(GpuComm comm, GpuArray src, GpuArray dest,
 cdef int comm_broadcast(GpuComm comm, GpuArray arr, int root) except -1
 cdef int comm_all_gather(GpuComm comm, GpuArray src, GpuArray dest) except -1
 
-cdef api void pygpu_reduce_from(GpuComm comm, GpuArray src, int opcode, int root)
-cdef api GpuArray pygpu_reduce(GpuComm comm, GpuArray src, int opcode)
-cdef api GpuArray pygpu_all_reduce(GpuComm comm, GpuArray src, int opcode)
-cdef api GpuArray pygpu_reduce_scatter(GpuComm comm, GpuArray src, int opcode)
-cdef api GpuArray pygpu_bcast_receive(GpuComm comm, int root)
-cdef api void pygpu_bcast_send(GpuComm comm, GpuArray arr)
-cdef api GpuArray pygpu_all_gather(GpuComm comm, GpuArray src)
+cdef api GpuArray pygpu_make_reduced(GpuComm comm, GpuArray src, int opcode)
+cdef api GpuArray pygpu_make_all_reduced(GpuComm comm, GpuArray src, int opcode)
+cdef api GpuArray pygpu_make_reduce_scattered(GpuComm comm, GpuArray src, int opcode)
+cdef api GpuArray pygpu_make_all_gathered(GpuComm comm, GpuArray src,
+                                          unsigned int nd_up)
