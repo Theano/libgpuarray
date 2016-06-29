@@ -7,14 +7,16 @@ cdef class GpuCommCliqueId:
     property comm_id:
         "Unique clique id to be used by each GpuComm in a group of devices"
         def __get__(self):
+            cdef bytes res
             comm_generate_id(self.context.ctx, self)
-            return self.comm_id.internal  # cast to python byte array/string
+            res = self.comm_id.internal[:GA_COMM_ID_BYTES]
+            return res
 
-        def __set__(self, bytearr):
-            if len(bytearr) < GA_COMM_ID_BYTES:
+        def __set__(self, unsigned char[:] bytearr):
+            cdef int length
+            length = bytearr.shape[0]
+            if length < GA_COMM_ID_BYTES:
                 raise ValueError, "gpucomm clique id must have length " + str(GA_COMM_ID_BYTES) + " bytes"
-            # Make sure that either reference is kept or copy
-            # Cast to bytearray
             self.comm_id.internal = bytearr[:GA_COMM_ID_BYTES]
 
 
