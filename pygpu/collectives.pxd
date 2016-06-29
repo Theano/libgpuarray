@@ -13,7 +13,7 @@ cdef extern from "gpuarray/buffer_collectives.h":
         GA_MAX,
         GA_MIN
 
-    cdef enum:
+    enum:
         GA_COMM_ID_BYTES
 
     ctypedef struct gpucommCliqueId:
@@ -47,7 +47,7 @@ cdef api class GpuCommCliqueId [type PyGpuCliqueIdType, object PyGpuCliqueIdObje
 cdef api class GpuComm [type PyGpuCommType, object PyGpuCommObject]:
     cdef gpucomm* c
     cdef readonly GpuContext context
-    # cdef object __weakref__
+    cdef object __weakref__
 
 
 cdef int to_reduce_opcode(op) except -1
@@ -68,8 +68,8 @@ cdef int comm_broadcast(GpuComm comm, GpuArray arr, int root) except -1
 cdef int comm_all_gather(GpuComm comm, GpuArray src, GpuArray dest) except -1
 
 cdef api:
-    GpuArray pygpu_make_reduced(GpuComm comm, GpuArray src, int opcode)
-    GpuArray pygpu_make_all_reduced(GpuComm comm, GpuArray src, int opcode)
-    GpuArray pygpu_make_reduce_scattered(GpuComm comm, GpuArray src, int opcode)
+    GpuArray pygpu_make_reduced(GpuComm comm, GpuArray src, int opcode) except None
+    GpuArray pygpu_make_all_reduced(GpuComm comm, GpuArray src, int opcode) except None
+    GpuArray pygpu_make_reduce_scattered(GpuComm comm, GpuArray src, int opcode) except None
     GpuArray pygpu_make_all_gathered(GpuComm comm, GpuArray src,
-                                     unsigned int nd_up)
+                                     unsigned int nd_up) except None

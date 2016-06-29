@@ -16,7 +16,7 @@ cdef class GpuCommCliqueId:
             cdef int length
             length = bytearr.shape[0]
             if length < GA_COMM_ID_BYTES:
-                raise ValueError, "gpucomm clique id must have length " + str(GA_COMM_ID_BYTES) + " bytes"
+                raise ValueError, "GpuComm clique id must have length %d bytes" % (GA_COMM_ID_BYTES)
             self.comm_id.internal = bytearr[:GA_COMM_ID_BYTES]
 
 
@@ -29,7 +29,7 @@ cdef class GpuComm:
     def __reduce__(self):
         raise RuntimeError, "Cannot pickle GpuComm object"
 
-    def __cinit__(self, GpuCommCliqueId cid, int ndev, int rank):
+    def __cinit__(self, GpuCommCliqueId cid not None, int ndev, int rank):
         self.context = cid.context
         cdef int err
         err = gpucomm_new(&self.c, self.context.ctx, self.cid.comm_id,
@@ -47,34 +47,34 @@ cdef class GpuComm:
         comm_get_rank(self, &gpurank)
         return gpurank
 
-    def reduce(self, GpuArray src, op, GpuArray dest=None, int root=None):
-        if not dest:
-            if root:
+    def reduce(self, GpuArray src not None, op, GpuArray dest=None, int root=-1):
+        if dest is None:
+            if root != -1:
                 return comm_reduce_from(self, src, to_reduce_opcode(op), root)
             else:
                 return pygpu_make_reduced(self, src, to_reduce_opcode(op))
-        if not root:
+        if root == -1:
             comm_get_rank(self, &root)
         return comm_reduce(self, src, dest, to_reduce_opcode(op), root)
 
-    def all_reduce(self, GpuArray src, op, GpuArray dest=None):
-        if not dest:
+    def all_reduce(self, GpuArray src not None, op, GpuArray dest=None):
+        if dest is None:
             return pygpu_make_all_reduced(self, src, to_reduce_opcode(op))
         return comm_all_reduce(self, src, dest, to_reduce_opcode(op))
 
-    def reduce_scatter(self, GpuArray src, op, GpuArray dest=None):
-        if not dest:
+    def reduce_scatter(self, GpuArray src not None, op, GpuArray dest=None):
+        if dest is None:
             return pygpu_make_reduce_scattered(self, src, to_reduce_opcode(op))
         return comm_reduce_scatter(self, src, dest, to_reduce_opcode(op))
 
-    def broadcast(self, Gpuarray array, int root=None):
-        if not root:
+    def broadcast(self, Gpuarray array not None, int root=-1):
+        if root == -1:
             comm_get_rank(self, &root)
         return comm_broadcast(self, array, root)
 
-    def all_gather(self, GpuArray src, GpuArray dest=None,
+    def all_gather(self, GpuArray src not None, GpuArray dest=None,
                    unsigned int nd_up=1):
-        if not dest:
+        if dest is None:
             return pygpu_make_all_gathered(self, src, nd_up)
         return comm_all_gather(self, src, dest)
 
@@ -92,11 +92,11 @@ cdef dict TO_RED_OP = {
     "minimum": GA_MIN,
     }
 
-cdef int to_reduce_opcode(op):
+cdef int to_reduce_opcode(op) except -1:
     if isinstance(op, int):
         return op
     res = TO_RED_OP.get(op.lower())
-    if res:
+    if res is not None:
         return res
     raise ValueError, "Invalid reduce operation"
 
@@ -165,7 +165,7 @@ cdef int comm_all_gather(GpuComm comm, GpuArray src, GpuArray dest) except -1:
     if err != GA_NO_ERROR:
         raise get_exc(err), gpucontext_error(comm_context(comm), err)
 
-cdef api GpuArray pygpu_make_reduced(GpuComm comm, GpuArray src, int opcode):
+cdef api GpuArray pygpu_make_reduced(GpuComm comm, GpuArray src, int opcode) except None:
     cdef GpuArray res
     res = pygpu_empty_like(src, GA_ANY_ORDER, -1)
     cdef int rank
@@ -173,13 +173,13 @@ cdef api GpuArray pygpu_make_reduced(GpuComm comm, GpuArray src, int opcode):
     comm_reduce(comm, src, res, opcode, rank)
     return res
 
-cdef api GpuArray pygpu_make_all_reduced(GpuComm comm, GpuArray src, int opcode):
+cdef api GpuArray pygpu_make_all_reduced(GpuComm comm, GpuArray src, int opcode) except None:
     cdef GpuArray res
     res = pygpu_empty_like(src, GA_ANY_ORDER, -1)
     comm_all_reduce(comm, src, res, opcode)
     return res
 
-cdef api GpuArray pygpu_make_reduce_scattered(GpuComm comm, GpuArray src, int opcode):
+cdef api GpuArray pygpu_make_reduce_scattered(GpuComm comm, GpuArray src, int opcode) except None:
     if src.ga.nd < 1:
         raise TypeError, "Source GpuArray must have number of dimensions >= 1"
 
@@ -198,6 +198,7 @@ cdef api GpuArray pygpu_make_reduce_scattered(GpuComm comm, GpuArray src, int op
         raise MemoryError, "Could not allocate dims"
 
     try:
+        cdef int j
         if is_c_cont:
             # Smallest in index dimension has the largest stride
             if src.ga.dimensions[0] % gpucount == 0:
@@ -234,7 +235,7 @@ cdef api GpuArray pygpu_make_reduce_scattered(GpuComm comm, GpuArray src, int op
     return res
 
 cdef api GpuArray pygpu_make_all_gathered(GpuComm comm, GpuArray src,
-                                          unsigned int nd_up):
+                                          unsigned int nd_up) except None:
     if src.ga.nd < 1:
         raise TypeError, "Source GpuArray must have number of dimensions >= 1"
 
@@ -252,6 +253,7 @@ cdef api GpuArray pygpu_make_all_gathered(GpuComm comm, GpuArray src,
         raise MemoryError, "Could not allocate dims"
 
     try:
+        cdef int j
         if is_c_cont:
             # Smallest in index dimension has the largest stride
             if nd_up == 0:
