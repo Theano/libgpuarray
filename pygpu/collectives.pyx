@@ -1,3 +1,14 @@
+from libc.stdlib cimport malloc, calloc, free
+
+from pygpu.gpuarray cimport (gpucontext, GpuContext, _GpuArray, GpuArray,
+                             ensure_context,
+                             GA_NO_ERROR, get_exc, gpucontext_error,
+                             GpuArray_IS_C_CONTIGUOUS,
+                             GA_C_ORDER, GA_F_ORDER, GA_ANY_ORDER,
+                             pygpu_empty_like, pygpu_empty, memcpy)
+from pygpu.gpuarray import GpuArrayException
+
+
 cdef class GpuCommCliqueId:
     """
     """
@@ -17,7 +28,7 @@ cdef class GpuCommCliqueId:
             length = bytearr.shape[0]
             if length < GA_COMM_ID_BYTES:
                 raise ValueError, "GpuComm clique id must have length %d bytes" % (GA_COMM_ID_BYTES)
-            self.comm_id.internal = bytearr[:GA_COMM_ID_BYTES]
+            memcpy(self.comm_id.internal, <char*>&bytearr[0], GA_COMM_ID_BYTES)
 
 
 cdef class GpuComm:
@@ -67,7 +78,7 @@ cdef class GpuComm:
             return pygpu_make_reduce_scattered(self, src, to_reduce_opcode(op))
         return comm_reduce_scatter(self, src, dest, to_reduce_opcode(op))
 
-    def broadcast(self, Gpuarray array not None, int root=-1):
+    def broadcast(self, GpuArray array not None, int root=-1):
         if root == -1:
             comm_get_rank(self, &root)
         return comm_broadcast(self, array, root)
@@ -155,7 +166,7 @@ cdef int comm_reduce_scatter(GpuComm comm, GpuArray src, GpuArray dest,
 
 cdef int comm_broadcast(GpuComm comm, GpuArray arr, int root) except -1:
     cdef int err
-    err = GpuArray_broadcast(&array.ga, root, comm.c)
+    err = GpuArray_broadcast(&arr.ga, root, comm.c)
     if err != GA_NO_ERROR:
         raise get_exc(err), gpucontext_error(comm_context(comm), err)
 
@@ -165,7 +176,7 @@ cdef int comm_all_gather(GpuComm comm, GpuArray src, GpuArray dest) except -1:
     if err != GA_NO_ERROR:
         raise get_exc(err), gpucontext_error(comm_context(comm), err)
 
-cdef api GpuArray pygpu_make_reduced(GpuComm comm, GpuArray src, int opcode) except None:
+cdef api GpuArray pygpu_make_reduced(GpuComm comm, GpuArray src, int opcode):
     cdef GpuArray res
     res = pygpu_empty_like(src, GA_ANY_ORDER, -1)
     cdef int rank
@@ -173,13 +184,13 @@ cdef api GpuArray pygpu_make_reduced(GpuComm comm, GpuArray src, int opcode) exc
     comm_reduce(comm, src, res, opcode, rank)
     return res
 
-cdef api GpuArray pygpu_make_all_reduced(GpuComm comm, GpuArray src, int opcode) except None:
+cdef api GpuArray pygpu_make_all_reduced(GpuComm comm, GpuArray src, int opcode):
     cdef GpuArray res
     res = pygpu_empty_like(src, GA_ANY_ORDER, -1)
     comm_all_reduce(comm, src, res, opcode)
     return res
 
-cdef api GpuArray pygpu_make_reduce_scattered(GpuComm comm, GpuArray src, int opcode) except None:
+cdef api GpuArray pygpu_make_reduce_scattered(GpuComm comm, GpuArray src, int opcode):
     if src.ga.nd < 1:
         raise TypeError, "Source GpuArray must have number of dimensions >= 1"
 
@@ -189,6 +200,7 @@ cdef api GpuArray pygpu_make_reduce_scattered(GpuComm comm, GpuArray src, int op
     cdef unsigned int nd
     cdef size_t chosen_dim_size
     cdef size_t* dims
+    cdef unsigned int j
 
     comm_get_count(comm, &gpucount)
     is_c_cont = GpuArray_IS_C_CONTIGUOUS(&src.ga)
@@ -198,7 +210,6 @@ cdef api GpuArray pygpu_make_reduce_scattered(GpuComm comm, GpuArray src, int op
         raise MemoryError, "Could not allocate dims"
 
     try:
-        cdef int j
         if is_c_cont:
             # Smallest in index dimension has the largest stride
             if src.ga.dimensions[0] % gpucount == 0:
@@ -235,7 +246,7 @@ cdef api GpuArray pygpu_make_reduce_scattered(GpuComm comm, GpuArray src, int op
     return res
 
 cdef api GpuArray pygpu_make_all_gathered(GpuComm comm, GpuArray src,
-                                          unsigned int nd_up) except None:
+                                          unsigned int nd_up):
     if src.ga.nd < 1:
         raise TypeError, "Source GpuArray must have number of dimensions >= 1"
 
@@ -244,6 +255,7 @@ cdef api GpuArray pygpu_make_all_gathered(GpuComm comm, GpuArray src,
     cdef bint is_c_cont
     cdef unsigned int nd
     cdef size_t* dims
+    cdef unsigned int j
 
     comm_get_count(comm, &gpucount)
     is_c_cont = GpuArray_IS_C_CONTIGUOUS(&src.ga)
@@ -253,7 +265,6 @@ cdef api GpuArray pygpu_make_all_gathered(GpuComm comm, GpuArray src,
         raise MemoryError, "Could not allocate dims"
 
     try:
-        cdef int j
         if is_c_cont:
             # Smallest in index dimension has the largest stride
             if nd_up == 0:
@@ -281,7 +292,7 @@ cdef api GpuArray pygpu_make_all_gathered(GpuComm comm, GpuArray src,
         res = pygpu_empty(nd, dims, src.ga.typecode,
                           GA_C_ORDER if is_c_cont else GA_F_ORDER,
                           src.context, type(src))
-        comm_all_gather(comm, src, res, opcode)
+        comm_all_gather(comm, src, res)
     finally:
         free(dims)
 
