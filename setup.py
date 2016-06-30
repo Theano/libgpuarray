@@ -13,15 +13,18 @@ try:
 except Exception:
     # for devel version
     raise
+
     def cythonize(args):
         for arg in args:
             arg.sources = [(s[:-3] + 'c' if s.endswith('.pyx') else s) for s in arg.sources]
 
 # clang gives an error if passed -mno-fused-madd
 # (and I don't even understand why it's passed in the first place)
-if sys.platform =='darwin':
+if sys.platform == 'darwin':
     from distutils import sysconfig, ccompiler
+
     sysconfig_customize_compiler = sysconfig.customize_compiler
+
     def customize_compiler(compiler):
         sysconfig_customize_compiler(compiler)
         if sys.platform == 'darwin':
@@ -72,41 +75,49 @@ if sys.platform == 'win32':
     # Just use the default location.
     current_dir = os.path.abspath(os.path.dirname(__file__))
     include_dirs += [os.path.join(current_dir, 'src')]
-    
+
     default_bin_dir = os.path.join(current_dir, 'lib', 'Release')
     if not os.path.isdir(default_bin_dir):
         raise RuntimeError('default binary dir {} does not exist, you may need to build the C library in release mode')
     library_dirs += [default_bin_dir]
-    
-    
+
+
 exts = [Extension('pygpu.gpuarray',
-                  sources = ['pygpu/gpuarray.pyx'],
-                  include_dirs = include_dirs,
-                  libraries = ['gpuarray'],
-                  library_dirs = library_dirs,
-                  define_macros = [('GPUARRAY_SHARED', None)]
+                  sources=['pygpu/gpuarray.pyx'],
+                  include_dirs=include_dirs,
+                  libraries=['gpuarray'],
+                  library_dirs=library_dirs,
+                  define_macros=[('GPUARRAY_SHARED', None)]
                   ),
         Extension('pygpu.blas',
-                  sources = ['pygpu/blas.pyx'],
-                  include_dirs = include_dirs,
-                  libraries = ['gpuarray'],
-                  library_dirs = library_dirs,
-                  define_macros = [('GPUARRAY_SHARED', None)]
+                  sources=['pygpu/blas.pyx'],
+                  include_dirs=include_dirs,
+                  libraries=['gpuarray'],
+                  library_dirs=library_dirs,
+                  define_macros=[('GPUARRAY_SHARED', None)]
                   ),
         Extension('pygpu._elemwise',
-                  sources = ['pygpu/_elemwise.pyx'],
-                  include_dirs = include_dirs,
-                  libraries = ['gpuarray'],
-                  library_dirs = library_dirs,
-                  define_macros = [('GPUARRAY_SHARED', None)]
+                  sources=['pygpu/_elemwise.pyx'],
+                  include_dirs=include_dirs,
+                  libraries=['gpuarray'],
+                  library_dirs=library_dirs,
+                  define_macros=[('GPUARRAY_SHARED', None)]
+                  ),
+        Extension('pygpu.collectives',
+                  sources=['pygpu/collectives.pyx'],
+                  include_dirs=include_dirs,
+                  libraries=['gpuarray'],
+                  library_dirs=library_dirs,
+                  define_macros=[('GPUARRAY_SHARED', None)]
                   )]
 
 setup(name='pygpu',
       version='0.2.1',
       description='numpy-like wrapper on libgpuarray for GPU computations',
-      packages = ['pygpu', 'pygpu/tests'],
-      data_files = [('pygpu', ['pygpu/gpuarray.h', 'pygpu/gpuarray_api.h',
-                               'pygpu/blas_api.h', 'pygpu/numpy_compat.h'])],
+      packages=['pygpu', 'pygpu/tests'],
+      data_files=[('pygpu', ['pygpu/gpuarray.h', 'pygpu/gpuarray_api.h',
+                             'pygpu/blas_api.h', 'pygpu/numpy_compat.h',
+                             'pygpu/collectives.h', 'pygpu/collectives_api.h'])],
       ext_modules=cythonize(exts),
       install_requires=['mako>=0.7'],
       )
