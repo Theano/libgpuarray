@@ -1026,6 +1026,7 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
 
   return GA_NO_ERROR;
  fail:
+  r->dimensions = res_dims;
   GpuArray_clear(r);
   return err;
 }
