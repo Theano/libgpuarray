@@ -1,4 +1,5 @@
 from libc.stdlib cimport malloc, calloc, free
+from libc.string cimport strncmp
 
 from pygpu.gpuarray cimport (gpucontext, GpuContext, _GpuArray, GpuArray,
                              ensure_context,
@@ -23,16 +24,25 @@ cdef class GpuCommCliqueId:
     """
     def __cinit__(self, GpuContext context=None, bytes comm_id=None):
         self.context = ensure_context(context)
+        if comm_id is None:
+            comm_generate_id(self.context.ctx, &self.c_comm_id)
+
+    def __init__(self, GpuContext context=None, bytes comm_id=None):
         if comm_id is not None:
             self.comm_id = comm_id
-        else:
-            comm_generate_id(self.context.ctx, self)
 
-    def __eq__(self, other):
-        return type(self) == type(other) and self.comm_id_py == other.comm_id_py
+    def __richcmp__(this, that, int op):
+        if op != 2 and op != 3:
+            raise RuntimeError, "Compare for equal or not equal only."
+        cdef bint res
+        res = type(this) == type(that) and \
+              strncmp(this.c_comm_id.internal, that.c_comm_id.internal, GA_COMM_ID_BYTES) == 0
+        if op == 2:
+            return res
+        return not res
 
     def __hash__(self):
-        return hash(self.__class__.__name__) ^ hash(self.comm_id_py)
+        return hash(self.__class__.__name__) ^ hash(self.c_comm_id.internal[:GA_COMM_ID_BYTES])
 
     def __reduce__(self):
         raise RuntimeError, "Cannot pickle %s object" % self.__class__.__name__
@@ -41,15 +51,15 @@ cdef class GpuCommCliqueId:
         "Unique clique id to be used by each :ref:`GpuComm` in a group of devices"
         def __get__(self):
             cdef bytes res
-            res = self.comm_id.internal[:GA_COMM_ID_BYTES]
+            res = self.c_comm_id.internal[:GA_COMM_ID_BYTES]
             return res
 
-        def __set__(self, unsigned char[:] bytearr):
+        def __set__(self, unsigned char[:] cid):
             cdef int length
-            length = bytearr.shape[0]
+            length = cid.shape[0]
             if length < GA_COMM_ID_BYTES:
                 raise ValueError, "GpuComm clique id must have length %d bytes" % (GA_COMM_ID_BYTES)
-            memcpy(self.comm_id.internal, <char*>&bytearr[0], GA_COMM_ID_BYTES)
+            memcpy(self.c_comm_id.internal, <char*>&cid[0], GA_COMM_ID_BYTES)
 
 
 cdef class GpuComm:
@@ -241,9 +251,9 @@ cdef gpucontext* comm_context(GpuComm comm) except NULL:
         raise GpuArrayException, "Invalid communicator or destroyed context"
     return res
 
-cdef int comm_generate_id(gpucontext* ctx, GpuCommCliqueId comm_id) except -1:
+cdef int comm_generate_id(gpucontext* ctx, gpucommCliqueId* comm_id) except -1:
     cdef int err
-    err = gpucomm_gen_clique_id(ctx, &comm_id.comm_id)
+    err = gpucomm_gen_clique_id(ctx, comm_id)
     if err != GA_NO_ERROR:
         raise get_exc(err), gpucontext_error(ctx, err)
 
