@@ -60,15 +60,19 @@ cdef class GpuComm:
         if err != GA_NO_ERROR:
             raise get_exc(err), gpucontext_error(self.context.ctx, err)
 
-    def get_count(self):
-        cdef int gpucount
-        comm_get_count(self, &gpucount)
-        return gpucount
+    property count:
+        "Total number of communicators inside the clique"
+        def __get__(self):
+            cdef int gpucount
+            comm_get_count(self, &gpucount)
+            return gpucount
 
-    def get_rank(self):
-        cdef int gpurank
-        comm_get_rank(self, &gpurank)
-        return gpurank
+    property rank:
+        "User-defined rank of this communicator inside the clique"
+        def __get__(self):
+            cdef int gpurank
+            comm_get_rank(self, &gpurank)
+            return gpurank
 
     def reduce(self, GpuArray src not None, op, GpuArray dest=None, int root=-1):
         if dest is None:
