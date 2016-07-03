@@ -10,12 +10,21 @@ from pygpu.gpuarray import GpuArrayException
 
 
 cdef class GpuCommCliqueId:
+    """Represents a unique id shared among :ref:`GpuComm` communicators which
+    participate in a multi-gpu clique.
+
+    Parameters
+    ----------
+    context: :ref:`GpuContext`, optional
+        Reference to which gpu this `GpuCommCliqueId` object belongs.
+    comm_id: bytes, optional
+        Existing unique id to be passed in this object.
+
     """
-    """
-    def __cinit__(self, GpuContext context=None, bytes bytearr=None):
+    def __cinit__(self, GpuContext context=None, bytes comm_id=None):
         self.context = ensure_context(context)
-        if bytearr is not None:
-            self.set_comm_id(bytearr)
+        if comm_id is not None:
+            self.comm_id = comm_id
         else:
             comm_generate_id(self.context.ctx, self)
 
@@ -29,7 +38,7 @@ cdef class GpuCommCliqueId:
         raise RuntimeError, "Cannot pickle %s object" % self.__class__.__name__
 
     property comm_id:
-        "Unique clique id to be used by each GpuComm in a group of devices"
+        "Unique clique id to be used by each :ref:`GpuComm` in a group of devices"
         def __get__(self):
             cdef bytes res
             res = self.comm_id.internal[:GA_COMM_ID_BYTES]
@@ -44,19 +53,32 @@ cdef class GpuCommCliqueId:
 
 
 cdef class GpuComm:
-    """
+    """Represents a communicator which participates in a multi-gpu clique.
+
+    It is used to invoke collective operations to gpus inside its clique.
+
+    Parameters
+    ----------
+    cid: :ref:`GpuCommCliqueId`
+        Unique id shared among participating communicators.
+    ndev: int
+        Number of communicators inside the clique.
+    rank: int
+        User-defined rank of this communicator inside the clique. It influences
+        order of collective operations.
+
     """
     def __dealloc__(self):
         gpucomm_free(self.c)
-
-    def __reduce__(self):
-        raise RuntimeError, "Cannot pickle %s object" % self.__class__.__name__
 
     def __cinit__(self, GpuCommCliqueId cid not None, int ndev, int rank):
         cdef int err
         err = gpucomm_new(&self.c, cid.context.ctx, cid.comm_id, ndev, rank)
         if err != GA_NO_ERROR:
             raise get_exc(err), gpucontext_error(cid.context.ctx, err)
+
+    def __reduce__(self):
+        raise RuntimeError, "Cannot pickle %s object" % self.__class__.__name__
 
     property count:
         "Total number of communicators inside the clique"
@@ -73,6 +95,27 @@ cdef class GpuComm:
             return gpurank
 
     def reduce(self, GpuArray src not None, op, GpuArray dest=None, int root=-1):
+        """Reduce collective operation for ranks in a communicator world.
+
+        Parameters
+        ----------
+        src: :ref:`GpuArray`
+            Array to be reduced.
+        op: string
+            Key indicating operation type.
+        dest: :ref:`GpuArray`, optional
+            Array to collecti reduce operation result.
+        root: int
+            Rank in `GpuComm` which will collect result.
+
+        Notes
+        -----
+        * `root` is necessary when invoking from a non-root rank. Root caller
+        needs not to provide `root` argument.
+        * Not providing `dest` argument for a root caller will result in creating
+        a new compatible :ref:`GpuArray` and returning result in it.
+
+        """
         if dest is None:
             if root != -1:
                 return comm_reduce_from(self, src, to_reduce_opcode(op), root)
@@ -83,22 +126,90 @@ cdef class GpuComm:
         return comm_reduce(self, src, dest, to_reduce_opcode(op), root)
 
     def all_reduce(self, GpuArray src not None, op, GpuArray dest=None):
+        """AllReduce collective operation for ranks in a communicator world.
+
+        Parameters
+        ----------
+        src: :ref:`GpuArray`
+            Array to be reduced.
+        op: string
+            Key indicating operation type.
+        dest: :ref:`GpuArray`, optional
+            Array to collect reduce operation result.
+
+        Notes
+        -----
+        * Not providing `dest` argument for a root caller will result in creating
+        a new compatible :ref:`GpuArray` and returning result in it.
+
+        """
         if dest is None:
             return pygpu_make_all_reduced(self, src, to_reduce_opcode(op))
         return comm_all_reduce(self, src, dest, to_reduce_opcode(op))
 
     def reduce_scatter(self, GpuArray src not None, op, GpuArray dest=None):
+        """ReduceScatter collective operation for ranks in a communicator world.
+
+        Parameters
+        ----------
+        src: :ref:`GpuArray`
+            Array to be reduced.
+        op: string
+            Key indicating operation type.
+        dest: :ref:`GpuArray`, optional
+            Array to collect reduce operation scattered result.
+
+        Notes
+        -----
+        * Not providing `dest` argument for a root caller will result in creating
+        a new compatible :ref:`GpuArray` and returning result in it.
+
+        """
         if dest is None:
             return pygpu_make_reduce_scattered(self, src, to_reduce_opcode(op))
         return comm_reduce_scatter(self, src, dest, to_reduce_opcode(op))
 
     def broadcast(self, GpuArray array not None, int root=-1):
+        """Broadcast collective operation for ranks in a communicator world.
+
+        Parameters
+        ----------
+        array: :ref:`GpuArray`
+            Array to be reduced.
+        root: int
+            Rank in `GpuComm` which broadcasts its `array`.
+
+        Notes
+        -----
+        * `root` is necessary when invoking from a non-root rank. Root caller
+        does not need to provide `root` argument.
+
+        """
         if root == -1:
             comm_get_rank(self, &root)
         return comm_broadcast(self, array, root)
 
     def all_gather(self, GpuArray src not None, GpuArray dest=None,
                    unsigned int nd_up=1):
+        """AllGather collective operation for ranks in a communicator world.
+
+        Parameters
+        ----------
+        src: :ref:`GpuArray`
+            Array to be gathered.
+        dest: :ref:`GpuArray`, optional
+            Array to receive all gathered arrays from ranks in `GpuComm`.
+        nd_up: unsigned int
+            Used when creating result array. Indicates how many extra dimensions
+            user wants result to have. Default is 1, which means that the result
+            will store each rank's gathered array in one extra new dimension.
+
+        Notes
+        -----
+        * Providing `nd_up` == 0 means that gathered arrays will be appended to
+        the dimension with the largest stride.
+
+        """
         if dest is None:
             return pygpu_make_all_gathered(self, src, nd_up)
         return comm_all_gather(self, src, dest)
