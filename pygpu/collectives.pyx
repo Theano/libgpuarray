@@ -19,6 +19,15 @@ cdef class GpuCommCliqueId:
         else:
             comm_generate_id(self.context.ctx, self)
 
+    def __eq__(self, other):
+        return type(self) == type(other) and self.comm_id_py == other.comm_id_py
+
+    def __hash__(self):
+        return hash(self.__class__.__name__) ^ hash(self.comm_id_py)
+
+    def __reduce__(self):
+        raise RuntimeError, "Cannot pickle %s object" % self.__class__.__name__
+
     property comm_id:
         "Unique clique id to be used by each GpuComm in a group of devices"
         def __get__(self):
@@ -41,7 +50,7 @@ cdef class GpuComm:
         gpucomm_free(self.c)
 
     def __reduce__(self):
-        raise RuntimeError, "Cannot pickle GpuComm object"
+        raise RuntimeError, "Cannot pickle %s object" % self.__class__.__name__
 
     def __cinit__(self, GpuCommCliqueId cid not None, int ndev, int rank):
         self.context = cid.context
