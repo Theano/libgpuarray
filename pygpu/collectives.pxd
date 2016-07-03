@@ -43,7 +43,6 @@ cdef api class GpuCommCliqueId [type PyGpuCliqueIdType, object PyGpuCliqueIdObje
 
 cdef api class GpuComm [type PyGpuCommType, object PyGpuCommObject]:
     cdef gpucomm* c
-    cdef readonly GpuContext context
     cdef object __weakref__
 
 

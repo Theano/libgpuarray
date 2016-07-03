@@ -53,12 +53,10 @@ cdef class GpuComm:
         raise RuntimeError, "Cannot pickle %s object" % self.__class__.__name__
 
     def __cinit__(self, GpuCommCliqueId cid not None, int ndev, int rank):
-        self.context = cid.context
         cdef int err
-        err = gpucomm_new(&self.c, self.context.ctx, self.cid.comm_id,
-                          ndev, rank)
+        err = gpucomm_new(&self.c, cid.context.ctx, cid.comm_id, ndev, rank)
         if err != GA_NO_ERROR:
-            raise get_exc(err), gpucontext_error(self.context.ctx, err)
+            raise get_exc(err), gpucontext_error(cid.context.ctx, err)
 
     property count:
         "Total number of communicators inside the clique"
