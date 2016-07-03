@@ -120,12 +120,10 @@ cdef dict TO_RED_OP = {
     }
 
 cdef int to_reduce_opcode(op) except -1:
-    if isinstance(op, int):
-        return op
     res = TO_RED_OP.get(op.lower())
     if res is not None:
         return res
-    raise ValueError, "Invalid reduce operation"
+    raise ValueError, "Invalid reduce operation: %s" % (str(op))
 
 cdef gpucontext* comm_context(GpuComm comm) except NULL:
     cdef gpucontext* res
