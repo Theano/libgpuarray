@@ -12,14 +12,17 @@ from pygpu.gpuarray import GpuArrayException
 cdef class GpuCommCliqueId:
     """
     """
-    def __cinit__(self, GpuContext context=None):
+    def __cinit__(self, GpuContext context=None, bytes bytearr=None):
         self.context = ensure_context(context)
+        if bytearr is not None:
+            self.set_comm_id(bytearr)
+        else:
+            comm_generate_id(self.context.ctx, self)
 
     property comm_id:
         "Unique clique id to be used by each GpuComm in a group of devices"
         def __get__(self):
             cdef bytes res
-            comm_generate_id(self.context.ctx, self)
             res = self.comm_id.internal[:GA_COMM_ID_BYTES]
             return res
 
