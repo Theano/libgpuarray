@@ -1,5 +1,5 @@
 from libc.stdlib cimport malloc, calloc, free
-from libc.string cimport strncmp
+from libc.string cimport memcmp
 
 from pygpu.gpuarray cimport (gpucontext, GpuContext, _GpuArray, GpuArray,
                              ensure_context,
@@ -36,7 +36,7 @@ cdef class GpuCommCliqueId:
             raise RuntimeError, "Compare for equal or not equal only."
         cdef bint res
         res = type(this) == type(that) and \
-              strncmp(this.c_comm_id.internal, that.c_comm_id.internal, GA_COMM_ID_BYTES) == 0
+              memcmp(<void*>this.c_comm_id.internal, <void*>that.c_comm_id.internal, GA_COMM_ID_BYTES) == 0
         if op == 2:
             return res
         return not res
