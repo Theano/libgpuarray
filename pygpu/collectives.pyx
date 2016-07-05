@@ -10,6 +10,8 @@ from pygpu.gpuarray cimport (gpucontext, GpuContext, _GpuArray, GpuArray,
 from pygpu.gpuarray import GpuArrayException
 
 
+COMM_ID_BYTES = GA_COMM_ID_BYTES
+
 cdef class GpuCommCliqueId:
     """Represents a unique id shared among :ref:`GpuComm` communicators which
     participate in a multi-gpu clique.
@@ -18,28 +20,36 @@ cdef class GpuCommCliqueId:
     ----------
     context: :ref:`GpuContext`, optional
         Reference to which gpu this `GpuCommCliqueId` object belongs.
-    comm_id: bytes, optional
+    comm_id: bytes-like, optional
         Existing unique id to be passed in this object.
 
     """
-    def __cinit__(self, GpuContext context=None, bytes comm_id=None):
+    def __cinit__(self, GpuContext context=None, unsigned char[:] comm_id=None):
         self.context = ensure_context(context)
         if comm_id is None:
             comm_generate_id(self.context.ctx, &self.c_comm_id)
 
-    def __init__(self, GpuContext context=None, bytes comm_id=None):
+    def __init__(self, GpuContext context=None, unsigned char[:] comm_id=None):
         if comm_id is not None:
             self.comm_id = comm_id
 
-    def __richcmp__(this, that, int op):
-        if op != 2 and op != 3:
-            raise RuntimeError, "Compare for equal or not equal only."
-        cdef bint res
-        res = type(this) == type(that) and \
-              memcmp(<void*>this.c_comm_id.internal, <void*>that.c_comm_id.internal, GA_COMM_ID_BYTES) == 0
-        if op == 2:
-            return res
-        return not res
+    def __richcmp__(self, other, int op):
+        if type(self) != type(other):
+            raise TypeError, "Cannot compare %s with %s" % (type(self), type(other))
+        cdef int res
+        res = memcmp(<void*>self.c_comm_id.internal, <void*>other.c_comm_id.internal, GA_COMM_ID_BYTES)
+        if op == 0:
+            return res < 0
+        elif op == 1:
+            return res <= 0
+        elif op == 2:
+            return res == 0
+        elif op == 3:
+            return res != 0
+        elif op == 4:
+            return res > 0
+        else:
+            return res >= 0
 
     def __hash__(self):
         return hash(self.__class__.__name__) ^ hash(self.c_comm_id.internal[:GA_COMM_ID_BYTES])
