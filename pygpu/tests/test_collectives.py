@@ -22,6 +22,8 @@ def get_user_gpu_rank():
             devname = os.environ[name]
             if devname.startswith("opencl"):
                 return -1
+            if devname[-1] == 'a':
+                return 0
             return int(devname[-1])
     return -1
 
@@ -37,16 +39,18 @@ class TestGpuCommCliqueId(unittest.TestCase):
         cls.cid = GpuCommCliqueId(context=ctx)
 
     def _create_in_scope_from_string(self):
-        comm_id = "pipes" * (COMM_ID_BYTES / 5 + 1)
+        comm_id = bytearray(b'pipes' * (COMM_ID_BYTES // 5 + 1))
         return GpuCommCliqueId(context=ctx, comm_id=comm_id)
 
     def test_create_from_string_id(self):
         cid2 = self._create_in_scope_from_string()
-        assert cid2.comm_id == "pipes" * (COMM_ID_BYTES / 5 + 1)
-        cid2.comm_id = "mlkies" * (COMM_ID_BYTES / 6 + 1)
-        assert cid2.comm_id == "mlkies" * (COMM_ID_BYTES / 6 + 1)
+        a = bytearray(b'pipes' * (COMM_ID_BYTES // 5 + 1))
+        assert cid2.comm_id == a[:COMM_ID_BYTES], (cid2.comm_id, a[:COMM_ID_BYTES])
+        b = bytearray(b'mlkies' * (COMM_ID_BYTES // 6 + 1))
+        cid2.comm_id = b
+        assert cid2.comm_id == b[:COMM_ID_BYTES], (cid2.comm_id, b[:COMM_ID_BYTES])
         with self.assertRaises(ValueError):
-            cid2.comm_id = "testestestest"
+            cid2.comm_id = bytearray(b'testestestest')
 
     def test_pickle(self):
         with self.assertRaises(RuntimeError):

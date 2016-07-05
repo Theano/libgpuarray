@@ -33,11 +33,15 @@ cdef class GpuCommCliqueId:
         if comm_id is not None:
             self.comm_id = comm_id
 
-    def __richcmp__(self, other, int op):
-        if type(self) != type(other):
-            raise TypeError, "Cannot compare %s with %s" % (type(self), type(other))
+    def __richcmp__(this, that, int op):
+        if type(this) != type(that):
+            raise TypeError, "Cannot compare %s with %s" % (type(this), type(that))
         cdef int res
-        res = memcmp(<void*>self.c_comm_id.internal, <void*>other.c_comm_id.internal, GA_COMM_ID_BYTES)
+        cdef GpuCommCliqueId a
+        a = this
+        cdef GpuCommCliqueId b
+        b = that
+        res = memcmp(<void*>a.c_comm_id.internal, <void*>b.c_comm_id.internal, GA_COMM_ID_BYTES)
         if op == 0:
             return res < 0
         elif op == 1:
@@ -60,7 +64,7 @@ cdef class GpuCommCliqueId:
     property comm_id:
         "Unique clique id to be used by each :ref:`GpuComm` in a group of devices"
         def __get__(self):
-            cdef bytes res
+            cdef bytearray res
             res = self.c_comm_id.internal[:GA_COMM_ID_BYTES]
             return res
 
