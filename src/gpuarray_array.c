@@ -1016,8 +1016,10 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
   for (i = 0; i < n; i++) {
     r->dimensions = as[i]->dimensions;
     err = ga_extcopy(r, as[i]);
-    if (err != GA_NO_ERROR)
+    if (err != GA_NO_ERROR) {
+      r->dimensions = res_dims;
       goto fail;
+    }
     r->offset += r->strides[axis] * as[i]->dimensions[axis];
   }
   r->offset = res_off;
@@ -1026,7 +1028,6 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
 
   return GA_NO_ERROR;
  fail:
-  r->dimensions = res_dims;
   GpuArray_clear(r);
   return err;
 }
