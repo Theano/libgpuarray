@@ -400,8 +400,12 @@ static int allocate(cuda_context *ctx, gpudata **res, gpudata **prev,
   gpudata *next;
   *prev = NULL;
 
-  if (!(ctx->flags & GA_CTX_DISABLE_ALLOCATION_CACHE))
-    if (size < BLOCK_SIZE) size = BLOCK_SIZE;
+  if (!(ctx->flags & GA_CTX_DISABLE_ALLOCATION_CACHE)) {
+    /* Round block size up to nearest power of two times BLOCK_SIZE */
+    size_t new_size = BLOCK_SIZE;
+    while (new_size < size) new_size *= 2;
+    size = new_size;
+  }
 
   cuda_enter(ctx);
 
