@@ -6,7 +6,7 @@ from six.moves import range
 from six import PY3
 import pickle
 
-import numpy
+import numpy as np
 
 import pygpu
 from pygpu.collectives import COMM_ID_BYTES, GpuCommCliqueId, GpuComm
@@ -34,9 +34,8 @@ gpurank = get_user_gpu_rank()
 # in both cases skip GpuComm tests
 
 class TestGpuCommCliqueId(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.cid = GpuCommCliqueId(context=ctx)
+    def setUp(self):
+        self.cid = GpuCommCliqueId(context=ctx)
 
     def _create_in_scope_from_string(self):
         comm_id = bytearray(b'pipes' * (COMM_ID_BYTES // 5 + 1))
@@ -86,6 +85,12 @@ class TestGpuCommCliqueId(unittest.TestCase):
         assert cid2 <= cid1
         with self.assertRaises(TypeError):
             a = cid2 > "asdfasfa"
+
+    def test_as_buffer(self):
+        a = np.asarray(self.cid)
+        assert np.allclose(a, self.cid.comm_id)
+        a[:] = [ord(b'a')] * COMM_ID_BYTES
+        assert np.allclose(a, self.cid.comm_id)
 
 
 #  class TestGpuComm(unittest.TestCase):

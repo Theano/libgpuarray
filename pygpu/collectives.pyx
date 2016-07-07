@@ -1,6 +1,9 @@
 from libc.stdlib cimport malloc, calloc, free
 from libc.string cimport memcmp
 
+from cpython cimport Py_buffer, Py_INCREF, Py_DECREF
+from cpython.buffer cimport PyBUF_FORMAT, PyBUF_ND, PyBUF_STRIDES
+
 from pygpu.gpuarray cimport (gpucontext, GpuContext, _GpuArray, GpuArray,
                              ensure_context,
                              GA_NO_ERROR, get_exc, gpucontext_error,
@@ -32,6 +35,40 @@ cdef class GpuCommCliqueId:
     def __init__(self, GpuContext context=None, unsigned char[:] comm_id=None):
         if comm_id is not None:
             self.comm_id = comm_id
+
+    def __getbuffer__(self, Py_buffer* buffer, int flags):
+        if buffer == NULL:
+            raise BufferError, "NULL buffer view in getbuffer"
+
+        buffer.buf = <char*>self.c_comm_id.internal
+        buffer.obj = self
+        buffer.len = GA_COMM_ID_BYTES * sizeof(char)
+        buffer.readonly = 0
+        buffer.itemsize = sizeof(char)
+        if flags & PyBUF_FORMAT == PyBUF_FORMAT:
+            buffer.format = 'b'
+        else:
+            buffer.format = NULL
+        buffer.ndim = 1
+        if flags & PyBUF_ND == PyBUF_ND:
+            buffer.shape = <Py_ssize_t*>calloc(1, sizeof(Py_ssize_t))
+            buffer.shape[0] = GA_COMM_ID_BYTES
+        else:
+            buffer.shape = NULL
+        if flags & PyBUF_STRIDES == PyBUF_STRIDES:
+            buffer.strides = &buffer.itemsize
+        else:
+            buffer.strides = NULL
+        buffer.suboffsets = NULL
+        buffer.internal = NULL
+        Py_INCREF(self)
+
+    def __releasebuffer__(self, Py_buffer* buffer):
+        if buffer == NULL:
+            raise BufferError, "NULL buffer view in releasebuffer"
+        if buffer.shape != NULL:
+            free(buffer.shape)
+        Py_DECREF(self)
 
     def __richcmp__(this, that, int op):
         if type(this) != type(that):
