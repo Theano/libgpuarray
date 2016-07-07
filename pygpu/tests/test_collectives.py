@@ -67,19 +67,25 @@ class TestGpuCommCliqueId(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             pickle.dumps(self.cid, protocol=-1)
 
+    def test_create_from_previous(self):
+        cid2 = GpuCommCliqueId(context=ctx, comm_id=bytearray(b'y' * COMM_ID_BYTES))
+        cid3 = GpuCommCliqueId(context=ctx, comm_id=cid2.comm_id)
+        assert cid2.comm_id == cid3.comm_id
+
     def test_richcmp(self):
-        other_cid1 = GpuCommCliqueId(context=ctx, comm_id=self.cid.comm_id)
-        other_cid2 = GpuCommCliqueId(context=ctx)
-        assert self.cid == other_cid1
-        assert self.cid != other_cid2
-        assert other_cid2 > other_cid1
-        assert other_cid2 >= other_cid1
-        assert self.cid >= other_cid1
-        assert other_cid1 < other_cid2
-        assert other_cid1 <= other_cid2
-        assert other_cid1 <= self.cid
+        cid1 = GpuCommCliqueId(context=ctx, comm_id=bytearray(b'y' * COMM_ID_BYTES))
+        cid2 = GpuCommCliqueId(context=ctx, comm_id=cid1.comm_id)
+        cid3 = GpuCommCliqueId(context=ctx, comm_id=bytearray(b'z' * COMM_ID_BYTES))
+        assert cid1 == cid2
+        assert cid1 != cid3
+        assert cid3 > cid2
+        assert cid3 >= cid2
+        assert cid1 >= cid2
+        assert cid2 < cid3
+        assert cid2 <= cid3
+        assert cid2 <= cid1
         with self.assertRaises(TypeError):
-            a = other_cid1 > "asdfasfa"
+            a = cid2 > "asdfasfa"
 
 
 #  class TestGpuComm(unittest.TestCase):
