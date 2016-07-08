@@ -66,6 +66,7 @@ cdef class GpuCommCliqueId:
     def __releasebuffer__(self, Py_buffer* buffer):
         if buffer == NULL:
             raise BufferError, "NULL buffer view in releasebuffer"
+
         if buffer.shape != NULL:
             free(buffer.shape)
         Py_DECREF(self)
@@ -429,7 +430,7 @@ cdef api GpuArray pygpu_make_reduce_scattered(GpuComm comm, GpuArray src, int op
                 else:
                     nd -= 1
             else:
-                raise TypeError, "Source GpuArray cannot be split in %d c-contiguous arrays" % (gpucount)
+                raise TypeError, "Source GpuArray cannot be split in %d f-contiguous arrays" % (gpucount)
         res = pygpu_empty(nd, dims, src.ga.typecode,
                           GA_C_ORDER if is_c_cont else GA_F_ORDER,
                           src.context, type(src))

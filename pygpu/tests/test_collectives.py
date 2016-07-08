@@ -8,7 +8,7 @@ import pickle
 
 import numpy as np
 
-import pygpu
+from pygpu import gpuarray
 from pygpu.collectives import COMM_ID_BYTES, GpuCommCliqueId, GpuComm
 
 from .support import (guard_devsup, check_meta, check_flags, check_all,
@@ -27,12 +27,14 @@ def get_user_gpu_rank():
             return int(devname[-1])
     return -1
 
-# check for py4mpi to test
-# check if rank == -1
-gpurank = get_user_gpu_rank()
-# mpirank = ...
-# in both cases skip GpuComm tests
+try:
+    from mpi4py import MPI
+    MPI_IMPORTED = True
+except:
+    MPI_IMPORTED = False
 
+
+@unittest.skipIf(get_user_gpu_rank() == -1, "Collective operations supported on CUDA devices only.")
 class TestGpuCommCliqueId(unittest.TestCase):
     def setUp(self):
         self.cid = GpuCommCliqueId(context=ctx)
@@ -93,10 +95,213 @@ class TestGpuCommCliqueId(unittest.TestCase):
         assert np.allclose(a, self.cid.comm_id)
 
 
-#  class TestGpuComm(unittest.TestCase):
-#      @classmethod
-#      def setUpClass(cls):
-#          # init mpi ?? make different main?
-#          cls.cid = GpuCommCliqueId(context=ctx)
-#          # broadcast common unique id
-#          # set unique id
+@unittest.skipUnless(MPI_IMPORTED, "Needs mpi4py module")
+@unittest.skipIf(get_user_gpu_rank() == -1, "Collective operations supported on CUDA devices only")
+class TestGpuComm(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.mpicomm = MPI.COMM_WORLD
+        cls.size = cls.mpicomm.Get_size()
+        cls.rank = cls.mpicomm.Get_rank()
+        cls.cid = GpuCommCliqueId(context=ctx)
+        cls.mpicomm.Bcast(cls.cid, root=0)
+        cls.gpucomm = GpuComm(cls.cid, cls.size, cls.rank)
+
+    def test_count(self):
+        assert self.gpucomm.count == self.size, (self.gpucomm.count, self.size)
+
+    def test_rank(self):
+        assert self.gpucomm.rank == self.rank, (self.gpucomm.rank, self.rank)
+
+    def test_reduce(self):
+        cpu, gpu = gen_gpuarray((3, 4, 5), order='c', incr=self.rank, ctx=ctx)
+        rescpu = np.empty_like(cpu)
+
+        resgpu = gpu._empty_like_me()
+        if self.rank != 0:
+            self.gpucomm.reduce(gpu, 'sum', resgpu, root=0)
+            self.mpicomm.Reduce([cpu, MPI.FLOAT], None, op=MPI.SUM, root=0)
+        else:
+            self.gpucomm.reduce(gpu, 'sum', resgpu)
+            self.mpicomm.Reduce([cpu, MPI.FLOAT], [rescpu, MPI.FLOAT], op=MPI.SUM, root=0)
+        if self.rank == 0:
+            assert np.allclose(resgpu, rescpu)
+
+        resgpu = self.gpucomm.reduce(gpu, 'sum', root=0)
+        if self.rank == 0:
+            assert resgpu.shape == gpu.shape, (resgpu.shape, gpu.shape)
+            assert resgpu.dtype == gpu.dtype, (resgpu.dtype, gpu.dtype)
+            assert resgpu.flags['C'] == gpu.flags['C']
+            assert resgpu.flags['F'] == gpu.flags['F']
+            assert np.allclose(resgpu, rescpu)
+        else:
+            assert resgpu is None
+
+        if self.rank == 0:
+            resgpu = self.gpucomm.reduce(gpu, 'sum')
+            assert resgpu.shape == gpu.shape, (resgpu.shape, gpu.shape)
+            assert resgpu.dtype == gpu.dtype, (resgpu.dtype, gpu.dtype)
+            assert resgpu.flags['C'] == gpu.flags['C']
+            assert resgpu.flags['F'] == gpu.flags['F']
+            assert np.allclose(resgpu, rescpu)
+        else:
+            resgpu = self.gpucomm.reduce(gpu, 'sum', root=0)
+            assert resgpu is None
+
+    def test_all_reduce(self):
+        cpu, gpu = gen_gpuarray((3, 4, 5), order='c', incr=self.rank, ctx=ctx)
+        rescpu = np.empty_like(cpu)
+        resgpu = gpu._empty_like_me()
+
+        self.gpucomm.all_reduce(gpu, 'sum', resgpu)
+        self.mpicomm.Allreduce([cpu, MPI.FLOAT], [rescpu, MPI.FLOAT], op=MPI.SUM)
+        assert np.allclose(resgpu, rescpu)
+
+        resgpu = self.gpucomm.all_reduce(gpu, 'sum')
+        assert resgpu.shape == gpu.shape, (resgpu.shape, gpu.shape)
+        assert resgpu.dtype == gpu.dtype, (resgpu.dtype, gpu.dtype)
+        assert resgpu.flags['C'] == gpu.flags['C']
+        assert resgpu.flags['F'] == gpu.flags['F']
+        assert np.allclose(resgpu, rescpu)
+
+    def test_reduce_scatter(self):
+        texp = self.size * np.arange(5 * self.size, dtype='int32') + sum(range(self.size))
+        exp = texp[self.rank * 5:self.rank * 5 + 5]
+
+        # order c
+        cpu = np.arange(5 * self.size, dtype='int32') + self.rank
+        np.reshape(cpu, (self.size, 5), order='C')
+        gpu = gpuarray.asarray(cpu, context=ctx)
+
+        resgpu = gpuarray.empty((5,), dtype='int32', order='C', context=ctx)
+
+        self.gpucomm.reduce_scatter(gpu, 'sum', resgpu)
+        assert np.allclose(resgpu, exp)
+
+        # order f
+        cpu = np.arange(5 * self.size, dtype='int32') + self.rank
+        np.reshape(cpu, (5, self.size), order='F')
+        gpu = gpuarray.asarray(cpu, context=ctx)
+
+        resgpu = gpuarray.empty((5,), dtype='int32', order='F', context=ctx)
+
+        self.gpucomm.reduce_scatter(gpu, 'sum', resgpu)
+        assert np.allclose(resgpu, exp)
+
+        # make result order c (one less dim)
+        cpu = np.arange(5 * self.size, dtype='int32') + self.rank
+        np.reshape(cpu, (self.size, 5), order='C')
+        gpu = gpuarray.asarray(cpu, context=ctx)
+
+        resgpu = self.gpucomm.reduce_scatter(gpu, 'sum')
+        check_all(resgpu, exp)
+        assert resgpu.flags['C_CONTIGUOUS'] is True
+
+        # c-contiguous split problem
+        cpu = np.arange(5 * (self.size + 1), dtype='int32') + self.rank
+        np.reshape(cpu, (self.size + 1, 5), order='C')
+        gpu = gpuarray.asarray(cpu, context=ctx)
+        with self.assertRaises(TypeError):
+            resgpu = self.gpucomm.reduce_scatter(gpu, 'sum')
+
+        # make result order f (one less dim)
+        cpu = np.arange(5 * self.size) + self.rank
+        np.reshape(cpu, (5, self.size), order='F')
+        gpu = gpuarray.asarray(cpu, context=ctx)
+
+        resgpu = self.gpucomm.reduce_scatter(gpu, 'sum', resgpu)
+        check_all(resgpu, exp)
+        assert resgpu.flags['F_CONTIGUOUS'] is True
+
+        # f-contiguous split problem
+        cpu = np.arange(5 * (self.size + 1), dtype='int32') + self.rank
+        np.reshape(cpu, (5, self.size + 1), order='F')
+        gpu = gpuarray.asarray(cpu, context=ctx)
+        with self.assertRaises(TypeError):
+            resgpu = self.gpucomm.reduce_scatter(gpu, 'sum')
+
+        # make result order c (same dim - less size)
+        texp = self.size * np.arange(5 * self.size * 3) + sum(range(self.size))
+        exp = texp[self.rank * 15:self.rank * 15 + 15]
+        np.reshape(exp, (3, 5), order='C')
+        cpu = np.arange(5 * self.size * 3, dtype='int32') + self.rank
+        np.reshape(cpu, (self.size * 3, 5), order='C')
+        gpu = gpuarray.asarray(cpu, context=ctx)
+
+        resgpu = self.gpucomm.reduce_scatter(gpu, 'sum')
+        check_all(resgpu, exp)
+        assert resgpu.flags['C_CONTIGUOUS'] is True
+
+        # make result order f (same dim - less size)
+        texp = self.size * np.arange(5 * self.size * 3) + sum(range(self.size))
+        exp = texp[self.rank * 15:self.rank * 15 + 15]
+        np.reshape(exp, (5, 3), order='F')
+        cpu = np.arange(5 * self.size * 3, dtype='int32') + self.rank
+        np.reshape(cpu, (5, self.size * 3), order='F')
+        gpu = gpuarray.asarray(cpu, context=ctx)
+
+        resgpu = self.gpucomm.reduce_scatter(gpu, 'sum')
+        check_all(resgpu, exp)
+        assert resgpu.flags['F_CONTIGUOUS'] is True
+
+    def test_bcast(self):
+        if self.rank == 0:
+            cpu, gpu = gen_gpuarray((3, 4, 5), order='c', incr=self.rank, ctx=ctx)
+        else:
+            cpu = np.zeros((3, 4, 5), dtype='float32')
+            gpu = gpuarray.asarray(cpu, context=ctx)
+
+        if self.rank == 0:
+            self.gpucomm.bcast(gpu)
+        else:
+            self.gpucomm.bcast(gpu, root=0)
+        self.mpicomm.Bcast(cpu, root=0)
+        assert np.allclose(gpu, cpu)
+
+    def test_all_gather(self):
+        texp = np.arange(self.size * 10, dtype='int32')
+        cpu = np.arange(self.rank * 10, self.rank * 10 + 10, dtype='int32')
+
+        a = cpu
+        gpu = gpuarray.asarray(a, context=ctx)
+        resgpu = self.gpucomm.all_gather(gpu, nd_up=0)
+        check_all(resgpu, texp)
+
+        a = cpu.reshape((2, 5), order='C')
+        exp = texp.reshape((2 * self.size, 5), order='C')
+        gpu = gpuarray.asarray(a, context=ctx)
+        resgpu = self.gpucomm.all_gather(gpu, nd_up=0)
+        check_all(resgpu, exp)
+
+        a = cpu.reshape((2, 5), order='C')
+        exp = texp.reshape((self.size, 2, 5), order='C')
+        gpu = gpuarray.asarray(a, context=ctx)
+        resgpu = self.gpucomm.all_gather(gpu, nd_up=1)
+        check_all(resgpu, exp)
+
+        a = cpu.reshape((2, 5), order='C')
+        exp = texp.reshape((self.size, 1, 1, 2, 5), order='C')
+        gpu = gpuarray.asarray(a, context=ctx)
+        resgpu = self.gpucomm.all_gather(gpu, nd_up=3)
+        check_all(resgpu, exp)
+
+        a = cpu.reshape((5, 2), order='F')
+        exp = texp.reshape((5, 2 * self.size), order='F')
+        gpu = gpuarray.asarray(a, context=ctx)
+        resgpu = self.gpucomm.all_gather(gpu, nd_up=0)
+        check_all(resgpu, exp)
+
+        a = cpu.reshape((5, 2), order='F')
+        exp = texp.reshape((5, 2, self.size), order='F')
+        gpu = gpuarray.asarray(a, context=ctx)
+        resgpu = self.gpucomm.all_gather(gpu, nd_up=1)
+        check_all(resgpu, exp)
+
+        a = cpu.reshape((5, 2), order='F')
+        exp = texp.reshape((5, 2, 1, 1, self.size), order='F')
+        gpu = gpuarray.asarray(a, context=ctx)
+        resgpu = self.gpucomm.all_gather(gpu, nd_up=3)
+        check_all(resgpu, exp)
+
+        with self.assertRaises(Exception):
+            resgpu = self.gpucomm.all_gather(gpu, nd_up=-2)
