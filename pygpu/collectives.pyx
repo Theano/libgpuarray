@@ -172,19 +172,25 @@ cdef class GpuComm:
         Notes
         -----
         * `root` is necessary when invoking from a non-root rank. Root caller
-        needs not to provide `root` argument.
+        does not need to provide `root` argument.
         * Not providing `dest` argument for a root caller will result in creating
         a new compatible :ref:`GpuArray` and returning result in it.
 
         """
+        cdef int srank
         if dest is None:
             if root != -1:
-                return comm_reduce_from(self, src, to_reduce_opcode(op), root)
+                comm_get_rank(self, &srank)
+                if root == srank:
+                    return pygpu_make_reduced(self, src, to_reduce_opcode(op))
+                comm_reduce_from(self, src, to_reduce_opcode(op), root)
+                return
             else:
                 return pygpu_make_reduced(self, src, to_reduce_opcode(op))
         if root == -1:
             comm_get_rank(self, &root)
-        return comm_reduce(self, src, dest, to_reduce_opcode(op), root)
+        comm_reduce(self, src, dest, to_reduce_opcode(op), root)
+        return
 
     def all_reduce(self, GpuArray src not None, op, GpuArray dest=None):
         """AllReduce collective operation for ranks in a communicator world.
@@ -206,7 +212,8 @@ cdef class GpuComm:
         """
         if dest is None:
             return pygpu_make_all_reduced(self, src, to_reduce_opcode(op))
-        return comm_all_reduce(self, src, dest, to_reduce_opcode(op))
+        comm_all_reduce(self, src, dest, to_reduce_opcode(op))
+        return
 
     def reduce_scatter(self, GpuArray src not None, op, GpuArray dest=None):
         """ReduceScatter collective operation for ranks in a communicator world.
@@ -228,9 +235,10 @@ cdef class GpuComm:
         """
         if dest is None:
             return pygpu_make_reduce_scattered(self, src, to_reduce_opcode(op))
-        return comm_reduce_scatter(self, src, dest, to_reduce_opcode(op))
+        comm_reduce_scatter(self, src, dest, to_reduce_opcode(op))
+        return
 
-    def broadcast(self, GpuArray array not None, int root=-1):
+    def bcast(self, GpuArray array not None, int root=-1):
         """Broadcast collective operation for ranks in a communicator world.
 
         Parameters
@@ -248,7 +256,8 @@ cdef class GpuComm:
         """
         if root == -1:
             comm_get_rank(self, &root)
-        return comm_broadcast(self, array, root)
+        comm_broadcast(self, array, root)
+        return
 
     def all_gather(self, GpuArray src not None, GpuArray dest=None,
                    unsigned int nd_up=1):
@@ -273,7 +282,8 @@ cdef class GpuComm:
         """
         if dest is None:
             return pygpu_make_all_gathered(self, src, nd_up)
-        return comm_all_gather(self, src, dest)
+        comm_all_gather(self, src, dest)
+        return
 
 
 cdef dict TO_RED_OP = {
