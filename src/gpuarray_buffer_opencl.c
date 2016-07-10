@@ -198,6 +198,9 @@ static const char CL_PREAMBLE[] =
   "#define LOCAL_MEM __local\n"
   "#define LOCAL_MEM_ARG __local\n"
   "#define REQD_WG_SIZE(x, y, z) __attribute__((reqd_work_group_size(x, y, z)))\n"
+  "#ifndef NULL\n"
+  "  #define NULL ((void*)0)\n"
+  "#endif\n"
   "#define LID_0 get_local_id(0)\n"
   "#define LID_1 get_local_id(1)\n"
   "#define LID_2 get_local_id(2)\n"
@@ -225,7 +228,9 @@ static const char CL_PREAMBLE[] =
   "#define ga_size ulong\n"
   "#define ga_ssize long\n"
   "#define load_half(p) vload_half(0, p)\n"
-  "#define store_half(p, v) vstore_half_rtn(v, 0, p)\n";
+  "#define store_half(p, v) vstore_half_rtn(v, 0, p)\n"
+  "#define GA_DECL_SHARED_PARAM(type, name) , __local type name[]\n"
+  "#define GA_DECL_SHARED_BODY(type, name)\n";
 
 /* XXX: add complex types, quad types, and longlong */
 /* XXX: add vector types */
@@ -918,9 +923,6 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
   if (n > 3)
     return GA_VALUE_ERROR;
 
-  if (shared != 0)
-    return GA_UNSUPPORTED_ERROR;
-
   dev = get_dev(ctx->ctx, &res);
   if (dev == NULL) return res;
 
@@ -929,6 +931,12 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
       err = cl_setkernelarg(k, i, args[i]);
       if (err != GA_NO_ERROR) return err;
     }
+  }
+
+  if (shared != 0) {
+    // the shared memory pointer must be the last argument
+    ctx->err = clSetKernelArg(k->k, k->argcount, shared, NULL);
+    if (ctx->err != CL_SUCCESS) return GA_IMPL_ERROR;
   }
 
   evw = calloc(sizeof(cl_event), k->argcount);
