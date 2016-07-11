@@ -497,7 +497,7 @@ static int cl_move(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff,
 
   if (src->ev != NULL)
     evw[num_ev++] = src->ev;
-  if (dst->ev != NULL)
+  if (dst->ev != NULL && src != dst)
     evw[num_ev++] = dst->ev;
 
   if (num_ev > 0)
@@ -510,7 +510,7 @@ static int cl_move(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff,
   }
   if (src->ev != NULL)
     clReleaseEvent(src->ev);
-  if (dst->ev != NULL)
+  if (dst->ev != NULL && src != dst)
     clReleaseEvent(dst->ev);
 
   src->ev = ev;
