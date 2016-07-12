@@ -111,9 +111,10 @@ if (CUDA_FOUND)
   add_definitions(-DWITH_CUDA)
   include_directories(${CUDADRV_INCLUDE})
 
-  set(BUILD_WITH_BLAS 1 PARENT_SCOPE)
   list(APPEND _GPUARRAY_SRC gpuarray_blas_cuda_cublas.c)
   add_definitions(-DWITH_CUDA_CUBLAS)
+
+  set(CMAKE_REQUIRED_LIBRARIES ${CUDA_CUBLAS_LIBRARIES})
 
   check_function_exists(cublasSgemmEx CUBLAS_SGEMMEX)
   if (CUBLAS_SGEMMEX)
@@ -136,7 +137,6 @@ if(OPENCL_FOUND)
 
   if(CLBLAS_FOUND)
     message(STATUS "Building with CLBLAS")
-    set(BUILD_WITH_BLAS 1 PARENT_SCOPE)
     list(APPEND _GPUARRAY_SRC gpuarray_blas_opencl_clblas.c)
     add_definitions(-DWITH_OPENCL_CLBLAS)
     include_directories(${CLBLAS_INCLUDE_DIRS})
