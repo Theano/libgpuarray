@@ -32,6 +32,59 @@ static gpudata *cl_alloc(gpucontext *c, size_t size, void *data, int flags,
                          int *ret);
 static void cl_release(gpudata *b);
 static void cl_free_ctx(cl_ctx *ctx);
+static gpukernel *cl_newkernel(gpucontext *ctx, unsigned int count,
+                               const char **strings, const size_t *lengths,
+                               const char *fname, unsigned int argcount,
+                               const int *types, int flags, int *ret,
+                               char **err_str);
+
+static const char CL_PREAMBLE[] =
+  "#define local_barrier() barrier(CLK_LOCAL_MEM_FENCE)\n"
+  "#define WITHIN_KERNEL /* empty */\n"
+  "#define KERNEL __kernel\n"
+  "#define GLOBAL_MEM __global\n"
+  "#define LOCAL_MEM __local\n"
+  "#define LOCAL_MEM_ARG __local\n"
+  "#define REQD_WG_SIZE(x, y, z) __attribute__((reqd_work_group_size(x, y, z)))\n"
+  "#ifndef NULL\n"
+  "  #define NULL ((void*)0)\n"
+  "#endif\n"
+  "#define LID_0 get_local_id(0)\n"
+  "#define LID_1 get_local_id(1)\n"
+  "#define LID_2 get_local_id(2)\n"
+  "#define LDIM_0 get_local_size(0)\n"
+  "#define LDIM_1 get_local_size(1)\n"
+  "#define LDIM_2 get_local_size(2)\n"
+  "#define GID_0 get_group_id(0)\n"
+  "#define GID_1 get_group_id(1)\n"
+  "#define GID_2 get_group_id(2)\n"
+  "#define GDIM_0 get_num_groups(0)\n"
+  "#define GDIM_1 get_num_groups(1)\n"
+  "#define GDIM_2 get_num_groups(2)\n"
+  "#define ga_bool uchar\n"
+  "#define ga_byte char\n"
+  "#define ga_ubyte uchar\n"
+  "#define ga_short short\n"
+  "#define ga_ushort ushort\n"
+  "#define ga_int int\n"
+  "#define ga_uint uint\n"
+  "#define ga_long long\n"
+  "#define ga_ulong ulong\n"
+  "#define ga_float float\n"
+  "#define ga_double double\n"
+  "#define ga_half half\n"
+  "#define ga_size ulong\n"
+  "#define ga_ssize long\n"
+  "#define load_half(p) vload_half(0, p)\n"
+  "#define store_half(p, v) vstore_half_rtn(v, 0, p)\n"
+  "#define GA_DECL_SHARED_PARAM(type, name) , __local type name[]\n"
+  "#define GA_DECL_SHARED_BODY(type, name)\n";
+
+static const char CL_CONTEXT_PREAMBLE[] =
+  "#define GA_WARP_SIZE %zu\n";  // to be filled by cl_make_ctx()
+
+/* XXX: add complex types, quad types, and longlong */
+/* XXX: add vector types */
 
 static cl_device_id get_dev(cl_context ctx, int *ret) {
   size_t sz;
@@ -62,6 +115,11 @@ cl_ctx *cl_make_ctx(cl_context ctx, int flags) {
   size_t len;
   int64_t v = 0;
   int e = 0;
+  size_t warp_size;
+  int ret;
+  const char dummy_kern[] = "__kernel void kdummy() {}\n";
+  const char *rlk[1];
+  gpukernel *m;
 
   id = get_dev(ctx, NULL);
   if (id == NULL) return NULL;
@@ -90,6 +148,7 @@ cl_ctx *cl_make_ctx(cl_context ctx, int flags) {
   res->refcnt = 1;
   res->exts = NULL;
   res->blas_handle = NULL;
+  res->preamble = NULL;
   res->q = clCreateCommandQueue(
     ctx, id,
     ISSET(flags, GA_CTX_SINGLE_STREAM) ? 0 : qprop&CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE,
@@ -113,6 +172,27 @@ cl_ctx *cl_make_ctx(cl_context ctx, int flags) {
     return NULL;
   }
   res->refcnt--; /* Prevent ref loop */
+
+  /* Create per-context OpenCL preamble */
+
+  // Create a dummy kernel and check GA_KERNEL_PROP_PREFLSIZE
+  rlk[0] = dummy_kern;
+  len = sizeof(dummy_kern);
+  // this dummy kernel does not require a CLUDA preamble
+  m = cl_newkernel((gpucontext *)res, 1, rlk, &len, "kdummy", 0, NULL, 0, &ret, NULL);
+  assert((m != NULL) && "Cannot create a dummy OpenCL kernel!");
+  ret = cl_property((gpucontext *)res, NULL, m, GA_KERNEL_PROP_PREFLSIZE, &warp_size);
+  if (ret != GA_NO_ERROR) warp_size = 128;
+
+  // Write the preferred workgroup multiple as GA_WARP_SIZE in preamble
+  len = snprintf(NULL, 0, CL_CONTEXT_PREAMBLE, warp_size);
+  len += 1;
+  res->preamble = malloc(len);
+  if (res->preamble == NULL)
+    return NULL;
+  ret = snprintf(res->preamble, len, CL_CONTEXT_PREAMBLE, warp_size);
+  assert((ret < len) && "BUG: Array ctx->preamble is not large enough!");
+  assert((ret > 0) && "Array CL_CONTEXT_PREAMBLE has encoding errors!");
   return res;
 }
 
@@ -138,6 +218,8 @@ static void cl_free_ctx(cl_ctx *ctx) {
     }
     clReleaseCommandQueue(ctx->q);
     clReleaseContext(ctx->ctx);
+    if (ctx->preamble != NULL)
+      free(ctx->preamble);
     CLEAR(ctx);
     free(ctx);
   }
@@ -180,62 +262,10 @@ cl_mem cl_get_buf(gpudata *g) { ASSERT_BUF(g); return g->buf; }
 #define CL_DOUBLE "cl_khr_fp64"
 #define CL_HALF "cl_khr_fp16"
 
-static gpukernel *cl_newkernel(gpucontext *ctx, unsigned int count,
-                               const char **strings, const size_t *lengths,
-                               const char *fname, unsigned int argcount,
-                               const int *types, int flags, int *ret,
-                               char **err_str);
 static void cl_releasekernel(gpukernel *k);
 static int cl_callkernel(gpukernel *k, unsigned int n,
                          const size_t *bs, const size_t *gs,
                          size_t shared, void **args);
-
-static char CL_PREAMBLE[] =
-  "#define local_barrier() barrier(CLK_LOCAL_MEM_FENCE)\n"
-  "#define WITHIN_KERNEL /* empty */\n"
-  "#define KERNEL __kernel\n"
-  "#define GLOBAL_MEM __global\n"
-  "#define LOCAL_MEM __local\n"
-  "#define LOCAL_MEM_ARG __local\n"
-  "#define REQD_WG_SIZE(x, y, z) __attribute__((reqd_work_group_size(x, y, z)))\n"
-  "#ifndef NULL\n"
-  "  #define NULL ((void*)0)\n"
-  "#endif\n"
-  "#define LID_0 get_local_id(0)\n"
-  "#define LID_1 get_local_id(1)\n"
-  "#define LID_2 get_local_id(2)\n"
-  "#define LDIM_0 get_local_size(0)\n"
-  "#define LDIM_1 get_local_size(1)\n"
-  "#define LDIM_2 get_local_size(2)\n"
-  "#define GID_0 get_group_id(0)\n"
-  "#define GID_1 get_group_id(1)\n"
-  "#define GID_2 get_group_id(2)\n"
-  "#define GDIM_0 get_num_groups(0)\n"
-  "#define GDIM_1 get_num_groups(1)\n"
-  "#define GDIM_2 get_num_groups(2)\n"
-  "#define ga_bool uchar\n"
-  "#define ga_byte char\n"
-  "#define ga_ubyte uchar\n"
-  "#define ga_short short\n"
-  "#define ga_ushort ushort\n"
-  "#define ga_int int\n"
-  "#define ga_uint uint\n"
-  "#define ga_long long\n"
-  "#define ga_ulong ulong\n"
-  "#define ga_float float\n"
-  "#define ga_double double\n"
-  "#define ga_half half\n"
-  "#define ga_size ulong\n"
-  "#define ga_ssize long\n"
-  "#define load_half(p) vload_half(0, p)\n"
-  "#define store_half(p, v) vstore_half_rtn(v, 0, p)\n"
-  "#define GA_DECL_SHARED_PARAM(type, name) , __local type name[]\n"
-  "#define GA_DECL_SHARED_BODY(type, name)\n"
-  "#define GA_WARP_SIZE %zu\n"  // to be filled by cl_check_extensions()
-  "\0                        "; // some extra space to fill parameters
-
-/* XXX: add complex types, quad types, and longlong */
-/* XXX: add vector types */
 
 
 static const char *get_error_string(cl_int err) {
@@ -675,31 +705,11 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
 static int cl_check_extensions(const char **preamble, unsigned int *count,
                                int flags, cl_ctx *ctx) {
   if (flags & GA_USE_CLUDA) {
-    char * fmt_string;
-    size_t warp_size;
-    int res;
-    const char dummy_kern[] = "__kernel void kdummy() {}\n";
-    const char *rlk[1];
-    size_t sz;
-    gpukernel *m;
-
-    // Create a dummy kernel and check GA_KERNEL_PROP_PREFLSIZE
-    rlk[0] = dummy_kern;
-    sz = sizeof(dummy_kern);
-    m = cl_newkernel((gpucontext *)ctx, 1, rlk, &sz, "kdummy", 0, NULL, 0, &res, NULL);
-    assert((m != NULL) && "Cannot create a dummy OpenCL kernel!");
-    res = cl_property((gpucontext *)ctx, NULL, m, GA_KERNEL_PROP_PREFLSIZE, &warp_size);
-    if (res != GA_NO_ERROR) warp_size = 128;
-
-    // Write the preferred workgroup multiple as GA_WARP_SIZE in preamble
-    fmt_string = malloc(sizeof(CL_PREAMBLE));
-    memcpy(fmt_string, CL_PREAMBLE, sizeof(CL_PREAMBLE));
-    res = snprintf(CL_PREAMBLE, sizeof(CL_PREAMBLE), fmt_string, warp_size);
-    free(fmt_string);
-    assert((res < sizeof(CL_PREAMBLE)) && "Array CL_PREAMBLE is not large enough!");
-    assert((res > 0) && "Array CL_PREAMBLE has encoding errors!");
-
+    // add the common preamble
     preamble[*count] = CL_PREAMBLE;
+    (*count)++;
+    // add the per-context preamble
+    preamble[*count] = ctx->preamble;
     (*count)++;
   }
   if (flags & GA_USE_SMALL) {
@@ -737,7 +747,7 @@ static gpukernel *cl_newkernel(gpucontext *c, unsigned int count,
   cl_program p;
   // Sync this table size with the number of flags that can add stuff
   // at the beginning
-  const char *preamble[4];
+  const char *preamble[5];
   size_t *newl = NULL;
   const char **news = NULL;
   unsigned int n = 0;
