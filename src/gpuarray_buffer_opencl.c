@@ -190,7 +190,7 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
                          const size_t *bs, const size_t *gs,
                          size_t shared, void **args);
 
-static const char CL_PREAMBLE[] =
+static char CL_PREAMBLE[] =
   "#define local_barrier() barrier(CLK_LOCAL_MEM_FENCE)\n"
   "#define WITHIN_KERNEL /* empty */\n"
   "#define KERNEL __kernel\n"
@@ -230,10 +230,13 @@ static const char CL_PREAMBLE[] =
   "#define load_half(p) vload_half(0, p)\n"
   "#define store_half(p, v) vstore_half_rtn(v, 0, p)\n"
   "#define GA_DECL_SHARED_PARAM(type, name) , __local type name[]\n"
-  "#define GA_DECL_SHARED_BODY(type, name)\n";
+  "#define GA_DECL_SHARED_BODY(type, name)\n"
+  "#define GA_WARP_SIZE %zu\n"  // to be filled by cl_check_extensions()
+  "\0                        "; // some extra space to fill parameters
 
 /* XXX: add complex types, quad types, and longlong */
 /* XXX: add vector types */
+
 
 static const char *get_error_string(cl_int err) {
   /* OpenCL 1.0 error codes */
@@ -672,6 +675,30 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
 static int cl_check_extensions(const char **preamble, unsigned int *count,
                                int flags, cl_ctx *ctx) {
   if (flags & GA_USE_CLUDA) {
+    char * fmt_string;
+    size_t warp_size;
+    int res;
+    const char dummy_kern[] = "__kernel void kdummy() {}\n";
+    const char *rlk[1];
+    size_t sz;
+    gpukernel *m;
+
+    // Create a dummy kernel and check GA_KERNEL_PROP_PREFLSIZE
+    rlk[0] = dummy_kern;
+    sz = sizeof(dummy_kern);
+    m = cl_newkernel((gpucontext *)ctx, 1, rlk, &sz, "kdummy", 0, NULL, 0, &res, NULL);
+    assert((m != NULL) && "Cannot create a dummy OpenCL kernel!");
+    res = cl_property((gpucontext *)ctx, NULL, m, GA_KERNEL_PROP_PREFLSIZE, &warp_size);
+    if (res != GA_NO_ERROR) warp_size = 128;
+
+    // Write the preferred workgroup multiple as GA_WARP_SIZE in preamble
+    fmt_string = malloc(sizeof(CL_PREAMBLE));
+    memcpy(fmt_string, CL_PREAMBLE, sizeof(CL_PREAMBLE));
+    res = snprintf(CL_PREAMBLE, sizeof(CL_PREAMBLE), fmt_string, warp_size);
+    free(fmt_string);
+    assert((res < sizeof(CL_PREAMBLE)) && "Array CL_PREAMBLE is not large enough!");
+    assert((res > 0) && "Array CL_PREAMBLE has encoding errors!");
+
     preamble[*count] = CL_PREAMBLE;
     (*count)++;
   }
