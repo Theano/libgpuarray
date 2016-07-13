@@ -12,9 +12,7 @@ import numpy as np
 from pygpu import gpuarray
 from pygpu.collectives import COMM_ID_BYTES, GpuCommCliqueId, GpuComm
 
-from .support import (guard_devsup, check_meta, check_flags, check_all,
-                      check_content, gen_gpuarray, context as ctx, dtypes_all,
-                      dtypes_no_complex, skip_single_f)
+from pygpu.tests.support import (check_all, gen_gpuarray, context as ctx)
 
 
 def get_user_gpu_rank():
@@ -107,7 +105,9 @@ class TestGpuComm(unittest.TestCase):
         cls.mpicomm = MPI.COMM_WORLD
         cls.size = cls.mpicomm.Get_size()
         cls.rank = cls.mpicomm.Get_rank()
-        cls.cid = GpuCommCliqueId(context=ctx)
+        cls.ctx = gpuarray.init("cuda" + str(cls.rank))
+        print("*** Collectives testing for", cls.ctx.devname, file=sys.stderr)
+        cls.cid = GpuCommCliqueId(context=cls.ctx)
         cls.mpicomm.Bcast(cls.cid, root=0)
         cls.gpucomm = GpuComm(cls.cid, cls.size, cls.rank)
 
@@ -118,7 +118,7 @@ class TestGpuComm(unittest.TestCase):
         assert self.gpucomm.rank == self.rank, (self.gpucomm.rank, self.rank)
 
     def test_reduce(self):
-        cpu, gpu = gen_gpuarray((3, 4, 5), order='c', incr=self.rank, ctx=ctx)
+        cpu, gpu = gen_gpuarray((3, 4, 5), order='c', incr=self.rank, ctx=self.ctx)
         rescpu = np.empty_like(cpu)
 
         resgpu = gpu._empty_like_me()
@@ -153,7 +153,7 @@ class TestGpuComm(unittest.TestCase):
             assert resgpu is None
 
     def test_all_reduce(self):
-        cpu, gpu = gen_gpuarray((3, 4, 5), order='c', incr=self.rank, ctx=ctx)
+        cpu, gpu = gen_gpuarray((3, 4, 5), order='c', incr=self.rank, ctx=self.ctx)
         rescpu = np.empty_like(cpu)
         resgpu = gpu._empty_like_me()
 
@@ -175,9 +175,9 @@ class TestGpuComm(unittest.TestCase):
         # order c
         cpu = np.arange(5 * self.size) + self.rank
         np.reshape(cpu, (self.size, 5), order='C')
-        gpu = gpuarray.asarray(cpu, context=ctx)
+        gpu = gpuarray.asarray(cpu, context=self.ctx)
 
-        resgpu = gpuarray.empty((5,), dtype='int64', order='C', context=ctx)
+        resgpu = gpuarray.empty((5,), dtype='int64', order='C', context=self.ctx)
 
         self.gpucomm.reduce_scatter(gpu, 'sum', resgpu)
         assert np.allclose(resgpu, exp)
@@ -185,9 +185,9 @@ class TestGpuComm(unittest.TestCase):
         # order f
         cpu = np.arange(5 * self.size) + self.rank
         np.reshape(cpu, (5, self.size), order='F')
-        gpu = gpuarray.asarray(cpu, context=ctx)
+        gpu = gpuarray.asarray(cpu, context=self.ctx)
 
-        resgpu = gpuarray.empty((5,), dtype='int64', order='F', context=ctx)
+        resgpu = gpuarray.empty((5,), dtype='int64', order='F', context=self.ctx)
 
         self.gpucomm.reduce_scatter(gpu, 'sum', resgpu)
         assert np.allclose(resgpu, exp)
@@ -195,7 +195,7 @@ class TestGpuComm(unittest.TestCase):
         # make result order c (one less dim)
         cpu = np.arange(5 * self.size) + self.rank
         np.reshape(cpu, (self.size, 5), order='C')
-        gpu = gpuarray.asarray(cpu, context=ctx)
+        gpu = gpuarray.asarray(cpu, context=self.ctx)
 
         resgpu = self.gpucomm.reduce_scatter(gpu, 'sum')
         check_all(resgpu, exp)
@@ -205,14 +205,14 @@ class TestGpuComm(unittest.TestCase):
         if self.size != 1:
             cpu = np.arange(5 * (self.size + 1), dtype='int32') + self.rank
             np.reshape(cpu, (self.size + 1, 5), order='C')
-            gpu = gpuarray.asarray(cpu, context=ctx)
+            gpu = gpuarray.asarray(cpu, context=self.ctx)
             with self.assertRaises(TypeError):
                 resgpu = self.gpucomm.reduce_scatter(gpu, 'sum')
 
         # make result order f (one less dim)
         cpu = np.arange(5 * self.size) + self.rank
         np.reshape(cpu, (5, self.size), order='F')
-        gpu = gpuarray.asarray(cpu, context=ctx)
+        gpu = gpuarray.asarray(cpu, context=self.ctx)
 
         resgpu = self.gpucomm.reduce_scatter(gpu, 'sum')
         check_all(resgpu, exp)
@@ -222,7 +222,7 @@ class TestGpuComm(unittest.TestCase):
         if self.size != 1:
             cpu = np.arange(5 * (self.size + 1), dtype='int32') + self.rank
             np.reshape(cpu, (5, self.size + 1), order='F')
-            gpu = gpuarray.asarray(cpu, context=ctx)
+            gpu = gpuarray.asarray(cpu, context=self.ctx)
             with self.assertRaises(TypeError):
                 resgpu = self.gpucomm.reduce_scatter(gpu, 'sum')
 
@@ -232,7 +232,7 @@ class TestGpuComm(unittest.TestCase):
         np.reshape(exp, (3, 5), order='C')
         cpu = np.arange(5 * self.size * 3) + self.rank
         np.reshape(cpu, (self.size * 3, 5), order='C')
-        gpu = gpuarray.asarray(cpu, context=ctx)
+        gpu = gpuarray.asarray(cpu, context=self.ctx)
 
         resgpu = self.gpucomm.reduce_scatter(gpu, 'sum')
         check_all(resgpu, exp)
@@ -244,7 +244,7 @@ class TestGpuComm(unittest.TestCase):
         np.reshape(exp, (5, 3), order='F')
         cpu = np.arange(5 * self.size * 3) + self.rank
         np.reshape(cpu, (5, self.size * 3), order='F')
-        gpu = gpuarray.asarray(cpu, context=ctx)
+        gpu = gpuarray.asarray(cpu, context=self.ctx)
 
         resgpu = self.gpucomm.reduce_scatter(gpu, 'sum')
         check_all(resgpu, exp)
@@ -252,10 +252,10 @@ class TestGpuComm(unittest.TestCase):
 
     def test_broadcast(self):
         if self.rank == 0:
-            cpu, gpu = gen_gpuarray((3, 4, 5), order='c', incr=self.rank, ctx=ctx)
+            cpu, gpu = gen_gpuarray((3, 4, 5), order='c', incr=self.rank, ctx=self.ctx)
         else:
             cpu = np.zeros((3, 4, 5), dtype='float32')
-            gpu = gpuarray.asarray(cpu, context=ctx)
+            gpu = gpuarray.asarray(cpu, context=self.ctx)
 
         if self.rank == 0:
             self.gpucomm.broadcast(gpu)
@@ -269,43 +269,43 @@ class TestGpuComm(unittest.TestCase):
         cpu = np.arange(self.rank * 10, self.rank * 10 + 10, dtype='int32')
 
         a = cpu
-        gpu = gpuarray.asarray(a, context=ctx)
+        gpu = gpuarray.asarray(a, context=self.ctx)
         resgpu = self.gpucomm.all_gather(gpu, nd_up=0)
         check_all(resgpu, texp)
 
         a = cpu.reshape((2, 5), order='C')
         exp = texp.reshape((2 * self.size, 5), order='C')
-        gpu = gpuarray.asarray(a, context=ctx)
+        gpu = gpuarray.asarray(a, context=self.ctx)
         resgpu = self.gpucomm.all_gather(gpu, nd_up=0)
         check_all(resgpu, exp)
 
         a = cpu.reshape((2, 5), order='C')
         exp = texp.reshape((self.size, 2, 5), order='C')
-        gpu = gpuarray.asarray(a, context=ctx)
+        gpu = gpuarray.asarray(a, context=self.ctx)
         resgpu = self.gpucomm.all_gather(gpu, nd_up=1)
         check_all(resgpu, exp)
 
         a = cpu.reshape((2, 5), order='C')
         exp = texp.reshape((self.size, 1, 1, 2, 5), order='C')
-        gpu = gpuarray.asarray(a, context=ctx)
+        gpu = gpuarray.asarray(a, context=self.ctx)
         resgpu = self.gpucomm.all_gather(gpu, nd_up=3)
         check_all(resgpu, exp)
 
         a = cpu.reshape((5, 2), order='F')
         exp = texp.reshape((5, 2 * self.size), order='F')
-        gpu = gpuarray.asarray(a, context=ctx)
+        gpu = gpuarray.asarray(a, context=self.ctx)
         resgpu = self.gpucomm.all_gather(gpu, nd_up=0)
         check_all(resgpu, exp)
 
         a = cpu.reshape((5, 2), order='F')
         exp = texp.reshape((5, 2, self.size), order='F')
-        gpu = gpuarray.asarray(a, context=ctx)
+        gpu = gpuarray.asarray(a, context=self.ctx)
         resgpu = self.gpucomm.all_gather(gpu, nd_up=1)
         check_all(resgpu, exp)
 
         a = cpu.reshape((5, 2), order='F')
         exp = texp.reshape((5, 2, 1, 1, self.size), order='F')
-        gpu = gpuarray.asarray(a, context=ctx)
+        gpu = gpuarray.asarray(a, context=self.ctx)
         resgpu = self.gpucomm.all_gather(gpu, nd_up=3)
         check_all(resgpu, exp)
 
