@@ -1,6 +1,6 @@
 from pygpu.gpuarray cimport (gpucontext, GpuContext, _GpuArray, GpuArray)
 
-cdef extern from "gpuarray/buffer_collectives.h" nogil:
+cdef extern from "gpuarray/buffer_collectives.h":
     ctypedef struct gpucomm:
         pass
 

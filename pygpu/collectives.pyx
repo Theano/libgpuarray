@@ -131,12 +131,11 @@ cdef class GpuComm:
 
     """
     def __dealloc__(self):
-        with nogil: gpucomm_free(self.c)
+        gpucomm_free(self.c)
 
     def __cinit__(self, GpuCommCliqueId cid not None, int ndev, int rank):
         cdef int err
-        with nogil:
-            err = gpucomm_new(&self.c, cid.context.ctx, cid.c_comm_id, ndev, rank)
+        err = gpucomm_new(&self.c, cid.context.ctx, cid.c_comm_id, ndev, rank)
         if err != GA_NO_ERROR:
             raise get_exc(err), gpucontext_error(cid.context.ctx, err)
 
@@ -311,7 +310,7 @@ cdef gpucontext* comm_context(GpuComm comm) except NULL:
 
 cdef int comm_generate_id(gpucontext* ctx, gpucommCliqueId* comm_id) except -1:
     cdef int err
-    with nogil: err = gpucomm_gen_clique_id(ctx, comm_id)
+    err = gpucomm_gen_clique_id(ctx, comm_id)
     if err != GA_NO_ERROR:
         raise get_exc(err), gpucontext_error(ctx, err)
 
