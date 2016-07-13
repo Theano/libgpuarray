@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import os
+import sys
 import unittest
 from six.moves import range
 from six import PY3
@@ -32,6 +33,7 @@ try:
     MPI_IMPORTED = True
 except:
     MPI_IMPORTED = False
+print("mpi4py found: " + str(MPI_IMPORTED), file=sys.stderr)
 
 
 @unittest.skipIf(get_user_gpu_rank() == -1, "Collective operations supported on CUDA devices only.")
@@ -100,6 +102,8 @@ class TestGpuCommCliqueId(unittest.TestCase):
 class TestGpuComm(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        if get_user_gpu_rank() == -1 or not MPI_IMPORTED:
+            return
         cls.mpicomm = MPI.COMM_WORLD
         cls.size = cls.mpicomm.Get_size()
         cls.rank = cls.mpicomm.Get_rank()
@@ -165,31 +169,31 @@ class TestGpuComm(unittest.TestCase):
         assert np.allclose(resgpu, rescpu)
 
     def test_reduce_scatter(self):
-        texp = self.size * np.arange(5 * self.size, dtype='int32') + sum(range(self.size))
+        texp = self.size * np.arange(5 * self.size) + sum(range(self.size))
         exp = texp[self.rank * 5:self.rank * 5 + 5]
 
         # order c
-        cpu = np.arange(5 * self.size, dtype='int32') + self.rank
+        cpu = np.arange(5 * self.size) + self.rank
         np.reshape(cpu, (self.size, 5), order='C')
         gpu = gpuarray.asarray(cpu, context=ctx)
 
-        resgpu = gpuarray.empty((5,), dtype='int32', order='C', context=ctx)
+        resgpu = gpuarray.empty((5,), dtype='int64', order='C', context=ctx)
 
         self.gpucomm.reduce_scatter(gpu, 'sum', resgpu)
         assert np.allclose(resgpu, exp)
 
         # order f
-        cpu = np.arange(5 * self.size, dtype='int32') + self.rank
+        cpu = np.arange(5 * self.size) + self.rank
         np.reshape(cpu, (5, self.size), order='F')
         gpu = gpuarray.asarray(cpu, context=ctx)
 
-        resgpu = gpuarray.empty((5,), dtype='int32', order='F', context=ctx)
+        resgpu = gpuarray.empty((5,), dtype='int64', order='F', context=ctx)
 
         self.gpucomm.reduce_scatter(gpu, 'sum', resgpu)
         assert np.allclose(resgpu, exp)
 
         # make result order c (one less dim)
-        cpu = np.arange(5 * self.size, dtype='int32') + self.rank
+        cpu = np.arange(5 * self.size) + self.rank
         np.reshape(cpu, (self.size, 5), order='C')
         gpu = gpuarray.asarray(cpu, context=ctx)
 
@@ -197,34 +201,36 @@ class TestGpuComm(unittest.TestCase):
         check_all(resgpu, exp)
         assert resgpu.flags['C_CONTIGUOUS'] is True
 
-        # c-contiguous split problem
-        cpu = np.arange(5 * (self.size + 1), dtype='int32') + self.rank
-        np.reshape(cpu, (self.size + 1, 5), order='C')
-        gpu = gpuarray.asarray(cpu, context=ctx)
-        with self.assertRaises(TypeError):
-            resgpu = self.gpucomm.reduce_scatter(gpu, 'sum')
+        # c-contiguous split problem (for size == 1, it can always be split)
+        if self.size != 1:
+            cpu = np.arange(5 * (self.size + 1), dtype='int32') + self.rank
+            np.reshape(cpu, (self.size + 1, 5), order='C')
+            gpu = gpuarray.asarray(cpu, context=ctx)
+            with self.assertRaises(TypeError):
+                resgpu = self.gpucomm.reduce_scatter(gpu, 'sum')
 
         # make result order f (one less dim)
         cpu = np.arange(5 * self.size) + self.rank
         np.reshape(cpu, (5, self.size), order='F')
         gpu = gpuarray.asarray(cpu, context=ctx)
 
-        resgpu = self.gpucomm.reduce_scatter(gpu, 'sum', resgpu)
+        resgpu = self.gpucomm.reduce_scatter(gpu, 'sum')
         check_all(resgpu, exp)
         assert resgpu.flags['F_CONTIGUOUS'] is True
 
-        # f-contiguous split problem
-        cpu = np.arange(5 * (self.size + 1), dtype='int32') + self.rank
-        np.reshape(cpu, (5, self.size + 1), order='F')
-        gpu = gpuarray.asarray(cpu, context=ctx)
-        with self.assertRaises(TypeError):
-            resgpu = self.gpucomm.reduce_scatter(gpu, 'sum')
+        # f-contiguous split problem (for size == 1, it can always be split)
+        if self.size != 1:
+            cpu = np.arange(5 * (self.size + 1), dtype='int32') + self.rank
+            np.reshape(cpu, (5, self.size + 1), order='F')
+            gpu = gpuarray.asarray(cpu, context=ctx)
+            with self.assertRaises(TypeError):
+                resgpu = self.gpucomm.reduce_scatter(gpu, 'sum')
 
         # make result order c (same dim - less size)
         texp = self.size * np.arange(5 * self.size * 3) + sum(range(self.size))
         exp = texp[self.rank * 15:self.rank * 15 + 15]
         np.reshape(exp, (3, 5), order='C')
-        cpu = np.arange(5 * self.size * 3, dtype='int32') + self.rank
+        cpu = np.arange(5 * self.size * 3) + self.rank
         np.reshape(cpu, (self.size * 3, 5), order='C')
         gpu = gpuarray.asarray(cpu, context=ctx)
 
@@ -236,7 +242,7 @@ class TestGpuComm(unittest.TestCase):
         texp = self.size * np.arange(5 * self.size * 3) + sum(range(self.size))
         exp = texp[self.rank * 15:self.rank * 15 + 15]
         np.reshape(exp, (5, 3), order='F')
-        cpu = np.arange(5 * self.size * 3, dtype='int32') + self.rank
+        cpu = np.arange(5 * self.size * 3) + self.rank
         np.reshape(cpu, (5, self.size * 3), order='F')
         gpu = gpuarray.asarray(cpu, context=ctx)
 
@@ -244,7 +250,7 @@ class TestGpuComm(unittest.TestCase):
         check_all(resgpu, exp)
         assert resgpu.flags['F_CONTIGUOUS'] is True
 
-    def test_bcast(self):
+    def test_broadcast(self):
         if self.rank == 0:
             cpu, gpu = gen_gpuarray((3, 4, 5), order='c', incr=self.rank, ctx=ctx)
         else:
@@ -252,9 +258,9 @@ class TestGpuComm(unittest.TestCase):
             gpu = gpuarray.asarray(cpu, context=ctx)
 
         if self.rank == 0:
-            self.gpucomm.bcast(gpu)
+            self.gpucomm.broadcast(gpu)
         else:
-            self.gpucomm.bcast(gpu, root=0)
+            self.gpucomm.broadcast(gpu, root=0)
         self.mpicomm.Bcast(cpu, root=0)
         assert np.allclose(gpu, cpu)
 

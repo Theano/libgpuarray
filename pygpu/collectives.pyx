@@ -131,11 +131,12 @@ cdef class GpuComm:
 
     """
     def __dealloc__(self):
-        gpucomm_free(self.c)
+        with nogil: gpucomm_free(self.c)
 
     def __cinit__(self, GpuCommCliqueId cid not None, int ndev, int rank):
         cdef int err
-        err = gpucomm_new(&self.c, cid.context.ctx, cid.comm_id, ndev, rank)
+        with nogil:
+            err = gpucomm_new(&self.c, cid.context.ctx, cid.c_comm_id, ndev, rank)
         if err != GA_NO_ERROR:
             raise get_exc(err), gpucontext_error(cid.context.ctx, err)
 
@@ -191,7 +192,6 @@ cdef class GpuComm:
         if root == -1:
             comm_get_rank(self, &root)
         comm_reduce(self, src, dest, to_reduce_opcode(op), root)
-        return
 
     def all_reduce(self, GpuArray src not None, op, GpuArray dest=None):
         """AllReduce collective operation for ranks in a communicator world.
@@ -214,7 +214,6 @@ cdef class GpuComm:
         if dest is None:
             return pygpu_make_all_reduced(self, src, to_reduce_opcode(op))
         comm_all_reduce(self, src, dest, to_reduce_opcode(op))
-        return
 
     def reduce_scatter(self, GpuArray src not None, op, GpuArray dest=None):
         """ReduceScatter collective operation for ranks in a communicator world.
@@ -237,9 +236,8 @@ cdef class GpuComm:
         if dest is None:
             return pygpu_make_reduce_scattered(self, src, to_reduce_opcode(op))
         comm_reduce_scatter(self, src, dest, to_reduce_opcode(op))
-        return
 
-    def bcast(self, GpuArray array not None, int root=-1):
+    def broadcast(self, GpuArray array not None, int root=-1):
         """Broadcast collective operation for ranks in a communicator world.
 
         Parameters
@@ -258,7 +256,6 @@ cdef class GpuComm:
         if root == -1:
             comm_get_rank(self, &root)
         comm_broadcast(self, array, root)
-        return
 
     def all_gather(self, GpuArray src not None, GpuArray dest=None,
                    unsigned int nd_up=1):
@@ -284,7 +281,6 @@ cdef class GpuComm:
         if dest is None:
             return pygpu_make_all_gathered(self, src, nd_up)
         comm_all_gather(self, src, dest)
-        return
 
 
 cdef dict TO_RED_OP = {
@@ -315,7 +311,7 @@ cdef gpucontext* comm_context(GpuComm comm) except NULL:
 
 cdef int comm_generate_id(gpucontext* ctx, gpucommCliqueId* comm_id) except -1:
     cdef int err
-    err = gpucomm_gen_clique_id(ctx, comm_id)
+    with nogil: err = gpucomm_gen_clique_id(ctx, comm_id)
     if err != GA_NO_ERROR:
         raise get_exc(err), gpucontext_error(ctx, err)
 
@@ -327,7 +323,7 @@ cdef int comm_get_count(GpuComm comm, int* gpucount) except -1:
 
 cdef int comm_get_rank(GpuComm comm, int* gpurank) except -1:
     cdef int err
-    err = gpucomm_get_count(comm.c, gpurank)
+    err = gpucomm_get_rank(comm.c, gpurank)
     if err != GA_NO_ERROR:
         raise get_exc(err), gpucontext_error(comm_context(comm), err)
 

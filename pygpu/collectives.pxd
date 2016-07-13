@@ -1,6 +1,6 @@
 from pygpu.gpuarray cimport (gpucontext, GpuContext, _GpuArray, GpuArray)
 
-cdef extern from "gpuarray/buffer_collectives.h":
+cdef extern from "gpuarray/buffer_collectives.h" nogil:
     ctypedef struct gpucomm:
         pass
 
@@ -10,8 +10,7 @@ cdef extern from "gpuarray/buffer_collectives.h":
         GA_MAX,
         GA_MIN
 
-    enum:
-        GA_COMM_ID_BYTES
+    enum: GA_COMM_ID_BYTES
 
     ctypedef struct gpucommCliqueId:
         char[GA_COMM_ID_BYTES] internal
@@ -24,7 +23,7 @@ cdef extern from "gpuarray/buffer_collectives.h":
     int gpucomm_get_count(gpucomm* comm, int* gpucount)
     int gpucomm_get_rank(gpucomm* comm, int* rank)
 
-cdef extern from "gpuarray/collectives.h":
+cdef extern from "gpuarray/collectives.h" nogil:
     int GpuArray_reduce_from(const _GpuArray* src, int opcode,
                              int root, gpucomm* comm)
     int GpuArray_reduce(const _GpuArray* src, _GpuArray* dest,
