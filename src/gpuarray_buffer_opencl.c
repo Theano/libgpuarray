@@ -688,11 +688,14 @@ static int cl_check_extensions(const char **preamble, unsigned int *count,
   if (flags & GA_USE_COMPLEX) {
     return GA_DEVSUP_ERROR; // for now
   }
+  // GA_USE_HALF should always work
+  /*
   if (flags & GA_USE_HALF) {
     if (check_ext(ctx, CL_HALF)) return GA_DEVSUP_ERROR;
     preamble[*count] = PRAGMA CL_HALF ENABLE;
     (*count)++;
   }
+  */
   if (flags & GA_USE_CUDA) {
     return GA_DEVSUP_ERROR;
   }
