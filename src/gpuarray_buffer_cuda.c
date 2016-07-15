@@ -626,7 +626,7 @@ static int cuda_waits(gpudata *a, int flags, CUstream s) {
   }
 
   cuda_enter(a->ctx);
-  if (flags & CUDA_WAIT_READ) {
+  if (ISSET(flags, CUDA_WAIT_READ) || ISSET(flags, CUDA_WAIT_WRITE)) {
     /* We wait for writes that happened before since multiple reads at
      * the same time are fine */
     a->ctx->err = cuStreamWaitEvent(s, a->wev, 0);
@@ -635,7 +635,7 @@ static int cuda_waits(gpudata *a, int flags, CUstream s) {
       return GA_IMPL_ERROR;
     }
   }
-  if (flags & CUDA_WAIT_WRITE) {
+  if (ISSET(flags, CUDA_WAIT_WRITE)) {
     /* Make sure to not disturb previous reads */
     a->ctx->err = cuStreamWaitEvent(s, a->rev, 0);
     if (a->ctx->err != CUDA_SUCCESS) {
@@ -657,9 +657,9 @@ static int cuda_records(gpudata *a, int flags, CUstream s) {
       ISSET(a->ctx->flags, GA_CTX_SINGLE_STREAM))
     return GA_NO_ERROR;
   cuda_enter(a->ctx);
-  if (flags & CUDA_WAIT_READ)
+  if (ISSET(flags, CUDA_WAIT_READ))
     a->ctx->err = cuEventRecord(a->rev, s);
-  if (flags & CUDA_WAIT_WRITE)
+  if (ISSET(flags, CUDA_WAIT_WRITE))
     a->ctx->err = cuEventRecord(a->wev, s);
   cuda_exit(a->ctx);
   a->ls = s;
