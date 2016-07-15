@@ -39,8 +39,8 @@ typedef struct _cl_ctx {
   cl_context ctx;
   cl_command_queue q;
   char *exts;
-  cl_int err;
   char *preamble;
+  cl_int err;
 } cl_ctx;
 
 STATIC_ASSERT(sizeof(cl_ctx) <= sizeof(gpucontext), sizeof_struct_gpucontext_cl);

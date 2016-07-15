@@ -37,54 +37,7 @@ static gpukernel *cl_newkernel(gpucontext *ctx, unsigned int count,
                                const char *fname, unsigned int argcount,
                                const int *types, int flags, int *ret,
                                char **err_str);
-
-static const char CL_PREAMBLE[] =
-  "#define local_barrier() barrier(CLK_LOCAL_MEM_FENCE)\n"
-  "#define WITHIN_KERNEL /* empty */\n"
-  "#define KERNEL __kernel\n"
-  "#define GLOBAL_MEM __global\n"
-  "#define LOCAL_MEM __local\n"
-  "#define LOCAL_MEM_ARG __local\n"
-  "#define REQD_WG_SIZE(x, y, z) __attribute__((reqd_work_group_size(x, y, z)))\n"
-  "#ifndef NULL\n"
-  "  #define NULL ((void*)0)\n"
-  "#endif\n"
-  "#define LID_0 get_local_id(0)\n"
-  "#define LID_1 get_local_id(1)\n"
-  "#define LID_2 get_local_id(2)\n"
-  "#define LDIM_0 get_local_size(0)\n"
-  "#define LDIM_1 get_local_size(1)\n"
-  "#define LDIM_2 get_local_size(2)\n"
-  "#define GID_0 get_group_id(0)\n"
-  "#define GID_1 get_group_id(1)\n"
-  "#define GID_2 get_group_id(2)\n"
-  "#define GDIM_0 get_num_groups(0)\n"
-  "#define GDIM_1 get_num_groups(1)\n"
-  "#define GDIM_2 get_num_groups(2)\n"
-  "#define ga_bool uchar\n"
-  "#define ga_byte char\n"
-  "#define ga_ubyte uchar\n"
-  "#define ga_short short\n"
-  "#define ga_ushort ushort\n"
-  "#define ga_int int\n"
-  "#define ga_uint uint\n"
-  "#define ga_long long\n"
-  "#define ga_ulong ulong\n"
-  "#define ga_float float\n"
-  "#define ga_double double\n"
-  "#define ga_half half\n"
-  "#define ga_size ulong\n"
-  "#define ga_ssize long\n"
-  "#define load_half(p) vload_half(0, p)\n"
-  "#define store_half(p, v) vstore_half_rtn(v, 0, p)\n"
-  "#define GA_DECL_SHARED_PARAM(type, name) , __local type name[]\n"
-  "#define GA_DECL_SHARED_BODY(type, name)\n";
-
-static const char CL_CONTEXT_PREAMBLE[] =
-  "#define GA_WARP_SIZE %zu\n";  // to be filled by cl_make_ctx()
-
-/* XXX: add complex types, quad types, and longlong */
-/* XXX: add vector types */
+static const char CL_CONTEXT_PREAMBLE[];
 
 static cl_device_id get_dev(cl_context ctx, int *ret) {
   size_t sz;
@@ -118,6 +71,7 @@ cl_ctx *cl_make_ctx(cl_context ctx, int flags) {
   size_t warp_size;
   int ret;
   const char dummy_kern[] = "__kernel void kdummy() {}\n";
+  strb context_preamble = STRB_STATIC_INIT;
   const char *rlk[1];
   gpukernel *m;
 
@@ -167,9 +121,7 @@ cl_ctx *cl_make_ctx(cl_context ctx, int flags) {
   TAG_CTX(res);
   res->errbuf = cl_alloc((gpucontext *)res, 8, &v, GA_BUFFER_INIT, &e);
   if (e != GA_NO_ERROR) {
-    err = res->err;
-    cl_free_ctx(res);
-    return NULL;
+    goto fail;
   }
   res->refcnt--; /* Prevent ref loop */
 
@@ -180,20 +132,24 @@ cl_ctx *cl_make_ctx(cl_context ctx, int flags) {
   len = sizeof(dummy_kern);
   // this dummy kernel does not require a CLUDA preamble
   m = cl_newkernel((gpucontext *)res, 1, rlk, &len, "kdummy", 0, NULL, 0, &ret, NULL);
-  assert((m != NULL) && "Cannot create a dummy OpenCL kernel!");
+  if (m == NULL)
+    goto fail;
   ret = cl_property((gpucontext *)res, NULL, m, GA_KERNEL_PROP_PREFLSIZE, &warp_size);
-  if (ret != GA_NO_ERROR) warp_size = 128;
+  if (ret != GA_NO_ERROR)
+    goto fail;
 
   // Write the preferred workgroup multiple as GA_WARP_SIZE in preamble
-  len = snprintf(NULL, 0, CL_CONTEXT_PREAMBLE, warp_size);
-  len += 1;
-  res->preamble = malloc(len);
+  strb_appendf(&context_preamble, CL_CONTEXT_PREAMBLE, (unsigned long)warp_size);
+  res->preamble = strb_cstr(&context_preamble);
   if (res->preamble == NULL)
-    return NULL;
-  ret = snprintf(res->preamble, len, CL_CONTEXT_PREAMBLE, warp_size);
-  assert((ret < len) && "BUG: Array ctx->preamble is not large enough!");
-  assert((ret > 0) && "Array CL_CONTEXT_PREAMBLE has encoding errors!");
+    goto fail;
+
   return res;
+
+fail:
+  err = res->err;
+  cl_free_ctx(res);
+  return NULL;
 }
 
 cl_command_queue cl_get_stream(gpucontext *ctx) {
@@ -267,6 +223,53 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
                          const size_t *bs, const size_t *gs,
                          size_t shared, void **args);
 
+static const char CL_PREAMBLE[] =
+  "#define local_barrier() barrier(CLK_LOCAL_MEM_FENCE)\n"
+  "#define WITHIN_KERNEL /* empty */\n"
+  "#define KERNEL __kernel\n"
+  "#define GLOBAL_MEM __global\n"
+  "#define LOCAL_MEM __local\n"
+  "#define LOCAL_MEM_ARG __local\n"
+  "#define REQD_WG_SIZE(x, y, z) __attribute__((reqd_work_group_size(x, y, z)))\n"
+  "#ifndef NULL\n"
+  "  #define NULL ((void*)0)\n"
+  "#endif\n"
+  "#define LID_0 get_local_id(0)\n"
+  "#define LID_1 get_local_id(1)\n"
+  "#define LID_2 get_local_id(2)\n"
+  "#define LDIM_0 get_local_size(0)\n"
+  "#define LDIM_1 get_local_size(1)\n"
+  "#define LDIM_2 get_local_size(2)\n"
+  "#define GID_0 get_group_id(0)\n"
+  "#define GID_1 get_group_id(1)\n"
+  "#define GID_2 get_group_id(2)\n"
+  "#define GDIM_0 get_num_groups(0)\n"
+  "#define GDIM_1 get_num_groups(1)\n"
+  "#define GDIM_2 get_num_groups(2)\n"
+  "#define ga_bool uchar\n"
+  "#define ga_byte char\n"
+  "#define ga_ubyte uchar\n"
+  "#define ga_short short\n"
+  "#define ga_ushort ushort\n"
+  "#define ga_int int\n"
+  "#define ga_uint uint\n"
+  "#define ga_long long\n"
+  "#define ga_ulong ulong\n"
+  "#define ga_float float\n"
+  "#define ga_double double\n"
+  "#define ga_half half\n"
+  "#define ga_size ulong\n"
+  "#define ga_ssize long\n"
+  "#define load_half(p) vload_half(0, p)\n"
+  "#define store_half(p, v) vstore_half_rtn(v, 0, p)\n"
+  "#define GA_DECL_SHARED_PARAM(type, name) , __local type name[]\n"
+  "#define GA_DECL_SHARED_BODY(type, name)\n";
+
+/* XXX: add complex types, quad types, and longlong */
+/* XXX: add vector types */
+
+static const char CL_CONTEXT_PREAMBLE[] =
+  "#define GA_WARP_SIZE %lu\n";  // to be filled by cl_make_ctx()
 
 static const char *get_error_string(cl_int err) {
   /* OpenCL 1.0 error codes */
