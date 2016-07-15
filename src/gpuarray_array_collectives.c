@@ -48,9 +48,10 @@ static inline int check_gpuarrays(int times_src, const GpuArray* src,
 
 int GpuArray_reduce_from(const GpuArray* src, int opcode, int root,
                          gpucomm* comm) {
+  size_t total_elems;
   if (!GpuArray_ISALIGNED(src))
     return GA_UNALIGNED_ERROR;
-  size_t total_elems = find_total_elems(src);
+  total_elems = find_total_elems(src);
   return gpucomm_reduce(src->data, src->offset, NULL, 0, total_elems,
                         src->typecode, opcode, root, comm);
 }
@@ -90,6 +91,7 @@ int GpuArray_reduce_scatter(const GpuArray* src, GpuArray* dest, int opcode,
 
 int GpuArray_broadcast(GpuArray* array, int root, gpucomm* comm) {
   int rank = 0;
+  size_t total_elems;
   GA_CHECK(gpucomm_get_rank(comm, &rank));
   if (rank == root) {
     if (!GpuArray_CHKFLAGS(array, GA_BEHAVED))
@@ -99,7 +101,7 @@ int GpuArray_broadcast(GpuArray* array, int root, gpucomm* comm) {
       return GA_UNALIGNED_ERROR;
   }
 
-  size_t total_elems = find_total_elems(array);
+  total_elems = find_total_elems(array);
 
   return gpucomm_broadcast(array->data, array->offset, total_elems,
                            array->typecode, root, comm);
