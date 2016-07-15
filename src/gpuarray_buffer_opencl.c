@@ -718,7 +718,9 @@ static gpukernel *cl_newkernel(gpucontext *c, unsigned int count,
   const char **news = NULL;
   unsigned int n = 0;
   int error;
-
+  strb debug_msg = STRB_STATIC_INIT;
+  size_t log_size;
+  
   ASSERT_CTX(ctx);
 
   if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
@@ -780,12 +782,10 @@ static gpukernel *cl_newkernel(gpucontext *c, unsigned int count,
     if (ctx->err == CL_BUILD_PROGRAM_FAILURE && err_str!=NULL) {
       *err_str = NULL;  // Fallback, in case there's an error
 
-      strb debug_msg = STRB_STATIC_INIT;
       // We're substituting debug_msg for a string with this first line:
       strb_appends(&debug_msg, "Program build failure ::\n");
 
       // Determine the size of the log
-      size_t log_size;
       clGetProgramBuildInfo(p, dev, CL_PROGRAM_BUILD_LOG, 0, NULL, &log_size);
 
       if(strb_ensure(&debug_msg, log_size)!=-1 && log_size>=1) { // Checks strb has enough space
