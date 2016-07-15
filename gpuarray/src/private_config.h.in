@@ -1,0 +1,53 @@
+/******************************************************************
+ * This file is generated from private_config.h.in.  Do not edit. *
+ ******************************************************************/
+#ifndef LIBGPUARRAY_PRIVATE_CONFIG_H
+#define LIBGPUARRAY_PRIVATE_CONFIG_H
+
+#cmakedefine HAVE_STRL
+#cmakedefine HAVE_MKSTEMP
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "gpuarray/config.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+#ifdef CONFUSE_EMACS
+}
+#endif  // CONFUSE_EMACS
+
+#ifdef _MSC_VER
+/* God damn Microsoft ... */
+#define snprintf _snprintf
+
+/* MS VC++ 2008 does not support inline */
+#define inline __inline
+#define alloca _alloca
+#endif  // _MSC_VER
+
+#ifdef _MSC_VER
+#define SPREFIX "I"
+#else  // _MSC_VER
+#define SPREFIX "z"
+#endif  // _MSC_VER
+
+#define nelems(a) (sizeof(a)/sizeof(a[0]))
+
+#ifndef HAVE_MKSTEMP
+GPUARRAY_LOCAL int mkstemp(char *path);
+#endif  // HAVE_MKSTEMP
+
+#ifndef HAVE_STRL
+GPUARRAY_LOCAL size_t strlcpy(char *dst, const char *src, size_t size);
+GPUARRAY_LOCAL size_t strlcat(char *dst, const char *src, size_t size);
+#endif  // HAVE_STRL
+
+#ifdef __cplusplus
+}
+#endif  // __cplusplus
+
+#endif  // LIBGPUARRAY_PRIVATE_CONFIG_H
