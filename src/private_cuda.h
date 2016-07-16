@@ -55,13 +55,13 @@
     }                                   \
   } while (0)
 
-#define CUDA_EXIT_ON_ERROR(a, cmd)       \
-  do {                                   \
-    (a)->ctx->err = (cmd);               \
-    if ((a)->ctx->err != CUDA_SUCCESS) { \
-      cuda_exit((a)->ctx);               \
-      return GA_IMPL_ERROR;              \
-    }                                    \
+#define CUDA_EXIT_ON_ERROR(ctx, cmd)  \
+  do {                                \
+    (ctx)->err = (cmd);               \
+    if ((ctx)->err != CUDA_SUCCESS) { \
+      cuda_exit((ctx));               \
+      return GA_IMPL_ERROR;           \
+    }                                 \
   } while (0)
 
 typedef struct _cuda_context {

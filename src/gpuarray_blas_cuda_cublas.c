@@ -347,9 +347,9 @@ static int sgemm(cb_order order, cb_transpose transA, cb_transpose transB,
 
   cuda_enter(ctx);
 
-  cuda_wait(A, CUDA_WAIT_READ);
-  cuda_wait(B, CUDA_WAIT_READ);
-  cuda_wait(C, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(B, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C, CUDA_WAIT_ALL));
 
   h->err = cublasSgemm(h->h,
                        convT(transA), convT(transB), M, N, K,
@@ -363,9 +363,9 @@ static int sgemm(cb_order order, cb_transpose transA, cb_transpose transB,
     return GA_BLAS_ERROR;
   }
 
-  cuda_record(A, CUDA_WAIT_READ);
-  cuda_record(B, CUDA_WAIT_READ);
-  cuda_record(C, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(C, CUDA_WAIT_ALL));
 
   cuda_exit(ctx);
   return GA_NO_ERROR;
@@ -407,9 +407,9 @@ static int dgemm(cb_order order, cb_transpose transA, cb_transpose transB,
 
   cuda_enter(ctx);
 
-  cuda_wait(A, CUDA_WAIT_READ);
-  cuda_wait(B, CUDA_WAIT_READ);
-  cuda_wait(C, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(B, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C, CUDA_WAIT_ALL));
 
   h->err = cublasDgemm(h->h,
                        convT(transA), convT(transB), M, N, K,
@@ -423,9 +423,9 @@ static int dgemm(cb_order order, cb_transpose transA, cb_transpose transB,
     return GA_BLAS_ERROR;
   }
 
-  cuda_record(A, CUDA_WAIT_READ);
-  cuda_record(B, CUDA_WAIT_READ);
-  cuda_record(C, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(C, CUDA_WAIT_ALL));
 
   cuda_exit(ctx);
   return GA_NO_ERROR;
@@ -471,9 +471,9 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
 
   cuda_enter(ctx);
 
-  cuda_wait(A, CUDA_WAIT_READ);
-  cuda_wait(B, CUDA_WAIT_READ);
-  cuda_wait(C, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(B, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C, CUDA_WAIT_ALL));
 
   h->err = cublasSgemmEx(h->h,
                          convT(transA), convT(transB), M, N, K,
@@ -503,9 +503,9 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
     return GA_BLAS_ERROR;
   }
 
-  cuda_record(A, CUDA_WAIT_READ);
-  cuda_record(B, CUDA_WAIT_READ);
-  cuda_record(C, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(C, CUDA_WAIT_ALL));
 
   cuda_exit(ctx);
   return GA_NO_ERROR;
@@ -570,9 +570,9 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
       ASSERT_BUF(A[i]);
       ASSERT_BUF(B[i]);
       ASSERT_BUF(C[i]);
-      cuda_wait(A[i], CUDA_WAIT_READ);
-      cuda_wait(B[i], CUDA_WAIT_READ);
-      cuda_wait(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(B[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C[i], CUDA_WAIT_ALL));
 
       h->err = cublasSgemm(h->h,
                            convT(transA), convT(transB),
@@ -588,9 +588,9 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
         return GA_BLAS_ERROR;
       }
 
-      cuda_record(A[i], CUDA_WAIT_READ);
-      cuda_record(B[i], CUDA_WAIT_READ);
-      cuda_record(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(C[i], CUDA_WAIT_ALL));
     }
   } else {
     float **T_l = alloca(sizeof(float *) * batchCount * 3);
@@ -603,9 +603,9 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
       ASSERT_BUF(A[i]);
       ASSERT_BUF(B[i]);
       ASSERT_BUF(C[i]);
-      cuda_wait(A[i], CUDA_WAIT_READ);
-      cuda_wait(B[i], CUDA_WAIT_READ);
-      cuda_wait(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(B[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C[i], CUDA_WAIT_ALL));
       A_l[i] = ((float *)A[i]->ptr) + offA[i];
       B_l[i] = ((float *)B[i]->ptr) + offB[i];
       C_l[i] = ((float *)C[i]->ptr) + offC[i];
@@ -633,9 +633,9 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     }
 
     for (i = 0; i < batchCount; i++) {
-      cuda_record(A[i], CUDA_WAIT_READ);
-      cuda_record(B[i], CUDA_WAIT_READ);
-      cuda_record(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(C[i], CUDA_WAIT_ALL));
     }
   }
 
@@ -690,9 +690,9 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
       ASSERT_BUF(A[i]);
       ASSERT_BUF(B[i]);
       ASSERT_BUF(C[i]);
-      cuda_wait(A[i], CUDA_WAIT_READ);
-      cuda_wait(B[i], CUDA_WAIT_READ);
-      cuda_wait(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(B[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C[i], CUDA_WAIT_ALL));
 
       h->err = cublasDgemm(h->h,
                            convT(transA), convT(transB),
@@ -708,9 +708,9 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
         return GA_BLAS_ERROR;
       }
 
-      cuda_record(A[i], CUDA_WAIT_READ);
-      cuda_record(B[i], CUDA_WAIT_READ);
-      cuda_record(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(C[i], CUDA_WAIT_ALL));
     }
   } else {
     double **T_l = alloca(sizeof(double *) * batchCount * 3);
@@ -723,9 +723,9 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
       ASSERT_BUF(A[i]);
       ASSERT_BUF(B[i]);
       ASSERT_BUF(C[i]);
-      cuda_wait(A[i], CUDA_WAIT_READ);
-      cuda_wait(B[i], CUDA_WAIT_READ);
-      cuda_wait(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(B[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C[i], CUDA_WAIT_ALL));
       A_l[i] = ((double *)A[i]->ptr) + offA[i];
       B_l[i] = ((double *)B[i]->ptr) + offB[i];
       C_l[i] = ((double *)C[i]->ptr) + offC[i];
@@ -753,9 +753,9 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     }
 
     for (i = 0; i < batchCount; i++) {
-      cuda_record(A[i], CUDA_WAIT_READ);
-      cuda_record(B[i], CUDA_WAIT_READ);
-      cuda_record(C[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(C[i], CUDA_WAIT_ALL));
     }
   }
 
@@ -796,9 +796,9 @@ static int sgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
 
   cuda_enter(ctx);
 
-  cuda_wait(A, CUDA_WAIT_READ);
-  cuda_wait(X, CUDA_WAIT_READ);
-  cuda_wait(Y, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(X, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Y, CUDA_WAIT_ALL));
 
   h->err = cublasSgemv(h->h,
                        convT(transA), M, N, &alpha,
@@ -812,9 +812,9 @@ static int sgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
     return GA_BLAS_ERROR;
   }
 
-  cuda_record(A, CUDA_WAIT_READ);
-  cuda_record(X, CUDA_WAIT_READ);
-  cuda_record(Y, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(X, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Y, CUDA_WAIT_ALL));
 
   cuda_exit(ctx);
 
@@ -847,9 +847,9 @@ static int dgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
 
   cuda_enter(ctx);
 
-  cuda_wait(A, CUDA_WAIT_READ);
-  cuda_wait(X, CUDA_WAIT_READ);
-  cuda_wait(Y, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(X, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Y, CUDA_WAIT_ALL));
 
   h->err = cublasDgemv(h->h,
                        convT(transA), M, N, &alpha,
@@ -863,9 +863,9 @@ static int dgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
     return GA_BLAS_ERROR;
   }
 
-  cuda_record(A, CUDA_WAIT_READ);
-  cuda_record(X, CUDA_WAIT_READ);
-  cuda_record(Y, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(X, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Y, CUDA_WAIT_ALL));
 
   cuda_exit(ctx);
 
@@ -944,9 +944,9 @@ static int sgemvBatch(cb_order order, cb_transpose transA,
       ASSERT_BUF(A[i]);
       ASSERT_BUF(x[i]);
       ASSERT_BUF(y[i]);
-      cuda_wait(A[i], CUDA_WAIT_READ);
-      cuda_wait(x[i], CUDA_WAIT_READ);
-      cuda_wait(y[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(x[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(y[i], CUDA_WAIT_ALL));
       A_l[i] = (float *)(A[i]->ptr + offA[i]);
       x_l[i] = (float *)(x[i]->ptr + offX[i]);
       y_l[i] = (float *)(y[i]->ptr + offY[i]);
@@ -998,9 +998,9 @@ static int sgemvBatch(cb_order order, cb_transpose transA,
 
 
   for (i = 0; i < batchCount; i++) {
-    cuda_record(A[i], CUDA_WAIT_READ);
-    cuda_record(x[i], CUDA_WAIT_READ);
-    cuda_record(y[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A[i], CUDA_WAIT_READ));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(x[i], CUDA_WAIT_READ));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(y[i], CUDA_WAIT_ALL));
   }
 
   cuda_exit(ctx);
@@ -1068,9 +1068,9 @@ static int dgemvBatch(cb_order order, cb_transpose transA,
       ASSERT_BUF(A[i]);
       ASSERT_BUF(x[i]);
       ASSERT_BUF(y[i]);
-      cuda_wait(A[i], CUDA_WAIT_READ);
-      cuda_wait(x[i], CUDA_WAIT_READ);
-      cuda_wait(y[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(x[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(y[i], CUDA_WAIT_ALL));
       A_l[i] = (double *)(A[i]->ptr + offA[i]);
       x_l[i] = (double *)(x[i]->ptr + offX[i]);
       y_l[i] = (double *)(y[i]->ptr + offY[i]);
@@ -1121,9 +1121,9 @@ static int dgemvBatch(cb_order order, cb_transpose transA,
   }
 
   for (i = 0; i < batchCount; i++) {
-    cuda_record(A[i], CUDA_WAIT_READ);
-    cuda_record(x[i], CUDA_WAIT_READ);
-    cuda_record(y[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A[i], CUDA_WAIT_READ));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(x[i], CUDA_WAIT_READ));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(y[i], CUDA_WAIT_ALL));
   }
 
   cuda_exit(ctx);
@@ -1166,9 +1166,9 @@ static int sger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
 
   cuda_enter(ctx);
 
-  cuda_wait(X, CUDA_WAIT_READ);
-  cuda_wait(Y, CUDA_WAIT_READ);
-  cuda_wait(A, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(X, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Y, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A, CUDA_WAIT_ALL));
 
   h->err = cublasSger(h->h, M, N, &alpha,
                                 ((float *)X->ptr) + offX, incX,
@@ -1181,9 +1181,9 @@ static int sger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
     return GA_BLAS_ERROR;
   }
 
-  cuda_record(X, CUDA_WAIT_READ);
-  cuda_record(Y, CUDA_WAIT_READ);
-  cuda_record(A, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(X, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Y, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A, CUDA_WAIT_ALL));
 
   cuda_exit(ctx);
 
@@ -1219,9 +1219,9 @@ static int dger(cb_order order, size_t M, size_t N, double alpha, gpudata *X,
 
   cuda_enter(ctx);
 
-  cuda_wait(X, CUDA_WAIT_READ);
-  cuda_wait(Y, CUDA_WAIT_READ);
-  cuda_wait(A, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(X, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Y, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A, CUDA_WAIT_ALL));
 
   h->err = cublasDger(h->h, M, N, &alpha,
                                 ((double *)X->ptr) + offX, incX,
@@ -1234,9 +1234,9 @@ static int dger(cb_order order, size_t M, size_t N, double alpha, gpudata *X,
     return GA_BLAS_ERROR;
   }
 
-  cuda_record(X, CUDA_WAIT_READ);
-  cuda_record(Y, CUDA_WAIT_READ);
-  cuda_record(A, CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(X, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Y, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A, CUDA_WAIT_ALL));
 
   cuda_exit(ctx);
 
@@ -1323,9 +1323,9 @@ static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
       ASSERT_BUF(A[i]);
       ASSERT_BUF(x[i]);
       ASSERT_BUF(y[i]);
-      cuda_wait(A[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
-      cuda_wait(x[i], CUDA_WAIT_READ);
-      cuda_wait(y[i], CUDA_WAIT_READ);
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A[i], CUDA_WAIT_ALL));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(x[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(y[i], CUDA_WAIT_READ));
       A_l[i] = (float *)(A[i]->ptr + offA[i]);
       x_l[i] = (float *)(x[i]->ptr + offX[i]);
       y_l[i] = (float *)(y[i]->ptr + offY[i]);
@@ -1374,9 +1374,9 @@ static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
 
 
   for (i = 0; i < batchCount; i++) {
-    cuda_record(A[i], CUDA_WAIT_READ);
-    cuda_record(x[i], CUDA_WAIT_READ);
-    cuda_record(y[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A[i], CUDA_WAIT_READ));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(x[i], CUDA_WAIT_READ));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(y[i], CUDA_WAIT_ALL));
   }
 
   cuda_exit(ctx);
@@ -1455,9 +1455,9 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
       ASSERT_BUF(A[i]);
       ASSERT_BUF(x[i]);
       ASSERT_BUF(y[i]);
-      cuda_wait(A[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
-      cuda_wait(x[i], CUDA_WAIT_READ);
-      cuda_wait(y[i], CUDA_WAIT_READ);
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A[i], CUDA_WAIT_ALL));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(x[i], CUDA_WAIT_READ));
+      GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(y[i], CUDA_WAIT_READ));
       A_l[i] = (double *)(A[i]->ptr + offA[i]);
       x_l[i] = (double *)(x[i]->ptr + offX[i]);
       y_l[i] = (double *)(y[i]->ptr + offY[i]);
@@ -1506,9 +1506,9 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
 
 
   for (i = 0; i < batchCount; i++) {
-    cuda_record(A[i], CUDA_WAIT_READ);
-    cuda_record(x[i], CUDA_WAIT_READ);
-    cuda_record(y[i], CUDA_WAIT_READ|CUDA_WAIT_WRITE);
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A[i], CUDA_WAIT_READ));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(x[i], CUDA_WAIT_READ));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(y[i], CUDA_WAIT_ALL));
   }
 
   cuda_exit(ctx);
