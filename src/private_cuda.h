@@ -46,6 +46,15 @@
 /* Keep in sync with the copy in gpuarray/extension.h */
 #define DONTFREE 0x10000000
 
+#define GA_CUDA_EXIT_ON_ERROR(ctx, cmd) \
+  do {                                  \
+    int err = (cmd);                    \
+    if (err != GA_NO_ERROR) {           \
+      cuda_exit((ctx));                 \
+      return err;                       \
+    }                                   \
+  } while (0)
+
 typedef struct _cuda_context {
   GPUCONTEXT_HEAD;
   CUcontext ctx;
@@ -57,8 +66,8 @@ typedef struct _cuda_context {
   unsigned int enter;
 } cuda_context;
 
-STATIC_ASSERT(sizeof(cuda_context) <= sizeof(gpucontext), sizeof_struct_gpucontext_cuda);
-
+STATIC_ASSERT(sizeof(cuda_context) <= sizeof(gpucontext),
+              sizeof_struct_gpucontext_cuda);
 
 /*
  * About freeblocks.
@@ -103,7 +112,8 @@ struct _gpudata {
 #endif
 };
 
-GPUARRAY_LOCAL gpudata *cuda_make_buf(cuda_context *c, CUdeviceptr p, size_t sz);
+GPUARRAY_LOCAL gpudata *cuda_make_buf(cuda_context *c, CUdeviceptr p,
+                                      size_t sz);
 GPUARRAY_LOCAL CUdeviceptr cuda_get_ptr(gpudata *g);
 GPUARRAY_LOCAL size_t cuda_get_sz(gpudata *g);
 GPUARRAY_LOCAL int cuda_wait(gpudata *, int);

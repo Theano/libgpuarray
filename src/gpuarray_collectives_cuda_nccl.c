@@ -239,10 +239,10 @@ static int reduce(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
   cuda_enter(ctx);
 
   // sync: wait till a write has finished (out of concurrent kernels)
-  GA_EXIT_ON_ERROR(ctx, cuda_wait(src, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(src, CUDA_WAIT_READ));
   // sync: wait till a read/write has finished (out of concurrent kernels)
   if (rank == root)
-    GA_EXIT_ON_ERROR(ctx, cuda_wait(dest, CUDA_WAIT_ALL));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(dest, CUDA_WAIT_ALL));
 
   // change stream of nccl ops to enable concurrency
   if (rank == root)
@@ -253,9 +253,9 @@ static int reduce(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
     NCCL_EXIT_ON_ERROR(ctx, ncclReduce((void*)(src->ptr + offsrc), NULL, count,
                                        datatype, op, root, comm->c, ctx->s));
 
-  GA_EXIT_ON_ERROR(ctx, cuda_record(src, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(src, CUDA_WAIT_READ));
   if (rank == root)
-    GA_EXIT_ON_ERROR(ctx, cuda_record(dest, CUDA_WAIT_ALL));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(dest, CUDA_WAIT_ALL));
 
   cuda_exit(ctx);
 
@@ -280,17 +280,17 @@ static int all_reduce(gpudata* src, size_t offsrc, gpudata* dest,
   cuda_enter(ctx);
 
   // sync: wait till a write has finished (out of concurrent kernels)
-  GA_EXIT_ON_ERROR(ctx, cuda_wait(src, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(src, CUDA_WAIT_READ));
   // sync: wait till a read/write has finished (out of concurrent kernels)
-  GA_EXIT_ON_ERROR(ctx, cuda_wait(dest, CUDA_WAIT_ALL));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(dest, CUDA_WAIT_ALL));
 
   // change stream of nccl ops to enable concurrency
   NCCL_EXIT_ON_ERROR(ctx, ncclAllReduce((void*)(src->ptr + offsrc),
                                         (void*)(dest->ptr + offdest), count,
                                         datatype, op, comm->c, ctx->s));
 
-  GA_EXIT_ON_ERROR(ctx, cuda_record(src, CUDA_WAIT_READ));
-  GA_EXIT_ON_ERROR(ctx, cuda_record(dest, CUDA_WAIT_ALL));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(src, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(dest, CUDA_WAIT_ALL));
 
   cuda_exit(ctx);
 
@@ -323,17 +323,17 @@ static int reduce_scatter(gpudata* src, size_t offsrc, gpudata* dest,
   cuda_enter(ctx);
 
   // sync: wait till a write has finished (out of concurrent kernels)
-  GA_EXIT_ON_ERROR(ctx, cuda_wait(src, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(src, CUDA_WAIT_READ));
   // sync: wait till a read/write has finished (out of concurrent kernels)
-  GA_EXIT_ON_ERROR(ctx, cuda_wait(dest, CUDA_WAIT_ALL));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(dest, CUDA_WAIT_ALL));
 
   // change stream of nccl ops to enable concurrency
   NCCL_EXIT_ON_ERROR(ctx, ncclReduceScatter((void*)(src->ptr + offsrc),
                                             (void*)(dest->ptr + offdest), count,
                                             datatype, op, comm->c, ctx->s));
 
-  GA_EXIT_ON_ERROR(ctx, cuda_record(src, CUDA_WAIT_READ));
-  GA_EXIT_ON_ERROR(ctx, cuda_record(dest, CUDA_WAIT_ALL));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(src, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(dest, CUDA_WAIT_ALL));
 
   cuda_exit(ctx);
 
@@ -358,18 +358,18 @@ static int broadcast(gpudata* array, size_t offset, size_t count, int typecode,
 
   // sync: wait till a write has finished (out of concurrent kernels)
   if (rank == root)
-    GA_EXIT_ON_ERROR(ctx, cuda_wait(array, CUDA_WAIT_READ));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(array, CUDA_WAIT_READ));
   else
-    GA_EXIT_ON_ERROR(ctx, cuda_wait(array, CUDA_WAIT_ALL));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(array, CUDA_WAIT_ALL));
 
   // change stream of nccl ops to enable concurrency
   NCCL_EXIT_ON_ERROR(ctx, ncclBcast((void*)(array->ptr + offset), count,
                                     datatype, root, comm->c, ctx->s));
 
   if (rank == root)
-    GA_EXIT_ON_ERROR(ctx, cuda_record(array, CUDA_WAIT_READ));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(array, CUDA_WAIT_READ));
   else
-    GA_EXIT_ON_ERROR(ctx, cuda_record(array, CUDA_WAIT_ALL));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(array, CUDA_WAIT_ALL));
 
   cuda_exit(ctx);
 
@@ -401,17 +401,17 @@ static int all_gather(gpudata* src, size_t offsrc, gpudata* dest,
   cuda_enter(ctx);
 
   // sync: wait till a write has finished (out of concurrent kernels)
-  GA_EXIT_ON_ERROR(ctx, cuda_wait(src, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(src, CUDA_WAIT_READ));
   // sync: wait till a read/write has finished (out of concurrent kernels)
-  GA_EXIT_ON_ERROR(ctx, cuda_wait(dest, CUDA_WAIT_ALL));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(dest, CUDA_WAIT_ALL));
 
   // change stream of nccl ops to enable concurrency
   NCCL_EXIT_ON_ERROR(
       ctx, ncclAllGather((void*)(src->ptr + offsrc), count, datatype,
                          (void*)(dest->ptr + offdest), comm->c, ctx->s));
 
-  GA_EXIT_ON_ERROR(ctx, cuda_record(src, CUDA_WAIT_READ));
-  GA_EXIT_ON_ERROR(ctx, cuda_record(dest, CUDA_WAIT_ALL));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(src, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(dest, CUDA_WAIT_ALL));
 
   cuda_exit(ctx);
 
