@@ -1413,7 +1413,7 @@ cdef class GpuArray:
     directly.
 
     You can also subclass this class and make the module create your
-    instances by passing the `cls` agument to any method that return a
+    instances by passing the `cls` argument to any method that return a
     new GpuArray.  This way of creating the class will NOT call your
     :meth:`__init__` method.
 
@@ -1464,6 +1464,26 @@ cdef class GpuArray:
             step[0] = 1
         else:
             raise IndexError, "cannot index with: %s" % (key,)
+
+    def write(self, np.ndarray src not None):
+        cdef size_t npsz = np.PyArray_NBYTES(src)
+        cdef size_t sz = gpuarray_get_elsize(self.ga.typecode)
+        cdef unsigned i
+        for i in range(self.ga.nd):
+            sz *= self.ga.dimensions[i]
+        if sz != npsz:
+            raise ValueError, "GpuArray and Numpy array do not have the same size in bytes"
+        array_write(self, np.PyArray_DATA(src), sz)
+
+    def read(self, np.ndarray dst not None):
+        cdef size_t npsz = np.PyArray_NBYTES(dst)
+        cdef size_t sz = gpuarray_get_elsize(self.ga.typecode)
+        cdef unsigned i
+        for i in range(self.ga.nd):
+            sz *= self.ga.dimensions[i]
+        if sz != npsz:
+            raise ValueError, "GpuArray and Numpy array do not have the same size in bytes"
+        array_read(np.PyArray_DATA(dst), sz, self)
 
     def __array__(self):
         """
