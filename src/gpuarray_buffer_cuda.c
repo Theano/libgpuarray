@@ -58,6 +58,7 @@ static int cuda_get_platform_count(unsigned int* platcount) {
 
 static int cuda_get_device_count(unsigned int platform,
                                  unsigned int* devcount) {
+  int dv;
   // platform number gets ignored in CUDA implementation
   if (!init_done) {
     err = cuInit(0);
@@ -65,7 +66,6 @@ static int cuda_get_device_count(unsigned int platform,
       return GA_IMPL_ERROR;
     init_done = 1;
   }
-  int dv;
   err = cuDeviceGetCount(&dv);
   if (err != CUDA_SUCCESS)
     return GA_IMPL_ERROR;

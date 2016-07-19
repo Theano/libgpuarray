@@ -1,6 +1,7 @@
 include(CheckFunctionExists)
 
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
+add_definitions(-Wdeclaration-after-statement)
 
 find_package(CUDA)
 find_package(OpenCL)

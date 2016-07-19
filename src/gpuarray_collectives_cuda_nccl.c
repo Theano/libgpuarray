@@ -41,8 +41,8 @@
     }                                                  \
   } while (0)
 
-extern const gpuarray_buffer_ops
-    cuda_ops;  //!< Link wrapped cuda core operations
+//!< Link wrapped cuda core operations
+extern const gpuarray_buffer_ops cuda_ops;
 
 /**
  * Definition of struct _gpucomm
@@ -73,19 +73,20 @@ static void comm_clear(gpucomm* comm) {
  */
 static int comm_new(gpucomm** comm_ptr, gpucontext* ctx,
                     gpucommCliqueId comm_id, int ndev, int rank) {
-  ASSERT_CTX(ctx);
   gpucomm* comm;
+  ncclResult_t nccl_err;
+
+  ASSERT_CTX(ctx);
   comm = calloc(1, sizeof(*comm));  // Allocate memory
   if (comm == NULL) {
     *comm_ptr = NULL;  // Set to NULL if failed
     return GA_MEMORY_ERROR;
   }
   comm->ctx = (cuda_context*)ctx;  // convert to underlying cuda context
-  comm->ctx
-      ->refcnt++;  // So that context would not be destroyed before communicator
+  // So that context would not be destroyed before communicator
+  comm->ctx->refcnt++;
   cuda_enter(comm->ctx);  // Use device
-  ncclResult_t nccl_err =
-      ncclCommInitRank(&comm->c, ndev, *((ncclUniqueId*)&comm_id), rank);
+  nccl_err = ncclCommInitRank(&comm->c, ndev, *((ncclUniqueId*)&comm_id), rank);
   cuda_exit(comm->ctx);
   TAG_COMM(comm);
   if (nccl_err != ncclSuccess) {
@@ -181,6 +182,7 @@ static inline int check_restrictions(gpudata* src, size_t offsrc, gpudata* dest,
                                      int opcode, gpucomm* comm,
                                      ncclDataType_t* datatype,
                                      ncclRedOp_t* op) {
+  size_t op_size;
   // Check if count is larger than INT_MAX
   // TODO remove whenif nccl adapts to size_t
   if (count > INT_MAX)
@@ -207,7 +209,7 @@ static inline int check_restrictions(gpudata* src, size_t offsrc, gpudata* dest,
   assert(!(offsrc > src->sz));
   assert(!(dest != NULL && offdest > dest->sz));
   // size to operate upon must be able to fit inside the gpudata (incl offsets)
-  size_t op_size = count * gpuarray_get_elsize(typecode);
+  op_size = count * gpuarray_get_elsize(typecode);
   if ((src->sz - offsrc) < op_size)
     return GA_VALUE_ERROR;
   if (dest != NULL && (dest->sz - offdest) < op_size)
@@ -223,10 +225,12 @@ static int reduce(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
                   gpucomm* comm) {
   ncclRedOp_t op;
   ncclDataType_t datatype;
-  ASSERT_BUF(src);
-  ASSERT_COMM(comm);
   gpudata* dst = NULL;
   int rank = 0;
+  cuda_context* ctx;
+
+  ASSERT_BUF(src);
+  ASSERT_COMM(comm);
   GA_CHECK(get_rank(comm, &rank));
   if (rank == root) {
     dst = dest;
@@ -235,7 +239,7 @@ static int reduce(gpudata* src, size_t offsrc, gpudata* dest, size_t offdest,
   GA_CHECK(check_restrictions(src, offsrc, dst, offdest, count, typecode,
                               opcode, comm, &datatype, &op));
 
-  cuda_context* ctx = comm->ctx;
+  ctx = comm->ctx;
   cuda_enter(ctx);
 
   // sync: wait till a write has finished (out of concurrent kernels)
@@ -270,13 +274,15 @@ static int all_reduce(gpudata* src, size_t offsrc, gpudata* dest,
                       gpucomm* comm) {
   ncclRedOp_t op;
   ncclDataType_t datatype;
+  cuda_context* ctx;
+
   ASSERT_BUF(src);
   ASSERT_COMM(comm);
   ASSERT_BUF(dest);
   GA_CHECK(check_restrictions(src, offsrc, dest, offdest, count, typecode,
                               opcode, comm, &datatype, &op));
 
-  cuda_context* ctx = comm->ctx;
+  ctx = comm->ctx;
   cuda_enter(ctx);
 
   // sync: wait till a write has finished (out of concurrent kernels)
@@ -303,23 +309,26 @@ static int all_reduce(gpudata* src, size_t offsrc, gpudata* dest,
 static int reduce_scatter(gpudata* src, size_t offsrc, gpudata* dest,
                           size_t offdest, size_t count, int typecode,
                           int opcode, gpucomm* comm) {
-  ASSERT_BUF(src);
-  ASSERT_COMM(comm);
-  ASSERT_BUF(dest);
   ncclRedOp_t op;
   ncclDataType_t datatype;
   int ndev = 0;
+  size_t resc_size;
+  cuda_context* ctx;
+
+  ASSERT_BUF(src);
+  ASSERT_COMM(comm);
+  ASSERT_BUF(dest);
   GA_CHECK(get_count(comm, &ndev));
   GA_CHECK(check_restrictions(src, offsrc, NULL, 0, count * ndev, typecode,
                               opcode, comm, &datatype, &op));
   if (dest->ctx != comm->ctx)
     return GA_VALUE_ERROR;
-  size_t resc_size = count * gpuarray_get_elsize(typecode);
+  resc_size = count * gpuarray_get_elsize(typecode);
   if ((dest->sz - offdest) < resc_size)
     return GA_VALUE_ERROR;
   assert(!(offdest > dest->sz));
 
-  cuda_context* ctx = comm->ctx;
+  ctx = comm->ctx;
   cuda_enter(ctx);
 
   // sync: wait till a write has finished (out of concurrent kernels)
@@ -345,15 +354,17 @@ static int reduce_scatter(gpudata* src, size_t offsrc, gpudata* dest,
  */
 static int broadcast(gpudata* array, size_t offset, size_t count, int typecode,
                      int root, gpucomm* comm) {
+  ncclDataType_t datatype;
+  int rank = 0;
+  cuda_context* ctx;
+
   ASSERT_BUF(array);
   ASSERT_COMM(comm);
-  ncclDataType_t datatype;
   GA_CHECK(check_restrictions(array, offset, NULL, 0, count, typecode, 0, comm,
                               &datatype, NULL));
-  int rank = 0;
   GA_CHECK(get_rank(comm, &rank));
 
-  cuda_context* ctx = comm->ctx;
+  ctx = comm->ctx;
   cuda_enter(ctx);
 
   // sync: wait till a write has finished (out of concurrent kernels)
@@ -382,22 +393,25 @@ static int broadcast(gpudata* array, size_t offset, size_t count, int typecode,
 static int all_gather(gpudata* src, size_t offsrc, gpudata* dest,
                       size_t offdest, size_t count, int typecode,
                       gpucomm* comm) {
+  ncclDataType_t datatype;
+  int ndev = 0;
+  size_t resc_size;
+  cuda_context* ctx;
+
   ASSERT_BUF(src);
   ASSERT_COMM(comm);
   ASSERT_BUF(dest);
-  ncclDataType_t datatype;
   GA_CHECK(check_restrictions(src, offsrc, NULL, 0, count, typecode, 0, comm,
                               &datatype, NULL));
   if (dest->ctx != comm->ctx)
     return GA_VALUE_ERROR;
-  int ndev = 0;
   GA_CHECK(get_count(comm, &ndev));
-  size_t resc_size = ndev * count * gpuarray_get_elsize(typecode);
+  resc_size = ndev * count * gpuarray_get_elsize(typecode);
   if ((dest->sz - offdest) < resc_size)
     return GA_VALUE_ERROR;
   assert(!(offdest > dest->sz));
 
-  cuda_context* ctx = comm->ctx;
+  ctx = comm->ctx;
   cuda_enter(ctx);
 
   // sync: wait till a write has finished (out of concurrent kernels)
@@ -420,8 +434,7 @@ static int all_gather(gpudata* src, size_t offsrc, gpudata* dest,
 
 /**
  * Instance of `gpuarray_comm_ops` which contains NCCL implementations. To be
- * linked
- * in \ref gpuarray_buffer_cuda.c, in order to fill a /ref gpucontext's
+ * linked in \ref gpuarray_buffer_cuda.c, in order to fill a /ref gpucontext's
  * comm_ops.
  */
 GPUARRAY_LOCAL gpuarray_comm_ops nccl_ops = {
