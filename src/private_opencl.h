@@ -39,6 +39,7 @@ typedef struct _cl_ctx {
   cl_context ctx;
   cl_command_queue q;
   char *exts;
+  char *preamble;
   cl_int err;
 } cl_ctx;
 

@@ -284,7 +284,8 @@ static const char CUDA_PREAMBLE[] =
     "#define load_half(p) __half2float(*(p))\n"
     "#define store_half(p, v) (*(p) = __float2half_rn(v))\n"
     "#define GA_DECL_SHARED_PARAM(type, name)\n"
-    "#define GA_DECL_SHARED_BODY(type, name) extern __shared__ type name[];\n";
+    "#define GA_DECL_SHARED_BODY(type, name) extern __shared__ type name[];\n"
+    "#define GA_WARP_SIZE warpSize\n";
 
 /* XXX: add complex, quads, longlong */
 /* XXX: add vector types */
