@@ -98,6 +98,90 @@ GPUARRAY_PUBLIC void gpuarray_elemwise_collapse(unsigned int n,
                                                 unsigned int *nd,
                                                 size_t *dim, ssize_t **strs);
 
+
+typedef uint16_t ga_half_t;
+
+/* code strongly inspired from
+   https://github.com/numpy/numpy/blob/master/numpy/core/src/npymath/halffloat.c#L246 */
+
+static inline ga_half_t ga_float2half(float f) {
+  union {
+    float f;
+    uint32_t bits;
+  } bf;
+  union {
+    ga_half_t h;
+    uint16_t bits;
+  } bh;
+
+  uint32_t f_exp, f_sig;
+  uint16_t h_sgn, h_exp, h_sig;
+
+  bf.f = f;
+
+  h_sgn = (bf.bits&0x80000000u) >> 16;
+  f_exp = (bf.bits&0x7f800000u);
+
+  /* Exponent overflow/NaN converts to signed inf/NaN */
+  if (f_exp >= 0x47800000u) {
+    if (f_exp == 0x7f800000u) {
+      /* Inf or NaN */
+      f_sig = (bf.bits&0x007fffffu);
+      if (f_sig != 0) {
+	/* NaN - propagate the flag in the significand... */
+	bh.bits = (uint16_t) (0x7c00u + (f_sig >> 13));
+	/* ...but make sure it stays a NaN */
+	if (bh.bits == 0x7c00u) {
+	  bh.bits++;
+	}
+	bh.bits += h_sgn;
+	return bh.h;
+      } else {
+	/* signed inf */
+	bh.bits = h_sgn + 0x7c00u;
+	return bh.h;
+      }
+    } else {
+      bh.bits = h_sgn + 0x7c00u;
+      return bh.h;
+    }
+  }
+
+  if (f_exp <= 0x38000000u) {
+    /*
+     * Signed zeros, subnormal floats, and floats with small
+     * exponents all convert to signed zero halfs.
+     */
+    if (f_exp < 0x33000000u) {
+      bh.bits = h_sgn;
+      return bh.h;
+    }
+    /* Make the subnormal significand */
+    f_exp >>= 23;
+    f_sig = (0x00800000u + (bf.bits&0x007fffffu));
+    f_sig >>= (113 - f_exp);
+    /* Handle rounding by adding 1 to the bit beyond half precision */
+    f_sig += 0x00001000u;
+    h_sig = (uint16_t) (f_sig >> 13);
+    /*
+     * If the rounding causes a bit to spill into h_exp, it will
+     * increment h_exp from zero to one and h_sig will be zero.
+     * This is the correct result.
+     */
+    bh.bits = h_sgn + h_sig;
+    return bh.h;
+  }
+
+  /* Regular case with no overflow or underflow */
+  h_exp = (uint16_t) ((f_exp - 0x38000000u) >> 13);
+  /* Handle rounding by adding 1 to the bit beyond half precision */
+  f_sig = (bf.bits&0x007fffffu);
+  f_sig += 0x00001000u;
+  h_sig = (uint16_t) (f_sig >> 13);
+  bh.bits = h_sgn + h_exp + h_sig;
+  return bh.h;
+}
+
 #ifdef __cplusplus
 }
 #endif
