@@ -1413,7 +1413,7 @@ cdef class GpuArray:
     directly.
 
     You can also subclass this class and make the module create your
-    instances by passing the `cls` agument to any method that return a
+    instances by passing the `cls` argument to any method that return a
     new GpuArray.  This way of creating the class will NOT call your
     :meth:`__init__` method.
 
@@ -1464,6 +1464,57 @@ cdef class GpuArray:
             step[0] = 1
         else:
             raise IndexError, "cannot index with: %s" % (key,)
+
+    def write(self, np.ndarray src not None):
+        """Writes host's Numpy array to device's GpuArray.
+
+        :param src: source array in host
+        :type src: np.ndarray
+
+        :raises ValueError: If this GpuArray is not compatible with `src`
+
+        """
+        if not self.flags.behaved:
+            raise ValueError, "Destination GpuArray is not well behaved: aligned and writeable"
+        if not ((self.flags.c_contiguous and src.flags['C_CONTIGUOUS'] and src.flags['ALIGNED']) or \
+                (self.flags.f_contiguous and src.flags['F_CONTIGUOUS'] and src.flags['ALIGNED'])):
+            raise ValueError, "GpuArray and Numpy array do not match in contiguity or Numpy array is not aligned"
+        if self.dtype != src.dtype:
+            raise ValueError, "GpuArray and Numpy array do not have matching data types"
+        cdef size_t npsz = np.PyArray_NBYTES(src)
+        cdef size_t sz = gpuarray_get_elsize(self.ga.typecode)
+        cdef unsigned i
+        for i in range(self.ga.nd):
+            sz *= self.ga.dimensions[i]
+        if sz != npsz:
+            raise ValueError, "GpuArray and Numpy array do not have the same size in bytes"
+        array_write(self, np.PyArray_DATA(src), sz)
+
+    def read(self, np.ndarray dst not None):
+        """Reads from this GpuArray into host's Numpy array.
+
+        :param dst: destination array in host
+        :type dst: np.ndarray
+
+        :raises ValueError: If this GpuArray is not compatible with `src`
+
+        """
+        a = np.PyArray_FLAGS(dst)
+        if not np.PyArray_ISBEHAVED(dst):
+            raise ValueError, "Destination Numpy array is not well behaved: aligned and writeable"
+        if not ((self.flags.c_contiguous and self.flags.aligned and dst.flags['C_CONTIGUOUS']) or \
+                (self.flags.f_contiguous and self.flags.aligned and dst.flags['F_CONTIGUOUS'])):
+            raise ValueError, "GpuArray and Numpy array do not match in contiguity or GpuArray is not aligned"
+        if self.dtype != dst.dtype:
+            raise ValueError, "GpuArray and Numpy array do not have matching data types"
+        cdef size_t npsz = np.PyArray_NBYTES(dst)
+        cdef size_t sz = gpuarray_get_elsize(self.ga.typecode)
+        cdef unsigned i
+        for i in range(self.ga.nd):
+            sz *= self.ga.dimensions[i]
+        if sz != npsz:
+            raise ValueError, "GpuArray and Numpy array do not have the same size in bytes"
+        array_read(np.PyArray_DATA(dst), sz, self)
 
     def __array__(self):
         """

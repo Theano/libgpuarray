@@ -303,6 +303,47 @@ def mapping_setitem_ellipsis2(shp, dtype, offseted):
     a_gpu[:] = b_gpu
     assert numpy.allclose(a, numpy.asarray(b_gpu))
 
+class WriteReadTest(unittest.TestCase):
+    def setUp(self):
+        self.cpu, self.gpu = gen_gpuarray((3, 4, 5), ctx=ctx)
+        self.cpu[0, 0, 0] = 80
+
+    def test_write(self):
+        self.gpu.write(self.cpu)
+        res = numpy.asarray(self.gpu)
+        assert numpy.allclose(self.cpu, res)
+
+        self.cpu[0, 0, 0] = 160
+        self.cpu.setflags(write=False)
+        self.gpu.write(self.cpu)
+        res = numpy.asarray(self.gpu)
+        assert numpy.allclose(self.cpu, res)
+
+        self.cpu = numpy.ndarray((2, 4, 5), dtype="float32", order='C')
+        self.assertRaises(ValueError, self.gpu.write, self.cpu)
+        self.cpu = numpy.ndarray((3, 4, 5), dtype="float64", order='C')
+        self.assertRaises(ValueError, self.gpu.write, self.cpu)
+        self.cpu = numpy.ndarray((3, 4, 5), dtype="float32", order='F')
+        self.assertRaises(ValueError, self.gpu.write, self.cpu)
+        self.cpu = numpy.ndarray((3, 4, 2, 5), dtype="float32", order='C')
+        self.assertRaises(ValueError, self.gpu.write, self.cpu[:, :, 0, :])
+
+    def test_read(self):
+        self.gpu.read(self.cpu)
+        res = numpy.asarray(self.gpu)
+        assert numpy.allclose(self.cpu, res)
+
+        self.cpu = numpy.ndarray((3, 4, 5), dtype="float32", order='C')
+        self.cpu.setflags(write=False)
+        self.assertRaises(ValueError, self.gpu.read, self.cpu)
+        self.cpu = numpy.ndarray((2, 4, 5), dtype="float32", order='C')
+        self.assertRaises(ValueError, self.gpu.read, self.cpu)
+        self.cpu = numpy.ndarray((3, 4, 5), dtype="float64", order='C')
+        self.assertRaises(ValueError, self.gpu.read, self.cpu)
+        self.cpu = numpy.ndarray((3, 4, 5), dtype="float32", order='F')
+        self.assertRaises(ValueError, self.gpu.read, self.cpu)
+        self.cpu = numpy.ndarray((3, 4, 2, 5), dtype="float32", order='C')
+        self.assertRaises(ValueError, self.gpu.read, self.cpu[:, :, 0, :])
 
 def test_copy_view():
     for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
