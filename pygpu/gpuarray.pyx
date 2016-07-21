@@ -4,6 +4,7 @@ from cpython.mem cimport PyMem_Malloc, PyMem_Free
 from libc.string cimport strncmp
 
 cimport numpy as np
+import numpy as np
 
 from cpython cimport Py_INCREF, PyNumber_Index
 from cpython.object cimport Py_EQ, Py_NE
@@ -1468,17 +1469,31 @@ cdef class GpuArray:
     def write(self, np.ndarray src not None):
         """Writes host's Numpy array to device's GpuArray.
 
+        This method is as fast as or even faster than :ref:asarray, because it
+        skips possible allocation of a buffer in device's memory. It uses this
+        already allocated GpuArray buffer to contain `src` array from host's
+        memory. It is required though that the GpuArray and the Numpy array are
+        compatible in byte size and data type. It is also needed for the
+        GpuArray to be well behaved and contiguous. If `src` is not aligned or
+        compatible in contiguity it will be copied to a new Numpy array in order
+        to be. It is allowed for this GpuArray and `src` to have different
+        shapes.
+
         :param src: source array in host
         :type src: np.ndarray
 
-        :raises ValueError: If this GpuArray is not compatible with `src`
+        :raises ValueError: If this GpuArray is not compatible with `src` or
+            if it is not well behaved or contiguous.
 
         """
         if not self.flags.behaved:
             raise ValueError, "Destination GpuArray is not well behaved: aligned and writeable"
-        if not ((self.flags.c_contiguous and src.flags['C_CONTIGUOUS'] and src.flags['ALIGNED']) or \
-                (self.flags.f_contiguous and src.flags['F_CONTIGUOUS'] and src.flags['ALIGNED'])):
-            raise ValueError, "GpuArray and Numpy array do not match in contiguity or Numpy array is not aligned"
+        if self.flags.c_contiguous:
+            src = np.asarray(src, order='C')
+        elif self.flags.f_contiguous:
+            src = np.asarray(src, order='F')
+        else:
+            raise ValueError, "Destination GpuArray is not contiguous"
         if self.dtype != src.dtype:
             raise ValueError, "GpuArray and Numpy array do not have matching data types"
         cdef size_t npsz = np.PyArray_NBYTES(src)
@@ -1493,13 +1508,23 @@ cdef class GpuArray:
     def read(self, np.ndarray dst not None):
         """Reads from this GpuArray into host's Numpy array.
 
+        This method is as fast as or even faster than :ref:__array__ method and
+        thus :ref:numpy.asarray. This is because it skips allocation of a new
+        buffer in host's memory to contain device's GpuArray. It uses an
+        existing Numpy ndarray as a buffer to get the GpuArray. It is required
+        though that the GpuArray and the Numpy array to be compatible in byte
+        size, contiguity and data type. It is also needed for `dst` to be
+        writeable and properly aligned in host's memory and for `self` to be
+        contiguous. It is allowed for this GpuArray and `dst` to have different
+        shapes.
+
         :param dst: destination array in host
         :type dst: np.ndarray
 
-        :raises ValueError: If this GpuArray is not compatible with `src`
+        :raises ValueError: If this GpuArray is not compatible with `src` or
+            if `dst` is not well behaved.
 
         """
-        a = np.PyArray_FLAGS(dst)
         if not np.PyArray_ISBEHAVED(dst):
             raise ValueError, "Destination Numpy array is not well behaved: aligned and writeable"
         if not ((self.flags.c_contiguous and self.flags.aligned and dst.flags['C_CONTIGUOUS']) or \

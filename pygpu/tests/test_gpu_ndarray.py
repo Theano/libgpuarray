@@ -323,10 +323,24 @@ class WriteReadTest(unittest.TestCase):
         self.assertRaises(ValueError, self.gpu.write, self.cpu)
         self.cpu = numpy.ndarray((3, 4, 5), dtype="float64", order='C')
         self.assertRaises(ValueError, self.gpu.write, self.cpu)
-        self.cpu = numpy.ndarray((3, 4, 5), dtype="float32", order='F')
-        self.assertRaises(ValueError, self.gpu.write, self.cpu)
-        self.cpu = numpy.ndarray((3, 4, 2, 5), dtype="float32", order='C')
-        self.assertRaises(ValueError, self.gpu.write, self.cpu[:, :, 0, :])
+
+        cpu2 = numpy.random.random((3, 4, 5))
+        cpu2 = numpy.asarray(cpu2, dtype='float32', order='F')
+        self.gpu.write(cpu2)
+        res = numpy.asarray(self.gpu)
+        assert numpy.allclose(cpu2, res)
+
+        cpu2 = numpy.random.random((3, 4, 2, 5))
+        cpu2 = numpy.asarray(cpu2, dtype='float32', order='C')
+        self.gpu.write(cpu2[:, :, 0, :])
+        res = numpy.asarray(self.gpu)
+        assert numpy.allclose(cpu2[:, :, 0, :], res)
+
+        cpu2 = numpy.random.random((3, 4, 2, 5))
+        cpu2 = numpy.asarray(cpu2, dtype='float32', order='F')
+        self.gpu.write(cpu2[:, :, 0, :])
+        res = numpy.asarray(self.gpu)
+        assert numpy.allclose(cpu2[:, :, 0, :], res)
 
     def test_read(self):
         self.gpu.read(self.cpu)
