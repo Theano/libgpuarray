@@ -80,6 +80,7 @@ static const char *code_sgemvBH_T_a1_b1_small =                         \
   "}\n";
 
 static const char *atomicadd_double =                                   \
+  "#if __CUDA_ARCH__ < 600\n"						\
   "__device__ double atomicAdd(double* address, double val) {"          \
   "  unsigned long long int* address_as_ull ="                          \
   "  (unsigned long long int*)address;"                                 \
@@ -91,7 +92,8 @@ static const char *atomicadd_double =                                   \
   "                    __longlong_as_double(assumed)));"                \
   "  } while (assumed != old);"                                         \
   "  return __longlong_as_double(old);"                                 \
-  "}\n";
+  "}\n"									\
+  "#endif\n";
 
 static const char *code_dgemvBH_N_a1_b1_small =                         \
   "extern \"C\" __global__ void dgemv(const double *A[], size_t lda, "  \
