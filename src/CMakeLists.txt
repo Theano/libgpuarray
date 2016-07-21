@@ -1,7 +1,9 @@
 include(CheckFunctionExists)
 
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
-add_definitions(-Wdeclaration-after-statement)
+if(CMAKE_COMPILER_IS_GNUCC)
+  add_definitions(-Wdeclaration-after-statement)
+endif()
 
 find_package(CUDA)
 find_package(OpenCL)
