@@ -118,12 +118,42 @@ START_TEST(test_elemwise_collapse) {
 }
 END_TEST
 
+START_TEST(test_float2half) {
+  const float f[] = {
+    2.9831426e-08f,
+    2e-25f,
+    2e-26f,
+    1.0005035f,
+    1.0002441f,
+    65519.f,
+    65520.f,
+  };
+  const ga_half_t h[] = {
+    0x0001u, /* 2e-24 */
+    0x0000u, /* 0 */
+    0x0000u, /* 0 */
+    0x3c01u, /* 1.0 + 2e-10 */
+    0x3c00u, /* 1.0 */
+    0x7bffu, /* 65504 */
+    0x7c00u, /* Inf */
+  };
+  unsigned int i;
+  ga_half_t hr;
+
+  for (i = 0; i < sizeof(f)/sizeof(f[0]); i++) {
+    hr = ga_float2half(f[i]);
+    ck_assert_int_eq(hr, h[i]);
+  }
+}
+END_TEST
+
 Suite *get_suite(void) {
   Suite *s = suite_create("util");
   TCase *tc = tcase_create("All");
   tcase_add_test(tc, test_register_type);
   tcase_add_test(tc, test_type_flags);
   tcase_add_test(tc, test_elemwise_collapse);
+  tcase_add_test(tc, test_float2half);
   suite_add_tcase(s, tc);
   return s;
 }
