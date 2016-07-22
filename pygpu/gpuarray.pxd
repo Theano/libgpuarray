@@ -70,6 +70,8 @@ cdef extern from "gpuarray/buffer.h":
     ctypedef struct gpukernel:
         pass
 
+    int get_platform_count(const char* name, int* platcount)
+    int get_device_count(const char* name, int platform, int* devcount)
     gpucontext *gpucontext_init(const char *name, int devno, int flags, int *ret)
     void gpucontext_deref(gpucontext *ctx)
     char *gpucontext_error(gpucontext *ctx, int err)

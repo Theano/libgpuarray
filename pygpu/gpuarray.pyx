@@ -488,6 +488,24 @@ cdef GpuContext ensure_context(GpuContext c):
 cdef bint pygpu_GpuArray_Check(object o):
     return isinstance(o, GpuArray)
 
+def count_platforms(kind):
+    """Return number of host's platforms compatible with `kind`.
+    """
+    cdef int platcount, err
+    err = get_platform_count(_s(kind), &platcount)
+    if err != GA_NO_ERROR:
+        raise get_exc(err), gpucontext_error(NULL, err)
+    return platcount
+
+def count_devices(kind, int platform):
+    """Returns number of devices in host's `platform` compatible with `kind`.
+    """
+    cdef int devcount, err
+    err = get_device_count(_s(kind), platform, &devcount)
+    if err != GA_NO_ERROR:
+        raise get_exc(err), gpucontext_error(NULL, err)
+    return devcount
+
 cdef GpuContext pygpu_init(dev, int flags):
     if dev.startswith('cuda'):
         kind = b"cuda"
