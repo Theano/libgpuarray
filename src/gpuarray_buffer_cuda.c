@@ -27,6 +27,7 @@
 #define FRAG_SIZE (64)
 
 static CUresult err;
+static int init_done = 0;
 
 GPUARRAY_LOCAL const gpuarray_buffer_ops cuda_ops;
 
@@ -57,6 +58,12 @@ static int cuda_get_platform_count(int* platcount) {
 
 static int cuda_get_device_count(int platform, int* devcount) {
   // platform number gets ignored in CUDA implementation
+  if (!init_done) {
+    err = cuInit(0);
+    if (err != CUDA_SUCCESS)
+      return GA_IMPL_ERROR;
+    init_done = 1;
+  }
   err = cuDeviceGetCount(devcount);
   if (err != CUDA_SUCCESS)
     return GA_IMPL_ERROR;
@@ -357,7 +364,6 @@ static cuda_context *do_init(CUdevice dev, int flags, int *ret) {
 static gpucontext *cuda_init(int ord, int flags, int *ret) {
     CUdevice dev;
     cuda_context *res;
-    static int init_done = 0;
 
     if (!init_done) {
       err = cuInit(0);
