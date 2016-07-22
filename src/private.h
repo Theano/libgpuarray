@@ -74,6 +74,8 @@ typedef struct _partial_gpucomm {
 } partial_gpucomm;
 
 struct _gpuarray_buffer_ops {
+  int (*get_platform_count)(int* platcount);
+  int (*get_device_count)(int platform, int* devcount);
   gpucontext *(*buffer_init)(int dev, int flags, int *ret);
   void (*buffer_deinit)(gpucontext *ctx);
   gpudata *(*buffer_alloc)(gpucontext *ctx, size_t sz, void *data, int flags,

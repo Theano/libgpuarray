@@ -50,6 +50,19 @@ static uint32_t strb_hash(void *_k) {
   return XXH32(k->s, k->l, 42);
 }
 
+static int cuda_get_platform_count(int* platcount) {
+  *platcount = 1;  // CUDA works on NVIDIA's GPUs
+  return GA_NO_ERROR;
+}
+
+static int cuda_get_device_count(int platform, int* devcount) {
+  // platform number gets ignored in CUDA implementation
+  err = cuDeviceGetCount(devcount);
+  if (err != CUDA_SUCCESS)
+    return GA_IMPL_ERROR;
+  return GA_NO_ERROR;
+}
+
 cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   cuda_context *res;
   void *p;
@@ -1720,7 +1733,9 @@ static const char *cuda_error(gpucontext *c) {
 }
 
 GPUARRAY_LOCAL
-const gpuarray_buffer_ops cuda_ops = {cuda_init,
+const gpuarray_buffer_ops cuda_ops = {cuda_get_platform_count,
+                                      cuda_get_device_count,
+                                      cuda_init,
                                       cuda_deinit,
                                       cuda_alloc,
                                       cuda_retain,

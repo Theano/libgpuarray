@@ -39,6 +39,40 @@ static gpukernel *cl_newkernel(gpucontext *ctx, unsigned int count,
                                char **err_str);
 static const char CL_CONTEXT_PREAMBLE[];
 
+static inline int cl_get_platform_count(int* platcount) {
+  cl_uint nump;
+  err = clGetPlatformIDs(0, NULL, &nump);
+  if (err != CL_SUCCESS)
+    return GA_IMPL_ERROR;
+  *platcount = (unsigned int)nump;
+  return GA_NO_ERROR;
+}
+
+static int cl_get_device_count(int platform, int* devcount) {
+  cl_platform_id *ps;
+  cl_platform_id p;
+  cl_uint numd;
+  int platcount;
+  GA_CHECK(cl_get_platform_count(&platcount));
+
+  ps = calloc(sizeof(*ps), platcount);
+  if (ps == NULL)
+    return GA_MEMORY_ERROR;
+  err = clGetPlatformIDs((unsigned int)platcount, ps, NULL);
+  if (err != CL_SUCCESS) {
+    free(ps);
+    return GA_IMPL_ERROR;
+  }
+  p = ps[platform];
+
+  err = clGetDeviceIDs(p, CL_DEVICE_TYPE_ALL, 0, NULL, &numd);
+  free(ps);
+  if (err != CL_SUCCESS)
+    return GA_IMPL_ERROR;
+  *devcount = (unsigned int)numd;
+  return GA_NO_ERROR;
+}
+
 static cl_device_id get_dev(cl_context ctx, int *ret) {
   size_t sz;
   cl_device_id res;
@@ -760,7 +794,7 @@ static gpukernel *cl_newkernel(gpucontext *c, unsigned int count,
   int error;
   strb debug_msg = STRB_STATIC_INIT;
   size_t log_size;
-  
+
   ASSERT_CTX(ctx);
 
   if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
@@ -1418,23 +1452,25 @@ static const char *cl_error(gpucontext *c) {
 }
 
 GPUARRAY_LOCAL
-const gpuarray_buffer_ops opencl_ops = {cl_init,
-                                       cl_deinit,
-                                       cl_alloc,
-                                       cl_retain,
-                                       cl_release,
-                                       cl_share,
-                                       cl_move,
-                                       cl_read,
-                                       cl_write,
-                                       cl_memset,
-                                       cl_newkernel,
-                                       cl_retainkernel,
-                                       cl_releasekernel,
-                                       cl_setkernelarg,
-                                       cl_callkernel,
-                                       cl_kernelbin,
-                                       cl_sync,
-                                       cl_transfer,
-                                       cl_property,
-                                       cl_error};
+const gpuarray_buffer_ops opencl_ops = {cl_get_platform_count,
+                                        cl_get_device_count,
+                                        cl_init,
+                                        cl_deinit,
+                                        cl_alloc,
+                                        cl_retain,
+                                        cl_release,
+                                        cl_share,
+                                        cl_move,
+                                        cl_read,
+                                        cl_write,
+                                        cl_memset,
+                                        cl_newkernel,
+                                        cl_retainkernel,
+                                        cl_releasekernel,
+                                        cl_setkernelarg,
+                                        cl_callkernel,
+                                        cl_kernelbin,
+                                        cl_sync,
+                                        cl_transfer,
+                                        cl_property,
+                                        cl_error};
