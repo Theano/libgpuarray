@@ -8,17 +8,29 @@
 #  NCCL_INCLUDE_DIR
 #  NCCL_LIBRARY
 
-find_path(NCCL_INCLUDE_DIR NAMES nccl.h
-    PATHS ${NCCL_ROOT_DIR}/include
-    )
+find_path(NCCL_INCLUDE_DIR
+    NAMES nccl.h
+    PATHS
+      ENV CUDA_PATH
+      ENV NCCL_ROOT_DIR
+    PATH_SUFFIXES
+      include)
 
-find_library(NCCL_LIBRARY NAMES nccl
-    PATHS ${NCCL_ROOT_DIR}/lib ${NCCL_ROOT_DIR}/lib64)
+find_library(NCCL_LIBRARY
+    NAMES nccl
+    PATHS
+      ENV CUDA_PATH
+      ENV NCCL_ROOT_DIR
+    PATH_SUFFIXES
+      lib64
+      lib)
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(NCCL DEFAULT_MSG NCCL_INCLUDE_DIR NCCL_LIBRARY)
+find_package_handle_standard_args(
+  NCCL
+  FOUND_VAR NCCL_FOUND
+  REQUIRED_VARS NCCL_LIBRARY NCCL_INCLUDE_DIR)
 
-if(NCCL_FOUND)
-  message(STATUS "Found NCCL (include: ${NCCL_INCLUDE_DIR}, library: ${NCCL_LIBRARY})")
-  mark_as_advanced(NCCL_INCLUDE_DIR NCCL_LIBRARY)
-endif()
+mark_as_advanced(
+  NCCL_INCLUDE_DIR
+  NCCL_LIBRARY)
