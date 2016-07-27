@@ -282,6 +282,7 @@ static int twoq_add(cache *_c, cache_key_t key, cache_value_t val) {
 
 static cache_value_t twoq_get(cache *_c, const cache_key_t key) {
   twoq_cache *c = (twoq_cache *)_c;
+  node *nn;
   node *n = hash_find(&c->data, key, c->c.keq, c->c.khash);
   if (n == NULL) {
     return NULL;
@@ -300,13 +301,13 @@ static cache_value_t twoq_get(cache *_c, const cache_key_t key) {
       n->temp = WARM;
       list_push(&c->warm, n);
       if (c->warm.size > c->warm_size) {
-        n = list_pop(&c->warm);
-        n->temp = COLD;
-        list_push(&c->cold, n);
+        nn = list_pop(&c->warm);
+        nn->temp = COLD;
+        list_push(&c->cold, nn);
       }
       break;
     default:
-      assert(0 &&"node temperature is not within expected values");      
+      assert(0 && "node temperature is not within expected values");
     }
     return n->val;
   }
