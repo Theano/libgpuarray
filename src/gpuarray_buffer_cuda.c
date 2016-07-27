@@ -1162,6 +1162,7 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
       res = (gpukernel *)cache_get(ctx->kernel_cache, &sb);
       if (res != NULL) {
         res->refcnt++;
+        strb_clear(&sb);
         return res;
       }
       bin = call_compiler(sb.s, sb.l, ctx->bin_id, &bin_len,
@@ -1248,11 +1249,10 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
       strb_clear(&sb);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
-    if (cache_add(ctx->kernel_cache, psb, res) != 0) {
-      FAIL(NULL, GA_MEMORY_ERROR);
-    }
     /* One of the refs is for the cache */
     res->refcnt++;
+    /* If this fails, it will free the key and remove a ref from the kernel. */
+    cache_add(ctx->kernel_cache, psb, res);
     return res;
 }
 
