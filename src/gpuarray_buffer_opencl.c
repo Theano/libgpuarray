@@ -39,7 +39,7 @@ static gpukernel *cl_newkernel(gpucontext *ctx, unsigned int count,
                                char **err_str);
 static const char CL_CONTEXT_PREAMBLE[];
 
-static inline int cl_get_platform_count(int* platcount) {
+static inline int cl_get_platform_count(unsigned int* platcount) {
   cl_uint nump;
   err = clGetPlatformIDs(0, NULL, &nump);
   if (err != CL_SUCCESS)
@@ -48,17 +48,17 @@ static inline int cl_get_platform_count(int* platcount) {
   return GA_NO_ERROR;
 }
 
-static int cl_get_device_count(int platform, int* devcount) {
+static int cl_get_device_count(unsigned int platform, unsigned int* devcount) {
   cl_platform_id *ps;
   cl_platform_id p;
   cl_uint numd;
-  int platcount;
+  unsigned int platcount;
   GA_CHECK(cl_get_platform_count(&platcount));
 
   ps = calloc(sizeof(*ps), platcount);
   if (ps == NULL)
     return GA_MEMORY_ERROR;
-  err = clGetPlatformIDs((unsigned int)platcount, ps, NULL);
+  err = clGetPlatformIDs(platcount, ps, NULL);
   if (err != CL_SUCCESS) {
     free(ps);
     return GA_IMPL_ERROR;

@@ -27,7 +27,7 @@ const gpuarray_buffer_ops *gpuarray_get_ops(const char *name) {
 
 #define FAIL(v, e) { if (ret) *ret = e; return v; }
 
-int get_platform_count(const char* name, int* platcount) {
+int gpu_get_platform_count(const char* name, unsigned int* platcount) {
   const gpuarray_buffer_ops* ops = gpuarray_get_ops(name);
   if (ops == NULL) {
     return GA_INVALID_ERROR;
@@ -35,7 +35,8 @@ int get_platform_count(const char* name, int* platcount) {
   return ops->get_platform_count(platcount);
 }
 
-int get_device_count(const char* name, int platform, int* devcount) {
+int gpu_get_device_count(const char* name, unsigned int platform,
+                         unsigned int* devcount) {
   const gpuarray_buffer_ops* ops = gpuarray_get_ops(name);
   if (ops == NULL) {
     return GA_INVALID_ERROR;

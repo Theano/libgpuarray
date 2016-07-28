@@ -51,12 +51,13 @@ static uint32_t strb_hash(void *_k) {
   return XXH32(k->s, k->l, 42);
 }
 
-static int cuda_get_platform_count(int* platcount) {
+static int cuda_get_platform_count(unsigned int* platcount) {
   *platcount = 1;  // CUDA works on NVIDIA's GPUs
   return GA_NO_ERROR;
 }
 
-static int cuda_get_device_count(int platform, int* devcount) {
+static int cuda_get_device_count(unsigned int platform,
+                                 unsigned int* devcount) {
   // platform number gets ignored in CUDA implementation
   if (!init_done) {
     err = cuInit(0);
@@ -64,9 +65,11 @@ static int cuda_get_device_count(int platform, int* devcount) {
       return GA_IMPL_ERROR;
     init_done = 1;
   }
-  err = cuDeviceGetCount(devcount);
+  int dv;
+  err = cuDeviceGetCount(&dv);
   if (err != CUDA_SUCCESS)
     return GA_IMPL_ERROR;
+  *devcount = (unsigned int)dv;
   return GA_NO_ERROR;
 }
 
