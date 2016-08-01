@@ -191,13 +191,10 @@ directory and run this command:
 
 ::
 
-  python -c "import pygpu;pygpu.test()"
+  DEVICE="<test device>" python -c "import pygpu;pygpu.test()"
 
-By default it will attempt to run the test on 'opencl0:0'.  To use a
-different device set the environment variable DEVICE or
-GPUARRAY_DEVICE to the desired device name.  See the documentation for
-:py:meth:`pygpu.gpuarray.init` for more details on the syntax of the
-device name.
+See the documentation for :py:meth:`pygpu.gpuarray.init` for more
+details on the syntax of the device name.
 
 The test script prints the device name of the chosen device so that
 you can confirm which device it is running on.
