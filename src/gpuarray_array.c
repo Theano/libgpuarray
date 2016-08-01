@@ -66,8 +66,10 @@ static int ga_extcopy(GpuArray *dst, const GpuArray *src) {
     if (k == NULL)
       return GA_MISC_ERROR;
     aa = memdup(&a, sizeof(a));
-    if (aa == NULL)
+    if (aa == NULL) {
+      GpuElemwise_free(k);
       return GA_MEMORY_ERROR;
+    }
     if (ctx->extcopy_cache == NULL)
       ctx->extcopy_cache = cache_twoq(4, 8, 8, 2, extcopy_eq, extcopy_hash,
                                       extcopy_free,
@@ -1040,7 +1042,7 @@ void GpuArray_fprintf(FILE *fd, const GpuArray *a) {
   unsigned int i;
   int comma = 0;
 
-  fprintf(fd, "GpuNdArray <%p, data: %p (%p)> nd=%d\n",
+  fprintf(fd, "GpuArray <%p, data: %p (%p)> nd=%d\n",
           a, a->data, *((void **)a->data), a->nd);
   fprintf(fd, "\tdims: %p, str: %p\n", a->dimensions, a->strides);
   fprintf(fd, "\tITEMSIZE: %zd\n", GpuArray_ITEMSIZE(a));
