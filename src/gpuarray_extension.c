@@ -51,4 +51,4 @@ void *gpuarray_get_extension(const char *name) {
     if (strcmp(name, ext_list[i].name) == 0) return ext_list[i].val;
   }
   return NULL;
-}  
+}

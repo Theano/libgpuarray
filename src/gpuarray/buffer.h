@@ -44,6 +44,31 @@ struct _gpukernel;
 typedef struct _gpukernel gpukernel;
 
 /**
+ * \brief Gets information about the number of available platforms for the
+ * backend specified in `name`.
+ * \param name [const char*] the backend name
+ * \param platcount [unsigned int*] will contain number of compatible platforms in host
+ * \return int GA_NO_ERROR, if success
+ */
+GPUARRAY_PUBLIC int gpu_get_platform_count(const char* name,
+                                           unsigned int* platcount);
+
+/**
+ * \brief Gets information about the number of compatible devices on a specific
+ * host's `platform` for the backend specified in `name`.
+ * \param name [const char*] the backend name
+ * \param platform [unsigned int] number for a platform in host
+ * \param devcount [unsigned int*] will contain number of compatible devices in
+ * `platform`
+ * \return int GA_NO_ERROR, if success
+ */
+GPUARRAY_PUBLIC int gpu_get_device_count(const char* name,
+                                         unsigned int platform,
+                                         unsigned int* devcount);
+
+
+
+/**
  * Create a context on the specified device.
  *
  * \warning This function is not thread-safe.

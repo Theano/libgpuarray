@@ -27,6 +27,23 @@ const gpuarray_buffer_ops *gpuarray_get_ops(const char *name) {
 
 #define FAIL(v, e) { if (ret) *ret = e; return v; }
 
+int gpu_get_platform_count(const char* name, unsigned int* platcount) {
+  const gpuarray_buffer_ops* ops = gpuarray_get_ops(name);
+  if (ops == NULL) {
+    return GA_INVALID_ERROR;
+  }
+  return ops->get_platform_count(platcount);
+}
+
+int gpu_get_device_count(const char* name, unsigned int platform,
+                         unsigned int* devcount) {
+  const gpuarray_buffer_ops* ops = gpuarray_get_ops(name);
+  if (ops == NULL) {
+    return GA_INVALID_ERROR;
+  }
+  return ops->get_device_count(platform, devcount);
+}
+
 gpucontext *gpucontext_init(const char *name, int dev, int flags, int *ret) {
   gpucontext *res;
   const gpuarray_buffer_ops *ops = gpuarray_get_ops(name);

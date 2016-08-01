@@ -27,6 +27,7 @@
 #define FRAG_SIZE (64)
 
 static CUresult err;
+static int init_done = 0;
 
 GPUARRAY_LOCAL const gpuarray_buffer_ops cuda_ops;
 
@@ -48,6 +49,28 @@ static int strb_eq(void *_k1, void *_k2) {
 static uint32_t strb_hash(void *_k) {
   strb *k = (strb *)_k;
   return XXH32(k->s, k->l, 42);
+}
+
+static int cuda_get_platform_count(unsigned int* platcount) {
+  *platcount = 1;  // CUDA works on NVIDIA's GPUs
+  return GA_NO_ERROR;
+}
+
+static int cuda_get_device_count(unsigned int platform,
+                                 unsigned int* devcount) {
+  // platform number gets ignored in CUDA implementation
+  if (!init_done) {
+    err = cuInit(0);
+    if (err != CUDA_SUCCESS)
+      return GA_IMPL_ERROR;
+    init_done = 1;
+  }
+  int dv;
+  err = cuDeviceGetCount(&dv);
+  if (err != CUDA_SUCCESS)
+    return GA_IMPL_ERROR;
+  *devcount = (unsigned int)dv;
+  return GA_NO_ERROR;
 }
 
 cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
@@ -344,7 +367,6 @@ static cuda_context *do_init(CUdevice dev, int flags, int *ret) {
 static gpucontext *cuda_init(int ord, int flags, int *ret) {
     CUdevice dev;
     cuda_context *res;
-    static int init_done = 0;
 
     if (!init_done) {
       err = cuInit(0);
@@ -1720,7 +1742,9 @@ static const char *cuda_error(gpucontext *c) {
 }
 
 GPUARRAY_LOCAL
-const gpuarray_buffer_ops cuda_ops = {cuda_init,
+const gpuarray_buffer_ops cuda_ops = {cuda_get_platform_count,
+                                      cuda_get_device_count,
+                                      cuda_init,
                                       cuda_deinit,
                                       cuda_alloc,
                                       cuda_retain,
