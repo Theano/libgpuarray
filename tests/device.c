@@ -18,7 +18,7 @@ int get_env_dev(const char **name) {
     if ((dev = getenv("GPUARRAY_TEST_DEVICE")) == NULL) {
       if ((dev = getenv("DEVICE")) == NULL) {
         fprintf(stderr, "No device specified for testing, specify a device with DEVICE or GPUARRAY_TEST_DEVICE");
-        return -1
+        return -1;
       }
     }
   }
