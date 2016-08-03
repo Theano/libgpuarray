@@ -206,7 +206,7 @@ cdef class GpuComm:
 
         Notes
         -----
-        * Not providing `dest` argument for a root caller will result in creating
+        * Not providing `dest` argument for a caller will result in creating
         a new compatible :ref:`GpuArray` and returning result in it.
 
         """
@@ -228,7 +228,7 @@ cdef class GpuComm:
 
         Notes
         -----
-        * Not providing `dest` argument for a root caller will result in creating
+        * Not providing `dest` argument for a caller will result in creating
         a new compatible :ref:`GpuArray` and returning result in it.
 
         """
