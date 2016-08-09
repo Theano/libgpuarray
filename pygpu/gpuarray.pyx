@@ -1,12 +1,13 @@
 cimport libc.stdio
 from libc.stdlib cimport malloc, calloc, free
 from cpython.mem cimport PyMem_Malloc, PyMem_Free
+from cpython.buffer cimport PyBUF_WRITEABLE, PyBUF_FORMAT, PyBUF_ND, PyBUF_SIMPLE, PyBUF_F_CONTIGUOUS, PyBUF_C_CONTIGUOUS, PyBUF_STRIDES
 from libc.string cimport strncmp
 
 cimport numpy as np
 import numpy as np
 
-from cpython cimport Py_INCREF, PyNumber_Index
+from cpython cimport Py_INCREF, PyNumber_Index, Py_buffer
 from cpython.object cimport Py_EQ, Py_NE
 
 def api_version():
@@ -1452,6 +1453,36 @@ cdef class GpuArray:
     def __init__(self):
         if type(self) is GpuArray:
             raise RuntimeError, "Called raw GpuArray.__init__"
+
+    def __getbuffer__(self, Py_buffer *buf, int flags):
+        if not (flags & PyBUF_STRIDES or
+                (flags & PyBUF_ND and GpuArray_IS_C_CONTIGUOUS(&self.ga))):
+            raise BufferError("Can't satisfy request for strides and dims")
+        if ((flags & PyBUF_C_CONTIGUOUS and
+             not GpuArray_IS_C_CONTIGUOUS(&self.ga)) or
+            (flags * PyBUF_F_CONTIGUOUS and
+             not GpuArray_IS_F_CONTIGUOUS(&self.ga))):
+            raise BufferError("Can't statisfy contiguity request")
+        if (flags & PyBUF_WRITEABLE and
+                not GpuArray_CHKFLAGS(&self.ga, GA_WRITEABLE)):
+            raise BufferError("Can't satisfy writability request")
+        buf.buf = <void *>(<size_t>((<void **>self.ga.data)[0]) + self.ga.offset)
+        buf.obj = self
+        buf.len = self.size()
+        buf.itemsize = gpuarray_get_elsize(self.ga.typecode)
+        buf.ndim = self.ga.nd
+        buf.readonly = not GpuArray_CHKFLAGS(&self.ga, GA_WRITEABLE)
+        if flags & PyBUF_FORMAT:
+            buf.format = self.dtype.char
+        else:
+            buf.format = NULL
+
+        buf.shape = <Py_ssize_t *>self.ga.dimensions
+        buf.strides = self.ga.strides
+        buf.suboffsets = NULL
+
+    def __releasebuffer__(self, Py_buffer *buf):
+        pass
 
     def __reduce__(self):
         raise RuntimeError, "Cannot pickle GpuArray object"
