@@ -554,6 +554,32 @@ static gpudata *cuda_alloc(gpucontext *c, size_t size, void *data, int flags,
   return res;
 }
 
+CUipcMemHandle cuda_get_ipc_handle(gpudata *d) {
+  CUipcMemHandle h = NULL;
+
+  ASSERT_BUF(d);
+  cuda_enter(d->ctx);
+  d->ctx->err = cuIpcGetMemHandle(&h, d->ptr);
+  cuda_exit(d->ctx);
+  return h;
+}
+
+gpudata *cuda_open_ipc_handle(gpucontext *c, CUipcMemHandle h, size_t sz) {
+  CUdeviceptr p;
+  cuda_context *ctx = (cuda_context *)c;
+  gpudata *d = NULL;
+
+  cuda_enter(ctx);
+  ctx->err = cuIpcOpenMemHandle(&p, h, CU_IPC_MEM_LAZY_ENABLE_PEER_ACCESS);
+  if (ctx->err == CUDA_SUCCESS) {
+    d = cuda_make_buf(ctx, p, sz);
+    if (d != NULL)
+      d->flags |= CUDA_IPC_MEMORY;
+  }
+  cuda_exit(ctx);
+  return d;
+}
+
 static void cuda_retain(gpudata *d) {
   ASSERT_BUF(d);
   d->refcnt++;
@@ -578,6 +604,9 @@ static void cuda_free(gpudata *d) {
     cuda_context *ctx = d->ctx;
     if (d->flags & DONTFREE) {
       /* This is the path for "external" buffers */
+      deallocate(d);
+    } else if (d->flags & CUDA_IPC_MEMORY) {
+      cuIpcCloseMemHandle(d->ptr);
       deallocate(d);
     } else if (ctx->flags & GA_CTX_DISABLE_ALLOCATION_CACHE) {
       /* Just free the pointer */
