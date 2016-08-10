@@ -16,8 +16,14 @@
 #include "gpuarray/buffer.h"
 #include "gpuarray/util.h"
 #include "gpuarray/error.h"
-#include "gpuarray/extension.h"
 #include "gpuarray/buffer_blas.h"
+
+#include "gpuarray/extension.h"
+
+STATIC_ASSERT(DONTFREE == GPUARRAY_CUDA_CTX_NOFREE, cuda_nofree_eq);
+STATIC_ASSERT(CUDA_WAIT_READ == GPUARRAY_CUDA_WAIT_READ, cuda_wait_read_eq);
+STATIC_ASSERT(CUDA_WAIT_WRITE == GPUARRAY_CUDA_WAIT_WRITE, cuda_wait_write_eq);
+STATIC_ASSERT(sizeof(GpuArrayIpcMemHandle) == sizeof(CUipcMemHandle), cuda_ipcmem_eq);
 
 /* Allocations will be made in blocks of at least this size */
 #define BLOCK_SIZE (4 * 1024 * 1024)
@@ -554,23 +560,28 @@ static gpudata *cuda_alloc(gpucontext *c, size_t size, void *data, int flags,
   return res;
 }
 
-CUipcMemHandle cuda_get_ipc_handle(gpudata *d) {
-  CUipcMemHandle h = NULL;
+GpuArrayIpcMemHandle cuda_get_ipc_handle(gpudata *d) {
+  CUipcMemHandle h = {{0}};
 
   ASSERT_BUF(d);
   cuda_enter(d->ctx);
   d->ctx->err = cuIpcGetMemHandle(&h, d->ptr);
   cuda_exit(d->ctx);
-  return h;
+  /* You need to do this stupid dance because direct casting of
+   * structures is not allowed */
+  return *((GpuArrayIpcMemHandle *)&h);
 }
 
-gpudata *cuda_open_ipc_handle(gpucontext *c, CUipcMemHandle h, size_t sz) {
+gpudata *cuda_open_ipc_handle(gpucontext *c, GpuArrayIpcMemHandle h, size_t sz) {
   CUdeviceptr p;
   cuda_context *ctx = (cuda_context *)c;
   gpudata *d = NULL;
 
   cuda_enter(ctx);
-  ctx->err = cuIpcOpenMemHandle(&p, h, CU_IPC_MEM_LAZY_ENABLE_PEER_ACCESS);
+  /* You need to do this stupid dance because direct casting of
+   * structures is not allowed */
+  ctx->err = cuIpcOpenMemHandle(&p, *((CUipcMemHandle *)&h),
+                                CU_IPC_MEM_LAZY_ENABLE_PEER_ACCESS);
   if (ctx->err == CUDA_SUCCESS) {
     d = cuda_make_buf(ctx, p, sz);
     if (d != NULL)
