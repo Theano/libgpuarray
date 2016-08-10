@@ -1424,6 +1424,28 @@ def _concatenate(list al, unsigned int axis, int restype, object cls,
     finally:
         PyMem_Free(als)
 
+cdef int (*cuda_get_ipc_handle)(gpudata *, GpuArrayIpcMemHandle *)
+cdef gpudata *(*cuda_open_ipc_handle)(gpucontext *, GpuArrayIpcMemHandle *, size_t)
+
+cuda_get_ipc_handle = <int (*)(gpudata *, GpuArrayIpcMemHandle *)>gpuarray_get_extension("cuda_get_ipc_handle")
+cuda_open_ipc_handle = <gpudata *(*)(gpucontext *, GpuArrayIpcMemHandle *, size_t)>gpuarray_get_extension("cuda_open_ipc_handle")
+
+def open_ipc_handle(GpuContext c, bytes hpy, size_t l):
+    """
+    Open an IPC handle to get a new GpuArray from it.
+    """
+    cdef char *b
+    cdef GpuArrayIpcMemHandle h
+    cdef gpudata *d
+
+    b = hpy
+    memcpy(&h, b, sizeof(h))
+
+    d = cuda_open_ipc_handle(c.ctx, &h, l)
+    if d is NULL:
+        raise GpuArrayException, "could not open handle"
+    return <size_t>d
+
 cdef class GpuArray:
     """
     Device array
@@ -1560,6 +1582,19 @@ cdef class GpuArray:
         if sz != npsz:
             raise ValueError, "GpuArray and Numpy array do not have the same size in bytes"
         array_read(np.PyArray_DATA(dst), sz, self)
+
+    def get_ipc_handle(self):
+        cdef GpuArrayIpcMemHandle h
+        cdef int err
+        if cuda_get_ipc_handle is NULL:
+            raise SystemError, "Could not get necessary extension"
+        if self.context.kind == 'cuda':
+            raise ValueError, "Only works for cuda contexts"
+        err = cuda_get_ipc_handle(self.ga.data, &h)
+        if err != GA_NO_ERROR:
+            raise get_exc(err), GpuArray_error(&self.ga, err)
+        res = <bytes>(<char *>&h)[:sizeof(h)]
+        return res
 
     def __array__(self):
         """

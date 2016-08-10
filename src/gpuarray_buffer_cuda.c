@@ -560,27 +560,22 @@ static gpudata *cuda_alloc(gpucontext *c, size_t size, void *data, int flags,
   return res;
 }
 
-GpuArrayIpcMemHandle cuda_get_ipc_handle(gpudata *d) {
-  CUipcMemHandle h = {{0}};
-
+int cuda_get_ipc_handle(gpudata *d, GpuArrayIpcMemHandle *h) {
   ASSERT_BUF(d);
   cuda_enter(d->ctx);
-  d->ctx->err = cuIpcGetMemHandle(&h, d->ptr);
+  CUDA_EXIT_ON_ERROR(d->ctx,
+                     cuIpcGetMemHandle((CUipcMemHandle *)h, d->ptr));
   cuda_exit(d->ctx);
-  /* You need to do this stupid dance because direct casting of
-   * structures is not allowed */
-  return *((GpuArrayIpcMemHandle *)&h);
+  return GA_NO_ERROR;
 }
 
-gpudata *cuda_open_ipc_handle(gpucontext *c, GpuArrayIpcMemHandle h, size_t sz) {
+gpudata *cuda_open_ipc_handle(gpucontext *c, GpuArrayIpcMemHandle *h, size_t sz) {
   CUdeviceptr p;
   cuda_context *ctx = (cuda_context *)c;
   gpudata *d = NULL;
 
   cuda_enter(ctx);
-  /* You need to do this stupid dance because direct casting of
-   * structures is not allowed */
-  ctx->err = cuIpcOpenMemHandle(&p, *((CUipcMemHandle *)&h),
+  ctx->err = cuIpcOpenMemHandle(&p, *((CUipcMemHandle *)h),
                                 CU_IPC_MEM_LAZY_ENABLE_PEER_ACCESS);
   if (ctx->err == CUDA_SUCCESS) {
     d = cuda_make_buf(ctx, p, sz);
