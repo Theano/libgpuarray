@@ -1425,6 +1425,11 @@ def _concatenate(list al, unsigned int axis, int restype, object cls,
     finally:
         PyMem_Free(als)
 
+cdef const char *get_buffer_format(int typecode) except NULL:
+  if typecode == GA_FLOAT:
+      return "f"
+  raise ValueError("No mapping for type")
+
 cdef class GpuArray:
     """
     Device array
@@ -1475,12 +1480,12 @@ cdef class GpuArray:
         if buf.buf is NULL:
             raise BufferError("Couldn't map buffer")
         buf.obj = self
-        buf.len = self.size()
+        buf.len = self.size
         buf.itemsize = gpuarray_get_elsize(self.ga.typecode)
         buf.ndim = self.ga.nd
         buf.readonly = not GpuArray_CHKFLAGS(&self.ga, GA_WRITEABLE)
         if flags & PyBUF_FORMAT:
-            buf.format = self.dtype.char
+            buf.format = get_buffer_format(self.ga.typecode)
         else:
             buf.format = NULL
 
