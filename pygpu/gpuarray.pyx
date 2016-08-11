@@ -1460,7 +1460,7 @@ cdef class GpuArray:
             raise BufferError("Can't satisfy request for strides and dims")
         if ((flags & PyBUF_C_CONTIGUOUS and
              not GpuArray_IS_C_CONTIGUOUS(&self.ga)) or
-            (flags * PyBUF_F_CONTIGUOUS and
+            (flags & PyBUF_F_CONTIGUOUS and
              not GpuArray_IS_F_CONTIGUOUS(&self.ga))):
             raise BufferError("Can't statisfy contiguity request")
         if (flags & PyBUF_WRITEABLE and
