@@ -1,7 +1,7 @@
 cimport libc.stdio
 from libc.stdlib cimport malloc, calloc, free
 from cpython.mem cimport PyMem_Malloc, PyMem_Free
-from cpython.buffer cimport PyBUF_WRITEABLE, PyBUF_FORMAT, PyBUF_ND, PyBUF_SIMPLE, PyBUF_F_CONTIGUOUS, PyBUF_C_CONTIGUOUS, PyBUF_STRIDES
+from cpython.buffer cimport PyBUF_WRITEABLE, PyBUF_FORMAT, PyBUF_ND, PyBUF_SIMPLE, PyBUF_F_CONTIGUOUS, PyBUF_C_CONTIGUOUS, PyBUF_ANY_CONTIGUOUS, PyBUF_STRIDES
 from libc.string cimport strncmp
 
 cimport numpy as np
@@ -1458,10 +1458,15 @@ cdef class GpuArray:
         if not (flags & PyBUF_STRIDES or
                 (flags & PyBUF_ND and GpuArray_IS_C_CONTIGUOUS(&self.ga))):
             raise BufferError("Can't satisfy request for strides and dims")
-        if ((flags & PyBUF_C_CONTIGUOUS and
+        # Python buffer protocol is really dumb and the following
+        # flags are not really flags and contain multiple bits so we
+        # have to check for the value to test.
+        if (((flags & PyBUF_C_CONTIGUOUS) == PyBUF_C_CONTIGUOUS and
              not GpuArray_IS_C_CONTIGUOUS(&self.ga)) or
-            (flags & PyBUF_F_CONTIGUOUS and
-             not GpuArray_IS_F_CONTIGUOUS(&self.ga))):
+            ((flags & PyBUF_F_CONTIGUOUS) == PyBUF_F_CONTIGUOUS and
+             not GpuArray_IS_F_CONTIGUOUS(&self.ga)) or
+            ((flags & PyBUF_ANY_CONTIGUOUS) == PyBUF_ANY_CONTIGUOUS and
+             not GpuArray_ISONESEGMENT(&self.ga))):
             raise BufferError("Can't statisfy contiguity request")
         if (flags & PyBUF_WRITEABLE and
                 not GpuArray_CHKFLAGS(&self.ga, GA_WRITEABLE)):
