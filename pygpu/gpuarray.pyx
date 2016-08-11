@@ -839,7 +839,7 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
         else:
             size = gpuarray_get_elsize(typecode)
             for i in range(nd-1, -1, -1):
-                strides[i] = size
+                cstrides[i] = size
                 size *= cdims[i]
 
         return pygpu_fromgpudata(<gpudata *>data, offset, typecode, nd, cdims,
