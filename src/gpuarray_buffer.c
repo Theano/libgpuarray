@@ -152,6 +152,14 @@ int gpudata_write(gpudata *dst, size_t dstoff, const void *src, size_t sz) {
                                                           src, sz);
 }
 
+void *gpudata_map(gpudata *d) {
+  return ((partial_gpudata *)d)->ctx->ops->buffer_map(d);
+}
+
+int gpudata_unmap(void *p, gpudata *d) {
+  return ((partial_gpudata *)d)->ctx->ops->buffer_unmap(d, p);
+}
+
 int gpudata_memset(gpudata *dst, size_t dstoff, int data) {
   return ((partial_gpudata *)dst)->ctx->ops->buffer_memset(dst, dstoff, data);
 }

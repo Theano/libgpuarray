@@ -788,6 +788,27 @@ static int cuda_write(gpudata *dst, size_t dstoff, const void *src,
     return GA_NO_ERROR;
 }
 
+static void *cuda_map(gpudata *d) {
+  void *p;
+
+  ASSERT_BUF(d);
+
+  cuda_enter(d->ctx);
+  d->ctx->err = cuPointerGetAttribute(&p, CU_POINTER_ATTRIBUTE_HOST_POINTER,
+                                      d->ptr);
+  if (d->ctx->err != CUDA_SUCCESS)
+    p = NULL;
+  cuda_exit(d->ctx);
+  return p;
+}
+
+static int cuda_unmap(gpudata *d, void *p) {
+  ASSERT_BUF(d);
+  /* We don't need to unmap anything apparently */
+
+  return GA_NO_ERROR;
+}
+
 static int cuda_memset(gpudata *dst, size_t dstoff, int data) {
     cuda_context *ctx = dst->ctx;
 
@@ -1746,6 +1767,8 @@ const gpuarray_buffer_ops cuda_ops = {cuda_get_platform_count,
                                       cuda_move,
                                       cuda_read,
                                       cuda_write,
+                                      cuda_map,
+                                      cuda_unmap,
                                       cuda_memset,
                                       cuda_newkernel,
                                       cuda_retainkernel,
