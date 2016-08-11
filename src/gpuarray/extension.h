@@ -20,7 +20,7 @@ extern "C" {
 #define GPUARRAY_CUDA_WAIT_WRITE 0x20000 /* CUDA_WAIT_WRITE */
 
 typedef struct _GpuArrayIpcMemHandle {
-  char private[64];
+  char priv[64];
 } GpuArrayIpcMemHandle;
 
 /**
