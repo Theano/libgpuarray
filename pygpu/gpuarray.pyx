@@ -1588,7 +1588,7 @@ cdef class GpuArray:
         cdef int err
         if cuda_get_ipc_handle is NULL:
             raise SystemError, "Could not get necessary extension"
-        if self.context.kind == 'cuda':
+        if self.context.kind != b'cuda':
             raise ValueError, "Only works for cuda contexts"
         err = cuda_get_ipc_handle(self.ga.data, &h)
         if err != GA_NO_ERROR:
