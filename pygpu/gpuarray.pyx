@@ -1466,7 +1466,9 @@ cdef class GpuArray:
         if (flags & PyBUF_WRITEABLE and
                 not GpuArray_CHKFLAGS(&self.ga, GA_WRITEABLE)):
             raise BufferError("Can't satisfy writability request")
-        buf.buf = <void *>(<size_t>((<void **>self.ga.data)[0]) + self.ga.offset)
+        buf.buf = gpudata_map(self.ga.data)
+        if buf.buf is NULL:
+            raise BufferError("Couldn't map buffer")
         buf.obj = self
         buf.len = self.size()
         buf.itemsize = gpuarray_get_elsize(self.ga.typecode)
@@ -1482,7 +1484,10 @@ cdef class GpuArray:
         buf.suboffsets = NULL
 
     def __releasebuffer__(self, Py_buffer *buf):
-        pass
+        cdef int err
+        err = gpudata_unmap(buf.buf, self.ga.data)
+        if err != GA_NO_ERROR:
+            raise get_exc(err), GpuArray_error(&self.ga, err)
 
     def __reduce__(self):
         raise RuntimeError, "Cannot pickle GpuArray object"

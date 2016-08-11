@@ -77,6 +77,8 @@ cdef extern from "gpuarray/buffer.h":
     char *gpucontext_error(gpucontext *ctx, int err)
     int gpucontext_property(gpucontext *ctx, int prop_id, void *res)
     int gpukernel_property(gpukernel *k, int prop_id, void *res)
+    void *gpudata_map(gpudata *)
+    int gpudata_unmap(void *, gpudata *)
     gpucontext *gpudata_context(gpudata *)
     gpucontext *gpukernel_context(gpukernel *)
 
