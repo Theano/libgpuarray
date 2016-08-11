@@ -87,6 +87,8 @@ struct _gpuarray_buffer_ops {
                      size_t sz);
   int (*buffer_read)(void *dst, gpudata *src, size_t srcoff, size_t sz);
   int (*buffer_write)(gpudata *dst, size_t dstoff, const void *src, size_t sz);
+  void *(*buffer_map)(gpudata *d);
+  int (*buffer_unmap)(gpudata *d, void *p);
   int (*buffer_memset)(gpudata *dst, size_t dstoff, int data);
   gpukernel *(*kernel_alloc)(gpucontext *ctx, unsigned int count,
                              const char **strings, const size_t *lengths,

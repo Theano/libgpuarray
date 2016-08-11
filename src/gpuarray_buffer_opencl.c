@@ -647,6 +647,53 @@ static int cl_write(gpudata *dst, size_t dstoff, const void *src, size_t sz) {
   return GA_NO_ERROR;
 }
 
+static void *cl_map(gpudata *d) {
+  void *p;
+  size_t sz;
+  cl_event evw[1];
+  cl_event *evl = NULL;
+  cl_uint num_ev = 0;
+
+  ASSERT_BUF(d);
+
+  if (d->ev != NULL) {
+    evw[0] = d->ev;
+    evl = evw;
+    num_ev = 1;
+  }
+
+  d->ctx->err = clGetMemObjectInfo(d->buf, CL_MEM_SIZE, sizeof(sz), &sz, NULL);
+
+  p = clEnqueueMapBuffer(d->ctx->q, d->buf, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE,
+                         0, sz, num_ev, evl, NULL, &d->ctx->err);
+
+  if (d->ctx->err != CL_SUCCESS) return NULL;
+  if (d->ev != NULL) clReleaseEvent(d->ev);
+  d->ev = NULL;
+  return p;
+}
+
+static int cl_unmap(gpudata *d, void *p) {
+  cl_event ev;
+  cl_event evw[1];
+  cl_event *evl = NULL;
+  cl_uint num_ev = 0;
+
+  ASSERT_BUF(d);
+
+  if (d->ev != NULL) {
+    evw[0] = d->ev;
+    evl = evw;
+    num_ev = 1;
+  }
+
+  d->ctx->err = clEnqueueUnmapMemObject(d->ctx->q, d->buf, p, num_ev, evl, &ev);
+  if (d->ctx->err != CL_SUCCESS) return GA_IMPL_ERROR;
+  if (d->ev != NULL) clReleaseEvent(d->ev);
+  d->ev = ev;
+  return GA_NO_ERROR;
+}
+
 static int cl_memset(gpudata *dst, size_t offset, int data) {
   char local_kern[256];
   cl_ctx *ctx = dst->ctx;
@@ -1463,6 +1510,8 @@ const gpuarray_buffer_ops opencl_ops = {cl_get_platform_count,
                                         cl_move,
                                         cl_read,
                                         cl_write,
+                                        cl_map,
+                                        cl_unmap,
                                         cl_memset,
                                         cl_newkernel,
                                         cl_retainkernel,

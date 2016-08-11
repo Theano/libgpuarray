@@ -364,6 +364,27 @@ GPUARRAY_PUBLIC int gpudata_write(gpudata *dst, size_t dstoff,
                                   const void *src, size_t sz);
 
 /**
+ * Return a pointer for host access to a device buffer.
+ *
+ * The returned pointer must be freed with gpudata_unmap().
+ *
+ * \param d buffer to map
+ *
+ * \returns NULL if an error occurs
+ */
+GPUARRAY_PUBLIC void *gpudata_map(gpudata *d);
+
+/**
+ * Free a mapped host pointer.
+ *
+ * \param p the pointer to free.
+ * \param d the buffer the pointer was mapped from.
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpudata_unmap(void *p, gpudata *d);
+
+/**
  * Set a buffer to a byte pattern.
  *
  * This function acts like the C function memset() for device buffers.
