@@ -1374,12 +1374,16 @@ static int cuda_sync(gpudata *b) {
 
   ASSERT_BUF(b);
   cuda_enter(ctx);
-  ctx->err = cuEventSynchronize(b->wev);
-  if (ctx->err != CUDA_SUCCESS)
-    err = GA_IMPL_ERROR;
-  ctx->err = cuEventSynchronize(b->rev);
-  if (ctx->err != CUDA_SUCCESS)
-    err = GA_IMPL_ERROR;
+  if (ctx->flags & GA_CTX_SINGLE_STREAM) {
+    cuStreamSynchronize(ctx->s);
+  } else {
+    ctx->err = cuEventSynchronize(b->wev);
+    if (ctx->err != CUDA_SUCCESS)
+      err = GA_IMPL_ERROR;
+    ctx->err = cuEventSynchronize(b->rev);
+    if (ctx->err != CUDA_SUCCESS)
+      err = GA_IMPL_ERROR;
+  }
   cuda_exit(ctx);
   return err;
 }
