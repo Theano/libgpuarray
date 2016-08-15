@@ -18,6 +18,7 @@
 #include "gpuarray/util.h"
 
 #include "util/strb.h"
+#include "util/integerfactoring.h"
 
 
 /* Datatypes */
@@ -102,7 +103,7 @@ GPUARRAY_PUBLIC int GpuArray_maxandargmax(GpuArray*       dstMax,
                                           const GpuArray* src,
                                           const int*      isReduced){
 	/**
-	 * Generate kernel source code
+	 * Generate kernel source code.
 	 */
 	
 	const char*  dstMaxType      = gpuarray_get_type(src->typecode) -> cluda_name;
@@ -113,23 +114,36 @@ GPUARRAY_PUBLIC int GpuArray_maxandargmax(GpuArray*       dstMax,
 	                                                      dstArgmaxType);
 	if(!s){return GA_MEMORY_ERROR;}
 	
-	/* Compile it */
-	const int    ARG_TYPECODE[8] = {
+	
+	/**
+	 * Compile it.
+	 */
+	
+	const int    ARG_TYPECODE[11] = {
 		GA_BUFFER, /* src */
+		GA_SIZE,   /* srcOff */
 		GA_BUFFER, /* srcSteps */
 		GA_BUFFER, /* srcSize */
 		GA_BUFFER, /* numBlk */
 		GA_BUFFER, /* dstMax */
+		GA_SIZE,   /* dstMaxOff */
 		GA_BUFFER, /* dstMaxSteps */
 		GA_BUFFER, /* dstArgmax */
+		GA_SIZE,   /* dstArgmaxOff */
 		GA_BUFFER  /* dstArgmaxSteps */
 	};
+	
 	const size_t l = strlen(s);
+	
 	GpuKernel kernel;
 	GpuKernel_init(&kernel, 0, 1, &s, &l, "maxandargmax",
 	               8, ARG_TYPECODE, 0, (char**)0);
 	
-	/* Invoke it. */
+	
+	/**
+	 * Invoke it.
+	 */
+	
 	invokeMaxAndArgmax(&kernel, src, isReduced);
 
 	/* Return error code */
@@ -207,6 +221,15 @@ static void  appendPrototype        (strb*           s,
 	strb_appends(s, "                         const X*        dstMaxSteps,\n");
 	strb_appends(s, "                         X*              dstArgmax,\n");
 	strb_appends(s, "                         const X*        dstArgmaxSteps)");
+}
+static void  appendOffsets          (strb*           s,
+                                     gen_kernel_ctx* ctx){
+	strb_appends(s, "/* Add offsets */\n");
+	strb_appends(s, "src       = (const GLOBAL_MEM T*)((const GLOBAL_MEM char*)src       + srcOff);\n");
+	strb_appends(s, "dstMax    = (GLOBAL_MEM T*)      ((GLOBAL_MEM char*)      dstMax    + dstMaxOff);\n");
+	strb_appends(s, "dstArgmax = (GLOBAL_MEM X*)      ((GLOBAL_MEM char*)      dstArgmax + dstArgmaxOff);\n");
+	strb_appends(s, "\n");
+	strb_appends(s, "\n");
 }
 static void  appendIndexDeclarations(strb*           s,
                                      gen_kernel_ctx* ctx){
@@ -481,46 +504,128 @@ static void  appendLoopMacroUndefs  (strb*           s,
 	strb_appends(s, "\t#undef DSTAINDEXER\n");
 }
 
-
-/**
- * FIXME: Implement a working scheduler and invoker.
- * 
- * To schedule effectively the work across several dimensions of possibly
- * ugly numbers, taking into account the limitations on thread & block
- * scheduling, will require some library capable of providing a "factoring"
- * of the tensor dimensions into "nice" prime numbers. Their product may
- * be allowed to be larger than the original number, provided it remains
- * within bounds.
- */
-
 /**
  * Compute a good thread block size / grid size for Nvidia.
  */
 
-static void  scheduleMaxAndArgmax   (size_t*         blockSize,
-                                     size_t*         gridSize,
-                                     const GpuArray* src,
-                                     const int*      isReduced){
-	//int maxThreadPerBlock = 1024;
-	//int numFreeIdx = src->nd - getRdxIdx(src->nd, isReduced);
+static void  scheduleMaxAndArgmax   (const GpuKernel* kernel,
+                                     const GpuArray*  src,
+                                     const int*       isReduced,
+                                     size_t*          blockSize,
+                                     size_t*          gridSize){
+	int i, j;
 	
-	/* Naive solution. Optimization is a tough problem. */
-	blockSize[0] = blockSize[1] = blockSize[2] = 1;
-	gridSize [0] = gridSize [1] = gridSize [2] = 1;
+	/* Obtain the constraints of our problem. */
+	size_t warpSize,
+	       maxL, maxL0, maxL1, maxL2,  /* Maximum total and per-dimension thread/block sizes */
+	       maxG, maxG0, maxG1, maxG2;  /* Maximum total and per-dimension block /grid  sizes */
+	gpukernel_property(kernel->k, GA_KERNEL_PROP_PREFLSIZE, &warpSize);
+	gpukernel_property(kernel->k, GA_KERNEL_PROP_MAXLSIZE,  &maxL);
+	gpudata_property  (src->data, GA_CTX_PROP_MAXLSIZE0,    &maxL0);
+	gpudata_property  (src->data, GA_CTX_PROP_MAXLSIZE1,    &maxL1);
+	gpudata_property  (src->data, GA_CTX_PROP_MAXLSIZE2,    &maxL2);
+	gpudata_property  (src->data, GA_CTX_PROP_MAXGSIZE,     &maxG);
+	gpudata_property  (src->data, GA_CTX_PROP_MAXGSIZE0,    &maxG0);
+	gpudata_property  (src->data, GA_CTX_PROP_MAXGSIZE1,    &maxG1);
+	gpudata_property  (src->data, GA_CTX_PROP_MAXGSIZE2,    &maxG2);
+	
+	int numRdxIdx  = getRdxIdx(src->nd, isReduced);
+	int numFreeIdx = src->nd - numRdxIdx;
+	
+	/**
+	 * Select which reduction dimensions will be associated with which hardware
+	 * x, y and z dimensions.
+	 */
+	
+	int            dims    [3];
+	uint64_t       dimSize [3] = {  1,   1,   1};
+	double         slack   [3] = {1.1, 1.1, 1.1};
+	uint64_t       kSmooth [3];
+	GA_FACTOR_LIST factDims[3];
+	GA_FACTOR_LIST factTBS [3];
+	uint64_t       tBS         =   1;
+	uint64_t       minThrd     =  64;
+	uint64_t       maxThrd     = 256;
+	
+	/************************************************************************
+	 * FIXME: Need logic to select up to 3 dimensions and plug them in dimSize!
+	 *        But what's the best dimension selection strategy to maximize
+	 *        memory bandwidth?
+	 *        Also need to fill out kSmooth[] based on all the GPU properties.
+	 ************************************************************************/
+	kSmooth[0] = maxL0;
+	kSmooth[1] = maxL1;
+	kSmooth[2] = maxL2;
+	
+	/**
+	 * Factorization job. We'll steadily increase the slack in case of failure
+	 * in order to ensure we do get a factorization.
+	 */
+	
+	for(i=0;i<numRdxIdx;i++){
+		while(!gaIFactorize(dimSize[i],
+		                    dimSize[i]*slack[i],
+		                    kSmooth[i],
+		                    &factDims[i])){
+			/**
+			 * Error! Failed to factorize dimension "xyz"[i] with given slack
+			 * and k-smoothness constraints! Increase slack. Once slack reaches
+			 * 2.0 it will factorize guaranteed.
+			 */
+			
+			slack[i] += 0.1;
+		}
+	}
+	
+	/**
+	 * Use the factorization. We "withdraw" factors from the factor lists one
+	 * at a time until we enter our target zone thread#. If the individual
+	 * maxLn in dimension n is about to be breached, we move on to the next
+	 * dimension.
+	 * 
+	 * The same process is then repeated with respect to grid size.
+	 * 
+	 * What's left after that is software blocking.
+	 */
+	
+	gaIFLInit(&factTBS[0]);
+	gaIFLInit(&factTBS[1]);
+	gaIFLInit(&factTBS[2]);
+	for(i=0;i<numRdxIdx;i++){
+		for(j=0;j<15;j++){
+			if(factDims[i].p[j] > 0){
+				factDims[i].p[j]--;
+				gaIFLAddFactors(&factTBS[i], factDims[i].f[j], 1);
+				tBS *= factDims[i].f[j];
+				
+				if(tBS >= minThrd && tBS <= maxThrd){
+					goto computeBS;
+				}
+			}
+		}
+	}
+	
+	computeBS:
+	blockSize[0] = gaIFLGetProduct(&factTBS[0]);
+	blockSize[1] = gaIFLGetProduct(&factTBS[1]);
+	blockSize[2] = gaIFLGetProduct(&factTBS[2]);
+	gridSize [0] = gaIFLGetProduct(&factDims[0]) / blockSize[0];
+	gridSize [1] = gaIFLGetProduct(&factDims[1]) / blockSize[1];
+	gridSize [2] = gaIFLGetProduct(&factDims[2]) / blockSize[2];
 }
 
 /**
  * Invoke the kernel.
  */
 
-static void  invokeMaxAndArgmax     (GpuKernel*      kernel,
+static void  invokeMaxAndArgmax     (GpuKernel*      k,
                                      const GpuArray* src,
                                      const int*      isReduced){
 	size_t blockSize[3];
 	size_t gridSize[3];
 	
-	scheduleMaxAndArgmax(blockSize, gridSize, src, isReduced);
-	GpuKernel_call(kernel,
+	scheduleMaxAndArgmax(k, src, isReduced, blockSize, gridSize);
+	GpuKernel_call(k,
 	               getRdxIdx(src->nd, isReduced),
 	               blockSize,
 	               gridSize,
