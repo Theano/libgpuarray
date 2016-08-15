@@ -1,0 +1,610 @@
+/* Includes */
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+#include "integerfactoring.h"
+
+
+
+/**
+ * Static Function Prototypes
+ */
+
+/**
+ * @brief Round up positive n to next power-of-2 and report its factorization.
+ */
+
+static int   gaIFactorizeNextPow2(uint64_t n, GA_FACTOR_LIST* fl);
+
+
+/**
+ * Function Definitions
+ */
+
+int      gaICtz       (uint64_t n){
+#if __GNUC__ >= 4
+	return n ? __builtin_ctzll(n) : 64;
+#else
+	int z;
+	
+	for(z=0;z<64;z++){
+		if((n>>z) & 1){break;}
+	}
+	
+	return z;
+#endif
+}
+
+int      gaIClz       (uint64_t n){
+#if __GNUC__ >= 4
+	return n ? __builtin_clzll(n) : 64;
+#else
+	int z;
+	
+	for(z=63;z>=0;z--){
+		if((n>>z) & 1){break;}
+	}
+	
+	return 63-z;
+#endif
+}
+
+uint64_t gaIMulMod    (uint64_t a, uint64_t b, uint64_t m){
+#if (__GNUC__ >= 4) && defined(__x86_64__)
+	uint64_t r;
+	
+	asm(
+	    "mul %2\n\t"
+	    "div %3\n\t"
+	    : "=&d"(r)                 /* Outputs */
+	    : "a"(a), "r"(b), "r"(m)   /* Inputs */
+	    : "cc"
+	);
+	
+	return r;
+#elif (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+	/* Hardcore GCC 4.6+ optimization jazz */
+	return ((unsigned __int128)a * (unsigned __int128)b) % m;
+#else
+	const uint64_t TWOPOW32 = (uint64_t)1<<32;
+	int i;
+	
+	a %= m;
+	b %= m;
+	
+	if(m <= TWOPOW32){
+		/**
+		 * Fast path: When performing modulo arithmetic on values <= 2^32,
+		 * (a*b) % m gives the correct answer.
+		 */
+		
+		return (a*b) % m;
+	}else{
+		/**
+		 * Slow path: Have to simulate 128-bit arithmetic long division.
+		 */
+		
+		uint64_t ah   = a>>32;
+		uint64_t al   = (uint32_t)a;
+		uint64_t bh   = b>>32;
+		uint64_t bl   = (uint32_t)b;
+		
+		uint64_t ahbh = ah*bh;
+		uint64_t ahbl = ah*bl;
+		uint64_t albh = al*bh;
+		uint64_t albl = al*bl;
+		
+		uint64_t md   = ahbl+albh;
+		
+		uint64_t lo   = albl + (md<<32);
+		uint64_t hi   = ahbh + (md>>32);
+		
+		/* Propagate carry-outs from `md` and `lo` into `hi` */
+		if(lo < albl){hi++;}
+		if(md < ahbl){hi+=TWOPOW32;}
+		
+		/**
+		 * Begin 128-bit-by-64-bit remainder.
+		 * 
+		 * 1) Cut down `hi` mod `m`. This implements the first few iterations
+		 *    of a shift-and-subtract loop, leaving only 64 iterations to go.
+		 * 2) Iterate 64 times:
+		 *     2.1) Shift left [hi:lo] by 1 bit, into [newHi:newLo].
+		 *     2.2) If:
+		 *         2.2.1) newHi < hi, then there was an overflow into bit 128.
+		 *                The value [1:newHi:newLo] is definitely larger than
+		 *                m, so we subtract. This situation can only occur if
+		 *                m > 2^63.
+		 *         2.2.2) newHi > m, then we must subtract m out of newHi in
+		 *                order to bring back newHi within the range [0, m).
+		 * 3) The modulo is in hi.
+		 */
+		
+		hi %= m;
+		for(i=0;i<64;i++){
+			uint64_t newLo = (lo<<1);
+			uint64_t newHi = (hi<<1) + (newLo<lo);
+			
+			if(newHi < hi || newHi > m){newHi -= m;}
+			
+			hi = newHi;
+			lo = newLo;
+		}
+		
+		return hi;
+	}
+#endif
+}
+
+uint64_t gaIPowMod    (uint64_t x, uint64_t a, uint64_t m){
+	/**
+	 * Special cases (order matters!):
+	 * - A modulo of 0 makes no sense and a modulo of 1 implies a return value
+	 *   of 0, since the result must be integer.
+	 * - An exponent of 0 requires a return value of 1.
+	 * - A base of 0 or 1 requires a return value of 0 or 1.
+	 * - An exponent of 1 requires a return value of x.
+	 * - An exponent of 2 can be handled by the modulo multiplication directly.
+	 */
+	
+	if(m<=1){
+		return 0;
+	}
+	
+	x %= m;
+	
+	if(a==0){
+		return 1;
+	}else if(x<=1){
+		return x;
+	}else if(a==1){
+		return x;
+	}else if(a==2){
+		return gaIMulMod(x,x,m);
+	}
+	
+	/**
+	 * Otherwise, perform modular exponentiation by squaring.
+	 */
+	
+	uint64_t r = 1;
+	while(a){
+		if(a&1){
+			r = gaIMulMod(r, x, m);
+		}
+		
+		x = gaIMulMod(x, x, m);
+		a >>= 1;
+	}
+	
+	return r;
+}
+
+int      gaIIsPrime   (uint64_t n){
+	/**
+	 * Check if it is 2, the oddest prime.
+	 */
+	
+	if(n==2){return 1;}
+	
+	/**
+	 * Check if it is an even integer.
+	 */
+	
+	if((n&1) == 0){return 0;}
+	
+	/**
+	 * For small integers, read directly the answer in a table.
+	 */
+	
+	if(n<256){
+		return "nnyynynynnnynynnnynynnnynnnnnyny"
+		       "nnnnnynnnynynnnynnnnnynnnnnynynn"
+		       "nnnynnnynynnnnnynnnynnnnnynnnnnn"
+		       "nynnnynynnnynynnnynnnnnnnnnnnnny"
+		       "nnnynnnnnynynnnnnnnnnynynnnnnynn"
+		       "nnnynnnynnnnnynnnnnynynnnnnnnnny"
+		       "nynnnynynnnnnnnnnnnynnnnnnnnnnny"
+		       "nnnynynnnynnnnnynynnnnnnnnnynnnn"[n] == 'y';
+	}
+	
+	/**
+	 * Test small prime factors.
+	 */
+	
+	int hasNoSmallFactors = n%3 && n%5 && n%7 && n%11 && n%13;
+	int hasSmallFactors   = !hasNoSmallFactors;
+	if(hasSmallFactors){
+		return 0;
+	}
+	
+	/**
+	 * Otherwise proceed to the Miller-Rabin test.
+	 * 
+	 * The Miller-Rabin test uses integer "witnesses" in an attempt at
+	 * proving the number composite. Should it fail to prove an integer
+	 * composite, it reports the number as "probably prime". However, if
+	 * the witnesses are chosen carefully, the Miller-Rabin test can be made
+	 * deterministic below a chosen threshold. In our case, we use the primes
+	 * 2 to 37 in order to ensure the correctness of the identifications for
+	 * integers under 2^64.
+	 */
+	
+	const uint64_t WITNESSES[]  = {2,3,5,7,11,13,17,19,23,29,31,37};
+	const int      NUMWITNESSES = sizeof(WITNESSES)/sizeof(WITNESSES[0]);
+	size_t         i, j;
+	
+	uint64_t r = gaICtz(n-1);
+	uint64_t d = (n-1)>>r;
+	
+	/* For each witness... */
+	for(i=0;i<NUMWITNESSES;i++){
+		uint64_t a = WITNESSES[i];
+		
+		/* Modular exponentiation of witness by d, modulo the prime. */
+		uint64_t x = gaIPowMod(a,d,n);
+		
+		/**
+		 * If result is 1 or n-1, test inconclusive (can't prove
+		 * compositeness).
+		 */
+		
+		if(x==1 || x==n-1){goto continueWitnessLoop;}
+		
+		/**
+		 * Otherwise, modulo-square x r-1 times. If result is ever 1, it's
+		 * composite. If result is ever n-1, it's inconclusive. If after r-1
+		 * iterations neither 1 nor n-1 came up, it's composite.
+		 */
+		
+		for(j=0;j<r-1;j++){
+			x = gaIPowMod(x,2,n);
+			
+			if(x==1){
+				/* Composite! */
+				return 0;
+			}else if(x == n-1){
+				/* Inconclusive (can't prove compositeness) */
+				goto continueWitnessLoop;
+			}
+		}
+		
+		/* Composite! */
+		return 0;
+		
+		continueWitnessLoop:;
+	}
+	
+	/**
+	 * Having failed to prove this is a composite, and given our choice of
+	 * witnesses, we know we've identified a prime.
+	 */
+	
+	return 1;
+}
+
+int      gaIFactorize (uint64_t n, uint64_t maxN, uint64_t k, GA_FACTOR_LIST* fl){
+	uint64_t i, x, p, f, c;
+	
+	/**
+	 * Insane argument handling.
+	 */
+	
+	if(!fl || (k == 1) || (maxN > 0 && maxN < n)){
+		return 0;
+	}
+	
+	/**
+	 * Handle special cases of n = 0,1,2.
+	 */
+	
+	if(n<=2){
+		gaIFLInit(fl);
+		gaIFLAddFactors(fl, n, 1);
+		return 1;
+	}
+	
+	/**
+	 * Magic-value arguments interpreted and canonicalized.
+	 */
+	
+	if(maxN == (uint64_t)-1 || gaIClz(maxN) < gaIClz(n)){
+		/**
+		 * Either we are allowed unlimited growth of n, or the slack space
+		 * [n, maxN] is big enough to contain a power of 2. We identify, round
+		 * up to and factorize the next higher power of 2 greater than or equal
+		 * to n trivially. Since powers of 2 are by definition 2-smooth, we
+		 * automatically satisfy the most stringent possible smoothness
+		 * constraint.
+		 */
+		
+		return gaIFactorizeNextPow2(n, fl);
+	}else if(maxN == 0){
+		/**
+		 * We are asked for a strict factoring.
+		 */
+		
+		maxN = n;
+	}
+	
+	if(k == 0 || k >= n){
+		/**
+		 * We want no k-smoothness constraint.
+		 */
+		
+		k = n;
+	}
+	
+	
+	/**
+	 * Master loop.
+	 */
+	
+	for(i=n; i <= maxN; i++){
+		/**
+		 * Do not manipulate the loop index!
+		 * Initial subfactor to cut down is x=i.
+		 */
+		
+		x = i;
+		gaIFLInit(fl);
+		
+		/**
+		 * Subfactorization always begins with an attempt at an initial
+		 * cut-down by factors of 2. Should this result in a 1 (which isn't
+		 * technically prime, but indicates a complete factorization), we
+		 * report success.
+		 */
+		
+		subfactorize:
+		gaIFLAddFactors(fl, 2, gaICtz(x));
+		x >>= gaICtz(x);
+		f = 3;
+		
+		/**
+		 * Primality test.
+		 * 
+		 * If the remaining factor x is a prime number, it's decision time. One
+		 * of two things is true:
+		 * 
+		 *  1) We have a smoothness constraint k and x is <= than it, or we
+		 *     don't have a smoothness constraint at all (k==n). Both cases are
+		 *     covered by checking x<=k.
+		 *     
+		 *     In this case we add x as the last factor to the factor list and
+		 *     return affirmatively.
+		 * 
+		 *  2) We have a smoothness constraint and x>k.
+		 *     
+		 *     In this case we have to increment x and begin anew the
+		 *     sub-factorization. This may cause us to fail out of factorizing
+		 *     the current i, by exceeding our slack limit. If this happens we
+		 *     abort the factorization rooted at i and move to the next i.
+		 */
+		
+		primetest:
+		if(x==1 || gaIIsPrime(x)){
+			if(x<=k){
+				gaIFLAddFactors(fl, x, 1);
+				return 1;
+			}else{
+				p = gaIFLGetProduct(fl);
+				if((maxN - p*x) < p){/* Overflow-free check maxN >= p*(x+1) */
+					goto nextI;
+				}else{
+					x++;
+					goto subfactorize;
+				}
+			}
+		}
+		
+		/**
+		 * Composite number handler.
+		 * 
+		 * We continue by trying to cut down x by factors of 3+. Should a trial
+		 * division by a factor f succeed, all powers of f are factored out of
+		 * x and once f no longer divides x evenly, a new primality test is
+		 * run. The primality test will be invoked at most 15 times from this loop.
+		 */
+		
+		for(;f<=k && f*f<=x && f<=0xFFFFFFFFU;f+=2){/* Overflow-safe f*f */
+			if(x%f == 0){
+				c = 0;
+				do{
+					x /= f;
+					c++;
+				}while(x%f == 0);
+				
+				gaIFLAddFactors(fl, f, c);
+				
+				goto primetest;
+			}
+		}
+		
+		/* Check before next iteration for 64-bit integer overflow. */
+		nextI: if(i == 0xFFFFFFFFFFFFFFFF){break;}
+	}
+	
+	/* Failed to factorize. */
+	return 0;
+}
+
+static int   gaIFactorizeNextPow2(uint64_t n, GA_FACTOR_LIST* fl){
+	n--;
+	n |= n >>  1;
+	n |= n >>  2;
+	n |= n >>  4;
+	n |= n >>  8;
+	n |= n >> 16;
+	n |= n >> 32;
+	n++;
+	
+	gaIFLInit(fl);
+	gaIFLAddFactors(fl, 2, gaICtz(n));
+	
+	return 1;
+}
+
+void     gaIFLInit(GA_FACTOR_LIST* fl){
+	memset(fl, 0, sizeof(*fl));
+}
+
+int      gaIFLAddFactors(GA_FACTOR_LIST* fl, uint64_t f, uint8_t p){
+	int i;
+	
+	/* Fast case: We're adding 0 powers of f. */
+	if(p == 0){
+		return 1;
+	}
+	
+	for(i=0;i<15;i++){
+		if(fl->f[i] == f){
+			/* Fast case: Factor already in list. */
+			fl->p[i] += p;
+			return 1;
+		}else if(fl->f[i] > f){
+			/* Inject the factor at this place in order to keep list sorted,
+			   if we have the capacity. */
+			
+			if(fl->f[14] != 0){
+				/* We can't bump the list rightwards, it's full already! */
+				return 0;
+			}
+			
+			memmove(&fl->f[i+1], &fl->f[i], sizeof(fl->f[i])*(14-i));
+			memmove(&fl->p[i+1], &fl->p[i], sizeof(fl->p[i])*(14-i));
+			fl->f[i] = f;
+			fl->p[i] = p;
+			return 1;
+		}else if(fl->f[i] == 0){
+			/* This is the biggest factor so far, and a slot still remains. */
+			fl->f[i] = f;
+			fl->p[i] = p;
+			return 1;
+		}
+	}
+	
+	return 0;
+}
+
+int      gaIFLGetFactorPower(GA_FACTOR_LIST* fl, uint64_t f){
+	int i;
+	
+	for(i=0;i<15;i++){
+		if(fl->f[i] == f){
+			return fl->p[i];
+		}
+	}
+	
+	return 0;
+}
+
+uint64_t gaIFLGetProduct(const GA_FACTOR_LIST* fl){
+	uint64_t p = 1;
+	int i, j;
+	
+	for(i=0;i<15;i++){
+		for(j=0;j<fl->p[i];j++){
+			p *= fl->f[i];
+		}
+	}
+	
+	return p;
+}
+
+uint64_t gaIFLGetGreatestFactor(const GA_FACTOR_LIST* fl){
+	uint64_t f = 1;
+	int i;
+	
+	for(i=0;i<15;i++){
+		if(f < fl->f[i]){
+			f = fl->f[i];
+		}
+	}
+	
+	return f;
+}
+
+int      gaIFLsnprintf(char* str, size_t size, const GA_FACTOR_LIST* fl){
+	int    i, j;
+	
+	int    total = 0;
+	size_t left = size;
+	char*  ptr  = size ? str : NULL;
+	
+	/* Loop over all factors and spit them out. */
+	for(i=0;i<15;i++){
+		for(j=0;j<fl->p[i];j++){
+			total += snprintf(ptr, left, "%llu*", (unsigned long long)fl->f[i]);
+			if(ptr){
+				left  -= strlen(ptr);
+				ptr   += strlen(ptr);
+			}
+		}
+	}
+	
+	/* If no factors were printed, print 1. */
+	if(total == 0){
+		total += snprintf(ptr, left, "1*");
+		if(ptr){
+			left  -= strlen(ptr);
+			ptr   += strlen(ptr);
+		}
+	}
+	
+	/* Terminate buffer ('*' -> '\0') and deduct one character. */
+	total--;
+	if(str && size > 0){
+		if(total >= size){
+			str[size-1] = '\0';
+		}else{
+			str[total]  = '\0';
+		}
+	}
+	
+	return total;
+}
+
+
+#if 0
+void runTest(uint64_t n, uint64_t maxN, uint64_t k){
+	char buf[128];
+	GA_FACTOR_LIST fl;
+	
+	int isPrime = gaIIsPrime(n);
+	printf("%llu %s prime.\n", (unsigned long long)n, isPrime ? "is" : "is not");
+	
+	if(k==0 || k>=n || maxN==0 || maxN==n){
+		printf("Attempting exact factorization of %llu.\n", (unsigned long long)n);
+	}
+	if(k>0 && k<n){
+		printf("Factorization will fail if no integer in the range [%llu, %llu] is"
+		       " %llu-smooth.\n",
+		       (unsigned long long)n,
+		       (unsigned long long)(maxN == 0 ? n : maxN),
+		       (unsigned long long)k);
+	}
+	
+	int factorized = gaIFactorize(n, maxN, k, &fl);
+	if(factorized){
+		gaIFLsnprintf(buf, sizeof(buf), &fl);
+		printf("%llu is %llu-smooth and factorizes as %s\n\n",
+		       (unsigned long long)gaIFLGetProduct(&fl),
+		       (unsigned long long)gaIFLGetGreatestFactor(&fl),
+		       buf);
+	}else{
+		printf("Factorization failed.\n\n");
+	}
+}
+
+int main(int argc,char* argv[]){
+	runTest(18446744073709551615ULL,                            0,  4096);
+	runTest(18446744073709551615ULL,                            0,     0);
+	runTest(18446744073709551615ULL,                           -1,     0);
+	runTest( 2196095973992233039ULL,                            0,     0);
+	runTest( 2196095973992233039ULL,  2196095973992233039ULL*1.01,    64);
+	
+	return 0;
+}
+#endif
+
