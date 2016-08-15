@@ -289,6 +289,7 @@ cdef dict TO_RED_OP = {
     '*': GA_PROD,
     "prod": GA_PROD,
     "product": GA_PROD,
+    "mul": GA_PROD,
     "max": GA_MAX,
     "maximum": GA_MAX,
     "min": GA_MIN,
