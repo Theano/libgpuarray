@@ -28,7 +28,7 @@ def test_split():
 
 
 def test_xsplit():
-    if numpy.version.version < '1.11':
+    if tuple(int(v) for v in numpy.version.version.split('.')[:2]) < (1, 11):
         raise SkipTest("Numpy version too old")
     for l in ('h', 'v'):
         for spl in (2, [3, 6]):
