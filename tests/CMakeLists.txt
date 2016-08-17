@@ -16,6 +16,14 @@ if(NOT CHECK_FOUND)
 endif()
 
 if(CHECK_FOUND)
+  set(CMAKE_REQUIRED_INCLUDE ${CHECK_INCLUDE_DIRS})
+  CHECK_SYMBOL_EXISTS(ck_assert_ptr_ne "check.h" CHECK_FUNCS)
+  if (NOT CHECK_FUNCS)
+    set(CHECK_FOUND 0)
+  endif()
+endif()
+
+if(CHECK_FOUND)
 enable_testing()
 
 include_directories(${CHECK_INCLUDE_DIRS})
