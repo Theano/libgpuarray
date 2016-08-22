@@ -11,17 +11,60 @@
  */
 
 /**
+ * @brief Count trailing zeros of a 64-bit integer.
+ * 
+ * @param [in] n  The integer whose trailing zero count is to be computed.
+ * @return     If n != 0, returns trailing zero count; Else returns 64.
+ */
+
+static int      gaICtz(uint64_t n);
+
+/**
+ * @brief Count leading zeros of a 64-bit integer.
+ * 
+ * @param [in] n  The integer whose leading zero count is to be computed.
+ * @return     If n != 0, returns leading zero count; Else returns 64.
+ */
+
+static int      gaIClz(uint64_t n);
+
+/**
+ * @brief Integer Modular Multiplication.
+ * 
+ * Computes
+ * 
+ *     $$a*b \pmod m$$
+ * 
+ * efficiently for 64-bit unsigned integers a, b, m.
+ */
+
+static uint64_t gaIMulMod    (uint64_t a, uint64_t b, uint64_t m);
+
+/**
+ * @brief Integer Modular Exponentiation.
+ * 
+ * Computes
+ * 
+ *     $$x^a \pmod m$$
+ * 
+ * efficiently for 64-bit unsigned integers x, a, m.
+ */
+
+static uint64_t gaIPowMod    (uint64_t x, uint64_t a, uint64_t m);
+
+/**
  * @brief Round up positive n to next power-of-2 and report its factorization.
  */
 
-static int   gaIFactorizeNextPow2(uint64_t n, GA_FACTOR_LIST* fl);
+static int      gaIFactorizeNextPow2(uint64_t n, ga_factor_list* fl);
+
 
 
 /**
  * Function Definitions
  */
 
-int      gaICtz       (uint64_t n){
+static int      gaICtz       (uint64_t n){
 #if __GNUC__ >= 4
 	return n ? __builtin_ctzll(n) : 64;
 #else
@@ -35,7 +78,7 @@ int      gaICtz       (uint64_t n){
 #endif
 }
 
-int      gaIClz       (uint64_t n){
+static int      gaIClz       (uint64_t n){
 #if __GNUC__ >= 4
 	return n ? __builtin_clzll(n) : 64;
 #else
@@ -49,7 +92,7 @@ int      gaIClz       (uint64_t n){
 #endif
 }
 
-uint64_t gaIMulMod    (uint64_t a, uint64_t b, uint64_t m){
+static uint64_t gaIMulMod    (uint64_t a, uint64_t b, uint64_t m){
 #if (__GNUC__ >= 4) && defined(__x86_64__)
 	uint64_t r;
 	
@@ -136,7 +179,7 @@ uint64_t gaIMulMod    (uint64_t a, uint64_t b, uint64_t m){
 #endif
 }
 
-uint64_t gaIPowMod    (uint64_t x, uint64_t a, uint64_t m){
+static uint64_t gaIPowMod    (uint64_t x, uint64_t a, uint64_t m){
 	/**
 	 * Special cases (order matters!):
 	 * - A modulo of 0 makes no sense and a modulo of 1 implies a return value
@@ -283,7 +326,7 @@ int      gaIIsPrime   (uint64_t n){
 	return 1;
 }
 
-int      gaIFactorize (uint64_t n, uint64_t maxN, uint64_t k, GA_FACTOR_LIST* fl){
+int      gaIFactorize (uint64_t n, uint64_t maxN, uint64_t k, ga_factor_list* fl){
 	uint64_t i, x, p, f, c;
 	
 	/**
@@ -429,7 +472,7 @@ int      gaIFactorize (uint64_t n, uint64_t maxN, uint64_t k, GA_FACTOR_LIST* fl
 	return 0;
 }
 
-static int   gaIFactorizeNextPow2(uint64_t n, GA_FACTOR_LIST* fl){
+static int      gaIFactorizeNextPow2(uint64_t n, ga_factor_list* fl){
 	n--;
 	n |= n >>  1;
 	n |= n >>  2;
@@ -445,11 +488,11 @@ static int   gaIFactorizeNextPow2(uint64_t n, GA_FACTOR_LIST* fl){
 	return 1;
 }
 
-void     gaIFLInit(GA_FACTOR_LIST* fl){
+void     gaIFLInit(ga_factor_list* fl){
 	memset(fl, 0, sizeof(*fl));
 }
 
-int      gaIFLAddFactors(GA_FACTOR_LIST* fl, uint64_t f, uint8_t p){
+int      gaIFLAddFactors(ga_factor_list* fl, uint64_t f, uint8_t p){
 	int i;
 	
 	/* Fast case: We're adding 0 powers of f. */
@@ -487,7 +530,7 @@ int      gaIFLAddFactors(GA_FACTOR_LIST* fl, uint64_t f, uint8_t p){
 	return 0;
 }
 
-int      gaIFLGetFactorPower(GA_FACTOR_LIST* fl, uint64_t f){
+int      gaIFLGetFactorPower(ga_factor_list* fl, uint64_t f){
 	int i;
 	
 	for(i=0;i<15;i++){
@@ -499,7 +542,7 @@ int      gaIFLGetFactorPower(GA_FACTOR_LIST* fl, uint64_t f){
 	return 0;
 }
 
-uint64_t gaIFLGetProduct(const GA_FACTOR_LIST* fl){
+uint64_t gaIFLGetProduct(const ga_factor_list* fl){
 	uint64_t p = 1;
 	int i, j;
 	
@@ -512,7 +555,7 @@ uint64_t gaIFLGetProduct(const GA_FACTOR_LIST* fl){
 	return p;
 }
 
-uint64_t gaIFLGetGreatestFactor(const GA_FACTOR_LIST* fl){
+uint64_t gaIFLGetGreatestFactor(const ga_factor_list* fl){
 	uint64_t f = 1;
 	int i;
 	
@@ -525,7 +568,7 @@ uint64_t gaIFLGetGreatestFactor(const GA_FACTOR_LIST* fl){
 	return f;
 }
 
-int      gaIFLsnprintf(char* str, size_t size, const GA_FACTOR_LIST* fl){
+int      gaIFLsnprintf(char* str, size_t size, const ga_factor_list* fl){
 	int    i, j;
 	
 	int    total = 0;
@@ -565,46 +608,4 @@ int      gaIFLsnprintf(char* str, size_t size, const GA_FACTOR_LIST* fl){
 	return total;
 }
 
-
-#if 0
-void runTest(uint64_t n, uint64_t maxN, uint64_t k){
-	char buf[128];
-	GA_FACTOR_LIST fl;
-	
-	int isPrime = gaIIsPrime(n);
-	printf("%llu %s prime.\n", (unsigned long long)n, isPrime ? "is" : "is not");
-	
-	if(k==0 || k>=n || maxN==0 || maxN==n){
-		printf("Attempting exact factorization of %llu.\n", (unsigned long long)n);
-	}
-	if(k>0 && k<n){
-		printf("Factorization will fail if no integer in the range [%llu, %llu] is"
-		       " %llu-smooth.\n",
-		       (unsigned long long)n,
-		       (unsigned long long)(maxN == 0 ? n : maxN),
-		       (unsigned long long)k);
-	}
-	
-	int factorized = gaIFactorize(n, maxN, k, &fl);
-	if(factorized){
-		gaIFLsnprintf(buf, sizeof(buf), &fl);
-		printf("%llu is %llu-smooth and factorizes as %s\n\n",
-		       (unsigned long long)gaIFLGetProduct(&fl),
-		       (unsigned long long)gaIFLGetGreatestFactor(&fl),
-		       buf);
-	}else{
-		printf("Factorization failed.\n\n");
-	}
-}
-
-int main(int argc,char* argv[]){
-	runTest(18446744073709551615ULL,                            0,  4096);
-	runTest(18446744073709551615ULL,                            0,     0);
-	runTest(18446744073709551615ULL,                           -1,     0);
-	runTest( 2196095973992233039ULL,                            0,     0);
-	runTest( 2196095973992233039ULL,  2196095973992233039ULL*1.01,    64);
-	
-	return 0;
-}
-#endif
 

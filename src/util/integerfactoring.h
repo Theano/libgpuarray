@@ -6,7 +6,6 @@
 /* Includes */
 #include <stdio.h>
 #include <stdint.h>
-#include <stdint-gcc.h>
 
 
 /* Defines */
@@ -21,8 +20,8 @@ extern "C" {
 
 
 /* Data Structure Prototypes & Typedefs */
-struct GA_FACTOR_LIST;
-typedef struct GA_FACTOR_LIST GA_FACTOR_LIST;
+struct ga_factor_list_;
+typedef struct ga_factor_list_ ga_factor_list;
 
 
 
@@ -44,7 +43,7 @@ typedef struct GA_FACTOR_LIST GA_FACTOR_LIST;
  * and serves as a sort of sentinel.
  */
 
-struct GA_FACTOR_LIST{
+struct ga_factor_list_{
 	uint64_t f[16];/* Factors */
 	uint8_t  p[16];/* Powers of factors */
 };
@@ -52,48 +51,6 @@ struct GA_FACTOR_LIST{
 
 
 /* Functions */
-
-/**
- * @brief Count trailing zeros of a 64-bit integer.
- * 
- * @param [in] n  The integer whose trailing zero count is to be computed.
- * @return     If n != 0, returns trailing zero count; Else returns 64.
- */
-
-int      gaICtz(uint64_t n);
-
-/**
- * @brief Count leading zeros of a 64-bit integer.
- * 
- * @param [in] n  The integer whose leading zero count is to be computed.
- * @return     If n != 0, returns leading zero count; Else returns 64.
- */
-
-int      gaIClz(uint64_t n);
-
-/**
- * @brief Integer Modular Multiplication.
- * 
- * Computes
- * 
- *     $$a*b \pmod m$$
- * 
- * efficiently for 64-bit unsigned integers a, b, m.
- */
-
-uint64_t gaIMulMod    (uint64_t a, uint64_t b, uint64_t m);
-
-/**
- * @brief Integer Modular Exponentiation.
- * 
- * Computes
- * 
- *     $$x^a \pmod m$$
- * 
- * efficiently for 64-bit unsigned integers x, a, m.
- */
-
-uint64_t gaIPowMod    (uint64_t x, uint64_t a, uint64_t m);
 
 /**
  * @brief Checks whether an integer is prime.
@@ -168,7 +125,7 @@ int      gaIIsPrime(uint64_t n);
  *         list is not guaranteed to be prime.
  */
 
-int      gaIFactorize(uint64_t n, uint64_t maxN, uint64_t k, GA_FACTOR_LIST* fl);
+int      gaIFactorize(uint64_t n, uint64_t maxN, uint64_t k, ga_factor_list* fl);
 
 /**
  * @brief Initialize a factors list to all-factors- and all-powers-zero.
@@ -176,7 +133,7 @@ int      gaIFactorize(uint64_t n, uint64_t maxN, uint64_t k, GA_FACTOR_LIST* fl)
  * Such a factors list represents 1, since 0^0 = 1.
  */
 
-void     gaIFLInit(GA_FACTOR_LIST* fl);
+void     gaIFLInit(ga_factor_list* fl);
 
 /**
  * @brief Add a factor f with power p to the factor list.
@@ -190,7 +147,7 @@ void     gaIFLInit(GA_FACTOR_LIST* fl);
  * @return Non-zero if factor successfully added; Zero otherwise.
  */
 
-int      gaIFLAddFactors(GA_FACTOR_LIST* fl, uint64_t f, uint8_t p);
+int      gaIFLAddFactors(ga_factor_list* fl, uint64_t f, uint8_t p);
 
 /**
  * @brief Get the power of a given factor within a factor list.
@@ -199,19 +156,19 @@ int      gaIFLAddFactors(GA_FACTOR_LIST* fl, uint64_t f, uint8_t p);
  *         factorization. If it does not occur, return 0.
  */
 
-int      gaIFLGetFactorPower(GA_FACTOR_LIST* fl, uint64_t f);
+int      gaIFLGetFactorPower(ga_factor_list* fl, uint64_t f);
 
 /**
  * @brief Compute the product of the factors stored in the factors list.
  */
 
-uint64_t gaIFLGetProduct(const GA_FACTOR_LIST* fl);
+uint64_t gaIFLGetProduct(const ga_factor_list* fl);
 
 /**
  * @brief Get the greatest factor in the factors list.
  */
 
-uint64_t gaIFLGetGreatestFactor(const GA_FACTOR_LIST* fl);
+uint64_t gaIFLGetGreatestFactor(const ga_factor_list* fl);
 
 /**
  * @brief Print out the factor list in a human-readable form, snprintf()-style.
@@ -227,7 +184,7 @@ uint64_t gaIFLGetGreatestFactor(const GA_FACTOR_LIST* fl);
  *                    out, assuming an unbounded, non-NULL buffer.
  */
 
-int   gaIFLsnprintf(char* str, size_t size, const GA_FACTOR_LIST* fl);
+int   gaIFLsnprintf(char* str, size_t size, const ga_factor_list* fl);
 
 
 /* End C++ Extern "C" Guard */
