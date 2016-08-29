@@ -370,8 +370,9 @@ static int gen_take1_kernel(GpuKernel *k, gpucontext *ctx, char **err_str,
     atypes[apos++] = GA_SSIZE;
     atypes[apos++] = GA_SIZE;
   }
-  strb_appends(&sb, " GLOBAL_MEM const ga_ssize *ind, ga_size n0, ga_size n1,"
-               " GLOBAL_MEM int* err) {\n");
+  strb_appendf(&sb, " GLOBAL_MEM const %s *ind, ga_size n0, ga_size n1,"
+               " GLOBAL_MEM int* err) {\n",
+               gpuarray_get_type(ind->typecode)->cluda_name);
   atypes[apos++] = GA_BUFFER;
   atypes[apos++] = GA_SIZE;
   atypes[apos++] = GA_SIZE;
