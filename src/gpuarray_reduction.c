@@ -25,8 +25,9 @@
 struct gen_kernel_ctx{
 	unsigned        numIdx;
 	unsigned        reduxLen;
-    const unsigned* reduxList;
+	const unsigned* reduxList;
 	unsigned        numFreeIdx;
+	unsigned*       axisList;
 	const char*     dstMaxType;
 	const char*     dstArgmaxType;
 };
@@ -74,6 +75,10 @@ static void  appendLoopInner        (strb*            s,
                                      gen_kernel_ctx*  ctx);
 static void  appendLoopMacroUndefs  (strb*            s,
                                      gen_kernel_ctx*  ctx);
+static void  computeAxisList        (unsigned*        axisList,
+                                     unsigned         numAxis,
+                                     const unsigned*  reduxList,
+                                     unsigned         reduxLen);
 static void  scheduleMaxAndArgmax   (const GpuKernel* kernel,
                                      const GpuArray*  src,
                                      unsigned         reduxLen,
@@ -200,15 +205,16 @@ GPUARRAY_PUBLIC int GpuArray_maxandargmax(GpuArray*       dstMax,
  * @return Zero if arguments invalid; Non-zero otherwise.
  */
 
-static int   checkargsMaxAndArgmax  (GpuArray*        dstMax,
-                                     GpuArray*        dstArgmax,
-                                     const GpuArray*  src,
-                                     unsigned         reduxLen,
-                                     const unsigned*  reduxList){
+static int   checkargsMaxAndArgmax  (GpuArray*         dstMax,
+                                     GpuArray*         dstArgmax,
+                                     const GpuArray*   src,
+                                     unsigned          reduxLen,
+                                     const unsigned*   reduxList){
 	int i, j;
 	
 	/* Insane src or reduxLen? */
-	if(!src || src->nd == 0 || reduxLen == 0 || reduxLen >= src->nd){
+	if(!dstMax || !dstArgmax || !src || src->nd == 0 || reduxLen == 0 ||
+	   reduxLen >= src->nd){
 		return 0;
 	}
 	
@@ -241,27 +247,38 @@ static int   checkargsMaxAndArgmax  (GpuArray*        dstMax,
  *         kernel, or else NULL.
  */
 
-static char* genkernelMaxAndArgmax (unsigned        numIdx,
-                                    const unsigned  reduxLen,
-                                    const unsigned* reduxList,
-                                    const char*     dstMaxType,
-                                    const char*     dstArgmaxType){
-	/* Obtain the parameters of the reduction. */
+static char* genkernelMaxAndArgmax (unsigned          numIdx,
+                                    const unsigned    reduxLen,
+                                    const unsigned*   reduxList,
+                                    const char*       dstMaxType,
+                                    const char*       dstArgmaxType){
+	/* Save the parameters of the reduction in a generator context. */
 	gen_kernel_ctx ctx;
 	ctx.numIdx        = numIdx;
 	ctx.reduxLen      = reduxLen;
 	ctx.reduxList     = reduxList;
 	ctx.numFreeIdx    = ctx.numIdx - ctx.reduxLen;
+	ctx.axisList      = malloc(numIdx*sizeof(unsigned));
 	ctx.dstMaxType    = dstMaxType;
 	ctx.dstArgmaxType = dstArgmaxType;
+	if(!ctx.axisList){
+		return NULL;
+	}
 	
+	/* Compute internal axis remapping. */
+	computeAxisList(ctx.axisList, ctx.numIdx, ctx.reduxList, ctx.reduxLen);
+	
+	/* Generate kernel proper. */
 	strb s = STRB_STATIC_INIT;
 	strb_ensure(&s, 5*1024);
 	appendKernel(&s, &ctx);
+	free(ctx.axisList);
+	
+	/* Return it. */
 	return strb_cstr(&s);
 }
-static void  appendKernel           (strb*           s,
-                                     gen_kernel_ctx* ctx){
+static void  appendKernel           (strb*            s,
+                                     gen_kernel_ctx*  ctx){
 	appendTypedefs         (s, ctx);
 	appendPrototype        (s, ctx);
 	strb_appends           (s, "{\n");
@@ -271,8 +288,8 @@ static void  appendKernel           (strb*           s,
 	appendLoops            (s, ctx);
 	strb_appends           (s, "}\n");
 }
-static void  appendTypedefs         (strb*           s,
-                                     gen_kernel_ctx* ctx){
+static void  appendTypedefs         (strb*            s,
+                                     gen_kernel_ctx*  ctx){
 	strb_appends(s, "/* Typedefs */\n");
 	strb_appendf(s, "typedef %s     T;/* The type of the array being processed. */\n", ctx->dstMaxType);
 	strb_appendf(s, "typedef %s     X;/* Index type: signed 32/64-bit. */\n",          ctx->dstArgmaxType);
@@ -280,8 +297,8 @@ static void  appendTypedefs         (strb*           s,
 	strb_appends(s, "\n");
 	strb_appends(s, "\n");
 }
-static void  appendPrototype        (strb*           s,
-                                     gen_kernel_ctx* ctx){
+static void  appendPrototype        (strb*            s,
+                                     gen_kernel_ctx*  ctx){
 	strb_appends(s, "KERNEL void maxandargmax(const T*        src,\n");
 	strb_appends(s, "                         const X         srcOff,\n");
 	strb_appends(s, "                         const X*        srcSteps,\n");
@@ -294,8 +311,8 @@ static void  appendPrototype        (strb*           s,
 	strb_appends(s, "                         const X         dstArgmaxOff,\n");
 	strb_appends(s, "                         const X*        dstArgmaxSteps)");
 }
-static void  appendOffsets          (strb*           s,
-                                     gen_kernel_ctx* ctx){
+static void  appendOffsets          (strb*            s,
+                                     gen_kernel_ctx*  ctx){
 	strb_appends(s, "/* Add offsets */\n");
 	strb_appends(s, "src       = (const GLOBAL_MEM T*)((const GLOBAL_MEM char*)src       + srcOff);\n");
 	strb_appends(s, "dstMax    = (GLOBAL_MEM T*)      ((GLOBAL_MEM char*)      dstMax    + dstMaxOff);\n");
@@ -303,8 +320,8 @@ static void  appendOffsets          (strb*           s,
 	strb_appends(s, "\n");
 	strb_appends(s, "\n");
 }
-static void  appendIndexDeclarations(strb*           s,
-                                     gen_kernel_ctx* ctx){
+static void  appendIndexDeclarations(strb*            s,
+                                     gen_kernel_ctx*  ctx){
 	strb_appends(s, "\t/* GPU kernel coordinates. Always 3D. */\n");
 	
 	strb_appends(s, "\tX bi0 = GID_0,       bi1 = GID_1,       bi2 = GID_2;\n");
@@ -329,13 +346,13 @@ static void  appendIndexDeclarations(strb*           s,
 	strb_appends(s, "\t\n");
 	strb_appends(s, "\t\n");
 }
-static void  appendIdxes            (strb*           s,
-                                     const char*     prologue,
-                                     const char*     prefix,
-                                     int             startIdx,
-                                     int             endIdx,
-                                     const char*     suffix,
-                                     const char*     epilogue){
+static void  appendIdxes            (strb*            s,
+                                     const char*      prologue,
+                                     const char*      prefix,
+                                     int              startIdx,
+                                     int              endIdx,
+                                     const char*      suffix,
+                                     const char*      epilogue){
 	int i;
 	
 	prologue = prologue ? prologue : "";
@@ -349,18 +366,18 @@ static void  appendIdxes            (strb*           s,
 	}
 	strb_appends(s, epilogue);
 }
-static void  appendRangeCalculations(strb*           s,
-                                     gen_kernel_ctx* ctx){
-	/* FIXME: Reorder axes. */
+static void  appendRangeCalculations(strb*            s,
+                                     gen_kernel_ctx*  ctx){
 	int i;
 	
+	/* Use internal remapping when computing the ranges for this thread. */
 	strb_appends(s, "\t/* Compute ranges for this thread. */\n");
 	
 	for(i=0;i<ctx->numIdx    ;i++){/* i*Dim   = srcSize[*]; */
-		strb_appendf(s, "\ti%dDim     = srcSize[%d];\n", i, i);
+		strb_appendf(s, "\ti%dDim     = srcSize[%d];\n", i, ctx->axisList[i]);
 	}
 	for(i=0;i<ctx->numIdx    ;i++){/* i*SStep = srcSteps[*]; */
-		strb_appendf(s, "\ti%dSStep   = srcSteps[%d];\n", i, i);
+		strb_appendf(s, "\ti%dSStep   = srcSteps[%d];\n", i, ctx->axisList[i]);
 	}
 	for(i=0;i<ctx->numFreeIdx;i++){/* i*MStep = dstMaxSteps[*]; */
 		strb_appendf(s, "\ti%dMStep   = dstMaxSteps[%d];\n", i, i);
@@ -369,7 +386,7 @@ static void  appendRangeCalculations(strb*           s,
 		strb_appendf(s, "\ti%dMStep   = dstArgmaxSteps[%d];\n", i, i);
 	}
 	for(i=0;i<ctx->numIdx    ;i++){/* i*ChunkSz = numBlk[*]; */
-		strb_appendf(s, "\ti%dChunkSz = chunkSize[%d];\n", i, i);
+		strb_appendf(s, "\ti%dChunkSz = chunkSize[%d];\n", i, ctx->axisList[i]);
 	}
 	for(i=ctx->numIdx-1;i>=ctx->numFreeIdx;i--){/* i*PDim  = ...; */
 		/**
@@ -411,8 +428,8 @@ static void  appendRangeCalculations(strb*           s,
 	strb_appends(s, "\t\n");
 	strb_appends(s, "\t\n");
 }
-static void  appendLoops            (strb*           s,
-                                     gen_kernel_ctx* ctx){
+static void  appendLoops            (strb*            s,
+                                     gen_kernel_ctx*  ctx){
 	strb_appends(s, "\t/**\n");
 	strb_appends(s, "\t * FREE LOOPS.\n");
 	strb_appends(s, "\t */\n");
@@ -422,8 +439,8 @@ static void  appendLoops            (strb*           s,
 	appendLoopOuter      (s, ctx);
 	appendLoopMacroUndefs(s, ctx);
 }
-static void  appendLoopMacroDefs    (strb*           s,
-                                     gen_kernel_ctx* ctx){
+static void  appendLoopMacroDefs    (strb*            s,
+                                     gen_kernel_ctx*  ctx){
 	int i;
 	
 	/**
@@ -478,8 +495,8 @@ static void  appendLoopMacroDefs    (strb*           s,
 	}
 	strb_appends(s, "0]\n");
 }
-static void  appendLoopOuter        (strb*           s,
-                                     gen_kernel_ctx* ctx){
+static void  appendLoopOuter        (strb*            s,
+                                     gen_kernel_ctx*  ctx){
 	int i;
 	
 	/**
@@ -504,8 +521,8 @@ static void  appendLoopOuter        (strb*           s,
 		strb_appends(s, "\t}\n");
 	}
 }
-static void  appendLoopInner        (strb*           s,
-                                     gen_kernel_ctx* ctx){
+static void  appendLoopInner        (strb*            s,
+                                     gen_kernel_ctx*  ctx){
 	int i;
 	
 	/**
@@ -568,14 +585,40 @@ static void  appendLoopInner        (strb*           s,
 	appendIdxes (s, "\tDSTMINDEXER(", "i", 0, ctx->numFreeIdx, "", ") = maxV;\n");
 	appendIdxes (s, "\tDSTAINDEXER(", "i", 0, ctx->numFreeIdx, "", ") = maxI;\n");
 }
-static void  appendLoopMacroUndefs  (strb*           s,
-                                     gen_kernel_ctx* ctx){
+static void  appendLoopMacroUndefs  (strb*            s,
+                                     gen_kernel_ctx*  ctx){
 	strb_appends(s, "\t#undef FOROVER\n");
 	strb_appends(s, "\t#undef ESCAPE\n");
 	strb_appends(s, "\t#undef SRCINDEXER\n");
 	strb_appends(s, "\t#undef RDXINDEXER\n");
 	strb_appends(s, "\t#undef DSTMINDEXER\n");
 	strb_appends(s, "\t#undef DSTAINDEXER\n");
+}
+static void  computeAxisList        (unsigned*        axisList,
+                                     unsigned         numAxis,
+                                     const unsigned*  reduxList,
+                                     unsigned         reduxLen){
+	unsigned i, j, f=0, r=numAxis-reduxLen;
+	
+	for(i=0;i<numAxis;i++){
+		/**
+		 * If axis i is in reduxList, add it to the end.
+		 */
+		
+		for(j=0;j<reduxLen;j++){
+			if(i==reduxList[j]){
+				axisList[r++] = i;
+				goto /* continue */ outerLoop;
+			}
+		}
+		
+		/**
+		 * Otherwise, axis i is not in reduxList. Add it to the beginning.
+		 */
+		
+		axisList[f++] = i;
+		outerLoop:;
+	}
 }
 
 /**
@@ -696,12 +739,12 @@ static void  scheduleMaxAndArgmax   (const GpuKernel* kernel,
  * Invoke the kernel.
  */
 
-static int   invokeMaxAndArgmax     (GpuKernel*      k,
-                                     GpuArray*       dstMax,
-                                     GpuArray*       dstArgmax,
-                                     const GpuArray* src,
-                                     unsigned        reduxLen,
-                                     const unsigned* reduxList){
+static int   invokeMaxAndArgmax     (GpuKernel*       k,
+                                     GpuArray*        dstMax,
+                                     GpuArray*        dstArgmax,
+                                     const GpuArray*  src,
+                                     unsigned         reduxLen,
+                                     const unsigned*  reduxList){
 	int         ret;
 	size_t      blockSize[3]   = {1,1,1};
 	size_t      gridSize [3]   = {1,1,1};
