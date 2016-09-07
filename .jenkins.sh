@@ -13,8 +13,6 @@ export PATH=/usr/local/cuda/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 export LIBRARY_PATH=/usr/local/cuda/lib64:$LIBRARY_PATH
 
-GPUARRAY=none
-
 # Set some default values
 : ${BUILDBOT_DIR:="$WORKSPACE/nightly_build"} # Jenkins workspace path
 # Can also set to "Debug", "Release" to go faster
@@ -24,9 +22,6 @@ GPUARRAY=none
 : ${DEVICES_OPENCL:=" "}
 # Parameters for nosetests
 : ${NOSE_PARAM="-v --with-xunit --xunit-file="}
-
-date
-hostname
 
 mkdir -p ${BUILDBOT_DIR}
 cd ${BUILDBOT_DIR}
@@ -64,8 +59,6 @@ export CPATH=${BUILDBOT_DIR}/local/include:${CPATH}
 # Build the pygpu modules
 (cd libgpuarray && python setup.py build_ext --inplace -I${BUILDBOT_DIR}/local/include -L${BUILDBOT_DIR}/local/lib)
 
-
-echo -n > ${BUILDBOT_DIR}/pygpu.log
 # Test it
 for dev in ${DEVICES_CUDA}; do
     echo "Testing pygpu for DEVICE=${dev}"
@@ -76,7 +69,3 @@ for dev in ${DEVICES_OPENCL}; do
     echo "Testing pygpu for DEVICE=${dev}"
     DEVICE=${dev} time nosetests --with-xunit --xunit-file=${test}${dev}tests.xml libgpuarray/pygpu/tests -e test_blas.py
 done
-
-env
-date
-hostname
