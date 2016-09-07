@@ -60,6 +60,8 @@ cdef class arg:
             self.a.flags |= GE_WRITE
         if scalar:
             self.a.flags |= GE_SCALAR
+        if self.a.flags == 0:
+            raise ValueError('no flags specified for arg %s' % (name,))
 
     property name:
         def __get__(self):
