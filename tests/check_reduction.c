@@ -75,39 +75,55 @@ START_TEST(test_reduction){
 	size_t i,j,k;
 	size_t dims[3] = {32,50,79};
 	size_t prodDims = dims[0]*dims[1]*dims[2];
+	const unsigned reduxList[] = {0,2};
 	
-	float*  pSrc    = malloc(sizeof(*pSrc)    * dims[0]*dims[1]*dims[2]);
-	float*  pMax    = malloc(sizeof(*pMax)    *         dims[1]        );
-	size_t* pArgmax = malloc(sizeof(*pArgmax) *         dims[1]        );
+	float*  pSrc    = calloc(1, sizeof(*pSrc)    * dims[0]*dims[1]*dims[2]);
+	float*  pMax    = calloc(1, sizeof(*pMax)    *         dims[1]        );
+	size_t* pArgmax = calloc(1, sizeof(*pArgmax) *         dims[1]        );
 	
 	ck_assert_ptr_ne(pSrc,    NULL);
 	ck_assert_ptr_ne(pMax,    NULL);
 	ck_assert_ptr_ne(pArgmax, NULL);
 	
+	
+	/**
+	 * Initialize source data.
+	 */
+	
 	for(i=0;i<prodDims;i++){
 		pSrc[i] = pcgRand01();
 	}
+	
+	
+	/**
+	 * Run the kernel.
+	 */
 	
 	GpuArray gaSrc;
 	GpuArray gaMax;
 	GpuArray gaArgmax;
 	
-	ga_assert_ok(GpuArray_empty(&gaSrc,    ctx, GA_FLOAT, 3, dims, GA_C_ORDER));
-	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
+	ga_assert_ok(GpuArray_empty(&gaSrc,    ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaMax,    ctx, GA_FLOAT, 1, &dims[1], GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaArgmax, ctx, GA_SIZE,  1, &dims[1], GA_C_ORDER));
 	
-	unsigned reduxList[] = {0,2};
+	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
+	ga_assert_ok(GpuArray_memset(&gaMax,    -1));  /* 0xFFFFFFFF is a qNaN. */
+	ga_assert_ok(GpuArray_memset(&gaArgmax, -1));
+	
 	ga_assert_ok(GpuArray_maxandargmax(&gaMax, &gaArgmax, &gaSrc, 2, reduxList));
 	
 	ga_assert_ok(GpuArray_read(pMax,    sizeof(*pMax)   *dims[1], &gaMax));
 	ga_assert_ok(GpuArray_read(pArgmax, sizeof(*pArgmax)*dims[1], &gaArgmax));
 	
 	
+	/**
+	 * Check that the destination tensors are correct.
+	 */
 	
 	for(j=0;j<dims[1];j++){
 		size_t gtArgmax = 0;
-		float  gtMax    = pSrc[j*dims[2]];
+		float  gtMax    = pSrc[(0*dims[1] + j)*dims[2] + 0];
 		
 		for(i=0;i<dims[0];i++){
 			for(k=0;k<dims[2];k++){
@@ -115,7 +131,86 @@ START_TEST(test_reduction){
 				
 				if(v > gtMax){
 					gtMax    = v;
-					gtArgmax = i*dims[1]*dims[2] + k;
+					gtArgmax = i*dims[2] + k;
+				}
+			}
+		}
+		
+		ck_assert_msg(gtMax    == pMax[j],    "Max value mismatch!");
+		ck_assert_msg(gtArgmax == pArgmax[j], "Argmax value mismatch!");
+	}
+}END_TEST
+
+START_TEST(test_idxtranspose){
+	pcgSeed(1);
+	
+	/**
+	 * We test here the same reduction as test_reduction, except with a
+	 * reversed reduxList {2,0} instead of {0,2}. That should lead to a
+	 * transposition of the argmax "coordinates" and thus a change in its
+	 * "flattened" output version.
+	 */
+	
+	size_t i,j,k;
+	size_t dims[3] = {32,50,79};
+	size_t prodDims = dims[0]*dims[1]*dims[2];
+	const unsigned reduxList[] = {2,0};
+	
+	float*  pSrc    = calloc(1, sizeof(*pSrc)    * dims[0]*dims[1]*dims[2]);
+	float*  pMax    = calloc(1, sizeof(*pMax)    *         dims[1]        );
+	size_t* pArgmax = calloc(1, sizeof(*pArgmax) *         dims[1]        );
+	
+	ck_assert_ptr_ne(pSrc,    NULL);
+	ck_assert_ptr_ne(pMax,    NULL);
+	ck_assert_ptr_ne(pArgmax, NULL);
+	
+	
+	/**
+	 * Initialize source data.
+	 */
+	
+	for(i=0;i<prodDims;i++){
+		pSrc[i] = pcgRand01();
+	}
+	
+	
+	/**
+	 * Run the kernel.
+	 */
+	
+	GpuArray gaSrc;
+	GpuArray gaMax;
+	GpuArray gaArgmax;
+	
+	ga_assert_ok(GpuArray_empty(&gaSrc,    ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaMax,    ctx, GA_FLOAT, 1, &dims[1], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaArgmax, ctx, GA_SIZE,  1, &dims[1], GA_C_ORDER));
+	
+	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
+	ga_assert_ok(GpuArray_memset(&gaMax,    -1));  /* 0xFFFFFFFF is a qNaN. */
+	ga_assert_ok(GpuArray_memset(&gaArgmax, -1));
+	
+	ga_assert_ok(GpuArray_maxandargmax(&gaMax, &gaArgmax, &gaSrc, 2, reduxList));
+	
+	ga_assert_ok(GpuArray_read(pMax,    sizeof(*pMax)   *dims[1], &gaMax));
+	ga_assert_ok(GpuArray_read(pArgmax, sizeof(*pArgmax)*dims[1], &gaArgmax));
+	
+	
+	/**
+	 * Check that the destination tensors are correct.
+	 */
+	
+	for(j=0;j<dims[1];j++){
+		size_t gtArgmax = 0;
+		float  gtMax    = pSrc[(0*dims[1] + j)*dims[2] + 0];
+		
+		for(k=0;k<dims[2];k++){
+			for(i=0;i<dims[0];i++){
+				float v = pSrc[(i*dims[1] + j)*dims[2] + k];
+				
+				if(v > gtMax){
+					gtMax    = v;
+					gtArgmax = k*dims[0] + i;
 				}
 			}
 		}
@@ -132,6 +227,7 @@ Suite *get_suite(void) {
 	tcase_set_timeout(tc, 8.0);
 	
 	tcase_add_test(tc, test_reduction);
+	tcase_add_test(tc, test_idxtranspose);
 	
 	suite_add_tcase(s, tc);
 	return s;

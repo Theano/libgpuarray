@@ -26,6 +26,8 @@ struct gen_kernel_ctx{
 	unsigned        numIdx;
 	unsigned        reduxLen;
 	const unsigned* reduxList;
+	unsigned        hwAxisLen;
+	const unsigned* hwAxisList;
 	unsigned        numFreeIdx;
 	unsigned*       axisList;
 	const char*     dstMaxType;
@@ -36,14 +38,25 @@ typedef struct gen_kernel_ctx gen_kernel_ctx;
 
 
 /* Function prototypes */
+static int   axisInSet              (unsigned         v,
+                                     const unsigned*  set,
+                                     size_t           setLen,
+                                     size_t*          where);
 static int   checkargsMaxAndArgmax  (GpuArray*        dstMax,
                                      GpuArray*        dstArgmax,
                                      const GpuArray*  src,
                                      unsigned         reduxLen,
                                      const unsigned*  reduxList);
-static char* genkernelMaxAndArgmax  (unsigned         numIdx,
+static void  selectHwAxes           (unsigned*        hwAxesLen,
+                                     unsigned*        hwAxisList,
+                                     const GpuArray*  src,
+                                     unsigned         reduxLen,
+                                     const unsigned*  reduxList);
+static char* gensourceMaxAndArgmax  (unsigned         numIdx,
                                      unsigned         reduxLen,
                                      const unsigned*  reduxList,
+                                     const unsigned   hwAxisLen,
+                                     const unsigned*  hwAxisList,
                                      const char*      dstMaxType,
                                      const char*      dstArgmaxType);
 static void  appendKernel           (strb*            s,
@@ -79,6 +92,9 @@ static void  computeAxisList        (unsigned*        axisList,
                                      unsigned         numAxis,
                                      const unsigned*  reduxList,
                                      unsigned         reduxLen);
+static int   compileMaxAndArgmax    (GpuKernel*       kernel,
+                                     const char*      src,
+                                     gpucontext*      ctx);
 static void  scheduleMaxAndArgmax   (const GpuKernel* kernel,
                                      const GpuArray*  src,
                                      unsigned         reduxLen,
@@ -91,7 +107,9 @@ static int   invokeMaxAndArgmax     (GpuKernel*       kernel,
                                      GpuArray*        dstArgmax,
                                      const GpuArray*  src,
                                      unsigned         reduxLen,
-                                     const unsigned*  reduxList);
+                                     const unsigned*  reduxList,
+                                     unsigned         hwAxisLen,
+                                     const unsigned*  hwAxisList);
 
 
 /* Function implementation */
@@ -100,69 +118,74 @@ GPUARRAY_PUBLIC int GpuArray_maxandargmax(GpuArray*       dstMax,
                                           const GpuArray* src,
                                           unsigned        reduxLen,
                                           const unsigned* reduxList){
-	/**
-	 * Sanity check on arguments
-	 */
+	int          ret           = 0;
+	unsigned     hwAxisLen     = 0;
+	unsigned     hwAxisList[3] = {0,0,0};
+	const char*  dstMaxType    = NULL;
+	const char*  dstArgmaxType = NULL;
+	char*        s             = NULL;
+	GpuKernel    kernel;
 	
+	/* Sanity-check arguments */
 	if(!checkargsMaxAndArgmax(dstMax, dstArgmax, src, reduxLen, reduxList)){
 		return GA_INVALID_ERROR;
 	}
 	
+	/* Select hardware axis mapping */
+	selectHwAxes(&hwAxisLen, hwAxisList, src, reduxLen, reduxList);
 	
-	/**
-	 * Generate kernel source code.
-	 */
-	
-	int          ret;
-	const char*  dstMaxType      = gpuarray_get_type(src->typecode) -> cluda_name;
-	const char*  dstArgmaxType   = gpuarray_get_type(GA_SIZE)       -> cluda_name;
-	char*        s               = genkernelMaxAndArgmax(src->nd,
-	                                                     reduxLen,
-	                                                     reduxList,
-	                                                     dstMaxType,
-	                                                     dstArgmaxType);
+	/* Generate kernel source code */
+	dstMaxType    = gpuarray_get_type(src->typecode)->cluda_name;
+	dstArgmaxType = gpuarray_get_type(GA_SSIZE)     ->cluda_name;
+	s = gensourceMaxAndArgmax(src->nd,
+	                          reduxLen,   reduxList,
+	                          hwAxisLen,  hwAxisList,
+	                          dstMaxType, dstArgmaxType);
 	if(!s){return GA_MEMORY_ERROR;}
 	
-	
-	/**
-	 * Compile it.
-	 */
-	
-	const int    ARG_TYPECODE[11] = {
-		GA_BUFFER, /* src */
-		GA_SIZE,   /* srcOff */
-		GA_BUFFER, /* srcSteps */
-		GA_BUFFER, /* srcSize */
-		GA_BUFFER, /* chnkSize */
-		GA_BUFFER, /* dstMax */
-		GA_SIZE,   /* dstMaxOff */
-		GA_BUFFER, /* dstMaxSteps */
-		GA_BUFFER, /* dstArgmax */
-		GA_SIZE,   /* dstArgmaxOff */
-		GA_BUFFER  /* dstArgmaxSteps */
-	};
-	
-	GpuKernel kernel;
-	const size_t l = strlen(s);
-	ret = GpuKernel_init(&kernel, gpudata_context(src->data),
-	                     1, (const char**)&s, &l, "maxandargmax",
-	                     11, ARG_TYPECODE, GA_USE_CLUDA, (char**)0);
+	/* Compile kernel source code */
+	ret = compileMaxAndArgmax(&kernel, s, gpudata_context(src->data));
 	free(s);
 	if(ret != GA_NO_ERROR){
 		return ret;
 	}
 	
-	
-	/**
-	 * Invoke it.
-	 */
-	
-	return invokeMaxAndArgmax(&kernel, dstMax, dstArgmax, src, reduxLen, reduxList);
+	/* Invoke compiled kernel */
+	return invokeMaxAndArgmax(&kernel, dstMax, dstArgmax, src,
+	                          reduxLen, reduxList, hwAxisLen, hwAxisList);
 }
 
 /**
+ * @brief Check whether axis numbered v is already in the given set of axes.
+ * 
+ * @param [in]  v
+ * @param [in]  set
+ * @param [in]  setLen
+ * @param [out] where
+ * @return Non-zero if the set is non-empty and v is in it; Zero otherwise.
+ */
+
+static int   axisInSet              (unsigned          v,
+                                     const unsigned*   set,
+                                     size_t            setLen,
+                                     size_t*           where){
+	size_t i;
+	
+	for(i=0;i<setLen;i++){
+		if(set[i] == v){
+			if(where){*where = i;}
+			return 1;
+		}
+	}
+	
+	return 0;
+}
+
+
+/**
  * @brief Check the sanity of the arguments, in agreement with the
- *        documentation for GpuArray_maxandargmax().
+ *        documentation for GpuArray_maxandargmax(). The list of arguments is
+ *        precisely in agreement with GpuArray_maxandargmax().
  * 
  * @param [in] dstMax
  * @param [in] dstArgmax
@@ -177,7 +200,7 @@ static int   checkargsMaxAndArgmax  (GpuArray*         dstMax,
                                      const GpuArray*   src,
                                      unsigned          reduxLen,
                                      const unsigned*   reduxList){
-	int i, j;
+	int i;
 	
 	/* Insane src or reduxLen? */
 	if(!dstMax || !dstArgmax || !src || src->nd == 0 || reduxLen == 0 ||
@@ -186,20 +209,51 @@ static int   checkargsMaxAndArgmax  (GpuArray*         dstMax,
 	}
 	
 	for(i=0;i<(int)reduxLen;i++){
-		/* Insane list entry? */
-		if(reduxList[i] >= src->nd){
+		/* Insane or duplicate list entry? */
+		if(reduxList[i] >= src->nd                ||
+		   axisInSet(reduxList[i], reduxList, i, 0)){
 			return 0;
-		}
-		
-		for(j=i-1;j>=0;j--){
-			/* Duplicate list entry? */
-			if(reduxList[i] == reduxList[j]){
-				return 0;
-			}
 		}
 	}
 	
 	return 1;
+}
+
+/**
+ * @brief Select which axes (up to 3) will be assigned to hardware
+ *        dimensions.
+ * 
+ * @param [out] hwAxisLen
+ * @param [out] hwAxisList
+ * @param [in]  src
+ * @param [in]  reduxLen
+ * @param [in]  reduxList
+ */
+
+static void  selectHwAxes           (unsigned*        hwAxisLen,
+                                     unsigned*        hwAxisList,
+                                     const GpuArray*  src,
+                                     unsigned         reduxLen,
+                                     const unsigned*  reduxList){
+	unsigned i, j;
+	
+	*hwAxisLen = src->nd-reduxLen < 3 ? src->nd-reduxLen : 3;
+	
+	for(i=0;i<*hwAxisLen;i++){
+		size_t   maxV = 0;
+		unsigned maxI = 0;
+		
+		for(j=0;j<src->nd;j++){
+			if(!axisInSet(j, hwAxisList, i,        0) &&
+			   !axisInSet(j, reduxList,  reduxLen, 0) &&
+			   src->dimensions[j] > maxV){
+				maxV = src->dimensions[j];
+				maxI = j;
+			}
+		}
+		
+		hwAxisList[i] = maxI;
+	}
 }
 
 /**
@@ -208,15 +262,19 @@ static int   checkargsMaxAndArgmax  (GpuArray*         dstMax,
  * @param [in]  numIdx
  * @param [in]  reduxLen
  * @param [in]  reduxList
+ * @param [in]  hwAxisLen
+ * @param [in]  hwAxisList
  * @param [in]  dstMaxType
  * @param [in]  dstArgmaxType
  * @return A free()'able string containing source code implementing the
  *         kernel, or else NULL.
  */
 
-static char* genkernelMaxAndArgmax (unsigned          numIdx,
+static char* gensourceMaxAndArgmax (unsigned          numIdx,
                                     const unsigned    reduxLen,
                                     const unsigned*   reduxList,
+                                    const unsigned    hwAxisLen,
+                                    const unsigned*   hwAxisList,
                                     const char*       dstMaxType,
                                     const char*       dstArgmaxType){
 	/* Save the parameters of the reduction in a generator context. */
@@ -224,6 +282,8 @@ static char* genkernelMaxAndArgmax (unsigned          numIdx,
 	ctx.numIdx        = numIdx;
 	ctx.reduxLen      = reduxLen;
 	ctx.reduxList     = reduxList;
+	ctx.hwAxisLen     = hwAxisLen;
+	ctx.hwAxisList    = hwAxisList;
 	ctx.numFreeIdx    = ctx.numIdx - ctx.reduxLen;
 	ctx.axisList      = malloc(numIdx*sizeof(unsigned));
 	ctx.dstMaxType    = dstMaxType;
@@ -280,27 +340,32 @@ static void  appendPrototype        (strb*            s,
 }
 static void  appendOffsets          (strb*            s,
                                      gen_kernel_ctx*  ctx){
-	strb_appends(s, "/* Add offsets */\n");
-	strb_appends(s, "src       = (const GLOBAL_MEM T*)((const GLOBAL_MEM char*)src       + srcOff);\n");
-	strb_appends(s, "dstMax    = (GLOBAL_MEM T*)      ((GLOBAL_MEM char*)      dstMax    + dstMaxOff);\n");
-	strb_appends(s, "dstArgmax = (GLOBAL_MEM X*)      ((GLOBAL_MEM char*)      dstArgmax + dstArgmaxOff);\n");
-	strb_appends(s, "\n");
-	strb_appends(s, "\n");
+	strb_appends(s, "\t/* Add offsets */\n");
+	strb_appends(s, "\tsrc       = (const GLOBAL_MEM T*)((const GLOBAL_MEM char*)src       + srcOff);\n");
+	strb_appends(s, "\tdstMax    = (GLOBAL_MEM T*)      ((GLOBAL_MEM char*)      dstMax    + dstMaxOff);\n");
+	strb_appends(s, "\tdstArgmax = (GLOBAL_MEM X*)      ((GLOBAL_MEM char*)      dstArgmax + dstArgmaxOff);\n");
+	strb_appends(s, "\t\n");
+	strb_appends(s, "\t\n");
 }
 static void  appendIndexDeclarations(strb*            s,
                                      gen_kernel_ctx*  ctx){
+	unsigned i;
 	strb_appends(s, "\t/* GPU kernel coordinates. Always 3D. */\n");
 	
-	strb_appends(s, "\tX bi0 = GID_0,       bi1 = GID_1,       bi2 = GID_2;\n");
-	strb_appends(s, "\tX bd0 = LDIM_0,      bd1 = LDIM_1,      bd2 = LDIM_2;\n");
-	strb_appends(s, "\tX ti0 = LID_0,       ti1 = LID_1,       ti2 = LID_2;\n");
-	strb_appends(s, "\tX gi0 = bi0*bd0+ti0, gi1 = bi1*bd1+ti1, gi2 = bi2*bd2+ti2;\n");
+	strb_appends(s, "\tX bi0 = GID_0,        bi1 = GID_1,        bi2 = GID_2;\n");
+	strb_appends(s, "\tX bd0 = LDIM_0,       bd1 = LDIM_1,       bd2 = LDIM_2;\n");
+	strb_appends(s, "\tX ti0 = LID_0,        ti1 = LID_1,        ti2 = LID_2;\n");
+	strb_appends(s, "\tX gi0 = bi0*bd0+ti0,  gi1 = bi1*bd1+ti1,  gi2 = bi2*bd2+ti2;\n");
+	strb_appends(s, "\tX ");
+	for(i=0;i<ctx->hwAxisLen;i++){
+		strb_appendf(s, "ci%u = chunkSize[%u]%s",
+		             i, i, (i==ctx->hwAxisLen-1) ? ";\n" : ", ");
+	}
 	
 	strb_appends(s, "\t\n");
 	strb_appends(s, "\t\n");
 	strb_appends(s, "\t/* Free indices & Reduction indices */\n");
 	
-	appendIdxes (s, "\tX ", "i", 0,               ctx->numIdx,     "ChunkSz", ";\n");
 	appendIdxes (s, "\tX ", "i", 0,               ctx->numIdx,     "",        ";\n");
 	appendIdxes (s, "\tX ", "i", 0,               ctx->numIdx,     "Dim",     ";\n");
 	appendIdxes (s, "\tX ", "i", 0,               ctx->numIdx,     "Start",   ";\n");
@@ -335,7 +400,8 @@ static void  appendIdxes            (strb*            s,
 }
 static void  appendRangeCalculations(strb*            s,
                                      gen_kernel_ctx*  ctx){
-	int i;
+	size_t hwDim;
+	int    i;
 	
 	/* Use internal remapping when computing the ranges for this thread. */
 	strb_appends(s, "\t/* Compute ranges for this thread. */\n");
@@ -350,10 +416,7 @@ static void  appendRangeCalculations(strb*            s,
 		strb_appendf(s, "\ti%dMStep   = dstMaxSteps[%d];\n", i, i);
 	}
 	for(i=0;i<ctx->numFreeIdx;i++){/* i*AStep = dstArgmaxSteps[*]; */
-		strb_appendf(s, "\ti%dMStep   = dstArgmaxSteps[%d];\n", i, i);
-	}
-	for(i=0;i<ctx->numIdx    ;i++){/* i*ChunkSz = numBlk[*]; */
-		strb_appendf(s, "\ti%dChunkSz = chunkSize[%d];\n", i, ctx->axisList[i]);
+		strb_appendf(s, "\ti%dAStep   = dstArgmaxSteps[%d];\n", i, i);
 	}
 	for(i=ctx->numIdx-1;i>=ctx->numFreeIdx;i--){/* i*PDim  = ...; */
 		/**
@@ -362,33 +425,33 @@ static void  appendRangeCalculations(strb*            s,
 		 */
 		
 		if(i == ctx->numIdx-1){
-			strb_appendf(s, "\ti%dPDim  = 1;\n", i);
+			strb_appendf(s, "\ti%dPDim    = 1;\n", i);
 		}else{
-			strb_appendf(s, "\ti%dPDim  = i%dPDim * i%dDim;\n", i, i+1, i);
+			strb_appendf(s, "\ti%dPDim    = i%dPDim * i%dDim;\n", i, i+1, i+1);
 		}
 	}
 	for(i=0;i<ctx->numIdx    ;i++){/* i*Start = ...; */
 		/**
-		 * The first 3 dimensions get to rely on hardware loops.
+		 * Up to 3 dimensions get to rely on hardware loops.
 		 * The others, if any, have to use software looping beginning at 0.
 		 */
 		
-		if(i < 3){
-			strb_appendf(s, "\ti%dStart = gi%d * i%dChunkSz;\n", i, i, i);
+		if(axisInSet(ctx->axisList[i], ctx->hwAxisList, ctx->hwAxisLen, &hwDim)){
+			strb_appendf(s, "\ti%dStart   = gi%d * ci%d;\n", i, hwDim, hwDim);
 		}else{
-			strb_appendf(s, "\ti%dStart = 0;\n", i);
+			strb_appendf(s, "\ti%dStart   = 0;\n", i);
 		}
 	}
 	for(i=0;i<ctx->numIdx    ;i++){/* i*End   = ...; */
 		/**
-		 * The first 3 dimensions get to rely on hardware loops.
+		 * Up to 3 dimensions get to rely on hardware loops.
 		 * The others, if any, have to use software looping beginning at 0.
 		 */
 		
-		if(i < 3){
-			strb_appendf(s, "\ti%dEnd   = i%dStart + bd%d * i%dChunkSz;\n", i, i, i, i);
+		if(axisInSet(ctx->axisList[i], ctx->hwAxisList, ctx->hwAxisLen, &hwDim)){
+			strb_appendf(s, "\ti%dEnd     = i%dStart + ci%d;\n", i, i, hwDim);
 		}else{
-			strb_appendf(s, "\ti%dEnd   = i%dStart + i%dDim;\n", i, i, i);
+			strb_appendf(s, "\ti%dEnd     = i%dStart + i%dDim;\n", i, i, i);
 		}
 	}
 	
@@ -426,11 +489,11 @@ static void  appendLoopMacroDefs    (strb*            s,
 	 * SRCINDEXER Macro
 	 */
 	
-	appendIdxes (s, "#define SRCINDEXER(", "i", 0, ctx->numIdx, "", ")   src[");
+	appendIdxes (s, "#define SRCINDEXER(", "i", 0, ctx->numIdx, "", ")   (*(GLOBAL_MEM T*)((GLOBAL_MEM char*)src + ");
 	for(i=0;i<ctx->numIdx;i++){
 		strb_appendf(s, "i%d*i%dSStep + \\\n                                            ", i, i);
 	}
-	strb_appends(s, "0]\n");
+	strb_appends(s, "0))\n");
 	
 	/**
 	 * RDXINDEXER Macro
@@ -446,21 +509,21 @@ static void  appendLoopMacroDefs    (strb*            s,
 	 * DSTMINDEXER Macro
 	 */
 	
-	appendIdxes (s, "#define DSTMINDEXER(", "i", 0, ctx->numFreeIdx, "", ")        dstMax[");
+	appendIdxes (s, "#define DSTMINDEXER(", "i", 0, ctx->numFreeIdx, "", ")        (*(GLOBAL_MEM T*)((GLOBAL_MEM char*)dstMax + ");
 	for(i=0;i<ctx->numFreeIdx;i++){
 		strb_appendf(s, "i%d*i%dMStep + \\\n                                                  ", i, i);
 	}
-	strb_appends(s, "0]\n");
+	strb_appends(s, "0))\n");
 	
 	/**
 	 * DSTAINDEXER Macro
 	 */
 	
-	appendIdxes (s, "#define DSTAINDEXER(", "i", 0, ctx->numFreeIdx, "", ")        dstArgmax[");
+	appendIdxes (s, "#define DSTAINDEXER(", "i", 0, ctx->numFreeIdx, "", ")        (*(GLOBAL_MEM X*)((GLOBAL_MEM char*)dstArgmax + ");
 	for(i=0;i<ctx->numFreeIdx;i++){
 		strb_appendf(s, "i%d*i%dAStep + \\\n                                                     ", i, i);
 	}
-	strb_appends(s, "0]\n");
+	strb_appends(s, "0))\n");
 }
 static void  appendLoopOuter        (strb*            s,
                                      gen_kernel_ctx*  ctx){
@@ -554,38 +617,57 @@ static void  appendLoopInner        (strb*            s,
 }
 static void  appendLoopMacroUndefs  (strb*            s,
                                      gen_kernel_ctx*  ctx){
-	strb_appends(s, "\t#undef FOROVER\n");
-	strb_appends(s, "\t#undef ESCAPE\n");
-	strb_appends(s, "\t#undef SRCINDEXER\n");
-	strb_appends(s, "\t#undef RDXINDEXER\n");
-	strb_appends(s, "\t#undef DSTMINDEXER\n");
-	strb_appends(s, "\t#undef DSTAINDEXER\n");
+	strb_appends(s, "#undef FOROVER\n");
+	strb_appends(s, "#undef ESCAPE\n");
+	strb_appends(s, "#undef SRCINDEXER\n");
+	strb_appends(s, "#undef RDXINDEXER\n");
+	strb_appends(s, "#undef DSTMINDEXER\n");
+	strb_appends(s, "#undef DSTAINDEXER\n");
 }
 static void  computeAxisList        (unsigned*        axisList,
                                      unsigned         numAxis,
                                      const unsigned*  reduxList,
                                      unsigned         reduxLen){
-	unsigned i, j, f=0, r=numAxis-reduxLen;
+	unsigned i, f=0;
 	
 	for(i=0;i<numAxis;i++){
-		/**
-		 * If axis i is in reduxList, add it to the end.
-		 */
-		
-		for(j=0;j<reduxLen;j++){
-			if(i==reduxList[j]){
-				axisList[r++] = i;
-				goto /* continue */ outerLoop;
-			}
+		if(axisInSet(i, reduxList, reduxLen, 0)){
+			continue;
 		}
-		
-		/**
-		 * Otherwise, axis i is not in reduxList. Add it to the beginning.
-		 */
-		
 		axisList[f++] = i;
-		outerLoop:;
 	}
+	memcpy(&axisList[f], reduxList, reduxLen*sizeof(*reduxList));
+}
+
+/**
+ * @brief Compile the kernel from source code.
+ * 
+ * @param [out] kernel
+ * @param [in]  src
+ * @param [in]  ctx
+ * @return
+ */
+
+static int   compileMaxAndArgmax    (GpuKernel*       kernel,
+                                     const char*      src,
+                                     gpucontext*      ctx){
+	const int    ARG_TYPECODE[11] = {
+		GA_BUFFER, /* src */
+		GA_SIZE,   /* srcOff */
+		GA_BUFFER, /* srcSteps */
+		GA_BUFFER, /* srcSize */
+		GA_BUFFER, /* chnkSize */
+		GA_BUFFER, /* dstMax */
+		GA_SIZE,   /* dstMaxOff */
+		GA_BUFFER, /* dstMaxSteps */
+		GA_BUFFER, /* dstArgmax */
+		GA_SIZE,   /* dstArgmaxOff */
+		GA_BUFFER  /* dstArgmaxSteps */
+	};
+	
+	const size_t l = strlen(src);
+	return GpuKernel_init(kernel, ctx, 1, &src, &l, "maxandargmax",
+	                      11, ARG_TYPECODE, GA_USE_CLUDA, (char**)0);
 }
 
 /**
@@ -711,11 +793,13 @@ static int   invokeMaxAndArgmax     (GpuKernel*       k,
                                      GpuArray*        dstArgmax,
                                      const GpuArray*  src,
                                      unsigned         reduxLen,
-                                     const unsigned*  reduxList){
-	int         ret = 0;
+                                     const unsigned*  reduxList,
+                                     unsigned         hwAxisLen,
+                                     const unsigned*  hwAxisList){
+	int         ret            = 0;
 	size_t      blockSize[3]   = {1,1,1};
 	size_t      gridSize [3]   = {1,1,1};
-	size_t      chunkSize[3]   = {1,1,1};
+	size_t      chunkSize[3]   = {50,1,1};
 	gpudata*    srcStepsGD     = 0, *srcSizeGD        = 0, *chunkSizeGD = 0,
 	            *dstMaxStepsGD = 0, *dstArgmaxStepsGD = 0;
 	gpucontext* ctx            = GpuArray_context(src);
@@ -726,10 +810,11 @@ static int   invokeMaxAndArgmax     (GpuKernel*       k,
 	 * 
 	 * This implies choosing the block, grid and chunk size appropriately.
 	 */
-	
+	/*
 	scheduleMaxAndArgmax(k, src, reduxLen, reduxList,
 	                     blockSize, gridSize, chunkSize);
-	
+	*/
+	(void)scheduleMaxAndArgmax;
 	
 	/**
 	 * Argument Marshalling. This the grossest gross thing in here.
@@ -743,7 +828,7 @@ static int   invokeMaxAndArgmax     (GpuKernel*       k,
 	                                 src->dimensions,
 	                                 GA_BUFFER_READ_ONLY|GA_BUFFER_INIT, &ret);
 	if(ret){goto releaseGpudata;}
-	chunkSizeGD      = gpudata_alloc(ctx, src->nd * sizeof(size_t),
+	chunkSizeGD      = gpudata_alloc(ctx, hwAxisLen * sizeof(size_t),
 	                                 chunkSize,
 	                                 GA_BUFFER_READ_ONLY|GA_BUFFER_INIT, &ret);
 	if(ret){goto releaseGpudata;}
@@ -784,25 +869,24 @@ static int   invokeMaxAndArgmax     (GpuKernel*       k,
 	};
 	
 	void* args[] = {
-		(void*)&argstr.src,
+		(void*) argstr.src,
 		(void*)&argstr.srcOff,
-		(void*)&argstr.srcSteps,
-		(void*)&argstr.srcSize,
-		(void*)&argstr.chunkSize,
-		(void*)&argstr.dstMax,
+		(void*) argstr.srcSteps,
+		(void*) argstr.srcSize,
+		(void*) argstr.chunkSize,
+		(void*) argstr.dstMax,
 		(void*)&argstr.dstMaxOff,
-		(void*)&argstr.dstMaxSteps,
-		(void*)&argstr.dstArgmax,
+		(void*) argstr.dstMaxSteps,
+		(void*) argstr.dstArgmax,
 		(void*)&argstr.dstArgmaxOff,
-		(void*)&argstr.dstArgmaxSteps
+		(void*) argstr.dstArgmaxSteps
 	};
-	
 	
 	/**
 	 * Call kernel, release arguments and return error code
 	 */
 	
-	ret = GpuKernel_call(k, 3, blockSize, gridSize, 0, args);
+	ret = GpuKernel_call(k, hwAxisLen, blockSize, gridSize, 0, args);
 	releaseGpudata:
 	gpudata_release(srcStepsGD);
 	gpudata_release(srcSizeGD);
