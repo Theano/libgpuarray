@@ -63,6 +63,9 @@ static       double   pcgRand01(void){
 }
 
 
+/**
+ * Test cases.
+ */
 
 START_TEST(test_reduction){
 	pcgSeed(1);

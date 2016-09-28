@@ -186,6 +186,35 @@ uint64_t gaIFLGetGreatestFactor(const ga_factor_list* fl);
 
 int   gaIFLsnprintf(char* str, size_t size, const ga_factor_list* fl);
 
+/**
+ * @brief Schedule block size, grid size and what's left over that fits in
+ *        neither, which will be called "chunk" size, subject to constraints.
+ * 
+ * @param [in]     n        Number of dimensions of the problem. The arrays
+ *                          maxBind, maxGind, factBS, factGS, factCS must have
+ *                          n elements.
+ * @param [in]     maxBtot  The product of the block sizes in all n dimensions
+ *                          will not exceed this value.
+ * @param [in]     maxBind  The block size in dimensions i=0..n-1 will not
+ *                          exceed maxBind[i].
+ * @param [in]     maxGtot  The product of the grid sizes in all n dimensions
+ *                          will not exceed this value.
+ * @param [in]     maxGind  The grid size in dimensions i=0..n-1 will not
+ *                          exceed maxGind[i].
+ * @param [in,out] factBS   The block size for dimensions 0..n-1, as a factor list.
+ * @param [in,out] factGS   The grid  size for dimensions 0..n-1, as a factor list.
+ * @param [in,out] factCS   The chunk size for dimensions 0..n-1, as a factor list.
+ */
+
+void  gaIFLSchedule(const unsigned  n,
+                    const uint64_t  maxBtot,
+                    const uint64_t* maxBind,
+                    const uint64_t  maxGtot,
+                    const uint64_t* maxGind,
+                    ga_factor_list* factBS,
+                    ga_factor_list* factGS,
+                    ga_factor_list* factCS);
+
 
 /* End C++ Extern "C" Guard */
 #ifdef __cplusplus

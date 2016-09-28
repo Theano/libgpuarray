@@ -560,7 +560,7 @@ uint64_t gaIFLGetGreatestFactor(const ga_factor_list* fl){
 	int i;
 	
 	for(i=0;i<15;i++){
-		if(f < fl->f[i]){
+		if(fl->p[i] > 0 && f < fl->f[i]){
 			f = fl->f[i];
 		}
 	}
@@ -608,4 +608,52 @@ int      gaIFLsnprintf(char* str, size_t size, const ga_factor_list* fl){
 	return total;
 }
 
-
+void  gaIFLSchedule(const unsigned  n,
+                    const uint64_t  maxBtot,
+                    const uint64_t* maxBind,
+                    const uint64_t  maxGtot,
+                    const uint64_t* maxGind,
+                    ga_factor_list* factBS,
+                    ga_factor_list* factGS,
+                    ga_factor_list* factCS){
+#if 0
+	printf("BS: (%6llu, %6llu, %6llu)\n",
+	       (unsigned long long)gaIFLGetProduct(&factBS[0]),
+	       (unsigned long long)gaIFLGetProduct(&factBS[1]),
+	       (unsigned long long)gaIFLGetProduct(&factBS[2]));
+	printf("GS: (%6llu, %6llu, %6llu)\n",
+	       (unsigned long long)gaIFLGetProduct(&factGS[0]),
+	       (unsigned long long)gaIFLGetProduct(&factGS[1]),
+	       (unsigned long long)gaIFLGetProduct(&factGS[2]));
+	printf("CS: (%6llu, %6llu, %6llu)\n",
+	       (unsigned long long)gaIFLGetProduct(&factCS[0]),
+	       (unsigned long long)gaIFLGetProduct(&factCS[1]),
+	       (unsigned long long)gaIFLGetProduct(&factCS[2]));
+	printf("\n");
+#endif
+	
+	/**
+	 * First, we move factors from factBS[i] and factGS[i] to factCS[i], in
+	 * order of largest to smallest, until their product is at or below
+	 * maxBind[i] and maxGind[i] respectively.
+	 */
+	
+	/**
+	 * Then we move out more factors from factBS[i] and factGS[i], in order of
+	 * smallest to largest, until their common product is  at or below maxBtot
+	 * and maxGtot respectively.
+	 */
+	
+	/**
+	 * At this point, the scheduling is guaranteed to be valid, but may be
+	 * nowhere close to optimal.
+	 * 
+	 * So we start moving in factors from factCS[i] to factBS[i], in order of
+	 * largest to smallest, while remaining below maxBtot and maxBind[i].
+	 */
+	
+	/**
+	 * Lastly, we move in factors from factCS[i] to factBG[i], in order of
+	 * largest to smallest, while remaining below maxGtot and maxGind[i].
+	 */
+}
