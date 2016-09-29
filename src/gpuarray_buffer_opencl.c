@@ -37,7 +37,8 @@ static gpukernel *cl_newkernel(gpucontext *ctx, unsigned int count,
                                const char *fname, unsigned int argcount,
                                const int *types, int flags, int *ret,
                                char **err_str);
-static const char CL_CONTEXT_PREAMBLE[];
+static const char CL_CONTEXT_PREAMBLE[] =
+"#define GA_WARP_SIZE %lu\n";  // to be filled by cl_make_ctx()
 
 static inline int cl_get_platform_count(unsigned int* platcount) {
   cl_uint nump;
@@ -301,9 +302,6 @@ static const char CL_PREAMBLE[] =
 
 /* XXX: add complex types, quad types, and longlong */
 /* XXX: add vector types */
-
-static const char CL_CONTEXT_PREAMBLE[] =
-  "#define GA_WARP_SIZE %lu\n";  // to be filled by cl_make_ctx()
 
 static const char *get_error_string(cl_int err) {
   /* OpenCL 1.0 error codes */
