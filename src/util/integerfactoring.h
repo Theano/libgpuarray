@@ -46,6 +46,7 @@ typedef struct ga_factor_list_ ga_factor_list;
 struct ga_factor_list_{
 	uint64_t f[16];/* Factors */
 	uint8_t  p[16];/* Powers of factors */
+	int      d;    /* Number of distinct factors. */
 };
 
 
@@ -112,13 +113,14 @@ int      gaIIsPrime(uint64_t n);
  * required.
  * 
  * @param [in]  n       The integer to be factorized. Must be >0.
- * @param [in]  maxN    The "slack" parameter. The factor list returned will not
- *                      have a product that exceeds this number.
+ * @param [in]  maxN    The "slack" parameter. The factor list returned will
+ *                      not have a product that exceeds this number.
  * @param [in]  k       The k-smoothness constraint. k is the largest
  *                      acceptable factor in the output factor list. The
  *                      factorizer will, effectively, treat any number all of
  *                      whose prime factors exceed k as a prime.
- * @param [out] fl      The output factor list.
+ * @param [out] fl      The output factor list. Does *NOT* need to be
+ *                      initialized.
  * @return Non-zero if a factorization is found that satisfies both slack and
  *         smoothness constraints; Zero if no such factorization is found.
  *         If this function returns zero, the last factor in the factor
@@ -136,6 +138,16 @@ int      gaIFactorize(uint64_t n, uint64_t maxN, uint64_t k, ga_factor_list* fl)
 void     gaIFLInit(ga_factor_list* fl);
 
 /**
+ * @brief Reports whether another *distinct* factor can be added to the factor
+ *        list safely.
+ * 
+ * @return Returns zero if there are less than 15 distinct factors in the list
+ *         and non-zero otherwise.
+ */
+
+int      gaIFLFull(ga_factor_list* fl);
+
+/**
  * @brief Add a factor f with power p to the factor list.
  * 
  * If factor f was already present in the factor list, increments
@@ -147,7 +159,7 @@ void     gaIFLInit(ga_factor_list* fl);
  * @return Non-zero if factor successfully added; Zero otherwise.
  */
 
-int      gaIFLAddFactors(ga_factor_list* fl, uint64_t f, uint8_t p);
+int      gaIFLAddFactors(ga_factor_list* fl, uint64_t f, int p);
 
 /**
  * @brief Get the power of a given factor within a factor list.
@@ -169,6 +181,12 @@ uint64_t gaIFLGetProduct(const ga_factor_list* fl);
  */
 
 uint64_t gaIFLGetGreatestFactor(const ga_factor_list* fl);
+
+/**
+ * @brief Get the smallest factor in the factors list.
+ */
+
+uint64_t gaIFLGetSmallestFactor(const ga_factor_list* fl);
 
 /**
  * @brief Print out the factor list in a human-readable form, snprintf()-style.
@@ -206,7 +224,7 @@ int   gaIFLsnprintf(char* str, size_t size, const ga_factor_list* fl);
  * @param [in,out] factCS   The chunk size for dimensions 0..n-1, as a factor list.
  */
 
-void  gaIFLSchedule(const unsigned  n,
+void  gaIFLSchedule(const int       n,
                     const uint64_t  maxBtot,
                     const uint64_t* maxBind,
                     const uint64_t  maxGtot,

@@ -58,6 +58,37 @@ static uint64_t gaIPowMod    (uint64_t x, uint64_t a, uint64_t m);
 
 static int      gaIFactorizeNextPow2(uint64_t n, ga_factor_list* fl);
 
+/**
+ * @brief Satisfy individual product limits on "from" by moving factors to
+ *        corresponding "to" list.
+ */
+
+static void     gaIFLScheduleSatisfyInd(const int       n,
+                                        ga_factor_list* from,
+                                        ga_factor_list* to,
+                                        const uint64_t* maxInd);
+
+/**
+ * @brief Satisfy global product limit on "from" by moving factors to
+ *        corresponding "to" list.
+ */
+
+static void     gaIFLScheduleSatisfyTot(const int       n,
+                                        ga_factor_list* from,
+                                        ga_factor_list* to,
+                                        const uint64_t  maxTot);
+
+/**
+ * @brief Optimize "to" by moving factors from "from", under both individual
+ *        and global limits.
+ */
+
+static void     gaIFLScheduleOpt(const int       n,
+                                 ga_factor_list* from,
+                                 ga_factor_list* to,
+                                 const uint64_t  maxTot,
+                                 const uint64_t* maxInd);
+
 
 
 /**
@@ -492,48 +523,88 @@ void     gaIFLInit(ga_factor_list* fl){
 	memset(fl, 0, sizeof(*fl));
 }
 
-int      gaIFLAddFactors(ga_factor_list* fl, uint64_t f, uint8_t p){
+int      gaIFLFull(ga_factor_list* fl){
+	return fl->d >= 15;/* Strictly speaking, fl->d never exceeds 15. */
+}
+
+int      gaIFLAddFactors(ga_factor_list* fl, uint64_t f, int p){
 	int i;
 	
-	/* Fast case: We're adding 0 powers of f. */
-	if(p == 0){
+	/**
+	 * Fast case: We're adding 0 powers of f, or any powers of 1. The
+	 * value of the factor list (and the integer it represents) is thus
+	 * unchanged.
+	 */
+	
+	if(p == 0 || f == 1){
 		return 1;
 	}
 	
-	for(i=0;i<15;i++){
+	/**
+	 * Otherwise, the factor list has to change. We scan linearly the factor
+	 * list for either a pre-existing spot or an insertion spot. Scanning
+	 * linearly over a 15-element array is faster and less complex than binary
+	 * search.
+	 */
+	
+	for(i=0;i<fl->d;i++){
 		if(fl->f[i] == f){
-			/* Fast case: Factor already in list. */
+			/**
+			 * Factor is already in list.
+			 */
+			
 			fl->p[i] += p;
+			if(fl->p[i] == 0){
+				/**
+				 * We removed all factors f. Bump leftwards the remainder to
+				 * maintain sorted order.
+				 */
+				
+				memmove(&fl->f[i], &fl->f[i+1], sizeof(fl->f[i])*(fl->d-i));
+				memmove(&fl->p[i], &fl->p[i+1], sizeof(fl->p[i])*(fl->d-i));
+				fl->d--;
+			}
 			return 1;
 		}else if(fl->f[i] > f){
 			/* Inject the factor at this place in order to keep list sorted,
 			   if we have the capacity. */
 			
-			if(fl->f[14] != 0){
+			if(gaIFLFull(fl)){
 				/* We can't bump the list rightwards, it's full already! */
 				return 0;
 			}
 			
-			memmove(&fl->f[i+1], &fl->f[i], sizeof(fl->f[i])*(14-i));
-			memmove(&fl->p[i+1], &fl->p[i], sizeof(fl->p[i])*(14-i));
+			memmove(&fl->f[i+1], &fl->f[i], sizeof(fl->f[i])*(fl->d-i));
+			memmove(&fl->p[i+1], &fl->p[i], sizeof(fl->p[i])*(fl->d-i));
 			fl->f[i] = f;
 			fl->p[i] = p;
-			return 1;
-		}else if(fl->f[i] == 0){
-			/* This is the biggest factor so far, and a slot still remains. */
-			fl->f[i] = f;
-			fl->p[i] = p;
+			fl->d++;
 			return 1;
 		}
 	}
 	
-	return 0;
+	/**
+	 * We looked at every factor in the list and f is strictly greater than
+	 * all of them.
+	 * 
+	 * If the list is full, we cannot insert f, but if it isn't, we can simply
+	 * tack it at the end.
+	 */
+	
+	if(gaIFLFull(fl)){
+		return 0;
+	}else{
+		fl->f[fl->d] = f;
+		fl->p[fl->d] = p;
+		fl->d++;
+		return 1;
+	}
 }
 
 int      gaIFLGetFactorPower(ga_factor_list* fl, uint64_t f){
 	int i;
 	
-	for(i=0;i<15;i++){
+	for(i=0;i<fl->d;i++){
 		if(fl->f[i] == f){
 			return fl->p[i];
 		}
@@ -546,7 +617,7 @@ uint64_t gaIFLGetProduct(const ga_factor_list* fl){
 	uint64_t p = 1;
 	int i, j;
 	
-	for(i=0;i<15;i++){
+	for(i=0;i<fl->d;i++){
 		for(j=0;j<fl->p[i];j++){
 			p *= fl->f[i];
 		}
@@ -556,16 +627,62 @@ uint64_t gaIFLGetProduct(const ga_factor_list* fl){
 }
 
 uint64_t gaIFLGetGreatestFactor(const ga_factor_list* fl){
-	uint64_t f = 1;
+	return fl->d ? fl->f[fl->d-1] : 1;
+}
+
+uint64_t gaIFLGetSmallestFactor(const ga_factor_list* fl){
+	return fl->d ? fl->f[0]         : 1;
+}
+
+static uint64_t gaIFLGetProductv(int n, const ga_factor_list* fl){
+	uint64_t p = 1;
 	int i;
 	
-	for(i=0;i<15;i++){
-		if(fl->p[i] > 0 && f < fl->f[i]){
-			f = fl->f[i];
+	for(i=0;i<n;i++){
+		p *= gaIFLGetProduct(fl+i);
+	}
+	
+	return p;
+}
+
+static uint64_t gaIFLGetGreatestFactorv(int n, const ga_factor_list* fl, int* idx){
+	uint64_t f = 0, currF;
+	int i, hasFactors=0;
+	
+	if(idx){*idx = 0;}
+	
+	for(i=0;i<n;i++){
+		if(fl[i].d > 0){
+			hasFactors = 1;
+			currF = gaIFLGetGreatestFactor(fl+i);
+			if(f <= currF){
+				f = currF;
+				if(idx){*idx = i;}
+			}
 		}
 	}
 	
-	return f;
+	return hasFactors ? f : 1;
+}
+
+static uint64_t gaIFLGetSmallestFactorv(int n, const ga_factor_list* fl, int* idx){
+	uint64_t f = -1, currF;
+	int i, hasFactors=0;
+	
+	if(idx){*idx = 0;}
+	
+	for(i=0;i<n;i++){
+		if(fl[i].d > 0){
+			hasFactors = 1;
+			currF = gaIFLGetSmallestFactor(fl+i);
+			if(f >= currF){
+				f = currF;
+				if(idx){*idx = i;}
+			}
+		}
+	}
+	
+	return hasFactors ? f : 1;
 }
 
 int      gaIFLsnprintf(char* str, size_t size, const ga_factor_list* fl){
@@ -576,7 +693,7 @@ int      gaIFLsnprintf(char* str, size_t size, const ga_factor_list* fl){
 	char*  ptr  = size ? str : NULL;
 	
 	/* Loop over all factors and spit them out. */
-	for(i=0;i<15;i++){
+	for(i=0;i<fl->d;i++){
 		for(j=0;j<fl->p[i];j++){
 			total += snprintf(ptr, left, "%llu*", (unsigned long long)fl->f[i]);
 			if(ptr){
@@ -608,29 +725,19 @@ int      gaIFLsnprintf(char* str, size_t size, const ga_factor_list* fl){
 	return total;
 }
 
-void  gaIFLSchedule(const unsigned  n,
-                    const uint64_t  maxBtot,
-                    const uint64_t* maxBind,
-                    const uint64_t  maxGtot,
-                    const uint64_t* maxGind,
-                    ga_factor_list* factBS,
-                    ga_factor_list* factGS,
-                    ga_factor_list* factCS){
-#if 0
-	printf("BS: (%6llu, %6llu, %6llu)\n",
-	       (unsigned long long)gaIFLGetProduct(&factBS[0]),
-	       (unsigned long long)gaIFLGetProduct(&factBS[1]),
-	       (unsigned long long)gaIFLGetProduct(&factBS[2]));
-	printf("GS: (%6llu, %6llu, %6llu)\n",
-	       (unsigned long long)gaIFLGetProduct(&factGS[0]),
-	       (unsigned long long)gaIFLGetProduct(&factGS[1]),
-	       (unsigned long long)gaIFLGetProduct(&factGS[2]));
-	printf("CS: (%6llu, %6llu, %6llu)\n",
-	       (unsigned long long)gaIFLGetProduct(&factCS[0]),
-	       (unsigned long long)gaIFLGetProduct(&factCS[1]),
-	       (unsigned long long)gaIFLGetProduct(&factCS[2]));
-	printf("\n");
-#endif
+void     gaIFLSchedule(const int       n,
+                       const uint64_t  maxBtot,
+                       const uint64_t* maxBind,
+                       const uint64_t  maxGtot,
+                       const uint64_t* maxGind,
+                       ga_factor_list* factBS,
+                       ga_factor_list* factGS,
+                       ga_factor_list* factCS){
+	/**
+	 * If we have zero dimensions, the scheduling job is easy.
+	 */
+	
+	if(n<=0){return;}
 	
 	/**
 	 * First, we move factors from factBS[i] and factGS[i] to factCS[i], in
@@ -638,11 +745,17 @@ void  gaIFLSchedule(const unsigned  n,
 	 * maxBind[i] and maxGind[i] respectively.
 	 */
 	
+	gaIFLScheduleSatisfyInd(n, factBS, factCS, maxBind);
+	gaIFLScheduleSatisfyInd(n, factGS, factCS, maxGind);
+	
 	/**
 	 * Then we move out more factors from factBS[i] and factGS[i], in order of
-	 * smallest to largest, until their common product is  at or below maxBtot
+	 * smallest to largest, until their common product is at or below maxBtot
 	 * and maxGtot respectively.
 	 */
+	
+	gaIFLScheduleSatisfyTot(n, factBS, factCS, maxBtot);
+	gaIFLScheduleSatisfyTot(n, factGS, factCS, maxGtot);
 	
 	/**
 	 * At this point, the scheduling is guaranteed to be valid, but may be
@@ -650,10 +763,119 @@ void  gaIFLSchedule(const unsigned  n,
 	 * 
 	 * So we start moving in factors from factCS[i] to factBS[i], in order of
 	 * largest to smallest, while remaining below maxBtot and maxBind[i].
-	 */
-	
-	/**
+	 * 
 	 * Lastly, we move in factors from factCS[i] to factBG[i], in order of
 	 * largest to smallest, while remaining below maxGtot and maxGind[i].
 	 */
+	
+	gaIFLScheduleOpt(n, factCS, factBS, maxBtot, maxBind);
+	gaIFLScheduleOpt(n, factCS, factGS, maxGtot, maxGind);
+}
+
+static void     gaIFLScheduleSatisfyInd(const int       n,
+                                        ga_factor_list* from,
+                                        ga_factor_list* to,
+                                        const uint64_t* maxInd){
+	int      i;
+	uint64_t f, p;
+	
+	for(i=0;i<n;i++){
+		p = gaIFLGetProduct       (from+i);
+		f = gaIFLGetGreatestFactor(from+i);
+		while(p > maxInd[i]){
+			if(p%f){
+				f  = gaIFLGetGreatestFactor(from+i);
+			}
+			p /= f;
+			gaIFLAddFactors(from+i, f, -1);
+			gaIFLAddFactors(to  +i, f, +1);
+		}
+	}
+}
+
+static void     gaIFLScheduleSatisfyTot(const int       n,
+                                        ga_factor_list* from,
+                                        ga_factor_list* to,
+                                        const uint64_t  maxTot){
+	int      a, i, c;
+	uint64_t f, p;
+	
+	p = gaIFLGetProductv(n, from);
+	a = 0;
+	
+	while(p > maxTot){
+		f = gaIFLGetSmallestFactorv(n, from, &a);
+		c = gaIFLGetFactorPower    (from+a, f);
+		
+		for(i=c-1;i>=0 && p>maxTot;i--){
+			p /= f;
+			gaIFLAddFactors(from+a, f, -1);
+			gaIFLAddFactors(to  +a, f, +1);
+		}
+	}
+}
+
+static void     gaIFLScheduleOpt(const int       n,
+                                 ga_factor_list* from,
+                                 ga_factor_list* to,
+                                 const uint64_t  maxTot,
+                                 const uint64_t* maxInd){
+	int i, j, k;
+	uint64_t maxFTot, maxFInd, currF, f;
+	uint64_t pInd[n], pTot = 1;
+	
+	/* Muzzle compiler about a random function being unused. */
+	(void)gaIFLGetGreatestFactorv;
+	
+	/**
+	 * Check whether optimization is possible.
+	 */
+	
+	for(i=0;i<n;i++){
+		pTot *= pInd[i] = gaIFLGetProduct(to+i);
+	}
+	maxFTot = maxTot/pTot;
+	if(maxFTot <= 1){
+		return;
+	}
+	
+	/* Optimize. */
+	do{
+		/**
+		 * At the beginning of each iteration, maxFTot is preset to maxTot/p,
+		 * the largest factor that can legitimately be added into `to` without
+		 * exceeding the *global* limit.
+		 * 
+		 * We select, amongst all dimensions, the largest f such that
+		 *     f <= maxFTot     and
+		 *     f <= maxFInd[k]
+		 * and record both f and k.
+		 */
+		
+		f =  1;
+		k = -1;
+		for(i=0;i<n;i++){
+			maxFInd = maxInd[i]/pInd[i];
+			
+			for(j=from[i].d-1;j>=0;j--){
+				currF = from[i].f[j];
+				
+				if(currF <= maxFTot && currF <= maxFInd && currF >= f){
+					f = currF;
+					k = i;
+					break;
+				}
+			}
+		}
+		
+		if(k == -1){
+			break;
+		}
+		
+		gaIFLAddFactors(from+k, f, -1);
+		gaIFLAddFactors(to  +k, f, +1);
+		pInd[k] *= f;
+		pTot    *= f;
+		maxFTot  = maxTot/pTot;
+	}while(maxFTot>1 && f>1);
 }

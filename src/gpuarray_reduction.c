@@ -261,7 +261,7 @@ static int   maxandargmaxCheckargs              (maxandargmax_ctx*  ctx){
 
 static int   maxandargmaxSelectHwAxes           (maxandargmax_ctx*  ctx){
 	unsigned i, j, maxI = 0;
-	size_t   maxV = 0;
+	size_t   maxV;
 	
 	ctx->ndh = ctx->ndd<3 ? ctx->ndd : 3;
 	
@@ -271,10 +271,12 @@ static int   maxandargmaxSelectHwAxes           (maxandargmax_ctx*  ctx){
 	 */
 	
 	for(i=0;i<ctx->ndh;i++){
+		maxV = 0;
+		
 		for(j=0;j<ctx->nds;j++){
 			if(!axisInSet(j, ctx->hwAxisList, i,        0) &&
 			   !axisInSet(j, ctx->reduxList,  ctx->ndr, 0) &&
-			   ctx->src->dimensions[j] > maxV){
+			   ctx->src->dimensions[j] >= maxV){
 				maxV = ctx->src->dimensions[j];
 				maxI = j;
 			}
@@ -707,7 +709,7 @@ static int   maxandargmaxSchedule               (maxandargmax_ctx*  ctx){
 		gaIFLInit(&factCS[i]);
 		
 		size_t warpMod = dims[i]%warpSize;
-		if(bestWarpMod>0 && (warpMod==0 || warpMod>bestWarpMod)){
+		if(bestWarpMod>0 && (warpMod==0 || warpMod>=bestWarpMod)){
 			bestWarpAxis = i;
 			bestWarpMod  = warpMod;
 		}
@@ -730,7 +732,6 @@ static int   maxandargmaxSchedule               (maxandargmax_ctx*  ctx){
 			 * 2.0 it will factorize guaranteed.
 			 */
 			
-			gaIFLInit(&factCS[i]);
 			slack[i] += 0.1;
 		}
 	}
