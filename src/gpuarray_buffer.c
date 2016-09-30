@@ -100,7 +100,9 @@ void gpudata_retain(gpudata *b) {
 }
 
 void gpudata_release(gpudata *b) {
-  ((partial_gpudata *)b)->ctx->ops->buffer_release(b);
+  if(b){
+    ((partial_gpudata *)b)->ctx->ops->buffer_release(b);
+  }
 }
 
 int gpudata_share(gpudata *a, gpudata *b, int *ret) {
