@@ -43,9 +43,9 @@ export CPATH=`pwd`/src:${CPATH}
 python setup.py build_ext --inplace
 
 # Test it
+test=pygpu
 for dev in ${DEVICES_CUDA}; do
     echo "Testing pygpu for DEVICE=${dev}"
-    test=${BUILDBOT_DIR}/pygpu
     DEVICE=${dev} time nosetests --with-xunit --xunit-file=${test}${dev}tests.xml pygpu/tests
 done
 for dev in ${DEVICES_OPENCL}; do
