@@ -211,6 +211,8 @@ static uint64_t gaIMulMod    (uint64_t a, uint64_t b, uint64_t m){
 }
 
 static uint64_t gaIPowMod    (uint64_t x, uint64_t a, uint64_t m){
+	uint64_t r;
+	
 	/**
 	 * Special cases (order matters!):
 	 * - A modulo of 0 makes no sense and a modulo of 1 implies a return value
@@ -241,7 +243,7 @@ static uint64_t gaIPowMod    (uint64_t x, uint64_t a, uint64_t m){
 	 * Otherwise, perform modular exponentiation by squaring.
 	 */
 	
-	uint64_t r = 1;
+	r = 1;
 	while(a){
 		if(a&1){
 			r = gaIMulMod(r, x, m);
@@ -255,6 +257,13 @@ static uint64_t gaIPowMod    (uint64_t x, uint64_t a, uint64_t m){
 }
 
 int      gaIIsPrime   (uint64_t n){
+	size_t         i, j;
+	int            hasNoSmallFactors, hasSmallFactors;
+	uint64_t       r, d;
+	const uint64_t WITNESSES[]  = {2,3,5,7,11,13,17,19,23,29,31,37};
+	const int      NUMWITNESSES = sizeof(WITNESSES)/sizeof(WITNESSES[0]);
+	
+	
 	/**
 	 * Check if it is 2, the oddest prime.
 	 */
@@ -286,8 +295,8 @@ int      gaIIsPrime   (uint64_t n){
 	 * Test small prime factors.
 	 */
 	
-	int hasNoSmallFactors = n%3 && n%5 && n%7 && n%11 && n%13;
-	int hasSmallFactors   = !hasNoSmallFactors;
+	hasNoSmallFactors = n%3 && n%5 && n%7 && n%11 && n%13;
+	hasSmallFactors   = !hasNoSmallFactors;
 	if(hasSmallFactors){
 		return 0;
 	}
@@ -304,12 +313,8 @@ int      gaIIsPrime   (uint64_t n){
 	 * integers under 2^64.
 	 */
 	
-	const uint64_t WITNESSES[]  = {2,3,5,7,11,13,17,19,23,29,31,37};
-	const int      NUMWITNESSES = sizeof(WITNESSES)/sizeof(WITNESSES[0]);
-	size_t         i, j;
-	
-	uint64_t r = gaICtz(n-1);
-	uint64_t d = (n-1)>>r;
+	r = gaICtz(n-1);
+	d = (n-1)>>r;
 	
 	/* For each witness... */
 	for(i=0;i<NUMWITNESSES;i++){

@@ -662,7 +662,20 @@ static int   maxandargmaxCompile                (maxandargmax_ctx*  ctx){
  */
 
 static int   maxandargmaxSchedule               (maxandargmax_ctx*  ctx){
-	int i;
+	int            i;
+	size_t         warpMod;
+	size_t         bestWarpMod  = 1;
+	unsigned       bestWarpAxis = 0;
+	uint64_t       maxLg;
+	uint64_t       maxLs[3];
+	uint64_t       maxGg;
+	uint64_t       maxGs[3];
+	uint64_t       dims [3];
+	double         slack[3];
+	ga_factor_list factBS[3];
+	ga_factor_list factGS[3];
+	ga_factor_list factCS[3];
+	
 	
 	/**
 	 * Obtain the constraints of our problem.
@@ -690,17 +703,12 @@ static int   maxandargmaxSchedule               (maxandargmax_ctx*  ctx){
 	 * - Finding on which hardware axis is it optimal to place the warpSize factor.
 	 */
 	
-	unsigned       bestWarpAxis = 0;
-	size_t         bestWarpMod  = 1;
-	uint64_t       maxLg        = maxL;
-	uint64_t       maxLs[3]     = {maxL0, maxL1, maxL2};
-	uint64_t       maxGg        = maxG;
-	uint64_t       maxGs[3]     = {maxG0, maxG1, maxG2};
-	uint64_t       dims [3]     = {1,     1,     1    };
-	double         slack[3]     = {1.1,   1.1,   1.1  };
-	ga_factor_list factBS[3];
-	ga_factor_list factGS[3];
-	ga_factor_list factCS[3];
+	maxLg    = maxL;
+	maxLs[0] = maxL0, maxLs[1]=maxL1, maxLs[2]=maxL2;
+	maxGg    = maxG;
+	maxGs[0] = maxG0, maxGs[1]=maxG1, maxGs[2]=maxG2;
+	dims[0]  = dims[1]  = dims[2]  = 1;
+	slack[0] = slack[1] = slack[2] = 1.1;
 	
 	for(i=0;i<ctx->ndh;i++){
 		dims[i] = ctx->src->dimensions[ctx->hwAxisList[i]];
@@ -708,7 +716,7 @@ static int   maxandargmaxSchedule               (maxandargmax_ctx*  ctx){
 		gaIFLInit(&factGS[i]);
 		gaIFLInit(&factCS[i]);
 		
-		size_t warpMod = dims[i]%warpSize;
+		warpMod = dims[i]%warpSize;
 		if(bestWarpMod>0 && (warpMod==0 || warpMod>=bestWarpMod)){
 			bestWarpAxis = i;
 			bestWarpMod  = warpMod;
@@ -761,6 +769,8 @@ static int   maxandargmaxSchedule               (maxandargmax_ctx*  ctx){
  */
 
 static int   maxandargmaxInvoke                 (maxandargmax_ctx*  ctx){
+	void* args[11];
+	
 	/**
 	 * Argument Marshalling. This the grossest gross thing in here.
 	 */
@@ -776,19 +786,17 @@ static int   maxandargmaxInvoke                 (maxandargmax_ctx*  ctx){
 	                                      ctx->dstMax->strides,    flags, 0);
 	ctx->dstArgmaxStepsGD = gpudata_alloc(ctx->gpuCtx, ctx->ndd * sizeof(size_t),
 	                                      ctx->dstArgmax->strides, flags, 0);
-	void* args[] = {
-		(void*) ctx->src->data,
-		(void*)&ctx->src->offset,
-		(void*) ctx->srcStepsGD,
-		(void*) ctx->srcSizeGD,
-		(void*) ctx->chunkSizeGD,
-		(void*) ctx->dstMax->data,
-		(void*)&ctx->dstMax->offset,
-		(void*) ctx->dstMaxStepsGD,
-		(void*) ctx->dstArgmax->data,
-		(void*)&ctx->dstArgmax->offset,
-		(void*) ctx->dstArgmaxStepsGD
-	};
+	args[ 0] = (void*) ctx->src->data;
+	args[ 1] = (void*)&ctx->src->offset;
+	args[ 2] = (void*) ctx->srcStepsGD;
+	args[ 3] = (void*) ctx->srcSizeGD;
+	args[ 4] = (void*) ctx->chunkSizeGD;
+	args[ 5] = (void*) ctx->dstMax->data;
+	args[ 6] = (void*)&ctx->dstMax->offset;
+	args[ 7] = (void*) ctx->dstMaxStepsGD;
+	args[ 8] = (void*) ctx->dstArgmax->data;
+	args[ 9] = (void*)&ctx->dstArgmax->offset;
+	args[10] = (void*) ctx->dstArgmaxStepsGD;
 	
 	if(ctx->srcStepsGD      &&
 	   ctx->srcSizeGD       &&
