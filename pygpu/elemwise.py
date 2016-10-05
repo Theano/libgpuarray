@@ -14,7 +14,7 @@ def _dtype(o):
 
 
 def as_argument(o, name, read=False, write=False):
-    if not read and not write:
+    if (not read) and (not write):
         raise ValueError('argument is neither read not write')
     return arg(name, _dtype(o), scalar=not isinstance(o, gpuarray.GpuArray),
                read=read, write=write)
