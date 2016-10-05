@@ -1,12 +1,13 @@
 cimport libc.stdio
 from libc.stdlib cimport malloc, calloc, free
 from cpython.mem cimport PyMem_Malloc, PyMem_Free
+from cpython.buffer cimport PyBUF_WRITEABLE, PyBUF_FORMAT, PyBUF_ND, PyBUF_SIMPLE, PyBUF_F_CONTIGUOUS, PyBUF_C_CONTIGUOUS, PyBUF_ANY_CONTIGUOUS, PyBUF_STRIDES
 from libc.string cimport strncmp
 
 cimport numpy as np
 import numpy as np
 
-from cpython cimport Py_INCREF, PyNumber_Index
+from cpython cimport Py_INCREF, PyNumber_Index, Py_buffer
 from cpython.object cimport Py_EQ, Py_NE
 
 def api_version():
@@ -839,7 +840,7 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
         else:
             size = gpuarray_get_elsize(typecode)
             for i in range(nd-1, -1, -1):
-                strides[i] = size
+                cstrides[i] = size
                 size *= cdims[i]
 
         return pygpu_fromgpudata(<gpudata *>data, offset, typecode, nd, cdims,
@@ -1424,6 +1425,33 @@ def _concatenate(list al, unsigned int axis, int restype, object cls,
     finally:
         PyMem_Free(als)
 
+cdef int (*cuda_get_ipc_handle)(gpudata *, GpuArrayIpcMemHandle *)
+cdef gpudata *(*cuda_open_ipc_handle)(gpucontext *, GpuArrayIpcMemHandle *, size_t)
+
+cuda_get_ipc_handle = <int (*)(gpudata *, GpuArrayIpcMemHandle *)>gpuarray_get_extension("cuda_get_ipc_handle")
+cuda_open_ipc_handle = <gpudata *(*)(gpucontext *, GpuArrayIpcMemHandle *, size_t)>gpuarray_get_extension("cuda_open_ipc_handle")
+
+def open_ipc_handle(GpuContext c, bytes hpy, size_t l):
+    """
+    Open an IPC handle to get a new GpuArray from it.
+    """
+    cdef char *b
+    cdef GpuArrayIpcMemHandle h
+    cdef gpudata *d
+
+    b = hpy
+    memcpy(&h, b, sizeof(h))
+
+    d = cuda_open_ipc_handle(c.ctx, &h, l)
+    if d is NULL:
+        raise GpuArrayException, "could not open handle"
+    return <size_t>d
+
+cdef const char *get_buffer_format(int typecode) except NULL:
+  if typecode == GA_FLOAT:
+      return "f"
+  raise ValueError("No mapping for type")
+
 cdef class GpuArray:
     """
     Device array
@@ -1452,6 +1480,46 @@ cdef class GpuArray:
     def __init__(self):
         if type(self) is GpuArray:
             raise RuntimeError, "Called raw GpuArray.__init__"
+
+    def __getbuffer__(self, Py_buffer *buf, int flags):
+        if not (flags & PyBUF_STRIDES or
+                (flags & PyBUF_ND and GpuArray_IS_C_CONTIGUOUS(&self.ga))):
+            raise BufferError("Can't satisfy request for strides and dims")
+        # Python buffer protocol is really dumb and the following
+        # flags are not really flags and contain multiple bits so we
+        # have to check for the value to test.
+        if (((flags & PyBUF_C_CONTIGUOUS) == PyBUF_C_CONTIGUOUS and
+             not GpuArray_IS_C_CONTIGUOUS(&self.ga)) or
+            ((flags & PyBUF_F_CONTIGUOUS) == PyBUF_F_CONTIGUOUS and
+             not GpuArray_IS_F_CONTIGUOUS(&self.ga)) or
+            ((flags & PyBUF_ANY_CONTIGUOUS) == PyBUF_ANY_CONTIGUOUS and
+             not GpuArray_ISONESEGMENT(&self.ga))):
+            raise BufferError("Can't statisfy contiguity request")
+        if (flags & PyBUF_WRITEABLE and
+                not GpuArray_CHKFLAGS(&self.ga, GA_WRITEABLE)):
+            raise BufferError("Can't satisfy writability request")
+        buf.buf = gpudata_map(self.ga.data)
+        if buf.buf is NULL:
+            raise BufferError("Couldn't map buffer")
+        buf.obj = self
+        buf.len = self.size
+        buf.itemsize = gpuarray_get_elsize(self.ga.typecode)
+        buf.ndim = self.ga.nd
+        buf.readonly = not GpuArray_CHKFLAGS(&self.ga, GA_WRITEABLE)
+        if flags & PyBUF_FORMAT:
+            buf.format = get_buffer_format(self.ga.typecode)
+        else:
+            buf.format = NULL
+
+        buf.shape = <Py_ssize_t *>self.ga.dimensions
+        buf.strides = self.ga.strides
+        buf.suboffsets = NULL
+
+    def __releasebuffer__(self, Py_buffer *buf):
+        cdef int err
+        err = gpudata_unmap(buf.buf, self.ga.data)
+        if err != GA_NO_ERROR:
+            raise get_exc(err), GpuArray_error(&self.ga, err)
 
     def __reduce__(self):
         raise RuntimeError, "Cannot pickle GpuArray object"
@@ -1560,6 +1628,19 @@ cdef class GpuArray:
         if sz != npsz:
             raise ValueError, "GpuArray and Numpy array do not have the same size in bytes"
         array_read(np.PyArray_DATA(dst), sz, self)
+
+    def get_ipc_handle(self):
+        cdef GpuArrayIpcMemHandle h
+        cdef int err
+        if cuda_get_ipc_handle is NULL:
+            raise SystemError, "Could not get necessary extension"
+        if self.context.kind != b'cuda':
+            raise ValueError, "Only works for cuda contexts"
+        err = cuda_get_ipc_handle(self.ga.data, &h)
+        if err != GA_NO_ERROR:
+            raise get_exc(err), GpuArray_error(&self.ga, err)
+        res = <bytes>(<char *>&h)[:sizeof(h)]
+        return res
 
     def __array__(self):
         """

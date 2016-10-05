@@ -19,6 +19,10 @@ extern "C" {
 #define GPUARRAY_CUDA_WAIT_READ  0x10000 /* CUDA_WAIT_READ */
 #define GPUARRAY_CUDA_WAIT_WRITE 0x20000 /* CUDA_WAIT_WRITE */
 
+typedef struct _GpuArrayIpcMemHandle {
+  char priv[64];
+} GpuArrayIpcMemHandle;
+
 /**
  * Obtain a function pointer for an extension.
  *

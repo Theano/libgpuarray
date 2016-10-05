@@ -16,8 +16,14 @@
 #include "gpuarray/buffer.h"
 #include "gpuarray/util.h"
 #include "gpuarray/error.h"
-#include "gpuarray/extension.h"
 #include "gpuarray/buffer_blas.h"
+
+#include "gpuarray/extension.h"
+
+STATIC_ASSERT(DONTFREE == GPUARRAY_CUDA_CTX_NOFREE, cuda_nofree_eq);
+STATIC_ASSERT(CUDA_WAIT_READ == GPUARRAY_CUDA_WAIT_READ, cuda_wait_read_eq);
+STATIC_ASSERT(CUDA_WAIT_WRITE == GPUARRAY_CUDA_WAIT_WRITE, cuda_wait_write_eq);
+STATIC_ASSERT(sizeof(GpuArrayIpcMemHandle) == sizeof(CUipcMemHandle), cuda_ipcmem_eq);
 
 /* Allocations will be made in blocks of at least this size */
 #define BLOCK_SIZE (4 * 1024 * 1024)
@@ -555,6 +561,32 @@ static gpudata *cuda_alloc(gpucontext *c, size_t size, void *data, int flags,
   return res;
 }
 
+int cuda_get_ipc_handle(gpudata *d, GpuArrayIpcMemHandle *h) {
+  ASSERT_BUF(d);
+  cuda_enter(d->ctx);
+  CUDA_EXIT_ON_ERROR(d->ctx,
+                     cuIpcGetMemHandle((CUipcMemHandle *)h, d->ptr));
+  cuda_exit(d->ctx);
+  return GA_NO_ERROR;
+}
+
+gpudata *cuda_open_ipc_handle(gpucontext *c, GpuArrayIpcMemHandle *h, size_t sz) {
+  CUdeviceptr p;
+  cuda_context *ctx = (cuda_context *)c;
+  gpudata *d = NULL;
+
+  cuda_enter(ctx);
+  ctx->err = cuIpcOpenMemHandle(&p, *((CUipcMemHandle *)h),
+                                CU_IPC_MEM_LAZY_ENABLE_PEER_ACCESS);
+  if (ctx->err == CUDA_SUCCESS) {
+    d = cuda_make_buf(ctx, p, sz);
+    if (d != NULL)
+      d->flags |= CUDA_IPC_MEMORY;
+  }
+  cuda_exit(ctx);
+  return d;
+}
+
 static void cuda_retain(gpudata *d) {
   ASSERT_BUF(d);
   d->refcnt++;
@@ -579,6 +611,9 @@ static void cuda_free(gpudata *d) {
     cuda_context *ctx = d->ctx;
     if (d->flags & DONTFREE) {
       /* This is the path for "external" buffers */
+      deallocate(d);
+    } else if (d->flags & CUDA_IPC_MEMORY) {
+      cuIpcCloseMemHandle(d->ptr);
       deallocate(d);
     } else if (ctx->flags & GA_CTX_DISABLE_ALLOCATION_CACHE) {
       /* Just free the pointer */
@@ -787,6 +822,27 @@ static int cuda_write(gpudata *dst, size_t dstoff, const void *src,
     }
     cuda_exit(ctx);
     return GA_NO_ERROR;
+}
+
+static void *cuda_map(gpudata *d) {
+  void *p;
+
+  ASSERT_BUF(d);
+
+  cuda_enter(d->ctx);
+  d->ctx->err = cuPointerGetAttribute(&p, CU_POINTER_ATTRIBUTE_HOST_POINTER,
+                                      d->ptr);
+  if (d->ctx->err != CUDA_SUCCESS)
+    p = NULL;
+  cuda_exit(d->ctx);
+  return p;
+}
+
+static int cuda_unmap(gpudata *d, void *p) {
+  ASSERT_BUF(d);
+  /* We don't need to unmap anything apparently */
+
+  return GA_NO_ERROR;
 }
 
 static int cuda_memset(gpudata *dst, size_t dstoff, int data) {
@@ -1354,12 +1410,16 @@ static int cuda_sync(gpudata *b) {
 
   ASSERT_BUF(b);
   cuda_enter(ctx);
-  ctx->err = cuEventSynchronize(b->wev);
-  if (ctx->err != CUDA_SUCCESS)
-    err = GA_IMPL_ERROR;
-  ctx->err = cuEventSynchronize(b->rev);
-  if (ctx->err != CUDA_SUCCESS)
-    err = GA_IMPL_ERROR;
+  if (ctx->flags & GA_CTX_SINGLE_STREAM) {
+    cuStreamSynchronize(ctx->s);
+  } else {
+    ctx->err = cuEventSynchronize(b->wev);
+    if (ctx->err != CUDA_SUCCESS)
+      err = GA_IMPL_ERROR;
+    ctx->err = cuEventSynchronize(b->rev);
+    if (ctx->err != CUDA_SUCCESS)
+      err = GA_IMPL_ERROR;
+  }
   cuda_exit(ctx);
   return err;
 }
@@ -1747,6 +1807,8 @@ const gpuarray_buffer_ops cuda_ops = {cuda_get_platform_count,
                                       cuda_move,
                                       cuda_read,
                                       cuda_write,
+                                      cuda_map,
+                                      cuda_unmap,
                                       cuda_memset,
                                       cuda_newkernel,
                                       cuda_retainkernel,
