@@ -15,3 +15,6 @@ Python module reference
 
    .. automodule:: pygpu._array
       :members:
+
+   .. automodule:: pygpu.collectives
+      :members:
