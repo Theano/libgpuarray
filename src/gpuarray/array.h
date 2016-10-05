@@ -607,6 +607,45 @@ GPUARRAY_PUBLIC void GpuArray_fprintf(FILE *fd, const GpuArray *a);
 
 GPUARRAY_PUBLIC int GpuArray_fdump(FILE *fd, const GpuArray *a);
 
+/**
+ * @brief Computes simultaneously the maxima and the arguments of maxima over
+ * specified axes of the tensor.
+ *
+ * Returns two tensors of identical shape. Both tensors' axes are a subset of
+ * the axes of the original tensor. The axes to be reduced are specified by
+ * the caller, and the maxima and arguments of maxima are computed over them.
+ *
+ * @param [out] dstMax     The resulting tensor of maxima
+ * @param [out] dstArgmax  the resulting tensor of arguments at maxima
+ * @param [in]  src        The source tensor.
+ * @param [in]  reduxLen   The number of axes reduced. Must be >= 1 and
+ *                         <= src->nd.
+ * @param [in]  reduxList  A list of integers of length reduxLen, indicating
+ *                         the axes to be reduced. The order of the axes
+ *                         matters for dstArgmax index calculations. All
+ *                         entries in the list must be unique, >= 0 and
+ *                         < src->nd.
+ *                         
+ *                         For example, if a 5D-tensor is reduced with an axis
+ *                         list of [3,4,1], then reduxLen shall be 3, and the
+ *                         index calculation in every point shall take the form
+ *                         
+ *                             dstArgmax[i0,i2] = i3 * src.shape[4] * src.shape[1] +
+ *                                                i4 * src.shape[1]                +
+ *                                                i1
+ *                         
+ *                         where (i3,i4,i1) are the coordinates of the maximum-
+ *                         valued element within subtensor [i0,:,i2,:,:] of src.
+ * @return GA_NO_ERROR if the operation was successful, or a non-zero error
+ *         code otherwise.
+ */
+
+GPUARRAY_PUBLIC int GpuArray_maxandargmax(GpuArray*       dstMax,
+                                          GpuArray*       dstArgmax,
+                                          const GpuArray* src,
+                                          unsigned        reduxLen,
+                                          const unsigned* reduxList);
+
 #ifdef __cplusplus
 }
 #endif

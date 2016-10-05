@@ -56,6 +56,7 @@ gpuarray_array_collectives.c
 gpuarray_kernel.c
 gpuarray_extension.c
 gpuarray_elemwise.c
+gpuarray_reduction.c
 )
 
 check_function_exists(strlcat HAVE_STRL)

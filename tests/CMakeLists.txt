@@ -48,6 +48,14 @@ add_executable(check_util main.c check_util.c)
 target_link_libraries(check_util ${CHECK_LIBRARIES} gpuarray)
 add_test(test_util "${CMAKE_CURRENT_BINARY_DIR}/check_util")
 
+add_executable(check_util_integerfactoring main.c check_util_integerfactoring.c)
+target_link_libraries(check_util_integerfactoring ${CHECK_LIBRARIES} gpuarray-static)
+add_test(test_util_integerfactoring "${CMAKE_CURRENT_BINARY_DIR}/check_util_integerfactoring")
+
+add_executable(check_reduction main.c device.c check_reduction.c)
+target_link_libraries(check_reduction ${CHECK_LIBRARIES} gpuarray)
+add_test(test_reduction "${CMAKE_CURRENT_BINARY_DIR}/check_reduction")
+
 add_executable(check_array main.c device.c check_array.c)
 target_link_libraries(check_array ${CHECK_LIBRARIES} gpuarray)
 add_test(test_array "${CMAKE_CURRENT_BINARY_DIR}/check_array")
