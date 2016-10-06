@@ -14,7 +14,9 @@ int gpucomm_new(gpucomm** comm, gpucontext* ctx, gpucommCliqueId comm_id,
 }
 
 void gpucomm_free(gpucomm* comm) {
-  gpucontext* ctx = gpucomm_context(comm);
+  gpucontext* ctx;
+  if (comm == NULL) return;
+  ctx = gpucomm_context(comm);
   if (ctx->comm_ops != NULL)
     ctx->comm_ops->comm_free(comm);
 }
