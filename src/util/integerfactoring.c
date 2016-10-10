@@ -1,8 +1,16 @@
 /* Includes */
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include "integerfactoring.h"
+
+
+/* Detect when to avoid VLAs. */
+#if defined(_MSC_VER) || defined(__STDC_NO_VLA__)
+#define GA_USING_MALLOC_FOR_VLA 1
+#endif
+
 
 
 
@@ -826,8 +834,12 @@ static void     gaIFLScheduleOpt(const int       n,
                                  const uint64_t  maxTot,
                                  const uint64_t* maxInd){
 	int i, j, k;
-	uint64_t maxFTot, maxFInd, currF, f;
-	uint64_t pInd[n], pTot = 1;
+	uint64_t maxFTot, maxFInd, currF, f, pTot = 1;
+#if GA_USING_MALLOC_FOR_VLA
+	uint64_t* pInd = malloc(n * sizeof(uint64_t));
+#else
+	uint64_t  pInd[n];
+#endif
 	
 	/* Muzzle compiler about a random function being unused. */
 	(void)gaIFLGetGreatestFactorv;
@@ -883,4 +895,8 @@ static void     gaIFLScheduleOpt(const int       n,
 		pTot    *= f;
 		maxFTot  = maxTot/pTot;
 	}while(maxFTot>1 && f>1);
+	
+#if GA_USING_MALLOC_FOR_VLA
+	free(pInd);
+#endif
 }
