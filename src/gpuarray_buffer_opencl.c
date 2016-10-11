@@ -476,11 +476,13 @@ static gpudata *cl_alloc(gpucontext *c, size_t size, void *data, int flags,
 
   if (flags & GA_BUFFER_READ_ONLY) {
     if (flags & GA_BUFFER_WRITE_ONLY) FAIL(NULL, GA_VALUE_ERROR);
+    clflags &= ~CL_MEM_READ_WRITE;
     clflags |= CL_MEM_READ_ONLY;
   }
 
   if (flags & GA_BUFFER_WRITE_ONLY) {
     if (flags & GA_BUFFER_READ_ONLY) FAIL(NULL, GA_VALUE_ERROR);
+    clflags &= ~CL_MEM_READ_WRITE;
     clflags |= CL_MEM_WRITE_ONLY;
   }
 
@@ -1113,6 +1115,10 @@ static int cl_transfer(gpudata *dst, size_t dstoff,
 
 #ifdef WITH_OPENCL_CLBLAS
 extern gpuarray_blas_ops clblas_ops;
+#else
+#ifdef WITH_OPENCL_CLBLAST
+extern gpuarray_blas_ops clblast_ops;
+#endif
 #endif
 
 static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
@@ -1239,8 +1245,13 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     *((gpuarray_blas_ops **)res) = &clblas_ops;
     return GA_NO_ERROR;
 #else
+#ifdef WITH_OPENCL_CLBLAST
+    *((gpuarray_blas_ops **)res) = &clblast_ops;
+    return GA_NO_ERROR;
+#else
     *((void **)res) = NULL;
     return GA_DEVSUP_ERROR;
+#endif
 #endif
 
   case GA_CTX_PROP_COMM_OPS:

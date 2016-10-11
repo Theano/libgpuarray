@@ -334,17 +334,17 @@ static void  maxandargmaxAppendTypedefs         (maxandargmax_ctx*  ctx){
 	strb_appends(&ctx->s, "\n");
 }
 static void  maxandargmaxAppendPrototype        (maxandargmax_ctx*  ctx){
-	strb_appends(&ctx->s, "KERNEL void maxandargmax(const T*        src,\n");
+	strb_appends(&ctx->s, "KERNEL void maxandargmax(const GLOBAL_MEM T*        src,\n");
 	strb_appends(&ctx->s, "                         const X         srcOff,\n");
-	strb_appends(&ctx->s, "                         const X*        srcSteps,\n");
-	strb_appends(&ctx->s, "                         const X*        srcSize,\n");
-	strb_appends(&ctx->s, "                         const X*        chunkSize,\n");
-	strb_appends(&ctx->s, "                         T*              dstMax,\n");
+	strb_appends(&ctx->s, "                         const GLOBAL_MEM X*        srcSteps,\n");
+	strb_appends(&ctx->s, "                         const GLOBAL_MEM X*        srcSize,\n");
+	strb_appends(&ctx->s, "                         const GLOBAL_MEM X*        chunkSize,\n");
+	strb_appends(&ctx->s, "                         GLOBAL_MEM T*              dstMax,\n");
 	strb_appends(&ctx->s, "                         const X         dstMaxOff,\n");
-	strb_appends(&ctx->s, "                         const X*        dstMaxSteps,\n");
-	strb_appends(&ctx->s, "                         X*              dstArgmax,\n");
+	strb_appends(&ctx->s, "                         const GLOBAL_MEM X*        dstMaxSteps,\n");
+	strb_appends(&ctx->s, "                         GLOBAL_MEM X*              dstArgmax,\n");
 	strb_appends(&ctx->s, "                         const X         dstArgmaxOff,\n");
-	strb_appends(&ctx->s, "                         const X*        dstArgmaxSteps)");
+	strb_appends(&ctx->s, "                         const GLOBAL_MEM X*        dstArgmaxSteps)");
 }
 static void  maxandargmaxAppendOffsets          (maxandargmax_ctx*  ctx){
 	strb_appends(&ctx->s, "\t/* Add offsets */\n");
