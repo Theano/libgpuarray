@@ -91,16 +91,18 @@ int      gaIIsPrime(uint64_t n);
  * The advantage of offering some slack to the factorizer is that in return,
  * the factorizer may succeed in outputting a factorization with smaller
  * factors. The maxN slack parameter must be 0 or be greater than or equal to
- * n, but it is useless to set it beyond twice the value of n.
+ * n, but it is completely useless to set it beyond 2n.
  *
- * When maxN is equal to -1 (2^64 - 1), or is greater than or equal to 2n,
- * there is a guarantee that there exists a power of two that lies between n
- * and 2n. Since this factorization involves only powers of the smallest prime
- * (2), it is a valid factorization under any valid k-smoothness constraint,
- * and so will be returned.
+ * When maxN is equal to -1 (2^64 - 1), or is greater than or equal to 2n, no
+ * upper limit is placed on the output factor list's product, but this
+ * implementation guarantees its product will not exceed 2n. This is because
+ * there always exists a power of two that lies between n and 2n, and since
+ * this factorization involves only powers of the smallest prime (2), it is a
+ * valid factorization under any valid k-smoothness constraint, and so may be
+ * returned.
  *
- * When maxN is equal to 0 or n (no increase in value allowed), this implies
- * that an exact factoring is requested.
+ * When maxN is equal to 0 (no increase in value allowed), an exact factoring
+ * is requested.
  *
  * The factorization can also be constrained by a (k)-smoothness constraint.
  * A k-smooth number n has no prime factors greater than k. If the factorizer
@@ -147,7 +149,7 @@ void     gaIFLInit(ga_factor_list* fl);
  *         and non-zero otherwise.
  */
 
-int      gaIFLFull(ga_factor_list* fl);
+int      gaIFLFull(const ga_factor_list* fl);
 
 /**
  * @brief Add a factor f with power p to the factor list.
@@ -170,13 +172,22 @@ int      gaIFLAddFactors(ga_factor_list* fl, uint64_t f, int p);
  *         factorization. If it does not occur, return 0.
  */
 
-int      gaIFLGetFactorPower(ga_factor_list* fl, uint64_t f);
+int      gaIFLGetFactorPower(const ga_factor_list* fl, uint64_t f);
 
 /**
  * @brief Compute the product of the factors stored in the factors list.
+ * 
+ * NB: This function may return an overflowed result. To detect if it will,
+ *     please call gaIFLIsOverflowed(fl).
  */
 
 uint64_t gaIFLGetProduct(const ga_factor_list* fl);
+
+/**
+ * @brief Check whether the factor list produces a number >= 2^64.
+ */
+
+int      gaIFLIsOverflowed(const ga_factor_list* fl);
 
 /**
  * @brief Get the greatest factor in the factors list.

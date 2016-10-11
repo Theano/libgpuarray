@@ -61,10 +61,13 @@ static uint64_t gaIMulMod    (uint64_t a, uint64_t b, uint64_t m);
 static uint64_t gaIPowMod    (uint64_t x, uint64_t a, uint64_t m);
 
 /**
- * @brief Round up positive n to next power-of-2 and report its factorization.
+ * @brief Round up positive n to next 2-, 3- or 5-smooth number and report its
+ *        factorization.
  */
 
-static int      gaIFactorizeNextPow2(uint64_t n, ga_factor_list* fl);
+static int      gaIFactorize2Smooth(uint64_t n, ga_factor_list* fl);
+static int      gaIFactorize3Smooth(uint64_t n, ga_factor_list* fl);
+static int      gaIFactorize5Smooth(uint64_t n, ga_factor_list* fl);
 
 /**
  * @brief Satisfy individual product limits on "from" by moving factors to
@@ -371,7 +374,10 @@ int      gaIIsPrime   (uint64_t n){
 }
 
 int      gaIFactorize (uint64_t n, uint64_t maxN, uint64_t k, ga_factor_list* fl){
-	uint64_t i, x, p, f, c;
+	int      infiniteSlack,  finiteSlack,   greaterThanMaxN,
+	         exactFactoring, noKSmoothness, kSmoothness;
+	uint64_t i, x, newX, p, f, c;
+
 
 	/**
 	 * Insane argument handling.
@@ -380,6 +386,7 @@ int      gaIFactorize (uint64_t n, uint64_t maxN, uint64_t k, ga_factor_list* fl
 	if(!fl || (k == 1) || (maxN > 0 && maxN < n)){
 		return 0;
 	}
+
 
 	/**
 	 * Handle special cases of n = 0,1,2.
@@ -391,40 +398,61 @@ int      gaIFactorize (uint64_t n, uint64_t maxN, uint64_t k, ga_factor_list* fl
 		return 1;
 	}
 
+
 	/**
 	 * Magic-value arguments interpreted and canonicalized.
 	 */
 
-	if(maxN == (uint64_t)-1 || gaIClz(maxN) < gaIClz(n)){
+	exactFactoring  = (maxN ==  0);
+	infiniteSlack   = (maxN == -1);
+	noKSmoothness   = (k    == 0) || (k >= n);
+	finiteSlack     = !infiniteSlack;
+	kSmoothness     = !noKSmoothness;
+	maxN            = exactFactoring ? n : maxN;
+	k               = noKSmoothness  ? n :    k;
+
+
+	/**
+	 * Try optimal k-smooth optimizers.
+	 */
+
+	if     (k <= 2){gaIFactorize2Smooth(n, fl);}
+	else if(k <= 4){gaIFactorize3Smooth(n, fl);}
+	else           {gaIFactorize5Smooth(n, fl);}
+	greaterThanMaxN = finiteSlack && (gaIFLIsOverflowed(fl)       ||
+	                                  gaIFLGetProduct  (fl) > maxN);
+	if(greaterThanMaxN){
+		if(kSmoothness && k<=6){
+			/**
+			 * We've *proven* there exists no k-smooth n <= maxN, k <= 6.
+			 * No use wasting more time here.
+			 */
+
+			return 0;
+		}
+
+		/* Otherwise fall-through to factorizer. */
+	}else{
 		/**
-		 * Either we are allowed unlimited growth of n, or the slack space
-		 * [n, maxN] is big enough to contain a power of 2. We identify, round
-		 * up to and factorize the next higher power of 2 greater than or equal
-		 * to n trivially. Since powers of 2 are by definition 2-smooth, we
-		 * automatically satisfy the most stringent possible smoothness
-		 * constraint.
+		 * Either the slack was infinite, or the product did not overflow and
+		 * was <= maxN. The k-smoothness criterion is guaranteed by the
+		 * factorizer we chose earlier.
+		 *
+		 * Therefore we have a satisfactory, optimal 2-, 3- or 5-smooth
+		 * factorization (although not necessarily an exact one unless it is
+		 * the case that maxN == n). We return it.
 		 */
 
-		return gaIFactorizeNextPow2(n, fl);
-	}else if(maxN == 0){
-		/**
-		 * We are asked for a strict factoring.
-		 */
-
-		maxN = n;
-	}
-
-	if(k == 0 || k >= n){
-		/**
-		 * We want no k-smoothness constraint.
-		 */
-
-		k = n;
+		return 1;
 	}
 
 
 	/**
 	 * Master loop.
+	 * 
+	 * We arrive here with finite slack and all optimal 2-, 3- and 5-smooth
+	 * factorizers unable to produce a factorization whose product is less
+	 * than or equal to maxN.
 	 */
 
 	for(i=n; i <= maxN; i++){
@@ -463,7 +491,7 @@ int      gaIFactorize (uint64_t n, uint64_t maxN, uint64_t k, ga_factor_list* fl
 		 *
 		 *  2) We have a smoothness constraint and x>k.
 		 *
-		 *     In this case we have to increment x and begin anew the
+		 *     In this case we have to inc/decrement x and begin anew the
 		 *     sub-factorization. This may cause us to fail out of factorizing
 		 *     the current i, by exceeding our slack limit. If this happens we
 		 *     abort the factorization rooted at i and move to the next i.
@@ -471,12 +499,17 @@ int      gaIFactorize (uint64_t n, uint64_t maxN, uint64_t k, ga_factor_list* fl
 
 		primetest:
 		if(x==1 || gaIIsPrime(x)){
-			if(x<=k){
+			if(x <= k){
 				gaIFLAddFactors(fl, x, 1);
 				return 1;
 			}else{
-				p = gaIFLGetProduct(fl);
-				if((maxN - p*x) < p){/* Overflow-free check maxN >= p*(x+1) */
+				p     = gaIFLGetProduct(fl);
+				newX  = n/p;
+				newX += newX*p < n; 
+				if(newX < x){
+					x = newX;
+					goto subfactorize;
+				}else if((maxN - p*x) < p){/* Overflow-free check maxN >= p*(x+1) */
 					goto nextI;
 				}else{
 					x++;
@@ -516,7 +549,7 @@ int      gaIFactorize (uint64_t n, uint64_t maxN, uint64_t k, ga_factor_list* fl
 	return 0;
 }
 
-static int      gaIFactorizeNextPow2(uint64_t n, ga_factor_list* fl){
+static int      gaIFactorize2Smooth(uint64_t n, ga_factor_list* fl){
 	n--;
 	n |= n >>  1;
 	n |= n >>  2;
@@ -532,11 +565,211 @@ static int      gaIFactorizeNextPow2(uint64_t n, ga_factor_list* fl){
 	return 1;
 }
 
+static int      gaIFactorize3Smooth(uint64_t n, ga_factor_list* fl){
+	uint64_t nBest=-1, i3Best=0, i3, p3, nCurr;
+	int nlz = gaIClz(n), isBest2to64 = 1;
+	
+	/**
+	 * Iterate over all powers of 3, scaling them by the least power-of-2 such
+	 * that the result is greater than or equal to n. Report the smallest nBest
+	 * so obtained.
+	 */
+	
+	for(i3=0, p3=1;i3<=40;i3++, p3*=3){
+		nCurr = p3;
+		
+		/**
+		 * If the current power of 3 is >= n, then this must be the last
+		 * iteration, but perhaps a pure power of 3 is the best choice, so
+		 * check for this.
+		 */
+		
+		if(nCurr >= n){
+			if(isBest2to64 || nBest >= nCurr){
+				isBest2to64 = 0;
+				nBest       = nCurr;
+				i3Best      = i3;
+			}
+			break;
+		}
+		
+		/**
+		 * Otherwise we have a pure power of 3, p3, less than n, and must
+		 * derive the least power of 2 such that p3 multiplied by that power of
+		 * 2 is greater than or equal to n. We then compute the product of
+		 * both.
+		 */
+		
+		nCurr <<= gaIClz(nCurr) - nlz;
+		if(nCurr<n){
+			/**
+			 * The line above only guarantees we get a value within a factor of
+			 * 2 from n. We may have to boost nCurr by another factor of 2, if
+			 * this is still possible without overflow.
+			 */
+			
+			nCurr<<=1;
+			if(nCurr<n){
+				/**
+				 * If we enter this branch, overflow occured. Moreover, we know
+				 * that (before overflow) it was the case that 2^63 <= nCurr < n,
+				 * and thus 2**64 is a superior factorization to this one. Skip.
+				 */
+				
+				continue;
+			}
+		}
+		
+		/**
+		 * By here we know that nCurr is >= n. But is it the best factorization
+		 * so far?
+		 */
+		
+		if(isBest2to64 || nBest >= nCurr){
+			isBest2to64 = 0;
+			nBest       = nCurr;
+			i3Best      = i3;
+			
+			if(nCurr == n){
+				break;
+			}
+		}
+	}
+	
+	
+	/**
+	 * Return the smallest n found above.
+	 * 
+	 * nBest and i3Best must be set.
+	 */
+	
+	gaIFLInit(fl);
+	if(isBest2to64){
+		gaIFLAddFactors(fl, 2, 64);
+	}else{
+		gaIFLAddFactors(fl, 2, gaICtz(nBest));
+		gaIFLAddFactors(fl, 3, i3Best);
+	}
+	return 1;
+}
+
+static int      gaIFactorize5Smooth(uint64_t n, ga_factor_list* fl){
+	uint64_t nBest=-1, i3Best=0, i3, p3, i5Best=0, i5, p5, nCurr;
+	int nlz = gaIClz(n), isBest2to64 = 1;
+	
+	/**
+	 * Iterate over all products of powers of 5 and 3, scaling them by the
+	 * least power-of-2 such that the result is greater than or equal to n.
+	 * Report the smallest nBest so obtained.
+	 */
+	
+	for(i5=0, p5=1;i5<=27;i5++, p5*=5){
+		nCurr = p5;
+		
+		/**
+		 * If the current power of 5 is >= n, then this must be the last
+		 * iteration, but perhaps a pure power of 5 is the best choice, so
+		 * check for this.
+		 */
+		
+		if(nCurr >= n){
+			if(isBest2to64 || nBest >= nCurr){
+				isBest2to64 = 0;
+				nBest       = nCurr;
+				i3Best      = 0;
+				i5Best      = i5;
+			}
+			break;
+		}
+		
+		for(i3=0, p3=1;i3<=40;i3++, p3*=3){
+			nCurr = p3*p5;
+			
+			/**
+			 * If the current product of powers of 3 and 5 is >= n, then this
+			 * must be the last iteration, but perhaps a pure power of 3 is the
+			 * best choice, so check for this.
+			 */
+			
+			if(nCurr >= n){
+				if(isBest2to64 || nBest >= nCurr){
+					isBest2to64 = 0;
+					nBest       = nCurr;
+					i3Best      = i3;
+					i5Best      = i5;
+				}
+				break;
+			}
+			
+			/**
+			 * Otherwise we have a number nCurr, composed purely of factors 3
+			 * and 5, that is less than n. We must derive the least power of 2
+			 * such that nCurr multiplied by that power of 2 is greater than or
+			 * equal to n. We then compute the product of both.
+			 */
+			
+			nCurr <<= gaIClz(nCurr) - nlz;
+			if(nCurr<n){
+				/**
+				 * The line above only guarantees we get a value within a factor of
+				 * 2 from n. We may have to boost nCurr by another factor of 2, if
+				 * this is still possible without overflow.
+				 */
+				
+				nCurr<<=1;
+				if(nCurr<n){
+					/**
+					 * If we enter this branch, overflow occured. Moreover, we know
+					 * that (before overflow) it was the case that 2^63 <= nCurr < n,
+					 * and thus 2**64 is a superior factorization to this one. Skip.
+					 */
+					
+					continue;
+				}
+			}
+			
+			/**
+			 * By here we know that nCurr is >= n. But is it the best factorization
+			 * so far?
+			 */
+			
+			if(isBest2to64 || nBest >= nCurr){
+				isBest2to64 = 0;
+				nBest       = nCurr;
+				i3Best      = i3;
+				i5Best      = i5;
+				
+				if(nCurr == n){
+					goto exit;
+				}
+			}
+		}
+	}
+	
+	
+	/**
+	 * Return the smallest n found above.
+	 * 
+	 * nBest and i3Best must be set.
+	 */
+	
+	exit:
+	gaIFLInit(fl);
+	if(isBest2to64){
+		gaIFLAddFactors(fl, 2, 64);
+	}else{
+		gaIFLAddFactors(fl, 2, gaICtz(nBest));
+		gaIFLAddFactors(fl, 3, i3Best);
+		gaIFLAddFactors(fl, 5, i5Best);
+	}
+	return 1;
+}
+
 void     gaIFLInit(ga_factor_list* fl){
 	memset(fl, 0, sizeof(*fl));
 }
 
-int      gaIFLFull(ga_factor_list* fl){
+int      gaIFLFull(const ga_factor_list* fl){
 	return fl->d >= 15;/* Strictly speaking, fl->d never exceeds 15. */
 }
 
@@ -614,7 +847,7 @@ int      gaIFLAddFactors(ga_factor_list* fl, uint64_t f, int p){
 	}
 }
 
-int      gaIFLGetFactorPower(ga_factor_list* fl, uint64_t f){
+int      gaIFLGetFactorPower(const ga_factor_list* fl, uint64_t f){
 	int i;
 
 	for(i=0;i<fl->d;i++){
@@ -637,6 +870,29 @@ uint64_t gaIFLGetProduct(const ga_factor_list* fl){
 	}
 
 	return p;
+}
+
+int      gaIFLIsOverflowed(const ga_factor_list* fl){
+	uint64_t p = 1, MAX=-1;
+	int i, j;
+	
+	if(gaIFLGetFactorPower(fl, 0) >=  1){
+		return 0;
+	}
+	if(gaIFLGetFactorPower(fl, 2) >= 64){
+		return 1;
+	}
+	
+	for(i=0;i<fl->d;i++){
+		for(j=0;j<fl->p[i];j++){
+			if(MAX/p < fl->f[i]){
+				return 1;
+			}
+			p *= fl->f[i];
+		}
+	}
+	
+	return 0;
 }
 
 uint64_t gaIFLGetGreatestFactor(const ga_factor_list* fl){

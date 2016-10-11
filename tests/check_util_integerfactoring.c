@@ -9,25 +9,117 @@
 
 
 /**
+ * Primality Checker
+ */
+
+START_TEST(test_primalitychecker){
+	/* Tiny numbers */
+	ck_assert(!gaIIsPrime(                   0ULL));
+	ck_assert(!gaIIsPrime(                   1ULL));
+	ck_assert( gaIIsPrime(                   2ULL));
+	ck_assert( gaIIsPrime(                   3ULL));
+	ck_assert(!gaIIsPrime(                   4ULL));
+	ck_assert( gaIIsPrime(                   5ULL));
+	ck_assert(!gaIIsPrime(                   6ULL));
+	ck_assert( gaIIsPrime(                   7ULL));
+	ck_assert(!gaIIsPrime(                   8ULL));
+	ck_assert(!gaIIsPrime(                   9ULL));
+	ck_assert(!gaIIsPrime(                  10ULL));
+	ck_assert( gaIIsPrime(                  11ULL));
+	ck_assert(!gaIIsPrime(                  12ULL));
+	ck_assert( gaIIsPrime(                  13ULL));
+	ck_assert(!gaIIsPrime(                  14ULL));
+	ck_assert(!gaIIsPrime(                  15ULL));
+	ck_assert(!gaIIsPrime(                  16ULL));
+	ck_assert( gaIIsPrime(                  17ULL));
+	ck_assert(!gaIIsPrime(                  18ULL));
+	ck_assert( gaIIsPrime(                  19ULL));
+	ck_assert(!gaIIsPrime(                  20ULL));
+	/* Small primes */
+	ck_assert( gaIIsPrime(                4987ULL));
+	ck_assert( gaIIsPrime(                4993ULL));
+	ck_assert( gaIIsPrime(                4999ULL));
+	/* Squares of primes */
+	ck_assert(!gaIIsPrime(            24870169ULL));
+	ck_assert(!gaIIsPrime(            24930049ULL));
+	ck_assert(!gaIIsPrime(            24990001ULL));
+	/* Catalan pseudoprimes */
+	ck_assert(!gaIIsPrime(                5907ULL));
+	ck_assert(!gaIIsPrime(             1194649ULL));
+	ck_assert(!gaIIsPrime(            12327121ULL));
+	/* Fermat base-2 pseudoprimes */
+	ck_assert(!gaIIsPrime(                 341ULL));
+	ck_assert(!gaIIsPrime(                 561ULL));
+	ck_assert(!gaIIsPrime(                 645ULL));
+	ck_assert(!gaIIsPrime(                1105ULL));
+	ck_assert(!gaIIsPrime(                1387ULL));
+	ck_assert(!gaIIsPrime(                1729ULL));
+	ck_assert(!gaIIsPrime(                1905ULL));
+	ck_assert(!gaIIsPrime(                2047ULL));
+	ck_assert(!gaIIsPrime(                2465ULL));
+	/* Strong Lucas pseudoprimes */
+	ck_assert(!gaIIsPrime(                5459ULL));
+	ck_assert(!gaIIsPrime(                5459ULL));
+	ck_assert(!gaIIsPrime(                5459ULL));
+	ck_assert(!gaIIsPrime(                5777ULL));
+	ck_assert(!gaIIsPrime(               10877ULL));
+	ck_assert(!gaIIsPrime(               16109ULL));
+	ck_assert(!gaIIsPrime(               18971ULL));
+	ck_assert(!gaIIsPrime(               22499ULL));
+	ck_assert(!gaIIsPrime(               24569ULL));
+	ck_assert(!gaIIsPrime(               25199ULL));
+	ck_assert(!gaIIsPrime(               40309ULL));
+	ck_assert(!gaIIsPrime(               58519ULL));
+	ck_assert(!gaIIsPrime(               75077ULL));
+	ck_assert(!gaIIsPrime(               97439ULL));
+	ck_assert(!gaIIsPrime(              100127ULL));
+	ck_assert(!gaIIsPrime(              113573ULL));
+	ck_assert(!gaIIsPrime(              115639ULL));
+	ck_assert(!gaIIsPrime(              130139ULL));
+	/* Medium, prime. */
+	ck_assert( gaIIsPrime(          2100000011ULL));
+	ck_assert( gaIIsPrime(          2100000017ULL));
+	/* Large, non-smooth, composite */
+	ck_assert(!gaIIsPrime( 2196095973992233039ULL));
+	/* Largest prime < 2**64: */
+	ck_assert( gaIIsPrime(18446744073709551557ULL));
+	/* Largest integers */
+	ck_assert(!gaIIsPrime(18446744073709551613ULL));
+	ck_assert(!gaIIsPrime(18446744073709551614ULL));
+	ck_assert(!gaIIsPrime(18446744073709551615ULL));
+}END_TEST
+
+/**
  * Integer Factorization test
  */
 
 START_TEST(test_integerfactorization){
 	ga_factor_list fl;
+	uint64_t       n;
 	
 	/**
 	 * Attempt exact factorization for 2^64-1, no k-smoothness constraint.
 	 * Expected PASS with 3*5*17*257*641*65537*6700417
 	 */
 	
-	ck_assert_int_ne(gaIFactorize(18446744073709551615ULL,                            0,     0, &fl), 0);
+	n = 18446744073709551615ULL;
+	ck_assert_int_ne (gaIFactorize(n,         0,     0, &fl), 0);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                    3ULL),  1);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                    5ULL),  1);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                   17ULL),  1);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                  257ULL),  1);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                  641ULL),  1);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                65537ULL),  1);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,              6700417ULL),  1);
+	ck_assert_uint_eq(gaIFLGetProduct(&fl), n);
 	
 	/**
 	 * Attempt exact factorization for 2^64-1, 4096-smooth constraint.
 	 * Expected FAIL, because 2^64-1 possesses prime factors in excess of 4096.
 	 */
 	
-	ck_assert_int_eq(gaIFactorize(18446744073709551615ULL,                            0,  4096, &fl), 0);
+	n = 18446744073709551615ULL;
+	ck_assert_int_eq (gaIFactorize(n,         0,  4096, &fl), 0);
 	
 	/**
 	 * Attempt approximate factorization for 2^64-1, no k-smoothness constraint.
@@ -35,7 +127,11 @@ START_TEST(test_integerfactorization){
 	 * Expected PASS, since 2^64-1 rounds up to 2^64 and 2^64 trivially factorizes.
 	 */
 	
-	ck_assert_int_ne(gaIFactorize(18446744073709551615ULL,                           -1,     0, &fl), 0);
+	n = 18446744073709551615ULL;
+	ck_assert_int_ne (gaIFactorize(n,        -1,     0, &fl), 0);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                    2ULL), 64);
+	ck_assert_uint_eq(gaIFLGetGreatestFactor(&fl), 2);
+	ck_assert_int_ne (gaIFLIsOverflowed(&fl), 0);
 	
 	/**
 	 * Attempt exact factorization for 2196095973992233039, no k-smoothness constraint.
@@ -44,18 +140,101 @@ START_TEST(test_integerfactorization){
 	 * Expected PASS *very quickly*, since it factorizes as 1299817*1299821*1299827
 	 */
 	
-	ck_assert_int_ne(gaIFactorize( 2196095973992233039ULL,                            0,     0, &fl), 0);
+	n =  2196095973992233039ULL;
+	ck_assert_int_ne (gaIFactorize(n,         0,     0, &fl), 0);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,              1299817ULL),  1);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,              1299821ULL),  1);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,              1299827ULL),  1);
+	ck_assert_uint_eq(gaIFLGetGreatestFactor(&fl), 1299827);
+	ck_assert_uint_eq(gaIFLGetProduct(&fl), n);
 	
 	/**
-	 * Attempt approximate factorization for 2196095973992233039, 64-smooth constraint.
+	 * Attempt approximate factorization for 2196095973992233039, 16-smooth constraint.
 	 * 2196095973992233039 is a large, highly non-smooth number, with three enormous
 	 * factors. It is not 64-smooth, so code paths that attempt approximate
-	 * factorization within the growth limits (1%) are exercised.
+	 * factorization within the growth limits (.005%) are exercised.
 	 * 
 	 * Expected PASS *relatively quickly*.
 	 */
 	
-	ck_assert_int_ne(gaIFactorize( 2196095973992233039ULL,  2196095973992233039ULL*1.01,    64, &fl), 0);
+	n =  2196095973992233039ULL;
+	ck_assert_int_ne (gaIFactorize(n, n*1.00005,    16, &fl), 0);
+	ck_assert_uint_ge(gaIFLGetProduct(&fl), n);
+	ck_assert_uint_le(gaIFLGetProduct(&fl), n*1.00005);
+	
+	/**
+	 * Attempt exact factorization of 7438473388800000000, 5-smooth constraint.
+	 * It is a large, 5-smooth number. This should exercise the 5-smooth
+	 * factorization path.
+	 */
+	
+	n =  7438473388800000000ULL;
+	ck_assert_int_ne (gaIFactorize(n,         0,     5, &fl), 0);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                    2ULL), 14);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                    3ULL), 19);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                    5ULL),  8);
+	ck_assert_uint_eq(gaIFLGetGreatestFactor(&fl), 5);
+	ck_assert_uint_eq(gaIFLGetProduct(&fl), n);
+	
+	/**
+	 * Attempt approximate factorization of 7438473388799999997, 2-smooth constraint.
+	 * It is a large, non-smooth number. This should exercise the optimal 2-smooth
+	 * factorizer in spite of the available, unlimited slack.
+	 */
+	
+	n =  7438473388799999997ULL;
+	ck_assert_int_ne (gaIFactorize(n,        -1,      2, &fl), 0);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                    2ULL), 63);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                    3ULL),  0);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                    5ULL),  0);
+	ck_assert_uint_eq(gaIFLGetGreatestFactor(&fl), 2);
+	ck_assert_uint_eq(gaIFLGetProduct(&fl),  9223372036854775808ULL);
+	
+	/**
+	 * Attempt approximate factorization of 7438473388799999997, 3-smooth constraint.
+	 * It is a large, non-smooth number. This should exercise the optimal 3-smooth
+	 * factorizer in spite of the available, unlimited slack.
+	 */
+	
+	n =  7438473388799999997ULL;
+	ck_assert_int_ne (gaIFactorize(n,        -1,      3, &fl), 0);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                    2ULL), 31);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                    3ULL), 20);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                    5ULL),  0);
+	ck_assert_uint_eq(gaIFLGetGreatestFactor(&fl), 3);
+	ck_assert_uint_eq(gaIFLGetProduct(&fl),  7487812485248974848ULL);
+	
+	/**
+	 * Attempt approximate factorization of 7438473388799999997, 5-smooth constraint.
+	 * It is a large, non-smooth number, but 3 integers above it is a 5-smooth
+	 * integer, 7438473388800000000. This should exercise the optimal 5-smooth
+	 * factorizer in spite of the available, unlimited slack.
+	 */
+	
+	n =  7438473388799999997ULL;
+	ck_assert_int_ne (gaIFactorize(n,        -1,     5, &fl), 0);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                    2ULL), 14);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                    3ULL), 19);
+	ck_assert_int_eq (gaIFLGetFactorPower(&fl,                    5ULL),  8);
+	ck_assert_uint_eq(gaIFLGetGreatestFactor(&fl), 5);
+	ck_assert_uint_eq(gaIFLGetProduct(&fl), 7438473388800000000ULL);
+	
+	/**
+	 * Toughest challenge: Attempt very tight approximate factorization of
+	 * 9876543210987654321 with .01% slack and 43-smooth constraint.
+	 * 
+	 * This forces a bypass of the optimal 5-smooth factorizers and heavily
+	 * exercises the nextI:, subfactorize:, primetest: and newX jumps and
+	 * calculations.
+	 * 
+	 * Expected PASS, "reasonably fast".
+	 */
+	
+	n =  9876543210987654321ULL;
+	ck_assert_int_ne (gaIFactorize(n, n*1.0001,    43, &fl), 0);
+	ck_assert_uint_ge(gaIFLGetProduct(&fl), n);
+	ck_assert_uint_le(gaIFLGetProduct(&fl), n*1.0001);
+	ck_assert_uint_le(gaIFLGetGreatestFactor(&fl), 43);
 }END_TEST
 
 START_TEST(test_scheduler){
@@ -278,6 +457,9 @@ Suite *get_suite(void){
 	Suite *s  = suite_create("util_integerfactoring");
 	TCase *tc = tcase_create("All");
 	
+	tcase_set_timeout(tc, 10.0);
+	
+	tcase_add_test(tc, test_primalitychecker);
 	tcase_add_test(tc, test_integerfactorization);
 	tcase_add_test(tc, test_scheduler);
 	
