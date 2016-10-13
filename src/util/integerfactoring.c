@@ -715,8 +715,8 @@ int      gaIFactorize (uint64_t n, uint64_t maxN, uint64_t k, ga_factor_list* fl
 	 * Magic-value arguments interpreted and canonicalized.
 	 */
 
-	exactFactoring  = (maxN ==  0);
-	infiniteSlack   = (maxN == -1);
+	exactFactoring  = (maxN == (uint64_t) 0);
+	infiniteSlack   = (maxN == (uint64_t)-1);
 	noKSmoothness   = (k    == 0) || (k >= n);
 	finiteSlack     = !infiniteSlack;
 	kSmoothness     = !noKSmoothness;
