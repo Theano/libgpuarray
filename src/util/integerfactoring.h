@@ -244,16 +244,27 @@ void gaIFLappend(strb *sb, const ga_factor_list* fl);
  * @param [in,out] factBS   The block size for dimensions 0..n-1, as a factor list.
  * @param [in,out] factGS   The grid  size for dimensions 0..n-1, as a factor list.
  * @param [in,out] factCS   The chunk size for dimensions 0..n-1, as a factor list.
+ * @param [in,out] bs       The block size for dimensions 0..n-1, as an integer.
+ * @param [in,out] gs       The grid  size for dimensions 0..n-1, as an integer.
+ * @param [in,out] cs       The chunk size for dimensions 0..n-1, as an integer.
  */
 
-void  gaIFLSchedule(const int       n,
-                    const uint64_t  maxBtot,
-                    const uint64_t* maxBind,
-                    const uint64_t  maxGtot,
-                    const uint64_t* maxGind,
-                    ga_factor_list* factBS,
-                    ga_factor_list* factGS,
-                    ga_factor_list* factCS);
+void     gaIFLSchedule(const int       n,
+                       const uint64_t  maxBtot,
+                       const uint64_t* maxBind,
+                       const uint64_t  maxGtot,
+                       const uint64_t* maxGind,
+                       ga_factor_list* factBS,
+                       ga_factor_list* factGS,
+                       ga_factor_list* factCS);
+void     gaISchedule  (const int       n,
+                       const uint64_t  maxBtot,
+                       const uint64_t* maxBind,
+                       const uint64_t  maxGtot,
+                       const uint64_t* maxGind,
+                       uint64_t*       bs,
+                       uint64_t*       gs,
+                       uint64_t*       cs);
 
 
 /* End C++ Extern "C" Guard */

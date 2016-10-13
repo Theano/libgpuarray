@@ -1309,6 +1309,91 @@ void gaIFLappend(strb *sb, const ga_factor_list* fl){
 	}
 }
 
+void     gaISchedule(const int       n,
+                     const uint64_t  maxBtot,
+                     const uint64_t* maxBind,
+                     const uint64_t  maxGtot,
+                     const uint64_t* maxGind,
+                     uint64_t*       bs,
+                     uint64_t*       gs,
+                     uint64_t*       cs){
+	int      i;
+	uint64_t kBS, kGS, k;
+
+	/**
+	 * Allocate a VLA or similar.
+	 * 
+	 * C89 neither allows VLAs nor a check beforehand that n>0 to avoid UB
+	 * (but malloc of 0 bytes is well-defined), so force VLA size to be >= 1
+	 * with a !n + n trick.
+	 */
+	
+#if GA_USING_MALLOC_FOR_VLA
+	ga_factor_list* factBS = malloc(n * sizeof(*factBS));
+	ga_factor_list* factGS = malloc(n * sizeof(*factGS));
+	ga_factor_list* factCS = malloc(n * sizeof(*factCS));
+#else
+	ga_factor_list factBS[!n + n];
+	ga_factor_list factGS[!n + n];
+	ga_factor_list factCS[!n + n];
+#endif
+
+
+	if(n<=0){return;}
+
+
+	/**
+	 * Factorize the provided integers under their k-smoothness constraint.
+	 * Use the strictest of either the block or grid constraints on each
+	 * dimension.
+	 */
+
+	for(i=0;i<n;i++){
+		kBS = maxBtot < maxBind[i] ? maxBtot : maxBind[i];
+		kGS = maxGtot < maxGind[i] ? maxGtot : maxGind[i];
+		k   =   kBS   <     kGS    ?   kBS   :     kGS;
+
+		gaIFactorize(bs[i], -1, k, factBS+i);
+		gaIFactorize(gs[i], -1, k, factGS+i);
+		gaIFactorize(cs[i], -1, k, factCS+i);
+	}
+
+	/**
+	 * Invoke scheduler core with factor-list version of our arguments.
+	 */
+
+	gaIFLSchedule(n,
+	              maxBtot,
+	              maxBind,
+	              maxGtot,
+	              maxGind,
+	              factBS,
+	              factGS,
+	              factCS);
+
+
+	/**
+	 * Convert factor lists to products and place them in output arguments.
+	 */
+
+	for(i=0;i<n;i++){
+		bs[i] = gaIFLGetProduct(factBS+i);
+		gs[i] = gaIFLGetProduct(factGS+i);
+		cs[i] = gaIFLGetProduct(factCS+i);
+	}
+
+
+	/**
+	 * Eliminate VLA-like storage if it was allocated with malloc().
+	 */
+
+#if GA_USING_MALLOC_FOR_VLA
+	free(factBS);
+	free(factGS);
+	free(factCS);
+#endif
+}
+
 void     gaIFLSchedule(const int       n,
                        const uint64_t  maxBtot,
                        const uint64_t* maxBind,
@@ -1407,7 +1492,7 @@ static void     gaIFLScheduleOpt(const int       n,
 	int i, j, k;
 	uint64_t maxFTot, maxFInd, currF, f, pTot = 1;
 #if GA_USING_MALLOC_FOR_VLA
-	uint64_t* pInd = malloc(n * sizeof(uint64_t));
+	uint64_t* pInd = malloc(n * sizeof(*pInd));
 #else
 	uint64_t  pInd[n];
 #endif
