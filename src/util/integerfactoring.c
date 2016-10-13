@@ -12,6 +12,10 @@
 #endif
 
 
+/* Defines */
+#define GA_IS_COMPOSITE      0
+#define GA_IS_PRIME          1
+#define GA_IS_PROBABLY_PRIME 2
 
 
 /**
@@ -37,6 +41,42 @@ static int      gaICtz(uint64_t n);
 static int      gaIClz(uint64_t n);
 
 /**
+ * @brief Integer Modular Addition.
+ * 
+ * Computes
+ * 
+ *     $$a+b \pmod m$$
+ * 
+ * efficiently for 64-bit unsigned integers a, b, m.
+ */
+
+static uint64_t gaIAddMod    (uint64_t a, uint64_t b, uint64_t m);
+
+/**
+ * @brief Integer Modular Subtraction.
+ * 
+ * Computes
+ * 
+ *     $$a-b \pmod m$$
+ * 
+ * efficiently for 64-bit unsigned integers a, b, m.
+ */
+
+static uint64_t gaISubMod    (uint64_t a, uint64_t b, uint64_t m);
+
+/**
+ * @brief Integer Modular Average.
+ * 
+ * Computes
+ * 
+ *     $$\frac{a+b}{2} \pmod m$$
+ * 
+ * efficiently for 64-bit unsigned integers a, b, m.
+ */
+
+static uint64_t gaIAvgMod    (uint64_t a, uint64_t b, uint64_t m);
+
+/**
  * @brief Integer Modular Multiplication.
  *
  * Computes
@@ -59,6 +99,40 @@ static uint64_t gaIMulMod    (uint64_t a, uint64_t b, uint64_t m);
  */
 
 static uint64_t gaIPowMod    (uint64_t x, uint64_t a, uint64_t m);
+
+/**
+ * @brief Jacobi Symbol
+ * 
+ * Computes the Jacobi symbol, notated
+ * 
+ *     $$(a/n)$$
+ * 
+ * efficiently for 64-bit unsigned integers a, n.
+ */
+
+static int      gaIJacobiSymbol(uint64_t a, uint64_t n);
+
+/**
+ * @brief Strong Fermat base-a probable prime test.
+ * 
+ * @param [in] n  An odd integer >= 3.
+ * @param [in] a  A witness integer > 0.
+ * @return Non-zero if n is a strong probable prime to base a and zero if n is
+ *         composite.
+ */
+
+static int      gaIIsPrimeStrongFermat(uint64_t n, uint64_t a);
+
+/**
+ * @brief Strong Lucas probable prime test.
+ * 
+ * The function uses Selfridge's Method A for selecting D,P,Q.
+ * 
+ * @param [in] n  An odd integer >= 3.
+ * @return Non-zero if n is a strong probable prime and zero if n is composite.
+ */
+
+static int      gaIIsPrimeStrongLucas(uint64_t n);
 
 /**
  * @brief Round up positive n to next 2-, 3- or 5-smooth number and report its
@@ -134,6 +208,38 @@ static int      gaIClz       (uint64_t n){
 #endif
 }
 
+static uint64_t gaIAddMod    (uint64_t a, uint64_t b, uint64_t m){
+	a %= m;
+	b %= m;
+	
+	if(m-a > b){
+		return a+b;
+	}else{
+		return a+b-m;
+	}
+}
+
+static uint64_t gaISubMod    (uint64_t a, uint64_t b, uint64_t m){
+	a %= m;
+	b %= m;
+	
+	if(a >= b){
+		return a-b;
+	}else{
+		return a-b+m;
+	}
+}
+
+static uint64_t gaIAvgMod    (uint64_t a, uint64_t b, uint64_t m){
+	uint64_t s = gaIAddMod(a,b,m);
+	
+	if(s&1){
+		return (s>>1)+(m>>1)+(s&m&1);
+	}else{
+		return s>>1;
+	}
+}
+
 static uint64_t gaIMulMod    (uint64_t a, uint64_t b, uint64_t m){
 #if (__GNUC__ >= 4) && defined(__x86_64__)
 	uint64_t r;
@@ -141,8 +247,8 @@ static uint64_t gaIMulMod    (uint64_t a, uint64_t b, uint64_t m){
 	asm(
 	    "mul %2\n\t"
 	    "div %3\n\t"
-	    : "=&d"(r)                 /* Outputs */
-	    : "a"(a), "r"(b), "r"(m)   /* Inputs */
+	    : "=&d"(r), "+a"(a)   /* Outputs */
+	    : "r"(b),  "r"(m)     /* Inputs */
 	    : "cc"
 	);
 
@@ -267,25 +373,254 @@ static uint64_t gaIPowMod    (uint64_t x, uint64_t a, uint64_t m){
 	return r;
 }
 
-int      gaIIsPrime   (uint64_t n){
-	size_t         i, j;
-	int            hasNoSmallFactors, hasSmallFactors;
-	uint64_t       r, d;
-	const uint64_t WITNESSES[]  = {2,3,5,7,11,13,17,19,23,29,31,37};
-	const int      NUMWITNESSES = sizeof(WITNESSES)/sizeof(WITNESSES[0]);
+static int      gaIJacobiSymbol(uint64_t a, uint64_t n){
+	int      s=0;
+	uint64_t e, a1, n1;
+	
+	a %= n;
+	
+	if(a == 1 || n == 1){
+		return 1;
+	}
+	
+	if(a == 0){
+		return 0;
+	}
+	
+	e  = gaICtz(a);
+	a1 = a >> e;
+	
+	if(e%2 == 0){
+		s =  1;
+	}else if(n%8 == 1 || n%8 == 7){
+		s =  1;
+	}else if(n%8 == 3 || n%8 == 5){
+		s = -1;
+	}
+	
+	if(n%4 == 3 && a1%4 == 3){
+		s = -s;
+	}
+	
+	n1 = n%a1;
+	return s*gaIJacobiSymbol(n1,a1);
+}
 
+static int      gaIIsPrimeStrongFermat(uint64_t n, uint64_t a){
+	/**
+	 * The Fermat strong probable prime test the Miller-Rabin test relies upon
+	 * uses integer "witnesses" in an attempt at proving the number composite.
+	 * Should it fail to prove an integer composite, it reports the number as
+	 * "probably prime". However, if the witnesses are chosen carefully, the
+	 * Miller-Rabin test can be made deterministic below a chosen threshold.
+	 * 
+	 * One can use the primes 2 to 37 in order to ensure the correctness of the
+	 * identifications for integers under 2^64.
+	 * 
+	 * Jim Sinclair has found that the seven witnesses
+	 *     2, 325, 9375, 28178, 450775, 9780504, 1795265022
+	 * also deterministically classify all integers <2^64.
+	 * 
+	 * 
+	 * The Fermat strong probable prime test states that, for integers
+	 *             n = d*2^s+1,  d odd, s integer >= 0
+	 *             a             integer (chosen witness)
+	 * n is a Fermat strong probable prime if
+	 *     a^(d    ) =  1 mod n       or
+	 *     a^(d*2^r) = -1 mod n       for any integer r, 0 <= r < s.
+	 * 
+	 * 
+	 * The justification for this comes from Fermat's Little Theorem: If n is
+	 * prime and a is any integer, then the following always holds:
+	 *           a^n =  a mod n
+	 * If n is prime and a is coprime to n, then the following always holds:
+	 *       a^(n-1) =  1 mod n
+	 * 
+	 * 
+	 * In effect, the logic goes
+	 * 
+	 *   A:   The number  n  is prime.                               (Statement)
+	 *   B:   The number  n  does not divide a.                      (Statement)
+	 *   C:   a^(  n-1)       =  1 mod n                             (Statement)
+	 *   D:   The commutative ring Z/nZ is a finite field.           (Statement)
+	 *   E:   Finite fields are unique factorization domains.        (Statement)
+	 *   F:   x^2 = 1 mod n factorizes as (x+1)(x-1) = 0 mod n.      (Statement)
+	 *   G:   x^2 mod n only has the trivial square roots 1 and -1   (Statement)
+	 *   H:   The number  n  is odd and >= 3.                        (Statement)
+	 *   I:   The number n-1 equals d*2^s, with d,s int > 0, d odd.  (Statement)
+	 *   J:   a^(    d)       =   1 mod n                            (Statement)
+	 *   K:   a^(d*2^r)       =  -1 mod n   for some 0 <= r < s.     (Statement)
+	 *   L:   a^(d*2^(r+1))   =   1 mod n   for some 0 <= r < s.     (Statement)
+	 *   M:   a^(d*2^r)      != +-1 mod n   AND                      (Statement)
+	 *        a^(d*2^(r+1))   =   1 mod n   for some 0 <= r < s.
+	 *   
+	 *   A&B           -->  C                 (Proposition:     Fermat's Little Theorem)
+	 *   !C            -->  !(A&B) = !A|!B    (Contrapositive:  Fermat's Little Theorem)
+	 *   A             <->  D                 (Proposition)
+	 *   E                                    (Proposition:     By definition)
+	 *   F                                    (Proposition:     x^2-x+x-1 = x^2-1 mod n)
+	 *   D&E&F         -->  G                 (Proposition:     (x+1)(x-1) is the only
+	 *                                                           factorization)
+	 *   !G            -->  !D|!E|!F          (Contrapositive:  See above)
+	 *   H&I&J         -->  C                 (Proposition:     Squaring  1 gives 1)
+	 *   H&I&K         -->  L                 (Proposition:     Squaring -1 gives 1)
+	 *   H&I&L         -->  C                 (Proposition:     1, squared or not, gives 1)
+	 *   H&I&K         -->  C                 (Hypothetical Syllogism)
+	 *   H&I&(J|K)     -->  C                 (Union)
+	 *   H&I&!(J|K)    -->  M|!C              (Proposition:     Either squaring
+	 *                                                            a^(d*2^(s-1)) != +-1 mod n
+	 *                                                          gives a 1, in which case
+	 *                                                          M holds, or it does not
+	 *                                                          give 1 and therefore
+	 *                                                            a^(n-1) != 1 mod n)
+	 *                                                          and thus !C holds.
+	 *   H&I&!(J|K)    -->  H&I&M | !A | !B   (Absorbtion, Hypothetical Syllogism)
+	 *   H&I&M         -->  !G                (Proposition:     x^2 = 1 mod n but x!=+1,
+	 *                                                          so x^2 - 1 has roots
+	 *                                                          other than +-1)
+	 *   H&I&M         -->  !D|!E|!F          (Modus Tollens)
+	 *   H&I&M         -->  !D                (Disjunctive Syllogism)
+	 *   H&I&M         -->  !A                (Biconditional)
+	 *   H&I&!(J|K)    -->  !A | !A | !B      (Hypothethical Syllogism)
+	 *   H&I&!(J|K)&B  -->  !A | !A           (Absorbtion)
+	 *   H&I&!(J|K)&B  -->  !A | !A           (Disjunctive Syllogism)
+	 *   H&I&!(J|K)&B  -->  !A                (Disjunctive Simplification)
+	 *                           ***** Conclusions: *****
+	 *                            H&I&M         -->  !A
+	 *                            H&I&!(J|K)&B  -->  !A
+	 * 
+	 * Broadly speaking, what the above tells us is:
+	 *   - We can't prove n prime (A), but we can prove it composite (!A).
+	 *   - Either H&I&M or H&I&!(J|K)&B prove compositeness.
+	 *   - If H&I&(J|K) for any r, then we've proven C true. If we prove C true,
+	 *     we can't use the contrapositive of Fermat's Little Theorem, so no
+	 *     conclusions about the truth-value of A can be made. The test is
+	 *     inconclusive. Thus this function returns "probably prime".
+	 */
+	
+	uint64_t d, x;
+	int64_t  s, r;
+	
+	a %= n;
+	if(a==0){
+		return GA_IS_PROBABLY_PRIME;
+	}
+	
+	s  = gaICtz(n-1);
+	d  = (n-1) >> s;
+	x  = gaIPowMod(a,d,n);
+	
+	if(x==1 || x==n-1){
+		return GA_IS_PROBABLY_PRIME;
+	}
+	
+	for(r=0;r<s-1;r++){
+		x = gaIMulMod(x,x,n);
+		if(x==1){
+			return GA_IS_COMPOSITE;
+		}else if(x == n-1){
+			return GA_IS_PROBABLY_PRIME;
+		}
+	}
+	
+	return GA_IS_COMPOSITE;
+}
+
+static int      gaIIsPrimeStrongLucas(uint64_t n){
+	uint64_t Dp, Dm, D, K, U, Ut, V, Vt;
+	int      J, r, i;
+	
+	/**
+	 * FIPS 186-4 C.3.3 (General) Lucas Probabilistic Primality Test
+	 * 
+	 * 1. Test if n is perfect square. If so, return "composite".
+	 * 
+	 *     NOTE: The only strong base-2 Fermat pseudoprime squares are
+	 *           1194649 and 12327121;
+	 */
+	
+	if(n==1194649 || n==12327121){
+		return GA_IS_COMPOSITE;
+	}
+	
+	/**
+	 * 2. Find first D in sequence 5,-7,9,-11,... s.t. Jacobi symbol (D/n) < 1.
+	 *     Iff Jacobi symbol is 0, return "composite".
+	 */
+	
+	Dp = gaIAddMod(0, 5, n);
+	Dm = gaISubMod(0, 7, n);
+	while(1){
+		J = gaIJacobiSymbol(Dp, n);
+		if     (J ==  0){return GA_IS_COMPOSITE;}
+		else if(J == -1){D = Dp;break;}
+		
+		J = gaIJacobiSymbol(Dm, n);
+		if     (J ==  0){return GA_IS_COMPOSITE;}
+		else if(J == -1){D = Dm;break;}
+		
+		Dp = gaIAddMod(Dp, 4, n);
+		Dm = gaISubMod(Dm, 4, n);
+	}
+	
+	/**
+	 * 3. K = n+1
+	 * 
+	 *     NOTE: Cannot overflow, since 2^64-1 is eliminated by strong Fermat
+	 *           base-2 test.
+	 */
+	
+	K = n+1;
+	
+	/**
+	 * 4. Let Kr, Kr–1, ..., K0 be the binary expansion of K, with Kr = 1.
+	 */
+	
+	r = 63-gaIClz(K);
+	
+	/**
+	 * 5. Set Ur = 1 and Vr = 1.
+	 */
+	
+	U = V = 1;
+	
+	/**
+	 * 6. For i=r–1 to 0, do
+	 */
+	
+	for(i=r-1;i>=0;i--){
+		Ut = gaIMulMod(U,V,n);
+		Vt = gaIAvgMod(gaIMulMod(V,V,n), gaIMulMod(D,gaIMulMod(U,U,n),n), n);
+		if((K>>i)&1){
+			U = gaIAvgMod(Ut,Vt,n);
+			V = gaIAvgMod(Vt,gaIMulMod(D,Ut,n),n);
+		}else{
+			U = Ut;
+			V = Vt;
+		}
+	}
+	
+	/**
+	 * 7. If U0==0, then return "probably prime". Otherwise, return "composite".
+	 */
+	
+	return U==0 ? GA_IS_PROBABLY_PRIME : GA_IS_COMPOSITE;
+}
+
+int      gaIIsPrime   (uint64_t n){
+	int            hasNoSmallFactors, hasSmallFactors;
 
 	/**
 	 * Check if it is 2, the oddest prime.
 	 */
 
-	if(n==2){return 1;}
+	if(n==2){return GA_IS_PRIME;}
 
 	/**
 	 * Check if it is an even integer.
 	 */
 
-	if((n&1) == 0){return 0;}
+	if((n&1) == 0){return GA_IS_COMPOSITE;}
 
 	/**
 	 * For small integers, read directly the answer in a table.
@@ -306,71 +641,35 @@ int      gaIIsPrime   (uint64_t n){
 	 * Test small prime factors.
 	 */
 
-	hasNoSmallFactors = n%3 && n%5 && n%7 && n%11 && n%13;
+	hasNoSmallFactors = n% 3 && n% 5 && n% 7 && n%11 && n%13 && n%17 && n%19 &&
+	                    n%23 && n%29 && n%31 && n%37 && n%41 && n%43 && n%47 &&
+	                    n%53 && n%59 && n%61 && n%67 && n%71 && n%73 && n%79;
 	hasSmallFactors   = !hasNoSmallFactors;
 	if(hasSmallFactors){
-		return 0;
+		return GA_IS_COMPOSITE;
 	}
 
 	/**
-	 * Otherwise proceed to the Miller-Rabin test.
+	 * We implement the Baillie-Pomerance-Selfridge-Wagstaff primality checker.
+	 *   1) A Fermat base-2 strong probable prime that is also
+	 *   2) A Lucas strong probable prime is
+	 *   3) Prime.
+	 * The BPSW test has no known failure cases and is proven to have no failures
+	 * for all numbers under 2^64. It is expected to have failures (composites
+	 * classified as "probably prime") but they are expected to be enormous.
 	 *
-	 * The Miller-Rabin test uses integer "witnesses" in an attempt at
-	 * proving the number composite. Should it fail to prove an integer
-	 * composite, it reports the number as "probably prime". However, if
-	 * the witnesses are chosen carefully, the Miller-Rabin test can be made
-	 * deterministic below a chosen threshold. In our case, we use the primes
-	 * 2 to 37 in order to ensure the correctness of the identifications for
-	 * integers under 2^64.
+	 * We begin with the Fermat base-2 strong primality test
+	 * (Miller-Rabin test with one witness only, a=2).
 	 */
 
-	r = gaICtz(n-1);
-	d = (n-1)>>r;
-
-	/* For each witness... */
-	for(i=0;i<NUMWITNESSES;i++){
-		uint64_t a = WITNESSES[i];
-
-		/* Modular exponentiation of witness by d, modulo the prime. */
-		uint64_t x = gaIPowMod(a,d,n);
-
-		/**
-		 * If result is 1 or n-1, test inconclusive (can't prove
-		 * compositeness).
-		 */
-
-		if(x==1 || x==n-1){goto continueWitnessLoop;}
-
-		/**
-		 * Otherwise, modulo-square x r-1 times. If result is ever 1, it's
-		 * composite. If result is ever n-1, it's inconclusive. If after r-1
-		 * iterations neither 1 nor n-1 came up, it's composite.
-		 */
-
-		for(j=0;j<r-1;j++){
-			x = gaIPowMod(x,2,n);
-
-			if(x==1){
-				/* Composite! */
-				return 0;
-			}else if(x == n-1){
-				/* Inconclusive (can't prove compositeness) */
-				goto continueWitnessLoop;
-			}
-		}
-
-		/* Composite! */
-		return 0;
-
-		continueWitnessLoop:;
-	}
+	return gaIIsPrimeStrongFermat(n,          2) &&
 
 	/**
-	 * Having failed to prove this is a composite, and given our choice of
-	 * witnesses, we know we've identified a prime.
+	 * Assuming this is one of the base-2 Fermat strong probable primes, we run
+	 * the Lucas primality test with Selfridge's Method A for selecting D.
 	 */
 
-	return 1;
+	       gaIIsPrimeStrongLucas (n            );
 }
 
 int      gaIFactorize (uint64_t n, uint64_t maxN, uint64_t k, ga_factor_list* fl){
@@ -568,22 +867,22 @@ static int      gaIFactorize2Smooth(uint64_t n, ga_factor_list* fl){
 static int      gaIFactorize3Smooth(uint64_t n, ga_factor_list* fl){
 	uint64_t nBest=-1, i3Best=0, i3, p3, nCurr;
 	int nlz = gaIClz(n), isBest2to64 = 1;
-	
+
 	/**
 	 * Iterate over all powers of 3, scaling them by the least power-of-2 such
 	 * that the result is greater than or equal to n. Report the smallest nBest
 	 * so obtained.
 	 */
-	
+
 	for(i3=0, p3=1;i3<=40;i3++, p3*=3){
 		nCurr = p3;
-		
+
 		/**
 		 * If the current power of 3 is >= n, then this must be the last
 		 * iteration, but perhaps a pure power of 3 is the best choice, so
 		 * check for this.
 		 */
-		
+
 		if(nCurr >= n){
 			if(isBest2to64 || nBest >= nCurr){
 				isBest2to64 = 0;
@@ -592,14 +891,14 @@ static int      gaIFactorize3Smooth(uint64_t n, ga_factor_list* fl){
 			}
 			break;
 		}
-		
+
 		/**
 		 * Otherwise we have a pure power of 3, p3, less than n, and must
 		 * derive the least power of 2 such that p3 multiplied by that power of
 		 * 2 is greater than or equal to n. We then compute the product of
 		 * both.
 		 */
-		
+
 		nCurr <<= gaIClz(nCurr) - nlz;
 		if(nCurr<n){
 			/**
@@ -607,7 +906,7 @@ static int      gaIFactorize3Smooth(uint64_t n, ga_factor_list* fl){
 			 * 2 from n. We may have to boost nCurr by another factor of 2, if
 			 * this is still possible without overflow.
 			 */
-			
+
 			nCurr<<=1;
 			if(nCurr<n){
 				/**
@@ -615,34 +914,34 @@ static int      gaIFactorize3Smooth(uint64_t n, ga_factor_list* fl){
 				 * that (before overflow) it was the case that 2^63 <= nCurr < n,
 				 * and thus 2**64 is a superior factorization to this one. Skip.
 				 */
-				
+
 				continue;
 			}
 		}
-		
+
 		/**
 		 * By here we know that nCurr is >= n. But is it the best factorization
 		 * so far?
 		 */
-		
+
 		if(isBest2to64 || nBest >= nCurr){
 			isBest2to64 = 0;
 			nBest       = nCurr;
 			i3Best      = i3;
-			
+
 			if(nCurr == n){
 				break;
 			}
 		}
 	}
-	
-	
+
+
 	/**
 	 * Return the smallest n found above.
-	 * 
+	 *
 	 * nBest and i3Best must be set.
 	 */
-	
+
 	gaIFLInit(fl);
 	if(isBest2to64){
 		gaIFLAddFactors(fl, 2, 64);
@@ -656,22 +955,22 @@ static int      gaIFactorize3Smooth(uint64_t n, ga_factor_list* fl){
 static int      gaIFactorize5Smooth(uint64_t n, ga_factor_list* fl){
 	uint64_t nBest=-1, i3Best=0, i3, p3, i5Best=0, i5, p5, nCurr;
 	int nlz = gaIClz(n), isBest2to64 = 1;
-	
+
 	/**
 	 * Iterate over all products of powers of 5 and 3, scaling them by the
 	 * least power-of-2 such that the result is greater than or equal to n.
 	 * Report the smallest nBest so obtained.
 	 */
-	
+
 	for(i5=0, p5=1;i5<=27;i5++, p5*=5){
 		nCurr = p5;
-		
+
 		/**
 		 * If the current power of 5 is >= n, then this must be the last
 		 * iteration, but perhaps a pure power of 5 is the best choice, so
 		 * check for this.
 		 */
-		
+
 		if(nCurr >= n){
 			if(isBest2to64 || nBest >= nCurr){
 				isBest2to64 = 0;
@@ -681,16 +980,16 @@ static int      gaIFactorize5Smooth(uint64_t n, ga_factor_list* fl){
 			}
 			break;
 		}
-		
+
 		for(i3=0, p3=1;i3<=40;i3++, p3*=3){
 			nCurr = p3*p5;
-			
+
 			/**
 			 * If the current product of powers of 3 and 5 is >= n, then this
 			 * must be the last iteration, but perhaps a pure power of 3 is the
 			 * best choice, so check for this.
 			 */
-			
+
 			if(nCurr >= n){
 				if(isBest2to64 || nBest >= nCurr){
 					isBest2to64 = 0;
@@ -700,14 +999,14 @@ static int      gaIFactorize5Smooth(uint64_t n, ga_factor_list* fl){
 				}
 				break;
 			}
-			
+
 			/**
 			 * Otherwise we have a number nCurr, composed purely of factors 3
 			 * and 5, that is less than n. We must derive the least power of 2
 			 * such that nCurr multiplied by that power of 2 is greater than or
 			 * equal to n. We then compute the product of both.
 			 */
-			
+
 			nCurr <<= gaIClz(nCurr) - nlz;
 			if(nCurr<n){
 				/**
@@ -715,7 +1014,7 @@ static int      gaIFactorize5Smooth(uint64_t n, ga_factor_list* fl){
 				 * 2 from n. We may have to boost nCurr by another factor of 2, if
 				 * this is still possible without overflow.
 				 */
-				
+
 				nCurr<<=1;
 				if(nCurr<n){
 					/**
@@ -723,37 +1022,37 @@ static int      gaIFactorize5Smooth(uint64_t n, ga_factor_list* fl){
 					 * that (before overflow) it was the case that 2^63 <= nCurr < n,
 					 * and thus 2**64 is a superior factorization to this one. Skip.
 					 */
-					
+
 					continue;
 				}
 			}
-			
+
 			/**
 			 * By here we know that nCurr is >= n. But is it the best factorization
 			 * so far?
 			 */
-			
+
 			if(isBest2to64 || nBest >= nCurr){
 				isBest2to64 = 0;
 				nBest       = nCurr;
 				i3Best      = i3;
 				i5Best      = i5;
-				
+
 				if(nCurr == n){
 					goto exit;
 				}
 			}
 		}
 	}
-	
-	
+
+
 	/**
 	 * Return the smallest n found above.
-	 * 
+	 *
 	 * nBest and i3Best must be set.
 	 */
-	
-	exit:
+
+    exit:
 	gaIFLInit(fl);
 	if(isBest2to64){
 		gaIFLAddFactors(fl, 2, 64);
@@ -875,14 +1174,14 @@ uint64_t gaIFLGetProduct(const ga_factor_list* fl){
 int      gaIFLIsOverflowed(const ga_factor_list* fl){
 	uint64_t p = 1, MAX=-1;
 	int i, j;
-	
+
 	if(gaIFLGetFactorPower(fl, 0) >=  1){
 		return 0;
 	}
 	if(gaIFLGetFactorPower(fl, 2) >= 64){
 		return 1;
 	}
-	
+
 	for(i=0;i<fl->d;i++){
 		for(j=0;j<fl->p[i];j++){
 			if(MAX/p < fl->f[i]){
@@ -891,7 +1190,7 @@ int      gaIFLIsOverflowed(const ga_factor_list* fl){
 			p *= fl->f[i];
 		}
 	}
-	
+
 	return 0;
 }
 
@@ -954,22 +1253,60 @@ static uint64_t gaIFLGetSmallestFactorv(int n, const ga_factor_list* fl, int* id
 	return hasFactors ? f : 1;
 }
 
+int      gaIFLsprintf(char* str, const ga_factor_list* fl){
+	int    i, j;
+	int    total = 0;
+	char*  ptr   = str;
+
+	/* Loop over all factors and spit them out. */
+	for(i=0;i<fl->d;i++){
+		for(j=0;j<fl->p[i];j++){
+			total += sprintf(ptr, "%llu*", (unsigned long long)fl->f[i]);
+			if(ptr){
+				ptr   += strlen(ptr);
+			}
+		}
+	}
+
+	/* If no factors were printed, print 1. */
+	if(total == 0){
+		total += sprintf(ptr, "1*");
+		if(ptr){
+			ptr   += strlen(ptr);
+		}
+	}
+
+	/* Terminate buffer ('*' -> '\0') and deduct one character. */
+	total--;
+	if(str){
+		str[total]  = '\0';
+	}
+
+	return total;
+}
+
 void gaIFLappend(strb *sb, const ga_factor_list* fl){
-  int i, j;
-  /* Loop over all factors and spit them out. */
-  for (i = 0; i < fl->d; i++) {
-    for (j = 0; j < fl->p[i]; j++) {
-      strb_appendf(sb, "%llu*", (unsigned long long)fl->f[i]);
-    }
-  }
+	int  i, j;
+	int  noFactorsPrinted = 1;
 
-  /* If no factors were printed, print 1. */
-  if (i == 0 && j == 0) {
-    strb_appendf(sb, "1*");
-  }
+	/* Loop over all factors and spit them out. */
+	for(i=0;i<fl->d;i++){
+		for(j=0;j<fl->p[i];j++){
+			noFactorsPrinted = 0;
+			strb_appendf(sb, "%llu*", (unsigned long long)fl->f[i]);
+		}
+	}
 
-  /* Deduct final '*'. */
-  sb->l -= 1;
+	/**
+	 * If no factors were printed, print 1.
+	 * Otherwise, delete final '*'.
+	 */
+
+	if(noFactorsPrinted){
+		strb_appendf(sb, "1");
+	}else{
+		sb->s[--sb->l] = '\0';
+	}
 }
 
 void     gaIFLSchedule(const int       n,

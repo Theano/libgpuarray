@@ -57,6 +57,7 @@ START_TEST(test_primalitychecker){
 	ck_assert(!gaIIsPrime(                1905ULL));
 	ck_assert(!gaIIsPrime(                2047ULL));
 	ck_assert(!gaIIsPrime(                2465ULL));
+	ck_assert(!gaIIsPrime(              486737ULL));
 	/* Strong Lucas pseudoprimes */
 	ck_assert(!gaIIsPrime(                5459ULL));
 	ck_assert(!gaIIsPrime(                5459ULL));

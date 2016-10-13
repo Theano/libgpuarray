@@ -202,6 +202,20 @@ uint64_t gaIFLGetGreatestFactor(const ga_factor_list* fl);
 uint64_t gaIFLGetSmallestFactor(const ga_factor_list* fl);
 
 /**
+ * @brief Print out the factor list in a human-readable form, sprintf()-style.
+ * 
+ * @param [out] str   A string into which to print out the factor list. If the
+ *                    factor list is a result of gaIFactorize(), then the
+ *                    maximum length of buffer required is 128 bytes.
+ *                    If str is NULL, nothing is printed.
+ * @param [in]  fl    The factor list to be printed.
+ * @return            The number of characters that would have been printed
+ *                    out, assuming an unbounded, non-NULL buffer.
+ */
+
+int gaIFLsprintf(char* str, const ga_factor_list* fl);
+
+/**
  * @brief Print out the factor list in a human-readable form.
  *
  * @param [out] sb   A string into which to print out the factor list. If the
@@ -210,7 +224,7 @@ uint64_t gaIFLGetSmallestFactor(const ga_factor_list* fl);
  * @param [in]  fl   The factor list to be printed.
  */
 
-void gaIFLsnprintf(strb *sb, const ga_factor_list* fl);
+void gaIFLappend(strb *sb, const ga_factor_list* fl);
 
 /**
  * @brief Schedule block size, grid size and what's left over that fits in
