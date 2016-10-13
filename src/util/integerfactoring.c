@@ -174,6 +174,19 @@ static void     gaIFLScheduleOpt(const int       n,
                                  const uint64_t  maxTot,
                                  const uint64_t* maxInd);
 
+/**
+ * @brief Schedule block/grid/chunk size, integer version, n checked >= 0.
+ */
+
+static void     gaIScheduleChecked(const int       n,
+                                   const uint64_t  maxBtot,
+                                   const uint64_t* maxBind,
+                                   const uint64_t  maxGtot,
+                                   const uint64_t* maxGind,
+                                   uint64_t*       bs,
+                                   uint64_t*       gs,
+                                   uint64_t*       cs);
+
 
 
 /**
@@ -1309,37 +1322,35 @@ void gaIFLappend(strb *sb, const ga_factor_list* fl){
 	}
 }
 
-void     gaISchedule(const int       n,
-                     const uint64_t  maxBtot,
-                     const uint64_t* maxBind,
-                     const uint64_t  maxGtot,
-                     const uint64_t* maxGind,
-                     uint64_t*       bs,
-                     uint64_t*       gs,
-                     uint64_t*       cs){
+static void     gaIScheduleChecked(const int       n,
+                                   const uint64_t  maxBtot,
+                                   const uint64_t* maxBind,
+                                   const uint64_t  maxGtot,
+                                   const uint64_t* maxGind,
+                                   uint64_t*       bs,
+                                   uint64_t*       gs,
+                                   uint64_t*       cs){
 	int      i;
 	uint64_t kBS, kGS, k;
 
 	/**
 	 * Allocate a VLA or similar.
-	 * 
-	 * C89 neither allows VLAs nor a check beforehand that n>0 to avoid UB
-	 * (but malloc of 0 bytes is well-defined), so force VLA size to be >= 1
-	 * with a !n + n trick.
+	 *
+	 * C89 neither allows VLAs nor a check beforehand that n>0 to avoid UB. The
+	 * check for n>0 was thus done in our caller.
 	 */
-	
+
 #if GA_USING_MALLOC_FOR_VLA
 	ga_factor_list* factBS = malloc(n * sizeof(*factBS));
 	ga_factor_list* factGS = malloc(n * sizeof(*factGS));
 	ga_factor_list* factCS = malloc(n * sizeof(*factCS));
 #else
-	ga_factor_list factBS[!n + n];
-	ga_factor_list factGS[!n + n];
-	ga_factor_list factCS[!n + n];
+	ga_factor_list factBS[n];
+	ga_factor_list factGS[n];
+	ga_factor_list factCS[n];
 #endif
 
 
-	if(n<=0){return;}
 
 
 	/**
@@ -1392,6 +1403,26 @@ void     gaISchedule(const int       n,
 	free(factGS);
 	free(factCS);
 #endif
+}
+
+void     gaISchedule(const int       n,
+                     const uint64_t  maxBtot,
+                     const uint64_t* maxBind,
+                     const uint64_t  maxGtot,
+                     const uint64_t* maxGind,
+                     uint64_t*       bs,
+                     uint64_t*       gs,
+                     uint64_t*       cs){
+	if(n<=0){return;}
+
+	gaIScheduleChecked(n,
+	                   maxBtot,
+	                   maxBind,
+	                   maxGtot,
+	                   maxGind,
+	                   bs,
+	                   gs,
+	                   cs);
 }
 
 void     gaIFLSchedule(const int       n,
