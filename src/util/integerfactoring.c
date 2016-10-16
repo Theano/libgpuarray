@@ -254,7 +254,7 @@ static uint64_t gaIAvgMod    (uint64_t a, uint64_t b, uint64_t m){
 }
 
 static uint64_t gaIMulMod    (uint64_t a, uint64_t b, uint64_t m){
-#if (__GNUC__ >= 4) && defined(__x86_64__)
+#if (__GNUC__ >= 4) && defined(__x86_64__) && !defined(__STRICT_ANSI__)
 	uint64_t r;
 
 	asm(
