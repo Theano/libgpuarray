@@ -995,12 +995,22 @@ static int      gaIFactorize5Smooth(uint64_t n, ga_factor_list* fl){
 		}
 
 		for(i3=0, p3=1;i3<=40;i3++, p3*=3){
+			/**
+			 * Detect when the product p3*p5 would overflow 2^64.
+			 */
+
+			if(i3){
+				nCurr = (p3/3)*p5;
+				if(nCurr+nCurr < nCurr || nCurr+nCurr+nCurr < nCurr+nCurr){
+					break;
+				}
+			}
 			nCurr = p3*p5;
 
 			/**
 			 * If the current product of powers of 3 and 5 is >= n, then this
-			 * must be the last iteration, but perhaps a pure power of 3 is the
-			 * best choice, so check for this.
+			 * must be the last iteration, but perhaps a pure product of powers
+			 * of 3 and 5 is the best choice, so check for this.
 			 */
 
 			if(nCurr >= n){
