@@ -77,6 +77,8 @@ cdef extern from "gpuarray/buffer.h":
     char *gpucontext_error(gpucontext *ctx, int err)
     int gpucontext_property(gpucontext *ctx, int prop_id, void *res)
     int gpukernel_property(gpukernel *k, int prop_id, void *res)
+    void *gpudata_map(gpudata *)
+    int gpudata_unmap(void *, gpudata *)
     gpucontext *gpudata_context(gpudata *)
     gpucontext *gpukernel_context(gpukernel *)
 
@@ -146,6 +148,7 @@ cdef extern from "gpuarray/array.h":
     bint GpuArray_CHKFLAGS(_GpuArray *a, int fl)
     bint GpuArray_ISONESEGMENT(_GpuArray *a)
     bint GpuArray_IS_C_CONTIGUOUS(_GpuArray *a)
+    bint GpuArray_IS_F_CONTIGUOUS(_GpuArray *a)
 
     ctypedef enum ga_order:
         GA_ANY_ORDER, GA_C_ORDER, GA_F_ORDER

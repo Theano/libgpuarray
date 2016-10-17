@@ -789,6 +789,27 @@ static int cuda_write(gpudata *dst, size_t dstoff, const void *src,
     return GA_NO_ERROR;
 }
 
+static void *cuda_map(gpudata *d) {
+  void *p;
+
+  ASSERT_BUF(d);
+
+  cuda_enter(d->ctx);
+  d->ctx->err = cuPointerGetAttribute(&p, CU_POINTER_ATTRIBUTE_HOST_POINTER,
+                                      d->ptr);
+  if (d->ctx->err != CUDA_SUCCESS)
+    p = NULL;
+  cuda_exit(d->ctx);
+  return p;
+}
+
+static int cuda_unmap(gpudata *d, void *p) {
+  ASSERT_BUF(d);
+  /* We don't need to unmap anything apparently */
+
+  return GA_NO_ERROR;
+}
+
 static int cuda_memset(gpudata *dst, size_t dstoff, int data) {
     cuda_context *ctx = dst->ctx;
 
@@ -1354,12 +1375,16 @@ static int cuda_sync(gpudata *b) {
 
   ASSERT_BUF(b);
   cuda_enter(ctx);
-  ctx->err = cuEventSynchronize(b->wev);
-  if (ctx->err != CUDA_SUCCESS)
-    err = GA_IMPL_ERROR;
-  ctx->err = cuEventSynchronize(b->rev);
-  if (ctx->err != CUDA_SUCCESS)
-    err = GA_IMPL_ERROR;
+  if (ctx->flags & GA_CTX_SINGLE_STREAM) {
+    cuStreamSynchronize(ctx->s);
+  } else {
+    ctx->err = cuEventSynchronize(b->wev);
+    if (ctx->err != CUDA_SUCCESS)
+      err = GA_IMPL_ERROR;
+    ctx->err = cuEventSynchronize(b->rev);
+    if (ctx->err != CUDA_SUCCESS)
+      err = GA_IMPL_ERROR;
+  }
   cuda_exit(ctx);
   return err;
 }
@@ -1747,6 +1772,8 @@ const gpuarray_buffer_ops cuda_ops = {cuda_get_platform_count,
                                       cuda_move,
                                       cuda_read,
                                       cuda_write,
+                                      cuda_map,
+                                      cuda_unmap,
                                       cuda_memset,
                                       cuda_newkernel,
                                       cuda_retainkernel,
