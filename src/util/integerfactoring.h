@@ -91,16 +91,18 @@ int      gaIIsPrime(uint64_t n);
  * The advantage of offering some slack to the factorizer is that in return,
  * the factorizer may succeed in outputting a factorization with smaller
  * factors. The maxN slack parameter must be 0 or be greater than or equal to
- * n, but it is useless to set it beyond twice the value of n.
+ * n, but it is completely useless to set it beyond 2n.
  *
- * When maxN is equal to -1 (2^64 - 1), or is greater than or equal to 2n,
- * there is a guarantee that there exists a power of two that lies between n
- * and 2n. Since this factorization involves only powers of the smallest prime
- * (2), it is a valid factorization under any valid k-smoothness constraint,
- * and so will be returned.
+ * When maxN is equal to -1 (2^64 - 1), or is greater than or equal to 2n, no
+ * upper limit is placed on the output factor list's product, but this
+ * implementation guarantees its product will not exceed 2n. This is because
+ * there always exists a power of two that lies between n and 2n, and since
+ * this factorization involves only powers of the smallest prime (2), it is a
+ * valid factorization under any valid k-smoothness constraint, and so may be
+ * returned.
  *
- * When maxN is equal to 0 or n (no increase in value allowed), this implies
- * that an exact factoring is requested.
+ * When maxN is equal to 0 (no increase in value allowed), an exact factoring
+ * is requested.
  *
  * The factorization can also be constrained by a (k)-smoothness constraint.
  * A k-smooth number n has no prime factors greater than k. If the factorizer
@@ -147,7 +149,7 @@ void     gaIFLInit(ga_factor_list* fl);
  *         and non-zero otherwise.
  */
 
-int      gaIFLFull(ga_factor_list* fl);
+int      gaIFLFull(const ga_factor_list* fl);
 
 /**
  * @brief Add a factor f with power p to the factor list.
@@ -170,13 +172,22 @@ int      gaIFLAddFactors(ga_factor_list* fl, uint64_t f, int p);
  *         factorization. If it does not occur, return 0.
  */
 
-int      gaIFLGetFactorPower(ga_factor_list* fl, uint64_t f);
+int      gaIFLGetFactorPower(const ga_factor_list* fl, uint64_t f);
 
 /**
  * @brief Compute the product of the factors stored in the factors list.
+ * 
+ * NB: This function may return an overflowed result. To detect if it will,
+ *     please call gaIFLIsOverflowed(fl).
  */
 
 uint64_t gaIFLGetProduct(const ga_factor_list* fl);
+
+/**
+ * @brief Check whether the factor list produces a number >= 2^64.
+ */
+
+int      gaIFLIsOverflowed(const ga_factor_list* fl);
 
 /**
  * @brief Get the greatest factor in the factors list.
@@ -191,6 +202,20 @@ uint64_t gaIFLGetGreatestFactor(const ga_factor_list* fl);
 uint64_t gaIFLGetSmallestFactor(const ga_factor_list* fl);
 
 /**
+ * @brief Print out the factor list in a human-readable form, sprintf()-style.
+ * 
+ * @param [out] str   A string into which to print out the factor list. If the
+ *                    factor list is a result of gaIFactorize(), then the
+ *                    maximum length of buffer required is 128 bytes.
+ *                    If str is NULL, nothing is printed.
+ * @param [in]  fl    The factor list to be printed.
+ * @return            The number of characters that would have been printed
+ *                    out, assuming an unbounded, non-NULL buffer.
+ */
+
+int gaIFLsprintf(char* str, const ga_factor_list* fl);
+
+/**
  * @brief Print out the factor list in a human-readable form.
  *
  * @param [out] sb   A string into which to print out the factor list. If the
@@ -199,7 +224,7 @@ uint64_t gaIFLGetSmallestFactor(const ga_factor_list* fl);
  * @param [in]  fl   The factor list to be printed.
  */
 
-void gaIFLsnprintf(strb *sb, const ga_factor_list* fl);
+void gaIFLappend(strb *sb, const ga_factor_list* fl);
 
 /**
  * @brief Schedule block size, grid size and what's left over that fits in
@@ -219,16 +244,27 @@ void gaIFLsnprintf(strb *sb, const ga_factor_list* fl);
  * @param [in,out] factBS   The block size for dimensions 0..n-1, as a factor list.
  * @param [in,out] factGS   The grid  size for dimensions 0..n-1, as a factor list.
  * @param [in,out] factCS   The chunk size for dimensions 0..n-1, as a factor list.
+ * @param [in,out] bs       The block size for dimensions 0..n-1, as an integer.
+ * @param [in,out] gs       The grid  size for dimensions 0..n-1, as an integer.
+ * @param [in,out] cs       The chunk size for dimensions 0..n-1, as an integer.
  */
 
-void  gaIFLSchedule(const int       n,
-                    const uint64_t  maxBtot,
-                    const uint64_t* maxBind,
-                    const uint64_t  maxGtot,
-                    const uint64_t* maxGind,
-                    ga_factor_list* factBS,
-                    ga_factor_list* factGS,
-                    ga_factor_list* factCS);
+void     gaIFLSchedule(const int       n,
+                       const uint64_t  maxBtot,
+                       const uint64_t* maxBind,
+                       const uint64_t  maxGtot,
+                       const uint64_t* maxGind,
+                       ga_factor_list* factBS,
+                       ga_factor_list* factGS,
+                       ga_factor_list* factCS);
+void     gaISchedule  (const int       n,
+                       const uint64_t  maxBtot,
+                       const uint64_t* maxBind,
+                       const uint64_t  maxGtot,
+                       const uint64_t* maxGind,
+                       uint64_t*       bs,
+                       uint64_t*       gs,
+                       uint64_t*       cs);
 
 
 /* End C++ Extern "C" Guard */
