@@ -123,7 +123,6 @@ struct _gpudata {
 
 GPUARRAY_LOCAL gpudata *cuda_make_buf(cuda_context *c, CUdeviceptr p,
                                       size_t sz);
-GPUARRAY_LOCAL CUdeviceptr cuda_get_ptr(gpudata *g);
 GPUARRAY_LOCAL size_t cuda_get_sz(gpudata *g);
 GPUARRAY_LOCAL int cuda_wait(gpudata *, int);
 GPUARRAY_LOCAL int cuda_record(gpudata *, int);
@@ -135,8 +134,9 @@ GPUARRAY_LOCAL int cuda_record(gpudata *, int);
 
 #define CUDA_WAIT_ALL   (CUDA_WAIT_READ|CUDA_WAIT_WRITE)
 
-#define CUDA_HEAD_ALLOC 0x40000
-#define CUDA_MAPPED_PTR 0x80000
+#define CUDA_IPC_MEMORY 0x100000
+#define CUDA_HEAD_ALLOC 0x200000
+#define CUDA_MAPPED_PTR 0x400000
 
 struct _gpukernel {
   cuda_context *ctx; /* Keep the context first */

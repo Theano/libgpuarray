@@ -789,7 +789,7 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
     :type shape: iterable of ints
     :param context: context of the gpudata
     :type context: GpuContext
-    :param strides: strides for the results
+    :param strides: strides for the results (C contiguous if not specified)
     :type strides: iterable of ints
     :param writable: is the data writable?
     :type writeable: bool
@@ -839,7 +839,7 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
         else:
             size = gpuarray_get_elsize(typecode)
             for i in range(nd-1, -1, -1):
-                strides[i] = size
+                cstrides[i] = size
                 size *= cdims[i]
 
         return pygpu_fromgpudata(<gpudata *>data, offset, typecode, nd, cdims,
@@ -1424,6 +1424,33 @@ def _concatenate(list al, unsigned int axis, int restype, object cls,
     finally:
         PyMem_Free(als)
 
+cdef int (*cuda_get_ipc_handle)(gpudata *, GpuArrayIpcMemHandle *)
+cdef gpudata *(*cuda_open_ipc_handle)(gpucontext *, GpuArrayIpcMemHandle *, size_t)
+
+cuda_get_ipc_handle = <int (*)(gpudata *, GpuArrayIpcMemHandle *)>gpuarray_get_extension("cuda_get_ipc_handle")
+cuda_open_ipc_handle = <gpudata *(*)(gpucontext *, GpuArrayIpcMemHandle *, size_t)>gpuarray_get_extension("cuda_open_ipc_handle")
+
+def open_ipc_handle(GpuContext c, bytes hpy, size_t l):
+    """
+    Open an IPC handle to get a new GpuArray from it.
+
+    :param c: context
+    :param hpy: binary handle data received
+    :param l: size of the referred memory block
+
+    """
+    cdef char *b
+    cdef GpuArrayIpcMemHandle h
+    cdef gpudata *d
+
+    b = hpy
+    memcpy(&h, b, sizeof(h))
+
+    d = cuda_open_ipc_handle(c.ctx, &h, l)
+    if d is NULL:
+        raise GpuArrayException, "could not open handle"
+    return <size_t>d
+
 cdef class GpuArray:
     """
     Device array
@@ -1560,6 +1587,19 @@ cdef class GpuArray:
         if sz != npsz:
             raise ValueError, "GpuArray and Numpy array do not have the same size in bytes"
         array_read(np.PyArray_DATA(dst), sz, self)
+
+    def get_ipc_handle(self):
+        cdef GpuArrayIpcMemHandle h
+        cdef int err
+        if cuda_get_ipc_handle is NULL:
+            raise SystemError, "Could not get necessary extension"
+        if self.context.kind != b'cuda':
+            raise ValueError, "Only works for cuda contexts"
+        err = cuda_get_ipc_handle(self.ga.data, &h)
+        if err != GA_NO_ERROR:
+            raise get_exc(err), GpuArray_error(&self.ga, err)
+        res = <bytes>(<char *>&h)[:sizeof(h)]
+        return res
 
     def __array__(self):
         """

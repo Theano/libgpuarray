@@ -196,6 +196,9 @@ cdef extern from "gpuarray/array.h":
 
 cdef extern from "gpuarray/extension.h":
     void *gpuarray_get_extension(const char *)
+    ctypedef struct GpuArrayIpcMemHandle:
+        pass
+
     cdef int GPUARRAY_CUDA_CTX_NOFREE
 
 cdef type get_exc(int errcode)
