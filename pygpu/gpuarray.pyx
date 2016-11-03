@@ -789,7 +789,7 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
     :type shape: iterable of ints
     :param context: context of the gpudata
     :type context: GpuContext
-    :param strides: strides for the results
+    :param strides: strides for the results (C contiguous if not specified)
     :type strides: iterable of ints
     :param writable: is the data writable?
     :type writeable: bool
@@ -1433,6 +1433,11 @@ cuda_open_ipc_handle = <gpudata *(*)(gpucontext *, GpuArrayIpcMemHandle *, size_
 def open_ipc_handle(GpuContext c, bytes hpy, size_t l):
     """
     Open an IPC handle to get a new GpuArray from it.
+
+    :param c: context
+    :param hpy: binary handle data received
+    :param l: size of the referred memory block
+
     """
     cdef char *b
     cdef GpuArrayIpcMemHandle h
