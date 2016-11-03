@@ -27,27 +27,27 @@ struct maxandargmax_ctx{
 	GpuArray*       dstMax;
 	GpuArray*       dstArgmax;
 	const GpuArray* src;
-	unsigned        reduxLen;
-	const unsigned* reduxList;
+	int             reduxLen;
+	const int*      reduxList;
 	
 	/* General. */
 	int             ret;
-	unsigned*       axisList;
+	int*            axisList;
 	gpucontext*     gpuCtx;
 	
 	/* Source code Generator. */
 	const char*     dstMaxType;
 	const char*     dstArgmaxType;
-	unsigned        ndd;
-	unsigned        ndr;
-	unsigned        nds;
-	unsigned        ndh;
+	int             ndd;
+	int             ndr;
+	int             nds;
+	int             ndh;
 	strb            s;
 	char*           sourceCode;
 	GpuKernel       kernel;
 	
 	/* Scheduler */
-	unsigned        hwAxisList[3];
+	int             hwAxisList[3];
 	size_t          blockSize [3];
 	size_t          gridSize  [3];
 	size_t          chunkSize [3];
@@ -64,8 +64,8 @@ typedef struct maxandargmax_ctx maxandargmax_ctx;
 
 
 /* Function prototypes */
-static int   axisInSet                          (unsigned           v,
-                                                 const unsigned*    set,
+static int   axisInSet                          (int                v,
+                                                 const int*         set,
                                                  size_t             setLen,
                                                  size_t*            where);
 static void  appendIdxes                        (strb*              s,
@@ -102,7 +102,8 @@ GPUARRAY_PUBLIC int GpuArray_maxandargmax       (GpuArray*       dstMax,
                                                  const GpuArray* src,
                                                  unsigned        reduxLen,
                                                  const unsigned* reduxList){
-	maxandargmax_ctx  ctxSTACK = {dstMax, dstArgmax, src, reduxLen, reduxList},
+	maxandargmax_ctx  ctxSTACK = {dstMax, dstArgmax, src,
+	                              (int)reduxLen, (const int*)reduxList},
 	                 *ctx      = &ctxSTACK;
 	
 	if(maxandargmaxCheckargs   (ctx) == GA_NO_ERROR &&
@@ -127,8 +128,8 @@ GPUARRAY_PUBLIC int GpuArray_maxandargmax       (GpuArray*       dstMax,
  * @return Non-zero if the set is non-empty and v is in it; Zero otherwise.
  */
 
-static int   axisInSet                          (unsigned           v,
-                                                 const unsigned*    set,
+static int   axisInSet                          (int                v,
+                                                 const int*         set,
                                                  size_t             setLen,
                                                  size_t*            where){
 	size_t i;
@@ -190,7 +191,7 @@ static void  appendIdxes                        (strb*              s,
  */
 
 static int   maxandargmaxCheckargs              (maxandargmax_ctx*  ctx){
-	unsigned i;
+	int i;
 	
 	/**
 	 * We initialize certain parts of the context.
@@ -216,13 +217,14 @@ static int   maxandargmaxCheckargs              (maxandargmax_ctx*  ctx){
 	
 	/* Insane src or reduxLen? */
 	if(!ctx->dstMax || !ctx->dstArgmax || !ctx->src || ctx->src->nd == 0 ||
-	    ctx->reduxLen == 0 || ctx->reduxLen >= ctx->src->nd){
+	    ctx->reduxLen == 0 || ctx->reduxLen > (int)ctx->src->nd){
 		return ctx->ret=GA_INVALID_ERROR;
 	}
 	
 	/* Insane or duplicate list entry? */
 	for(i=0;i<ctx->reduxLen;i++){
-		if(ctx->reduxList[i] >= ctx->src->nd                ||
+		if(ctx->reduxList[i] <  0                            ||
+		   ctx->reduxList[i] >= (int)ctx->src->nd            ||
 		   axisInSet(ctx->reduxList[i], ctx->reduxList, i, 0)){
 			return ctx->ret=GA_INVALID_ERROR;
 		}
@@ -260,8 +262,8 @@ static int   maxandargmaxCheckargs              (maxandargmax_ctx*  ctx){
  */
 
 static int   maxandargmaxSelectHwAxes           (maxandargmax_ctx*  ctx){
-	unsigned i, j, maxI = 0;
-	size_t   maxV;
+	int    i, j, maxI = 0;
+	size_t maxV;
 	
 	ctx->ndh = ctx->ndd<3 ? ctx->ndd : 3;
 	
@@ -355,7 +357,7 @@ static void  maxandargmaxAppendOffsets          (maxandargmax_ctx*  ctx){
 	strb_appends(&ctx->s, "\t\n");
 }
 static void  maxandargmaxAppendIndexDeclarations(maxandargmax_ctx*  ctx){
-	unsigned i;
+	int i;
 	strb_appends(&ctx->s, "\t/* GPU kernel coordinates. Always 3D. */\n");
 	
 	strb_appends(&ctx->s, "\tX bi0 = GID_0,        bi1 = GID_1,        bi2 = GID_2;\n");
@@ -605,7 +607,7 @@ static void  maxandargmaxAppendLoopMacroUndefs  (maxandargmax_ctx*  ctx){
 	strb_appends(&ctx->s, "#undef DSTAINDEXER\n");
 }
 static void  maxandargmaxComputeAxisList        (maxandargmax_ctx*  ctx){
-	unsigned i, f=0;
+	int i, f=0;
 	
 	for(i=0;i<ctx->nds;i++){
 		if(axisInSet(i, ctx->reduxList, ctx->ndr, 0)){
