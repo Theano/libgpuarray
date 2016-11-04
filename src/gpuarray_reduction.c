@@ -364,24 +364,26 @@ static void  maxandargmaxAppendIndexDeclarations(maxandargmax_ctx*  ctx){
 	strb_appends(&ctx->s, "\tX bd0 = LDIM_0,       bd1 = LDIM_1,       bd2 = LDIM_2;\n");
 	strb_appends(&ctx->s, "\tX ti0 = LID_0,        ti1 = LID_1,        ti2 = LID_2;\n");
 	strb_appends(&ctx->s, "\tX gi0 = bi0*bd0+ti0,  gi1 = bi1*bd1+ti1,  gi2 = bi2*bd2+ti2;\n");
-	strb_appends(&ctx->s, "\tX ");
-	for(i=0;i<ctx->ndh;i++){
-		strb_appendf(&ctx->s, "ci%u = chunkSize[%u]%s",
-		             i, i, (i==ctx->ndh-1) ? ";\n" : ", ");
+	if(ctx->ndh>0){
+		strb_appends(&ctx->s, "\tX ");
+		for(i=0;i<ctx->ndh;i++){
+			strb_appendf(&ctx->s, "ci%u = chunkSize[%u]%s",
+			             i, i, (i==ctx->ndh-1) ? ";\n" : ", ");
+		}
 	}
 	
 	strb_appends(&ctx->s, "\t\n");
 	strb_appends(&ctx->s, "\t\n");
 	strb_appends(&ctx->s, "\t/* Free indices & Reduction indices */\n");
 	
-	appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->nds,     "",        ";\n");
-	appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->nds,     "Dim",     ";\n");
-	appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->nds,     "Start",   ";\n");
-	appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->nds,     "End",     ";\n");
-	appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->nds,     "SStep",   ";\n");
-	appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->ndd, "MStep",   ";\n");
-	appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->ndd, "AStep",   ";\n");
-	appendIdxes (&ctx->s, "\tX ", "i", ctx->ndd, ctx->nds,     "PDim",    ";\n");
+	if(ctx->nds > 0){appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->nds, "",        ";\n");}
+	if(ctx->nds > 0){appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->nds, "Dim",     ";\n");}
+	if(ctx->nds > 0){appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->nds, "Start",   ";\n");}
+	if(ctx->nds > 0){appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->nds, "End",     ";\n");}
+	if(ctx->nds > 0){appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->nds, "SStep",   ";\n");}
+	if(ctx->ndd > 0){appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->ndd, "MStep",   ";\n");}
+	if(ctx->ndd > 0){appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->ndd, "AStep",   ";\n");}
+	if(ctx->nds > ctx->ndd){appendIdxes (&ctx->s, "\tX ", "i", ctx->ndd, ctx->nds, "PDim",    ";\n");}
 	
 	strb_appends(&ctx->s, "\t\n");
 	strb_appends(&ctx->s, "\t\n");
@@ -725,8 +727,10 @@ static int   maxandargmaxSchedule               (maxandargmax_ctx*  ctx){
 		}
 	}
 	
-	dims[bestWarpAxis] = (dims[bestWarpAxis] + warpSize - 1)/warpSize;
-	gaIFactorize(warpSize, 0, 0, &factBS[bestWarpAxis]);
+	if(ctx->ndh > 0){
+		dims[bestWarpAxis] = (dims[bestWarpAxis] + warpSize - 1)/warpSize;
+		gaIFactorize(warpSize, 0, 0, &factBS[bestWarpAxis]);
+	}
 	
 	/**
 	 * Factorization job. We'll steadily increase the slack in case of failure
@@ -806,7 +810,7 @@ static int   maxandargmaxInvoke                 (maxandargmax_ctx*  ctx){
 	   ctx->dstMaxStepsGD   &&
 	   ctx->dstArgmaxStepsGD){
 		ctx->ret = GpuKernel_call(&ctx->kernel,
-		                          ctx->ndh,
+		                          ctx->ndh>0 ? ctx->ndh : 1,
 		                          ctx->blockSize,
 		                          ctx->gridSize,
 		                          0,

@@ -348,6 +348,93 @@ START_TEST(test_veryhighrank){
 	GpuArray_clear(&gaArgmax);
 }END_TEST
 
+START_TEST(test_alldimsreduced){
+	pcgSeed(1);
+
+	/**
+	 * We test here a reduction of some random 3D tensor on all dimensions.
+	 */
+
+	size_t i,j,k;
+	size_t dims[3]  = {32,50,79};
+	size_t prodDims = dims[0]*dims[1]*dims[2];
+	const unsigned reduxList[] = {0,1,2};
+
+	float*  pSrc    = calloc(1, sizeof(*pSrc)    * dims[0]*dims[1]*dims[2]);
+	float*  pMax    = calloc(1, sizeof(*pMax)                             );
+	size_t* pArgmax = calloc(1, sizeof(*pArgmax)                          );
+
+	ck_assert_ptr_ne(pSrc,    NULL);
+	ck_assert_ptr_ne(pMax,    NULL);
+	ck_assert_ptr_ne(pArgmax, NULL);
+
+
+	/**
+	 * Initialize source data.
+	 */
+
+	for(i=0;i<prodDims;i++){
+		pSrc[i] = pcgRand01();
+	}
+
+
+	/**
+	 * Run the kernel.
+	 */
+
+	GpuArray gaSrc;
+	GpuArray gaMax;
+	GpuArray gaArgmax;
+
+	ga_assert_ok(GpuArray_empty(&gaSrc,    ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaMax,    ctx, GA_FLOAT, 0, NULL,     GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaArgmax, ctx, GA_SIZE,  0, NULL,     GA_C_ORDER));
+
+	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
+	ga_assert_ok(GpuArray_memset(&gaMax,    -1));  /* 0xFFFFFFFF is a qNaN. */
+	ga_assert_ok(GpuArray_memset(&gaArgmax, -1));
+
+	ga_assert_ok(GpuArray_maxandargmax(&gaMax, &gaArgmax, &gaSrc, 3, reduxList));
+
+	ga_assert_ok(GpuArray_read(pMax,    sizeof(*pMax),    &gaMax));
+	ga_assert_ok(GpuArray_read(pArgmax, sizeof(*pArgmax), &gaArgmax));
+
+
+	/**
+	 * Check that the destination tensors are correct.
+	 */
+
+	size_t gtArgmax = 0;
+	float  gtMax    = pSrc[0];
+
+	for(i=0;i<dims[0];i++){
+		for(j=0;j<dims[1];j++){
+			for(k=0;k<dims[2];k++){
+				float v = pSrc[(i*dims[1] + j)*dims[2] + k];
+
+				if(v > gtMax){
+					gtMax    = v;
+					gtArgmax = (i*dims[1] + j)*dims[2] + k;
+				}
+			}
+		}
+	}
+
+	ck_assert_msg(gtMax    == pMax[0],    "Max value mismatch!");
+	ck_assert_msg(gtArgmax == pArgmax[0], "Argmax value mismatch!");
+
+	/**
+	 * Deallocate.
+	 */
+
+	free(pSrc);
+	free(pMax);
+	free(pArgmax);
+	GpuArray_clear(&gaSrc);
+	GpuArray_clear(&gaMax);
+	GpuArray_clear(&gaArgmax);
+}END_TEST
+
 Suite *get_suite(void) {
 	Suite *s  = suite_create("reduction");
 	TCase *tc = tcase_create("basic");
@@ -357,6 +444,7 @@ Suite *get_suite(void) {
 	tcase_add_test(tc, test_reduction);
 	tcase_add_test(tc, test_idxtranspose);
 	tcase_add_test(tc, test_veryhighrank);
+	tcase_add_test(tc, test_alldimsreduced);
 
 	suite_add_tcase(s, tc);
 	return s;
