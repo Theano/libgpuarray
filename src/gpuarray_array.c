@@ -280,7 +280,7 @@ int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
       return GA_VALUE_ERROR;
     }
     if (steps[i] == 0 &&
-	(starts[i] == -1 || starts[i] >= a->dimensions[i])) {
+	(starts[i] == -1 || starts[i] >= (ssize_t)a->dimensions[i])) {
       free(newdims);
       free(newstrs);
       return GA_VALUE_ERROR;
@@ -663,10 +663,10 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
 
     for (ok = oi; ok < oj - 1; ok++) {
       if (ord == GA_F_ORDER) {
-        if (a->strides[ok+1] != a->dimensions[ok]*a->strides[ok])
+        if (a->strides[ok+1] != (ssize_t)a->dimensions[ok]*a->strides[ok])
           goto need_copy;
       } else {
-        if (a->strides[ok] != a->dimensions[ok+1]*a->strides[ok+1])
+        if (a->strides[ok] != (ssize_t)a->dimensions[ok+1]*a->strides[ok+1])
           goto need_copy;
       }
     }
@@ -1125,7 +1125,7 @@ int GpuArray_is_c_contiguous(const GpuArray *a) {
   int i;
 
   for (i = a->nd - 1; i >= 0; i--) {
-    if (a->strides[i] != size) return 0;
+    if (a->strides[i] != (ssize_t)size) return 0;
     // We suppose that overflow will not happen since data has to fit in memory
     size *= a->dimensions[i];
   }
@@ -1137,7 +1137,7 @@ int GpuArray_is_f_contiguous(const GpuArray *a) {
   unsigned int i;
 
   for (i = 0; i < a->nd; i++) {
-    if (a->strides[i] != size) return 0;
+    if (a->strides[i] != (ssize_t)size) return 0;
     // We suppose that overflow will not happen since data has to fit in memory
     size *= a->dimensions[i];
   }
