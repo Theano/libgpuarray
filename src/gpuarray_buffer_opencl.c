@@ -1453,11 +1453,12 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
 
 static const char *cl_error(gpucontext *c) {
   cl_ctx *ctx = (cl_ctx *)c;
-  if (ctx == NULL)
+  if (ctx == NULL){
     return get_error_string(err);
-  else
+  }else{
     ASSERT_CTX(ctx);
     return get_error_string(ctx->err);
+  }
 }
 
 GPUARRAY_LOCAL
