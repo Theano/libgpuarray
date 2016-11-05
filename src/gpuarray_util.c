@@ -173,7 +173,7 @@ void gpuarray_elemwise_collapse(unsigned int n, unsigned int *_nd,
     int collapse = 1;
     for (k = 0; k < n; k++) {
       collapse &= (strs[k] == NULL ||
-                   strs[k][i - 1] == dims[i] * strs[k][i]);
+                   strs[k][i - 1] == (ssize_t)dims[i] * strs[k][i]);
     }
     if (collapse) {
       dims[i-1] *= dims[i];

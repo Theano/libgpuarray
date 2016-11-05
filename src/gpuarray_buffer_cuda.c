@@ -871,7 +871,7 @@ static int detect_arch(const char *prefix, char *ret, CUresult *err) {
   *err = get_cc(dev, &major, &minor);
   if (*err != CUDA_SUCCESS) return GA_IMPL_ERROR;
   res = snprintf(ret, sz, "%s%d%d", prefix, major, minor);
-  if (res == -1 || res > sz) return GA_UNSUPPORTED_ERROR;
+  if (res == -1 || res > (ssize_t)sz) return GA_UNSUPPORTED_ERROR;
   return GA_NO_ERROR;
 }
 
