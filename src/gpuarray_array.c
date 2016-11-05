@@ -280,7 +280,7 @@ int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
       return GA_VALUE_ERROR;
     }
     if (steps[i] == 0 &&
-	(starts[i] == -1 || starts[i] >= (ssize_t)a->dimensions[i])) {
+	(starts[i] == -1 || (size_t)starts[i] >= a->dimensions[i])) {
       free(newdims);
       free(newstrs);
       return GA_VALUE_ERROR;
