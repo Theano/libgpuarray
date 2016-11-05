@@ -370,7 +370,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   int err;
   gpudata **A_datas = NULL, **B_datas = NULL, **C_datas = NULL;
   size_t *A_offsets = NULL, *B_offsets = NULL, *C_offsets = NULL;
-  int i;
+  size_t i;
 
   if (A->typecode != GA_FLOAT && A->typecode != GA_DOUBLE)
     return GA_INVALID_ERROR;
