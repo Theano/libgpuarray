@@ -331,7 +331,8 @@ static int sgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   ASSERT_BUF(C);
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
-      LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc))
+      LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
+      LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
     return GA_XLARGE_ERROR;
 
   if (order == cb_c) {
@@ -395,7 +396,8 @@ static int dgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   ASSERT_BUF(C);
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
-      LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc))
+      LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
+      LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
     return GA_XLARGE_ERROR;
 
   if (order == cb_c) {
@@ -463,7 +465,8 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   ASSERT_BUF(C);
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
-      LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc))
+      LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
+      LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
     return GA_XLARGE_ERROR;
 
   if (order == cb_c) {
@@ -556,7 +559,8 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   if (batchCount == 0) return GA_NO_ERROR;
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
-      LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc))
+      LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
+      LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
     return GA_XLARGE_ERROR;
 
   ASSERT_BUF(A[0]);
@@ -680,7 +684,8 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   if (batchCount == 0) return GA_NO_ERROR;
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
-      LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc))
+      LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
+      LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
     return GA_XLARGE_ERROR;
 
   ASSERT_BUF(A[0]);
@@ -806,7 +811,7 @@ static int sgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
   ASSERT_BUF(X);
   ASSERT_BUF(Y);
 
-  if (LARGE_VAL(M) || LARGE_VAL(N) ||
+  if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(M * N) ||
       LARGE_VAL(lda) || LARGE_VAL(incX) || LARGE_VAL(incY))
     return GA_XLARGE_ERROR;
 
@@ -861,7 +866,7 @@ static int dgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
   ASSERT_BUF(X);
   ASSERT_BUF(Y);
 
-  if (LARGE_VAL(M) || LARGE_VAL(N) ||
+  if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(M * N) ||
       LARGE_VAL(lda) || LARGE_VAL(incX) || LARGE_VAL(incY))
     return GA_XLARGE_ERROR;
 
@@ -1181,7 +1186,7 @@ static int sger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
   ASSERT_BUF(Y);
   ASSERT_BUF(A);
 
-  if (LARGE_VAL(M) || LARGE_VAL(N) ||
+  if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(M * N) ||
       LARGE_VAL(lda) || LARGE_VAL(incX) || LARGE_VAL(incY))
     return GA_XLARGE_ERROR;
 
@@ -1238,7 +1243,7 @@ static int dger(cb_order order, size_t M, size_t N, double alpha, gpudata *X,
   ASSERT_BUF(Y);
   ASSERT_BUF(A);
 
-  if (LARGE_VAL(M) || LARGE_VAL(N) ||
+  if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(M * N) ||
       LARGE_VAL(lda) || LARGE_VAL(incX) || LARGE_VAL(incY))
     return GA_XLARGE_ERROR;
 
