@@ -5,7 +5,9 @@
 #include "gpuarray/kernel.h"
 #include "gpuarray/error.h"
 
-#include "cublas_v2.h"
+#include <limits.h>
+
+#include <cublas_v2.h>
 
 extern const gpuarray_buffer_ops cuda_ops;
 
@@ -32,6 +34,8 @@ typedef struct _blas_handle {
   GpuKernel dgerBH_gen_small;
   cublasStatus_t err;
 } blas_handle;
+
+#define LARGE_VAL(v) (v >= INT_MAX)
 
 static const char *code_sgemvBH_N_a1_b1_small =                         \
   "extern \"C\"__global__ void sgemv(const float *A[], size_t lda, "    \
@@ -326,6 +330,11 @@ static int sgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   ASSERT_BUF(B);
   ASSERT_BUF(C);
 
+  if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
+      LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
+      LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
+    return GA_XLARGE_ERROR;
+
   if (order == cb_c) {
     /* swap A and B */
     t = N;
@@ -385,6 +394,11 @@ static int dgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   ASSERT_BUF(A);
   ASSERT_BUF(B);
   ASSERT_BUF(C);
+
+  if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
+      LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
+      LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
+    return GA_XLARGE_ERROR;
 
   if (order == cb_c) {
     /* swap A and B */
@@ -449,6 +463,11 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   ASSERT_BUF(A);
   ASSERT_BUF(B);
   ASSERT_BUF(C);
+
+  if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
+      LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
+      LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
+    return GA_XLARGE_ERROR;
 
   if (order == cb_c) {
     /* swap A and B */
@@ -538,6 +557,11 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   cb_transpose transT;
 
   if (batchCount == 0) return GA_NO_ERROR;
+
+  if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
+      LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
+      LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
+    return GA_XLARGE_ERROR;
 
   ASSERT_BUF(A[0]);
   ctx = A[0]->ctx;
@@ -658,6 +682,11 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   cb_transpose transT;
 
   if (batchCount == 0) return GA_NO_ERROR;
+
+  if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
+      LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
+      LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
+    return GA_XLARGE_ERROR;
 
   ASSERT_BUF(A[0]);
   ctx = A[0]->ctx;
@@ -782,6 +811,10 @@ static int sgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
   ASSERT_BUF(X);
   ASSERT_BUF(Y);
 
+  if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(M * N) ||
+      LARGE_VAL(lda) || LARGE_VAL(incX) || LARGE_VAL(incY))
+    return GA_XLARGE_ERROR;
+
   if (order == cb_c) {
     t = N;
     N = M;
@@ -832,6 +865,10 @@ static int dgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
   ASSERT_BUF(A);
   ASSERT_BUF(X);
   ASSERT_BUF(Y);
+
+  if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(M * N) ||
+      LARGE_VAL(lda) || LARGE_VAL(incX) || LARGE_VAL(incY))
+    return GA_XLARGE_ERROR;
 
   if (order == cb_c) {
     t = N;
@@ -1149,6 +1186,10 @@ static int sger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
   ASSERT_BUF(Y);
   ASSERT_BUF(A);
 
+  if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(M * N) ||
+      LARGE_VAL(lda) || LARGE_VAL(incX) || LARGE_VAL(incY))
+    return GA_XLARGE_ERROR;
+
   if (order == cb_c) {
     t = M;
     M = N;
@@ -1201,6 +1242,10 @@ static int dger(cb_order order, size_t M, size_t N, double alpha, gpudata *X,
   ASSERT_BUF(X);
   ASSERT_BUF(Y);
   ASSERT_BUF(A);
+
+  if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(M * N) ||
+      LARGE_VAL(lda) || LARGE_VAL(incX) || LARGE_VAL(incY))
+    return GA_XLARGE_ERROR;
 
   if (order == cb_c) {
     t = M;

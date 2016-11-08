@@ -34,6 +34,7 @@ enum ga_error {
   GA_NODEV_ERROR,
   GA_MISC_ERROR,
   GA_COMM_ERROR,
+  GA_XLARGE_ERROR,
   /* Add more error types if needed, but at the end */
   /* Don't forget to sync with Gpu_error() */
 };

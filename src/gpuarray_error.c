@@ -23,6 +23,7 @@ const char *gpuarray_error_str(int err) {
   case GA_NODEV_ERROR:       return "No devices are available";
   case GA_MISC_ERROR:        return "Undeterminate error";
   case GA_COMM_ERROR:        return "Error in collectives call";
+  case GA_XLARGE_ERROR:      return "Input size too large for operation";
   default: return "Unknown GA error";
   }
 }

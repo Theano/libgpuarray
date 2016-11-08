@@ -1978,7 +1978,10 @@ cdef class GpuArray:
         return str(numpy.asarray(self))
 
     def __repr__(self):
-        return 'gpuarray.' + repr(numpy.asarray(self))
+        try:
+            return 'gpuarray.' + repr(numpy.asarray(self))
+        except Exception:
+            return 'gpuarray.array(<content not available>)'
 
 
 
