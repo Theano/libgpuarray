@@ -2,6 +2,7 @@
 
 #include "private.h"
 #include "private_cuda.h"
+#include <nvrtc.h>
 
 #include <sys/types.h>
 
@@ -28,8 +29,11 @@ STATIC_ASSERT(sizeof(GpuArrayIpcMemHandle) == sizeof(CUipcMemHandle), cuda_ipcme
 /* Allocations will be made in blocks of at least this size */
 #define BLOCK_SIZE (4 * 1024 * 1024)
 
-/* No returned allocations will be smaller than this size.
-   Also, they will be aligned to this size. */
+/* No returned allocations will be smaller than this size.  Also, they
+ * will be aligned to this size.
+ *
+ * Some libraries depend on this value and will crash if it's smaller.
+ */
 #define FRAG_SIZE (64)
 
 static CUresult err;
@@ -150,9 +154,7 @@ static void deallocate(gpudata *);
 static void cuda_free_ctx(cuda_context *ctx) {
   gpuarray_blas_ops *blas_ops;
   gpudata *next, *curr;
-#if CUDA_VERSION >= 7000
   CUdevice dev;
-#endif
 
   ASSERT_CTX(ctx);
   ctx->refcnt--;
@@ -179,14 +181,10 @@ static void cuda_free_ctx(cuda_context *ctx) {
     cache_destroy(ctx->kernel_cache);
 
     if (!(ctx->flags & DONTFREE)) {
-#if CUDA_VERSION < 7000
-      cuCtxDestroy(ctx->ctx);
-#else
       cuCtxPushCurrent(ctx->ctx);
       cuCtxGetDevice(&dev);
       cuCtxPopCurrent(NULL);
       cuDevicePrimaryCtxRelease(dev);
-#endif
     }
     CLEAR(ctx);
     free(ctx);
@@ -324,10 +322,8 @@ static cuda_context *do_init(CUdevice dev, int flags, int *ret) {
     cuda_context *res;
     CUcontext ctx;
     unsigned int fl = CU_CTX_SCHED_AUTO;
-#if CUDA_VERSION >= 7000
     unsigned int cur_fl;
     int act;
-#endif
     int i;
 
     CHKFAIL(NULL);
@@ -339,10 +335,6 @@ static cuda_context *do_init(CUdevice dev, int flags, int *ret) {
     CHKFAIL(NULL);
     if (i != 1)
       FAIL(NULL, GA_UNSUPPORTED_ERROR);
-#if CUDA_VERSION < 7000
-    err = cuCtxCreate(&ctx, fl, dev);
-    CHKFAIL(NULL);
-#else
     err = cuDevicePrimaryCtxGetState(dev, &cur_fl, &act);
     CHKFAIL(NULL);
     if (act == 1) {
@@ -356,14 +348,9 @@ static cuda_context *do_init(CUdevice dev, int flags, int *ret) {
     CHKFAIL(NULL);
     err = cuCtxPushCurrent(ctx);
     CHKFAIL(NULL);
-#endif
     res = cuda_make_ctx(ctx, flags);
     if (res == NULL) {
-#if CUDA_VERSION < 7000
-      cuCtxDestroy(ctx);
-#else
       cuDevicePrimaryCtxRelease(dev);
-#endif
       FAIL(NULL, GA_IMPL_ERROR);
     }
     /* Don't leave the context on the thread stack */
@@ -875,10 +862,6 @@ static int detect_arch(const char *prefix, char *ret, CUresult *err) {
   return GA_NO_ERROR;
 }
 
-#ifdef WITH_NVRTC
-
-#include <nvrtc.h>
-
 static void *call_compiler(const char *src, size_t len, const char *arch_arg,
                            size_t *bin_len, char **log, size_t *log_len,
                            int *ret) {
@@ -939,165 +922,6 @@ end:
   }
   return buf;
 }
-
-#else /* WITH_NVRTC */
-
-#include <sys/stat.h>
-
-#include <fcntl.h>
-#include <limits.h>
-
-#ifdef _WIN32
-#include <process.h>
-/* I am really tired of hunting through online docs
- * to find where the define is.  256 seem to be the
- * consensus for the value so there it is.
- */
-#define PATH_MAX 256
-#else
-#include <sys/param.h>
-#include <sys/wait.h>
-#endif
-
-#ifdef _MSC_VER
-#include <io.h>
-#define read _read
-#define write _write
-#define close _close
-#define unlink _unlink
-#define fstat _fstat
-#define open _open
-#else
-#include <unistd.h>
-#endif
-
-static const char *TMP_VAR_NAMES[] = {"GPUARRAY_TMPDIR", "TMPDIR", "TMP",
-                                      "TEMP", "USERPROFILE"};
-
-
-static void *call_compiler(const char *src, size_t len, const char *arch_arg,
-                           size_t *bin_len, char **log, size_t *log_len,
-                           int *ret) {
-    char namebuf[PATH_MAX];
-    char outbuf[PATH_MAX];
-    char *tmpdir;
-    struct stat st;
-    ssize_t s;
-#ifndef _WIN32
-    pid_t p;
-#endif
-    unsigned int i;
-    int sys_err;
-    int fd;
-    char *buf;
-
-    for (i = 0; i < sizeof(TMP_VAR_NAMES)/sizeof(TMP_VAR_NAMES[0]); i++) {
-        tmpdir = getenv(TMP_VAR_NAMES[i]);
-        if (tmpdir != NULL) break;
-    }
-    if (tmpdir == NULL) {
-#ifdef _WIN32
-      tmpdir = ".";
-#else
-      tmpdir = "/tmp";
-#endif
-    }
-
-    strlcpy(namebuf, tmpdir, sizeof(namebuf));
-    strlcat(namebuf, "/gpuarray.cuda.XXXXXXXX", sizeof(namebuf));
-
-    fd = mkstemp(namebuf);
-    if (fd == -1) FAIL(NULL, GA_SYS_ERROR);
-
-    strlcpy(outbuf, namebuf, sizeof(outbuf));
-    strlcat(outbuf, ".cubin", sizeof(outbuf));
-
-    /* Don't want to write the final NUL */
-    s = write(fd, src, len-1);
-    close(fd);
-    /* fd is not non-blocking; should have complete write */
-    if (s == -1) {
-        unlink(namebuf);
-        FAIL(NULL, GA_SYS_ERROR);
-    }
-
-    /* This block executes nvcc on the written-out file */
-#ifdef DEBUG
-#define NVCC_ARGS NVCC_BIN, "-g", "-G", "-arch", arch_arg, "-x", "cu", \
-      "--cubin", namebuf, "-o", outbuf
-#else
-#define NVCC_ARGS NVCC_BIN, "-arch", arch_arg, "-x", "cu", \
-      "--cubin", namebuf, "-o", outbuf
-#endif
-#ifdef _WIN32
-    sys_err = _spawnl(_P_WAIT, NVCC_BIN, NVCC_ARGS, NULL);
-    unlink(namebuf);
-    if (sys_err == -1) FAIL(NULL, GA_SYS_ERROR);
-    if (sys_err != 0) FAIL(NULL, GA_RUN_ERROR);
-#else
-    p = fork();
-    if (p == 0) {
-        execl(NVCC_BIN, NVCC_ARGS, NULL);
-        exit(1);
-    }
-    if (p == -1) {
-        unlink(namebuf);
-        FAIL(NULL, GA_SYS_ERROR);
-    }
-
-    /* We need to wait until after the waitpid for the unlink because otherwise
-       we might delete the input file before nvcc is finished with it. */
-    if (waitpid(p, &sys_err, 0) == -1) {
-        unlink(namebuf);
-        unlink(outbuf);
-        FAIL(NULL, GA_SYS_ERROR);
-    } else {
-#ifdef DEBUG
-      /* Only cleanup if GPUARRAY_NOCLEANUP is not set */
-      if (getenv("GPUARRAY_NOCLEANUP") == NULL)
-#endif
-	unlink(namebuf);
-    }
-
-    if (WIFSIGNALED(sys_err) || WEXITSTATUS(sys_err) != 0) {
-        unlink(outbuf);
-        FAIL(NULL, GA_RUN_ERROR);
-    }
-#endif
-
-    fd = open(outbuf, O_RDONLY);
-    if (fd == -1) {
-        unlink(outbuf);
-        FAIL(NULL, GA_SYS_ERROR);
-    }
-
-    if (fstat(fd, &st) == -1) {
-        close(fd);
-        unlink(outbuf);
-        FAIL(NULL, GA_SYS_ERROR);
-    }
-
-    buf = malloc((size_t)st.st_size);
-    if (buf == NULL) {
-        close(fd);
-        unlink(outbuf);
-        FAIL(NULL, GA_SYS_ERROR);
-    }
-
-    s = read(fd, buf, (size_t)st.st_size);
-    close(fd);
-    unlink(outbuf);
-    /* fd is blocking; should have complete read */
-    if (s == -1) {
-      free(buf);
-      FAIL(NULL, GA_SYS_ERROR);
-    }
-
-    *bin_len = (size_t)st.st_size;
-    return buf;
-}
-
-#endif /* WITH_NVRTC */
 
 static void _cuda_freekernel(gpukernel *k) {
   k->refcnt--;

@@ -93,11 +93,7 @@ STATIC_ASSERT(sizeof(cuda_context) <= sizeof(gpucontext),
  * flag.
  */
 
-#ifdef WITH_NVRTC
 #define ARCH_PREFIX "compute_"
-#else
-#define ARCH_PREFIX "sm_"
-#endif
 
 GPUARRAY_LOCAL cuda_context *cuda_make_ctx(CUcontext ctx, int flags);
 GPUARRAY_LOCAL CUstream cuda_get_stream(cuda_context *ctx);
