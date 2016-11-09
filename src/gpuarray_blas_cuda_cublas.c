@@ -621,7 +621,8 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     const float **A_l = (const float **)T_l;
     const float **B_l = (const float **)T_l + batchCount;
     float **C_l = T_l + (batchCount * 2);
-    CUdeviceptr Ta, Aa, Ba, Ca;
+    gpudata *Ta;
+    CUdeviceptr Aa, Ba, Ca;
 
     for (i = 0; i < batchCount; i++) {
       ASSERT_BUF(A[i]);
@@ -635,12 +636,13 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
       C_l[i] = ((float *)C[i]->ptr) + offC[i];
     }
 
-    cuMemAlloc(&Ta, sizeof(float *) * batchCount * 3);
-    Aa = Ta;
-    Ba = Ta + (batchCount * sizeof(float *));
-    Ca = Ta + (batchCount * sizeof(float *) * 2);
+    Ta = gpudata_alloc((gpucontext *)ctx, sizeof(float *) * batchCount * 3,
+                       NULL, 0, NULL);
+    Aa = *(CUdeviceptr *)Ta;
+    Ba = Aa + (batchCount * sizeof(float *));
+    Ca = Aa + (batchCount * sizeof(float *) * 2);
 
-    cuMemcpyHtoD(Ta, T_l, sizeof(float *) * batchCount * 3);
+    gpudata_write(Ta, 0, T_l, sizeof(float *) * batchCount * 3);
 
     h->err = cublasSgemmBatched(h->h,
                                 convT(transA), convT(transB),
@@ -648,7 +650,7 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
                                 (const float **)Aa, lda,
                                 (const float **)Ba, ldb, &beta,
                                 (float **)Ca, ldc, batchCount);
-    cuMemFree(Ta);
+    gpudata_release(Ta);
     if (h->err != CUBLAS_STATUS_SUCCESS) {
       cuda_exit(ctx);
       if (h->err == CUBLAS_STATUS_ARCH_MISMATCH)
@@ -746,7 +748,8 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     const double **A_l = (const double **)T_l;
     const double **B_l = (const double **)T_l + batchCount;
     double **C_l = T_l + (batchCount * 2);
-    CUdeviceptr Ta, Aa, Ba, Ca;
+    gpudata *Ta;
+    CUdeviceptr Aa, Ba, Ca;
 
     for (i = 0; i < batchCount; i++) {
       ASSERT_BUF(A[i]);
@@ -760,12 +763,13 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
       C_l[i] = ((double *)C[i]->ptr) + offC[i];
     }
 
-    cuMemAlloc(&Ta, sizeof(double *) * batchCount * 3);
-    Aa = Ta;
-    Ba = Ta + (batchCount * sizeof(double *));
-    Ca = Ta + (batchCount * sizeof(double *) * 2);
+    Ta = gpudata_alloc((gpucontext *)ctx, sizeof(double *) * batchCount * 3,
+                       NULL, 0, NULL);
+    Aa = *(CUdeviceptr *)Ta;
+    Ba = Aa + (batchCount * sizeof(double *));
+    Ca = Aa + (batchCount * sizeof(double *) * 2);
 
-    cuMemcpyHtoD(Ta, T_l, sizeof(double *) * batchCount * 3);
+    gpudata_write(Ta, 0, T_l, sizeof(double *) * batchCount * 3);
 
     h->err = cublasDgemmBatched(h->h,
                                 convT(transA), convT(transB),
@@ -773,7 +777,7 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
                                 (const double **)Aa, lda,
                                 (const double **)Ba, ldb, &beta,
                                 (double **)Ca, ldc, batchCount);
-    cuMemFree(Ta);
+    gpudata_release(Ta);
     if (h->err != CUBLAS_STATUS_SUCCESS) {
       cuda_exit(ctx);
       if (h->err == CUBLAS_STATUS_ARCH_MISMATCH)
