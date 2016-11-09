@@ -86,19 +86,16 @@ endif()
 
 if (CUDA_FOUND)
   if (APPLE)
-    FIND_LIBRARY(CUDADRV_LIBRARY CUDA)
     FIND_PATH(CUDADRV_INCLUDE CUDA/cuda.h)
     # this is somewhat a hack, but otherwise cublas_v2.h isn't found
     set(CUDADRV_INCLUDE ${CUDADRV_INCLUDE} ${CUDA_TOOLKIT_INCLUDE})
   endif()
-  if(NOT CUDADRV_LIBRARY)
-    set(CUDADRV_LIBRARY ${CUDA_CUDA_LIBRARY})
+  if(NOT CUDADRV_INCLUDE)
     set(CUDADRV_INCLUDE ${CUDA_TOOLKIT_INCLUDE})
   endif()
 
   find_cuda_helper_libs(nvrtc)
 
-  set(CUDADRV_LIBRARY ${CUDADRV_LIBRARY} ${CUDA_nvrtc_LIBRARY})
   list(APPEND _GPUARRAY_SRC gpuarray_buffer_cuda.c)
   add_definitions(-DWITH_CUDA)
   include_directories(${CUDADRV_INCLUDE})
@@ -146,9 +143,10 @@ configure_file(
   )
 
 add_subdirectory(util)
+add_subdirectory(loaders)
 
 set_rel(GPUARRAY_SRC ${_GPUARRAY_SRC})
-list(APPEND GPUARRAY_SRC ${UTIL_SRC})
+list(APPEND GPUARRAY_SRC ${UTIL_SRC} ${LOADERS_SRC})
 
 add_library(gpuarray SHARED ${GPUARRAY_SRC})
 set_target_properties(gpuarray PROPERTIES
@@ -160,8 +158,8 @@ set_target_properties(gpuarray PROPERTIES
 add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
 
 if(CUDA_FOUND)
-  target_link_libraries(gpuarray ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
-  target_link_libraries(gpuarray-static ${CUDADRV_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
+  target_link_libraries(gpuarray ${CUDA_nvrtc_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
+  target_link_libraries(gpuarray-static ${CUDA_nvrtc_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
   if (NCCL_FOUND)
     target_link_libraries(gpuarray ${NCCL_LIBRARY})
     target_link_libraries(gpuarray-static ${NCCL_LIBRARY})

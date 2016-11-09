@@ -37,7 +37,6 @@ STATIC_ASSERT(sizeof(GpuArrayIpcMemHandle) == sizeof(CUipcMemHandle), cuda_ipcme
 #define FRAG_SIZE (64)
 
 static CUresult err;
-static int init_done = 0;
 
 GPUARRAY_LOCAL const gpuarray_buffer_ops cuda_ops;
 
@@ -61,6 +60,21 @@ static uint32_t strb_hash(void *_k) {
   return XXH32(k->s, k->l, 42);
 }
 
+static int setup_done = 0;
+static int setup_lib(void) {
+  int res;
+  if (!setup_done) {
+    res = load_libcuda();
+    if (res != GA_NO_ERROR)
+      return err;
+    err = cuInit(0);
+    if (err != CUDA_SUCCESS)
+      return GA_IMPL_ERROR;
+    setup_done = 1;
+  }
+  return GA_NO_ERROR;
+}
+
 static int cuda_get_platform_count(unsigned int* platcount) {
   *platcount = 1;  // CUDA works on NVIDIA's GPUs
   return GA_NO_ERROR;
@@ -70,12 +84,7 @@ static int cuda_get_device_count(unsigned int platform,
                                  unsigned int* devcount) {
   int dv;
   // platform number gets ignored in CUDA implementation
-  if (!init_done) {
-    err = cuInit(0);
-    if (err != CUDA_SUCCESS)
-      return GA_IMPL_ERROR;
-    init_done = 1;
-  }
+  GA_CHECK(setup_lib());
   err = cuDeviceGetCount(&dv);
   if (err != CUDA_SUCCESS)
     return GA_IMPL_ERROR;
@@ -86,6 +95,11 @@ static int cuda_get_device_count(unsigned int platform,
 cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   cuda_context *res;
   void *p;
+  int e;
+
+  e = setup_lib();
+  if (e != GA_NO_ERROR)
+    return NULL;
 
   res = calloc(1, sizeof(*res));
   if (res == NULL)
@@ -361,12 +375,11 @@ static cuda_context *do_init(CUdevice dev, int flags, int *ret) {
 static gpucontext *cuda_init(int ord, int flags, int *ret) {
     CUdevice dev;
     cuda_context *res;
+    int r;
 
-    if (!init_done) {
-      err = cuInit(0);
-      CHKFAIL(NULL);
-      init_done = 1;
-    }
+    r = setup_lib();
+    if (r != GA_NO_ERROR)
+      return NULL;
 
     if (ord == -1) {
       int i, c;
@@ -833,9 +846,6 @@ static int cuda_memset(gpudata *dst, size_t dstoff, int data) {
 }
 
 static CUresult get_cc(CUdevice dev, int *maj, int *min) {
-#if CUDA_VERSION < 6500
-  return cuDeviceComputeCapability(maj, min, dev);
-#else
   CUresult lerr;
   lerr = cuDeviceGetAttribute(maj,
                               CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
@@ -845,7 +855,6 @@ static CUresult get_cc(CUdevice dev, int *maj, int *min) {
   return cuDeviceGetAttribute(min,
                               CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
                               dev);
-#endif
 }
 
 static int detect_arch(const char *prefix, char *ret, CUresult *err) {
@@ -976,7 +985,7 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
-    ctx->err = cuDeviceComputeCapability(&major, &minor, dev);
+    ctx->err = get_cc(dev, &major, &minor);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);

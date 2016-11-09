@@ -1,11 +1,7 @@
 #ifndef _PRIVATE_CUDA_H
 #define _PRIVATE_CUDA_H
 
-#ifdef __APPLE__
-#include <CUDA/cuda.h>
-#else
-#include <cuda.h>
-#endif
+#include "loaders/libcuda.h"
 
 #include <cache.h>
 

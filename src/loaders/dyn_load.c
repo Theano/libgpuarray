@@ -1,8 +1,8 @@
-#include "util/dyn_load.h"
+#include "dyn_load.h"
 
 #ifdef __unix__
 
-#include <dlcfn.h>
+#include <dlfcn.h>
 
 void *ga_load_library(const char *name) {
   return dlopen(name, RTLD_LAZY|RTLD_LOCAL);
