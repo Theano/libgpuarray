@@ -499,8 +499,11 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
     pl = ls[0];
     ls[0] = ls[1];
     ls[1] = pl;
+    gs[0] = 1;
+  } else {
+    gs[0] = gs[1];
+    gs[1] = 1;
   }
-  gs[0] = 1;
 
   argp = 0;
   GpuKernel_setarg(&k, argp++, a->data);
