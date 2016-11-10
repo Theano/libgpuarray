@@ -5,16 +5,15 @@ if(CMAKE_COMPILER_IS_GNUCC)
   add_definitions(-Wdeclaration-after-statement)
 endif()
 
-find_package(CUDA)
+find_package(CUDA REQUIRED)
+find_package(NCCL)
+
 find_package(OpenCL)
 if(OpenCL_FOUND)
 find_package(clBLAS)
 if(NOT CLBLAS_FOUND)
 find_package(CLBlast)
 endif()
-endif()
-if(CUDA_FOUND)
-find_package(NCCL)
 endif()
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
@@ -60,6 +59,8 @@ gpuarray_kernel.c
 gpuarray_extension.c
 gpuarray_elemwise.c
 gpuarray_reduction.c
+gpuarray_buffer_cuda.c
+gpuarray_blas_cuda_cublas.c
 )
 
 check_function_exists(strlcat HAVE_STRL)
@@ -77,36 +78,28 @@ if(NOT HAVE_MKSTEMP)
   list(APPEND _GPUARRAY_SRC gpuarray_mkstemp.c)
 endif()
 
-if (CUDA_FOUND)
-  if (CUDA_VERSION_MAJOR LESS 7)
-    message( WARNING "This package requires CUDA 7.0 or more (building with NCCL).  Found version ${CUDA_VERSION_STRING}")
-    set(CUDA_FOUND 0)
-  endif()
+if (CUDA_VERSION_MAJOR LESS 7)
+  message( FATAL_ERROR "This package requires CUDA 7.0 or more.  Found version ${CUDA_VERSION_STRING}")
 endif()
 
-if (CUDA_FOUND)
-  if (APPLE)
-    FIND_PATH(CUDADRV_INCLUDE CUDA/cuda.h)
-    # this is somewhat a hack, but otherwise cublas_v2.h isn't found
-    set(CUDADRV_INCLUDE ${CUDADRV_INCLUDE} ${CUDA_TOOLKIT_INCLUDE})
-  endif()
-  if(NOT CUDADRV_INCLUDE)
-    set(CUDADRV_INCLUDE ${CUDA_TOOLKIT_INCLUDE})
-  endif()
+if (APPLE)
+  FIND_PATH(CUDADRV_INCLUDE CUDA/cuda.h)
+  # this is somewhat a hack, but otherwise cublas_v2.h isn't found
+  set(CUDADRV_INCLUDE ${CUDADRV_INCLUDE} ${CUDA_TOOLKIT_INCLUDE})
+endif()
+if(NOT CUDADRV_INCLUDE)
+  set(CUDADRV_INCLUDE ${CUDA_TOOLKIT_INCLUDE})
+endif()
 
-  list(APPEND _GPUARRAY_SRC gpuarray_buffer_cuda.c)
-  add_definitions(-DWITH_CUDA)
-  include_directories(${CUDADRV_INCLUDE})
+include_directories(${CUDADRV_INCLUDE})
 
-  list(APPEND _GPUARRAY_SRC gpuarray_blas_cuda_cublas.c)
 
-  if(NCCL_FOUND)
-    message(STATUS "Building with NCCL")
-    set(BUILD_WITH_COLLECTIVES 1 PARENT_SCOPE)
-    add_definitions(-DWITH_CUDA_NCCL)
-    list(APPEND _GPUARRAY_SRC gpuarray_collectives_cuda_nccl.c)
-    include_directories(${NCCL_INCLUDE_DIR})
-  endif()
+if(NCCL_FOUND)
+  message(STATUS "Building with NCCL")
+  set(BUILD_WITH_COLLECTIVES 1 PARENT_SCOPE)
+  add_definitions(-DWITH_CUDA_NCCL)
+  list(APPEND _GPUARRAY_SRC gpuarray_collectives_cuda_nccl.c)
+  include_directories(${NCCL_INCLUDE_DIR})
 endif()
 
 if(OpenCL_FOUND)
@@ -147,11 +140,9 @@ set_target_properties(gpuarray PROPERTIES
 
 add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
 
-if(CUDA_FOUND)
-  if (NCCL_FOUND)
-    target_link_libraries(gpuarray ${NCCL_LIBRARY})
-    target_link_libraries(gpuarray-static ${NCCL_LIBRARY})
-  endif()
+if (NCCL_FOUND)
+  target_link_libraries(gpuarray ${NCCL_LIBRARY})
+  target_link_libraries(gpuarray-static ${NCCL_LIBRARY})
 endif()
 
 if(OpenCL_FOUND)

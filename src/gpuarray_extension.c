@@ -7,7 +7,6 @@ typedef struct _ext {
   void *val;
 } ext;
 
-#ifdef WITH_CUDA
 extern void cuda_enter(void);
 extern void cuda_exit(void);
 extern void *cuda_make_ctx(void);
@@ -18,7 +17,6 @@ extern void *cuda_wait(void);
 extern void *cuda_record(void);
 extern void *cuda_get_ipc_handle(void);
 extern void *cuda_open_ipc_handle(void);
-#endif
 #ifdef WITH_OPENCL
 extern void *cl_make_ctx(void);
 extern void *cl_get_stream(void);
@@ -27,7 +25,6 @@ extern void *cl_get_buf(void);
 #endif
 
 static ext ext_list[] = {
-#ifdef WITH_CUDA
   {"cuda_enter", cuda_enter},
   {"cuda_exit", cuda_exit},
   {"cuda_make_ctx", cuda_make_ctx},
@@ -38,7 +35,6 @@ static ext ext_list[] = {
   {"cuda_record", cuda_record},
   {"cuda_get_ipc_handle", cuda_get_ipc_handle},
   {"cuda_open_ipc_handle", cuda_open_ipc_handle},
-#endif
 #ifdef WITH_OPENCL
   {"cl_make_ctx", cl_make_ctx},
   {"cl_get_stream", cl_get_stream},
