@@ -3,11 +3,7 @@
 
 #include "private.h"
 
-#ifdef __APPLE__
-#include <OpenCL/opencl.h>
-#else
-#include <CL/opencl.h>
-#endif
+#include "loaders/libopencl.h"
 
 #ifdef DEBUG
 #include <assert.h>

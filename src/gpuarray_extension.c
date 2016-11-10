@@ -17,12 +17,11 @@ extern void *cuda_wait(void);
 extern void *cuda_record(void);
 extern void *cuda_get_ipc_handle(void);
 extern void *cuda_open_ipc_handle(void);
-#ifdef WITH_OPENCL
+
 extern void *cl_make_ctx(void);
 extern void *cl_get_stream(void);
 extern void *cl_make_buf(void);
 extern void *cl_get_buf(void);
-#endif
 
 static ext ext_list[] = {
   {"cuda_enter", cuda_enter},
@@ -35,12 +34,11 @@ static ext ext_list[] = {
   {"cuda_record", cuda_record},
   {"cuda_get_ipc_handle", cuda_get_ipc_handle},
   {"cuda_open_ipc_handle", cuda_open_ipc_handle},
-#ifdef WITH_OPENCL
+
   {"cl_make_ctx", cl_make_ctx},
   {"cl_get_stream", cl_get_stream},
   {"cl_make_buf", cl_make_buf},
   {"cl_get_buf", cl_get_buf},
-#endif
 };
 
 #define N_EXT (sizeof(ext_list)/sizeof(ext_list[0]))

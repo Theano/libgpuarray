@@ -3,4 +3,5 @@ dyn_load.c
 libcuda.c
 libnvrtc.c
 libcublas.c
+libopencl.c
 )

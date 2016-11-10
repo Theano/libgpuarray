@@ -9,15 +9,11 @@
 #include "private.h"
 
 extern const gpuarray_buffer_ops cuda_ops;
-#ifdef WITH_OPENCL
 extern const gpuarray_buffer_ops opencl_ops;
-#endif
 
 const gpuarray_buffer_ops *gpuarray_get_ops(const char *name) {
   if (strcmp("cuda", name) == 0) return &cuda_ops;
-#ifdef WITH_OPENCL
   if (strcmp("opencl", name) == 0) return &opencl_ops;
-#endif
   return NULL;
 }
 

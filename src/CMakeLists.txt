@@ -8,13 +8,12 @@ endif()
 find_package(CUDA REQUIRED)
 find_package(NCCL)
 
-find_package(OpenCL)
-if(OpenCL_FOUND)
+find_package(OpenCL REQUIRED)
 find_package(clBLAS)
 if(NOT CLBLAS_FOUND)
-find_package(CLBlast)
+  find_package(CLBlast)
 endif()
-endif()
+
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
@@ -61,6 +60,7 @@ gpuarray_elemwise.c
 gpuarray_reduction.c
 gpuarray_buffer_cuda.c
 gpuarray_blas_cuda_cublas.c
+gpuarray_buffer_opencl.c
 )
 
 check_function_exists(strlcat HAVE_STRL)
@@ -102,22 +102,18 @@ if(NCCL_FOUND)
   include_directories(${NCCL_INCLUDE_DIR})
 endif()
 
-if(OpenCL_FOUND)
-  list(APPEND _GPUARRAY_SRC gpuarray_buffer_opencl.c)
-  add_definitions(-DWITH_OPENCL)
-  include_directories(${OpenCL_INCLUDE_DIRS})
+include_directories(${OpenCL_INCLUDE_DIRS})
 
-  if(CLBLAS_FOUND)
-    message(STATUS "Building with CLBLAS")
-    list(APPEND _GPUARRAY_SRC gpuarray_blas_opencl_clblas.c)
-    add_definitions(-DWITH_OPENCL_CLBLAS)
-    include_directories(${CLBLAS_INCLUDE_DIRS})
-  elseif(CLBLAS_FOUND)
-    message(STATUS "Building with CLBLAST")
-    list(APPEND _GPUARRAY_SRC gpuarray_blas_opencl_clblast.c)
-    add_definitions(-DWITH_OPENCL_CLBLAST)
-    include_directories(${CLBLAST_INCLUDE_DIRS})
-  endif()
+if(CLBLAS_FOUND)
+  message(STATUS "Building with CLBLAS")
+  list(APPEND _GPUARRAY_SRC gpuarray_blas_opencl_clblas.c)
+  add_definitions(-DWITH_OPENCL_CLBLAS)
+  include_directories(${CLBLAS_INCLUDE_DIRS})
+elseif(CLBLAS_FOUND)
+  message(STATUS "Building with CLBLAST")
+  list(APPEND _GPUARRAY_SRC gpuarray_blas_opencl_clblast.c)
+  add_definitions(-DWITH_OPENCL_CLBLAST)
+  include_directories(${CLBLAST_INCLUDE_DIRS})
 endif()
 
 configure_file(
@@ -140,18 +136,17 @@ set_target_properties(gpuarray PROPERTIES
 
 add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
 
+target_link_libraries(gpuarray ${CMAKE_DL_LIBS})
+target_link_libraries(gpuarray-static ${CMAKE_DL_LIBS})
+
 if (NCCL_FOUND)
   target_link_libraries(gpuarray ${NCCL_LIBRARY})
   target_link_libraries(gpuarray-static ${NCCL_LIBRARY})
 endif()
 
-if(OpenCL_FOUND)
-  target_link_libraries(gpuarray ${OpenCL_LIBRARIES})
-  target_link_libraries(gpuarray-static ${OpenCL_LIBRARIES})
-  if (CLBLAS_FOUND)
-    target_link_libraries(gpuarray ${CLBLAS_LIBRARIES})
-    target_link_libraries(gpuarray-static ${CLBLAS_LIBRARIES})
-  endif()
+if (CLBLAS_FOUND)
+  target_link_libraries(gpuarray ${CLBLAS_LIBRARIES})
+  target_link_libraries(gpuarray-static ${CLBLAS_LIBRARIES})
 endif()
 
 set(headers
