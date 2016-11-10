@@ -1152,6 +1152,14 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     size_t *psz;
     cl_device_id id;
     cl_uint ui;
+    /* For GA_CTX_PROP_PCIBUSID (currently desactivated).
+     * According to http://www.makelinux.net/ldd3/chp-12-sect-1
+     * (accessed on 2016/11/09:15h41 EST):
+     * domain: 16 bits, bus: 8 bits, device: 5 bits, function: 3 bits. */
+    /*
+    uint32_t* busid;
+    uint32_t domain = 0, bus = 0, device = 0, function = 0;
+    */
 
   case GA_CTX_PROP_DEVNAME:
     ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
@@ -1171,6 +1179,46 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     }
     *((char **)res) = s;
     return GA_NO_ERROR;
+
+  case GA_CTX_PROP_PCIBUSID:
+    /* PS: Currently desactivated. This does not print the same
+     * Bus ID as cuda and nvidia-smi. For the moment, I don't find
+     * which info will display the correct PCI Bus ID with OpenCL. */
+    /*
+    ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
+                                &id, NULL);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_VENDOR_ID, 0, NULL, &sz);
+    if (ctx->err != CL_SUCCESS)
+      return GA_IMPL_ERROR;
+    if(sz != 4)
+      return GA_IMPL_ERROR;
+    busid = malloc(sz);
+    if (busid == NULL)
+      return GA_MEMORY_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_VENDOR_ID, sz, busid, NULL);
+    if (ctx->err != CL_SUCCESS) {
+      free(busid);
+      return GA_IMPL_ERROR;
+    }
+    domain = *busid >> (32-16);
+    bus = *busid << 16 >> (32-8);
+    device = *busid << 24 >> (32-5);
+    function = *busid << 29 >> (32-3);
+    free(busid);
+    s = malloc(13);
+    sprintf(s, "%04x", domain);
+    sprintf(s + 5, "%02x", bus);
+    sprintf(s + 8, "%02x", device);
+    sprintf(s + 11, "%01x", function);
+    s[4] = s[7] = ':';
+    s[10] = '.';
+    *((char **)res) = s;
+    return GA_NO_ERROR;
+    */
+    *((void **)res) = NULL;
+    return GA_DEVSUP_ERROR;
 
   case GA_CTX_PROP_MAXLSIZE:
     ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),

@@ -1502,6 +1502,30 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     *((char **)res) = s;
     cuda_exit(ctx);
     return GA_NO_ERROR;
+  
+  case GA_CTX_PROP_PCIBUSID:
+    cuda_enter(ctx);
+    ctx->err = cuCtxGetDevice(&id);
+    if (ctx->err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    s = malloc(13);
+    if (s == NULL) {
+      cuda_exit(ctx);
+      return GA_MEMORY_ERROR;
+    }
+    ctx->err = cudaDeviceGetPCIBusId(s, 13, id);
+    if (ctx->err != CUDA_SUCCESS) {
+      /* PS: in GA_CTX_PROP_DEVNAME above, s is not freed here.
+       * I think it should be freed, isn't it ? */
+      free(s);
+      cuda_exit(ctx);
+      return GA_IMPL_ERROR;
+    }
+    *((char **)res) = s;
+    cuda_exit(ctx);
+    return GA_NO_ERROR;
 
   case GA_CTX_PROP_MAXLSIZE:
     cuda_enter(ctx);
