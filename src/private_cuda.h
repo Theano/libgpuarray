@@ -3,10 +3,8 @@
 
 #ifdef __APPLE__
 #include <CUDA/cuda.h>
-#include <CUDA/cuda_runtime_api.h>
 #else
 #include <cuda.h>
-#include <cuda_runtime_api.h>
 #endif
 
 #include <cache.h>
