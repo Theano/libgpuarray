@@ -99,14 +99,6 @@ if (CUDA_FOUND)
   include_directories(${CUDADRV_INCLUDE})
 
   list(APPEND _GPUARRAY_SRC gpuarray_blas_cuda_cublas.c)
-  add_definitions(-DWITH_CUDA_CUBLAS)
-
-  set(CMAKE_REQUIRED_LIBRARIES ${CUDA_CUBLAS_LIBRARIES})
-
-  check_function_exists(cublasSgemmEx CUBLAS_SGEMMEX)
-  if (CUBLAS_SGEMMEX)
-    add_definitions(-DHAVE_CUBLAS_SGEMMEX)
-  endif()
 
   if(NCCL_FOUND)
     message(STATUS "Building with NCCL")
@@ -156,8 +148,6 @@ set_target_properties(gpuarray PROPERTIES
 add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
 
 if(CUDA_FOUND)
-  target_link_libraries(gpuarray ${CUDA_CUBLAS_LIBRARIES})
-  target_link_libraries(gpuarray-static ${CUDA_CUBLAS_LIBRARIES})
   if (NCCL_FOUND)
     target_link_libraries(gpuarray ${NCCL_LIBRARY})
     target_link_libraries(gpuarray-static ${NCCL_LIBRARY})

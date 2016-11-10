@@ -69,6 +69,8 @@ typedef struct _cuda_context {
   gpudata *freeblocks;
   cache *kernel_cache;
   unsigned int enter;
+  unsigned char major;
+  unsigned char minor;
 } cuda_context;
 
 STATIC_ASSERT(sizeof(cuda_context) <= sizeof(gpucontext),

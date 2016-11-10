@@ -61,8 +61,10 @@ static uint32_t strb_hash(void *_k) {
 }
 
 static int setup_done = 0;
+static int major = -1;
+static int minor = -1;
 static int setup_lib(void) {
-  int res, major, minor, tmp;
+  int res, tmp;
   const char *ver;
   if (!setup_done) {
     res = load_libcuda();
@@ -127,6 +129,8 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   res->refcnt = 1;
   res->flags = flags;
   res->enter = 0;
+  res->major = major;
+  res->minor = minor;
   res->freeblocks = NULL;
   if (detect_arch(ARCH_PREFIX, res->bin_id, &err)) {
     goto fail_stream;
@@ -192,8 +196,8 @@ static void cuda_free_ctx(cuda_context *ctx) {
   if (ctx->refcnt == 0) {
     assert(ctx->enter == 0 && "Context was active when freed!");
     if (ctx->blas_handle != NULL) {
-      ctx->err = cuda_property((gpucontext *)ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS,
-                               &blas_ops);
+      cuda_property((gpucontext *)ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS,
+                    &blas_ops);
       blas_ops->teardown((gpucontext *)ctx);
     }
     cuMemFreeHost((void *)ctx->errbuf->ptr);
@@ -1293,9 +1297,7 @@ static int cuda_transfer(gpudata *dst, size_t dstoff,
   return GA_NO_ERROR;
 }
 
-#ifdef WITH_CUDA_CUBLAS
 extern gpuarray_blas_ops cublas_ops;
-#endif  // WITH_CUDA_CUBLAS
 #ifdef WITH_CUDA_NCCL
 extern gpuarray_comm_ops nccl_ops;
 #endif  // WITH_CUDA_NCCL
@@ -1447,13 +1449,8 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_BLAS_OPS:
-#ifdef WITH_CUDA_CUBLAS
     *((gpuarray_blas_ops **)res) = &cublas_ops;
     return GA_NO_ERROR;
-#else
-    *((void **)res) = NULL;
-    return GA_DEVSUP_ERROR;
-#endif  // WITH_CUDA_CUBLAS
 
   case GA_CTX_PROP_COMM_OPS:
 #ifdef WITH_CUDA_NCCL

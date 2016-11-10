@@ -7,7 +7,7 @@
 
 #include <limits.h>
 
-#include <cublas_v2.h>
+#include "loaders/libcublas.h"
 
 extern const gpuarray_buffer_ops cuda_ops;
 
@@ -175,6 +175,10 @@ static int setup(gpucontext *c) {
 
   if (ctx->blas_handle != NULL)
     return GA_NO_ERROR;
+
+  e = load_libcublas(ctx->minor, ctx->major);
+  if (e != GA_NO_ERROR)
+    return e;
 
   handle = calloc(1, sizeof(*handle));
   if (handle == NULL)
@@ -450,7 +454,6 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
                  gpudata *A, size_t offA, size_t lda,
                  gpudata *B, size_t offB, size_t ldb,
                  float beta, gpudata *C, size_t offC, size_t ldc) {
-#ifdef HAVE_CUBLAS_SGEMMEX
   /* This will use float32 for computation as it's the best we can
    * have right now. In the future when native float16 support will be
    * there we will switch to that. */
@@ -463,6 +466,9 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   ASSERT_BUF(A);
   ASSERT_BUF(B);
   ASSERT_BUF(C);
+
+  if (cublasSgemmEx == NULL)
+    return GA_DEVSUP_ERROR;
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
       LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
@@ -497,23 +503,11 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   h->err = cublasSgemmEx(h->h,
                          convT(transA), convT(transB), M, N, K,
                          &alpha, ((uint16_t *)A->ptr) + offA,
-#if CUDA_VERSION >= 8000
                          CUDA_R_16F,
-#else
-                         CUBLAS_DATA_HALF,
-#endif
                          lda, ((uint16_t *)B->ptr) + offB,
-#if CUDA_VERSION >= 8000
                          CUDA_R_16F,
-#else
-                         CUBLAS_DATA_HALF,
-#endif
                          ldb, &beta, ((uint16_t *)C->ptr) + offC,
-#if CUDA_VERSION >= 8000
                          CUDA_R_16F,
-#else
-                         CUBLAS_DATA_HALF,
-#endif
                          ldc);
   if (h->err != CUBLAS_STATUS_SUCCESS) {
     cuda_exit(ctx);
@@ -528,9 +522,6 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
 
   cuda_exit(ctx);
   return GA_NO_ERROR;
-#else
-  return GA_DEVSUP_ERROR;
-#endif
 }
 
 static int hgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
@@ -1216,9 +1207,9 @@ static int sger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A, CUDA_WAIT_ALL));
 
   h->err = cublasSger(h->h, M, N, &alpha,
-                                ((float *)X->ptr) + offX, incX,
-                                ((float *)Y->ptr) + offY, incY,
-                                ((float *)A->ptr) + offA, lda);
+                      ((float *)X->ptr) + offX, incX,
+                      ((float *)Y->ptr) + offY, incY,
+                      ((float *)A->ptr) + offA, lda);
   if (h->err != CUBLAS_STATUS_SUCCESS) {
     cuda_exit(ctx);
     if (h->err == CUBLAS_STATUS_ARCH_MISMATCH)
@@ -1273,9 +1264,9 @@ static int dger(cb_order order, size_t M, size_t N, double alpha, gpudata *X,
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A, CUDA_WAIT_ALL));
 
   h->err = cublasDger(h->h, M, N, &alpha,
-                                ((double *)X->ptr) + offX, incX,
-                                ((double *)Y->ptr) + offY, incY,
-                                ((double *)A->ptr) + offA, lda);
+                      ((double *)X->ptr) + offX, incX,
+                      ((double *)Y->ptr) + offY, incY,
+                      ((double *)A->ptr) + offA, lda);
   if (h->err != CUBLAS_STATUS_SUCCESS) {
     cuda_exit(ctx);
     if (h->err == CUBLAS_STATUS_ARCH_MISMATCH)
