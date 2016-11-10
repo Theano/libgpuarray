@@ -2,7 +2,7 @@
 
 #include "private.h"
 #include "private_cuda.h"
-#include <nvrtc.h>
+#include "loaders/libnvrtc.h"
 
 #include <sys/types.h>
 
@@ -62,7 +62,8 @@ static uint32_t strb_hash(void *_k) {
 
 static int setup_done = 0;
 static int setup_lib(void) {
-  int res;
+  int res, major, minor, tmp;
+  const char *ver;
   if (!setup_done) {
     res = load_libcuda();
     if (res != GA_NO_ERROR)
@@ -70,6 +71,22 @@ static int setup_lib(void) {
     err = cuInit(0);
     if (err != CUDA_SUCCESS)
       return GA_IMPL_ERROR;
+    ver = getenv("GPUARRAY_CUDA_VERSION");
+    if (ver == NULL || strlen(ver) != 2) {
+      err = gcuDriverGetVersion(&tmp);
+      if (err != CUDA_SUCCESS)
+        return GA_IMPL_ERROR;
+      major = tmp / 1000;
+      minor = (tmp / 10) % 10;
+    } else {
+      major = ver[0] - '0';
+      minor = ver[1] - '0';
+    }
+    if (major > 9 || major < 0 || minor > 9 || minor < 0)
+      return GA_VALUE_ERROR;
+    res = load_libnvrtc(major, minor);
+    if (res != GA_NO_ERROR)
+      return err;
     setup_done = 1;
   }
   return GA_NO_ERROR;

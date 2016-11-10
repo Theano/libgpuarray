@@ -94,8 +94,6 @@ if (CUDA_FOUND)
     set(CUDADRV_INCLUDE ${CUDA_TOOLKIT_INCLUDE})
   endif()
 
-  find_cuda_helper_libs(nvrtc)
-
   list(APPEND _GPUARRAY_SRC gpuarray_buffer_cuda.c)
   add_definitions(-DWITH_CUDA)
   include_directories(${CUDADRV_INCLUDE})
@@ -158,8 +156,8 @@ set_target_properties(gpuarray PROPERTIES
 add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
 
 if(CUDA_FOUND)
-  target_link_libraries(gpuarray ${CUDA_nvrtc_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
-  target_link_libraries(gpuarray-static ${CUDA_nvrtc_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
+  target_link_libraries(gpuarray ${CUDA_CUBLAS_LIBRARIES})
+  target_link_libraries(gpuarray-static ${CUDA_CUBLAS_LIBRARIES})
   if (NCCL_FOUND)
     target_link_libraries(gpuarray ${NCCL_LIBRARY})
     target_link_libraries(gpuarray-static ${NCCL_LIBRARY})
