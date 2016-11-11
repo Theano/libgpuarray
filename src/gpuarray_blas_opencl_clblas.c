@@ -1,7 +1,7 @@
 #include "private.h"
 #include "private_opencl.h"
 
-#include <clBLAS.h>
+#include "loaders/libclblas.h"
 
 #include "gpuarray/buffer_blas.h"
 #include "gpuarray/error.h"
@@ -36,6 +36,8 @@ static int setup(gpucontext *ctx) {
   clblasStatus err;
 
   if (refcnt == 0) {
+    GA_CHECK(load_libclblas());
+
     err = clblasSetup();
     if (err != clblasSuccess)
       return GA_BLAS_ERROR;

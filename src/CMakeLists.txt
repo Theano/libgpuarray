@@ -52,6 +52,7 @@ gpuarray_buffer_cuda.c
 gpuarray_blas_cuda_cublas.c
 gpuarray_collectives_cuda_nccl.c
 gpuarray_buffer_opencl.c
+gpuarray_blas_opencl_clblas.c
 )
 
 check_function_exists(strlcat HAVE_STRL)
@@ -91,11 +92,6 @@ add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
 
 target_link_libraries(gpuarray ${CMAKE_DL_LIBS})
 target_link_libraries(gpuarray-static ${CMAKE_DL_LIBS})
-
-if (BUILD_WITH_CLBLAS)
-  target_link_libraries(gpuarray ${CLBLAS_LIBRARIES})
-  target_link_libraries(gpuarray-static ${CLBLAS_LIBRARIES})
-endif()
 
 set(headers
   gpuarray/array.h

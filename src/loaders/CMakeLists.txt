@@ -5,4 +5,5 @@ libnvrtc.c
 libcublas.c
 libnccl.c
 libopencl.c
+libclblas.c
 )
