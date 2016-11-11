@@ -5,16 +5,6 @@ if(CMAKE_COMPILER_IS_GNUCC)
   add_definitions(-Wdeclaration-after-statement)
 endif()
 
-find_package(CUDA REQUIRED)
-find_package(NCCL)
-
-find_package(OpenCL REQUIRED)
-find_package(clBLAS)
-if(NOT CLBLAS_FOUND)
-  find_package(CLBlast)
-endif()
-
-
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_custom_command(
@@ -60,6 +50,7 @@ gpuarray_elemwise.c
 gpuarray_reduction.c
 gpuarray_buffer_cuda.c
 gpuarray_blas_cuda_cublas.c
+gpuarray_collectives_cuda_nccl.c
 gpuarray_buffer_opencl.c
 )
 
@@ -76,44 +67,6 @@ endif()
 
 if(NOT HAVE_MKSTEMP)
   list(APPEND _GPUARRAY_SRC gpuarray_mkstemp.c)
-endif()
-
-if (CUDA_VERSION_MAJOR LESS 7)
-  message( FATAL_ERROR "This package requires CUDA 7.0 or more.  Found version ${CUDA_VERSION_STRING}")
-endif()
-
-if (APPLE)
-  FIND_PATH(CUDADRV_INCLUDE CUDA/cuda.h)
-  # this is somewhat a hack, but otherwise cublas_v2.h isn't found
-  set(CUDADRV_INCLUDE ${CUDADRV_INCLUDE} ${CUDA_TOOLKIT_INCLUDE})
-endif()
-if(NOT CUDADRV_INCLUDE)
-  set(CUDADRV_INCLUDE ${CUDA_TOOLKIT_INCLUDE})
-endif()
-
-include_directories(${CUDADRV_INCLUDE})
-
-
-if(NCCL_FOUND)
-  message(STATUS "Building with NCCL")
-  set(BUILD_WITH_COLLECTIVES 1 PARENT_SCOPE)
-  add_definitions(-DWITH_CUDA_NCCL)
-  list(APPEND _GPUARRAY_SRC gpuarray_collectives_cuda_nccl.c)
-  include_directories(${NCCL_INCLUDE_DIR})
-endif()
-
-include_directories(${OpenCL_INCLUDE_DIRS})
-
-if(CLBLAS_FOUND)
-  message(STATUS "Building with CLBLAS")
-  list(APPEND _GPUARRAY_SRC gpuarray_blas_opencl_clblas.c)
-  add_definitions(-DWITH_OPENCL_CLBLAS)
-  include_directories(${CLBLAS_INCLUDE_DIRS})
-elseif(CLBLAS_FOUND)
-  message(STATUS "Building with CLBLAST")
-  list(APPEND _GPUARRAY_SRC gpuarray_blas_opencl_clblast.c)
-  add_definitions(-DWITH_OPENCL_CLBLAST)
-  include_directories(${CLBLAST_INCLUDE_DIRS})
 endif()
 
 configure_file(
@@ -139,12 +92,7 @@ add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
 target_link_libraries(gpuarray ${CMAKE_DL_LIBS})
 target_link_libraries(gpuarray-static ${CMAKE_DL_LIBS})
 
-if (NCCL_FOUND)
-  target_link_libraries(gpuarray ${NCCL_LIBRARY})
-  target_link_libraries(gpuarray-static ${NCCL_LIBRARY})
-endif()
-
-if (CLBLAS_FOUND)
+if (BUILD_WITH_CLBLAS)
   target_link_libraries(gpuarray ${CLBLAS_LIBRARIES})
   target_link_libraries(gpuarray-static ${CLBLAS_LIBRARIES})
 endif()

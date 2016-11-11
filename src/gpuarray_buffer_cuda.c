@@ -1298,9 +1298,7 @@ static int cuda_transfer(gpudata *dst, size_t dstoff,
 }
 
 extern gpuarray_blas_ops cublas_ops;
-#ifdef WITH_CUDA_NCCL
 extern gpuarray_comm_ops nccl_ops;
-#endif  // WITH_CUDA_NCCL
 
 static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
                          void *res) {
@@ -1453,13 +1451,8 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_COMM_OPS:
-#ifdef WITH_CUDA_NCCL
       *((gpuarray_comm_ops**)res) = &nccl_ops;
       return GA_NO_ERROR;
-#else
-      *((void**) res) = NULL;
-      return GA_DEVSUP_ERROR;
-#endif  // WITH_CUDA_NCCL
 
   case GA_CTX_PROP_BIN_ID:
     *((const char **)res) = ctx->bin_id;
