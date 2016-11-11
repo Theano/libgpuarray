@@ -5,9 +5,6 @@
 #include "dyn_load.h"
 #include "gpuarray/error.h"
 
-/* This code is strongly inspired from the dynamic loading code in the
- * samples */
-
 #define DEF_PROC(name, args) t##name *name
 
 #include "libnvrtc.fn"

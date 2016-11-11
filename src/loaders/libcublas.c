@@ -3,8 +3,6 @@
 #include "libcublas.h"
 #include "dyn_load.h"
 #include "gpuarray/error.h"
-/* This code is strongly inspired from the dynamic loading code in the
- * samples */
 
 #define DEF_PROC(name, args) t##name *name
 #define DEF_PROC_V2(name, args) DEF_PROC(name, args)

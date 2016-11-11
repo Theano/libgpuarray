@@ -3,8 +3,7 @@
 #include "libopencl.h"
 #include "dyn_load.h"
 #include "gpuarray/error.h"
-/* This code is strongly inspired from the dynamic loading code in the
- * samples */
+
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
 static char libname[] = "OpenCL.dll";
 #else /* Unix */
