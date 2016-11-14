@@ -1172,6 +1172,11 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     *((char **)res) = s;
     return GA_NO_ERROR;
 
+  case GA_CTX_PROP_PCIBUSID:
+    /* For the moment, PCI Bus ID is not supported for OpenCL. */
+    *((void **)res) = NULL;
+    return GA_DEVSUP_ERROR;
+
   case GA_CTX_PROP_MAXLSIZE:
     ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id),
                                 &id, NULL);

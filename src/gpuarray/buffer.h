@@ -680,6 +680,15 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
  */
 #define GA_CTX_PROP_COMM_OPS  18
 
+/**
+ * Get the device PCI Bus ID for the context.
+ *
+ * \note The returned string is allocated and must be freed by the caller.
+ *
+ * Type: `char *`
+ */
+#define GA_CTX_PROP_PCIBUSID 19
+
 /* Start at 512 for GA_BUFFER_PROP_ */
 #define GA_BUFFER_PROP_START  512
 

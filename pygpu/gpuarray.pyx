@@ -1016,6 +1016,19 @@ cdef class GpuContext:
                 free(tmp)
             return res
 
+    property pcibusid:
+        "Device PCI Bus ID for this context"
+        def __get__(self):
+            cdef char *tmp
+            cdef unicode res
+
+            ctx_property(self, GA_CTX_PROP_PCIBUSID, &tmp)
+            try:
+                res = tmp.decode('ascii')
+            finally:
+                free(tmp)
+            return res
+
     property maxlsize:
         "Maximum size of thread block (local size) for this context"
         def __get__(self):
