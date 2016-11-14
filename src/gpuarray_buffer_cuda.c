@@ -69,7 +69,7 @@ static int setup_lib(void) {
   if (!setup_done) {
     res = load_libcuda();
     if (res != GA_NO_ERROR)
-      return err;
+      return res;
     err = cuInit(0);
     if (err != CUDA_SUCCESS)
       return GA_IMPL_ERROR;
@@ -88,7 +88,7 @@ static int setup_lib(void) {
       return GA_VALUE_ERROR;
     res = load_libnvrtc(major, minor);
     if (res != GA_NO_ERROR)
-      return err;
+      return res;
     setup_done = 1;
   }
   return GA_NO_ERROR;
