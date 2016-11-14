@@ -8,7 +8,11 @@
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
 static char libname[] = "nvcuda.dll";
 #else /* Unix */
+#ifdef __APPLE__
+static char libname[] = "CUDA.framework/CUDA";
+#else
 static char libname[] = "libcuda.so";
+#endif
 #endif
 
 #define DEF_PROC(name, args) t##name *name

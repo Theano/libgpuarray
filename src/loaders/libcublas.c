@@ -41,6 +41,7 @@ int load_libcublas(int major, int minor) {
 
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
   {
+    static const char DIGITS[] = "0123456789";
     char libname[] = "cublas64_??.dll";
 
     libname[9] = DIGITS[major];
@@ -49,7 +50,17 @@ int load_libcublas(int major, int minor) {
     lib = ga_load_library(libname);
   }
 #else /* Unix */
+#ifdef __APPLE__
+  {
+    static const char DIGITS[] = "0123456789";
+    char libname[] = "/Developer/NVIDIA/CUDA-?.?/lib/libcublas.dylib";
+    libname[23] = DIGITS[major];
+    libname[25] = DIGITS[minor];
+    lib = ga_load_library(libname);
+  }
+#else
   lib = ga_load_library("libcublas.so");
+#endif
 #endif
   if (lib == NULL)
     return GA_LOAD_ERROR;

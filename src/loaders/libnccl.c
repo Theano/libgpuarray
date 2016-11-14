@@ -4,17 +4,20 @@
 #include "dyn_load.h"
 #include "gpuarray/error.h"
 
-#if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
-static const char libname[] = "nccl.dll";
-#else /* Unix */
-static const char libname[] = "libnccl.so";
-#endif
-
 #define DEF_PROC(ret, name, args) t##name *name
 
 #include "libnccl.fn"
 
 #undef DEF_PROC
+
+#if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64) || defined(__APPLE__)
+/* As far as we know, nccl is not available or buildable on platforms
+   other than linux */
+int load_libnccl(void) {
+  return GA_UNSUPPORTED_ERROR;
+}
+#else /* Unix */
+static const char libname[] = "libnccl.so";
 
 #define DEF_PROC(ret, name, args)            \
   name = (t##name *)ga_func_ptr(lib, #name); \
@@ -39,3 +42,4 @@ int load_libnccl(void) {
   loaded = 1;
   return GA_NO_ERROR;
 }
+#endif
