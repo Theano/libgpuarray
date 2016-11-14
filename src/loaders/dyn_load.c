@@ -1,15 +1,27 @@
 #include "dyn_load.h"
 
-#ifdef __unix__
+#if defined(__unix__) || defined(__APPLE__)
 
 #include <dlfcn.h>
+#include <stddef.h>
+#include <err.h>
 
 void *ga_load_library(const char *name) {
-  return dlopen(name, RTLD_LAZY|RTLD_LOCAL);
+  void *res = dlopen(name, RTLD_LAZY|RTLD_LOCAL);
+#ifdef DEBUG
+  if (res == NULL)
+    warn("dlopen: %s", name);
+#endif
+  return res;
 }
 
 void *ga_func_ptr(void *h, const char *name) {
-  return dlsym(h, name);
+  void *res = dlsym(h, name);
+#ifdef DEBUG
+  if (res == NULL)
+    warn("dlsym: %s", name);
+#endif
+  return res;
 }
 
 #else
