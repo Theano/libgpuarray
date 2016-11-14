@@ -121,7 +121,7 @@ cl_ctx *cl_make_ctx(cl_context ctx, int flags) {
   int e = 0;
   size_t warp_size;
   int ret;
-  const char dummy_kern[] = "__kernel void kdummy() {}\n";
+  const char dummy_kern[] = "__kernel void kdummy(float f) {}\n";
   strb context_preamble = STRB_STATIC_INIT;
   const char *rlk[1];
   gpukernel *m;
