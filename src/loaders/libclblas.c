@@ -7,7 +7,11 @@
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
 static const char libname[] = "clBLAS.dll";
 #else /* Unix */
+#ifdef __APPLE__
+static const char libname[] = "libclBLAS.dylib";
+#else
 static const char libname[] = "libclBLAS.so";
+#endif
 #endif
 
 #define DEF_PROC(ret, name, args) t##name *name

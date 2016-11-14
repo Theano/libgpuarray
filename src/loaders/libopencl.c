@@ -7,7 +7,11 @@
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
 static char libname[] = "OpenCL.dll";
 #else /* Unix */
+#ifdef __APPLE__
+static char libname[] = "OpenCL.framework/OpenCL";
+#else
 static char libname[] = "libOpenCL.so";
+#endif
 #endif
 
 #define DEF_PROC(ret, name, args) t##name *name

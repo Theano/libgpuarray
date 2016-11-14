@@ -5,9 +5,13 @@
 #include "gpuarray/error.h"
 
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
-static const char libname[] = "clBLAST.dll";
+static const char libname[] = "clblast.dll";
 #else /* Unix */
-static const char libname[] = "libclBLAST.so";
+#ifdef __APPLE__
+static const char libname[] = "libclblast.dylib";
+#else
+static const char libname[] = "libclblast.so";
+#endif
 #endif
 
 #define DEF_PROC(ret, name, args) t##name *name
