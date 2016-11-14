@@ -1,7 +1,7 @@
 #include "private.h"
 #include "private_opencl.h"
 
-#include <clblast_c.h>
+#include "loader/libclblast.h"
 
 #include "gpuarray/buffer_blas.h"
 #include "gpuarray/error.h"
@@ -68,8 +68,8 @@ static int hgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     ARRAY_INIT(B[i]);
     ARRAY_INIT(C[i]);
     err = CLBlastHgemm(convO(order), convT(transA), convT(transB), M, N, K,
-                      (half)alpha, A[i]->buf, offA[i], lda, B[i]->buf, offB[i], ldb,
-                      (half)beta, C[i]->buf, offB[i], ldc, 1, &ctx->q, &ev);
+                       float_to_half(alpha), A[i]->buf, offA[i], lda, B[i]->buf, offB[i], ldb,
+                       float_to_half(beta), C[i]->buf, offB[i], ldc, 1, &ctx->q, &ev);
     if (err != kSuccess)
       return GA_BLAS_ERROR;
     ARRAY_FINI(A[i]);
@@ -205,9 +205,9 @@ static int hgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
   ARRAY_INIT(X);
   ARRAY_INIT(Y);
 
-  err = CLBlastHgemv(convO(order), convT(transA), M, N, (half)alpha,
-                    A->buf, offA, lda, X->buf, offX, incX,
-                    (half)beta, Y->buf, offY, incY, 1, &ctx->q, &ev);
+  err = CLBlastHgemv(convO(order), convT(transA), M, N, float_to_half(alpha),
+                     A->buf, offA, lda, X->buf, offX, incX,
+                     float_to_half(beta), Y->buf, offY, incY, 1, &ctx->q, &ev);
   if (err != kSuccess)
     return GA_BLAS_ERROR;
 
@@ -291,8 +291,8 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   ARRAY_INIT(C);
 
   err = CLBlastHgemm(convO(order), convT(transA), convT(transB), M, N, K,
-                    (half)alpha, A->buf, offA, lda, B->buf, offB, ldb,
-                    (half)beta, C->buf, offC, ldc, 1, &ctx->q, &ev);
+                     float_to_half(alpha), A->buf, offA, lda, B->buf, offB, ldb,
+                     float_to_half(beta), C->buf, offC, ldc, 1, &ctx->q, &ev);
   if (err != kSuccess)
     return GA_BLAS_ERROR;
 
@@ -376,8 +376,8 @@ static int hger(cb_order order, size_t M, size_t N, float alpha,
   ARRAY_INIT(Y);
   ARRAY_INIT(A);
 
-  err = CLBlastHger(convO(order), M, N, (half)alpha, X->buf, offX, incX,
-                   Y->buf, offY, incY, A->buf, offA, lda, 1, &ctx->q, &ev);
+  err = CLBlastHger(convO(order), M, N, float_to_half(alpha), X->buf, offX, incX,
+                    Y->buf, offY, incY, A->buf, offA, lda, 1, &ctx->q, &ev);
   if (err != kSuccess)
     return GA_BLAS_ERROR;
 

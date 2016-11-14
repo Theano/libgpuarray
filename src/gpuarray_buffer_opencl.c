@@ -12,6 +12,9 @@
 #include <string.h>
 #include <limits.h>
 
+#include "loader/libclblas.h"
+#include "loader/libclblast.h"
+
 #ifdef _MSC_VER
 #define strdup _strdup
 #endif
@@ -1126,9 +1129,7 @@ static int cl_transfer(gpudata *dst, size_t dstoff,
 }
 
 extern gpuarray_blas_ops clblas_ops;
-#ifdef WITH_OPENCL_CLBLAST
 extern gpuarray_blas_ops clblast_ops;
-#endif
 
 static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
                        void *res) {
@@ -1255,12 +1256,14 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_BLAS_OPS:
-    *((gpuarray_blas_ops **)res) = &clblas_ops;
-    return GA_NO_ERROR;
-#ifdef WITH_OPENCL_CLBLAST
-    *((gpuarray_blas_ops **)res) = &clblast_ops;
-    return GA_NO_ERROR;
-#endif
+  {
+    int e;
+    if ((e = load_libclblas()) == GA_NO_ERROR)
+      *((gpuarray_blas_ops **)res) = &clblas_ops;
+    if ((e = load_libclblast()) == GA_NO_ERROR)
+      *((gpuarray_blas_ops **)res) = &clblast_ops;
+    return e;
+  }
 
   case GA_CTX_PROP_COMM_OPS:
     // TODO Complete in the future whenif a multi-gpu collectives API for

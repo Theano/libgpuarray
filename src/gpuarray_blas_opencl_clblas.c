@@ -36,8 +36,6 @@ static int setup(gpucontext *ctx) {
   clblasStatus err;
 
   if (refcnt == 0) {
-    GA_CHECK(load_libclblas());
-
     err = clblasSetup();
     if (err != clblasSuccess)
       return GA_BLAS_ERROR;
