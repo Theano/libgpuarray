@@ -23,6 +23,8 @@ typedef signed __int32 cl_int;
 typedef unsigned __int32 cl_uint;
 typedef signed __int64 cl_long;
 typedef unsigned __int64 cl_ulong;
+
+typedef unsigned __int16 cl_half;
 typedef float cl_float;
 typedef double cl_double;
 #else
@@ -31,6 +33,8 @@ typedef int32_t cl_int __attribute__((aligned(4)));
 typedef uint32_t cl_uint __attribute__((aligned(4)));
 typedef int64_t cl_long __attribute__((aligned(8)));
 typedef uint64_t cl_ulong __attribute__((aligned(8)));
+
+typedef uint16_t cl_half __attribute__((aligned(2)));
 typedef float cl_float __attribute__((aligned(4)));
 typedef double cl_double __attribute__((aligned(8)));
 #endif

@@ -5,7 +5,7 @@
 
 typedef enum Layout_ {
   kRowMajor = 101,
-  kColumnMajor = 102
+  kColMajor = 102
 } Layout;
 
 typedef enum Transpose_ {

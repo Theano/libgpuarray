@@ -53,6 +53,7 @@ gpuarray_blas_cuda_cublas.c
 gpuarray_collectives_cuda_nccl.c
 gpuarray_buffer_opencl.c
 gpuarray_blas_opencl_clblas.c
+gpuarray_blas_opencl_clblast.c
 )
 
 check_function_exists(strlcat HAVE_STRL)

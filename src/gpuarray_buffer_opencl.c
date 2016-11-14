@@ -12,8 +12,8 @@
 #include <string.h>
 #include <limits.h>
 
-#include "loader/libclblas.h"
-#include "loader/libclblast.h"
+#include "loaders/libclblas.h"
+#include "loaders/libclblast.h"
 
 #ifdef _MSC_VER
 #define strdup _strdup

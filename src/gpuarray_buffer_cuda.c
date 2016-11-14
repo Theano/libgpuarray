@@ -75,7 +75,7 @@ static int setup_lib(void) {
       return GA_IMPL_ERROR;
     ver = getenv("GPUARRAY_CUDA_VERSION");
     if (ver == NULL || strlen(ver) != 2) {
-      err = gcuDriverGetVersion(&tmp);
+      err = cuDriverGetVersion(&tmp);
       if (err != CUDA_SUCCESS)
         return GA_IMPL_ERROR;
       major = tmp / 1000;

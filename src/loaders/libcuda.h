@@ -28,6 +28,13 @@ typedef enum CUdevice_attribute_enum CUdevice_attribute;
 typedef enum CUfunction_attribute_enum CUfunction_attribute;
 typedef enum CUevent_flags_enum CUevent_flags;
 typedef enum CUctx_flags_enum CUctx_flags;
+typedef enum CUipcMem_flags_enum CUipcMem_flags;
+
+#define CU_IPC_HANDLE_SIZE 64
+
+typedef struct CUipcMemHandle_st {
+  char reserved[CU_IPC_HANDLE_SIZE];
+} CUipcMemHandle;
 
 int load_libcuda(void);
 
@@ -171,6 +178,10 @@ enum CUctx_flags_enum {
   CU_CTX_SCHED_BLOCKING_SYNC = 0x04,
   CU_CTX_BLOCKING_SYNC       = 0x04,
   CU_CTX_MAP_HOST            = 0x08,
+};
+
+enum CUipcMem_flags_enum {
+  CU_IPC_MEM_LAZY_ENABLE_PEER_ACCESS = 0x1
 };
 
 #endif

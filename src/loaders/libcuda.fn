@@ -6,6 +6,7 @@ DEF_PROC(cuDeviceGet, (CUdevice *device, int ordinal));
 DEF_PROC(cuDeviceGetCount, (int *count));
 DEF_PROC(cuDeviceGetName, (char *name, int len, CUdevice dev));
 DEF_PROC(cuDeviceGetAttribute, (int *pi, CUdevice_attribute attrib, CUdevice dev));
+DEF_PROC(cuDeviceGetPCIBusId, (char *pciBusId, int len, CUdevice dev));
 
 DEF_PROC(cuDevicePrimaryCtxGetState, (CUdevice dev, unsigned int *flags, int *active));
 DEF_PROC(cuDevicePrimaryCtxSetFlags, (CUdevice dev, unsigned int flags));
@@ -46,3 +47,7 @@ DEF_PROC(cuStreamCreate, (CUstream *phStream, unsigned int Flags));
 DEF_PROC(cuStreamWaitEvent, (CUstream hStream, CUevent hEvent, unsigned int Flags));
 DEF_PROC(cuStreamSynchronize, (CUstream hStream));
 DEF_PROC_V2(cuStreamDestroy, (CUstream hStream));
+
+DEF_PROC(cuIpcGetMemHandle, (CUipcMemHandle *pHandle, CUdeviceptr dptr));
+DEF_PROC(cuIpcOpenMemHandle, (CUdeviceptr *pdptr, CUipcMemHandle handle, unsigned int Flags));
+DEF_PROC(cuIpcCloseMemHandle, (CUdeviceptr dptr));
