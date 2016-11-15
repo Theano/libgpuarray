@@ -176,7 +176,7 @@ int      gaIFLGetFactorPower(const ga_factor_list* fl, uint64_t f);
 
 /**
  * @brief Compute the product of the factors stored in the factors list.
- * 
+ *
  * NB: This function may return an overflowed result. To detect if it will,
  *     please call gaIFLIsOverflowed(fl).
  */
@@ -203,7 +203,7 @@ uint64_t gaIFLGetSmallestFactor(const ga_factor_list* fl);
 
 /**
  * @brief Print out the factor list in a human-readable form, sprintf()-style.
- * 
+ *
  * @param [out] str   A string into which to print out the factor list. If the
  *                    factor list is a result of gaIFactorize(), then the
  *                    maximum length of buffer required is 128 bytes.
@@ -275,4 +275,3 @@ void     gaISchedule  (const int       n,
 
 /* End Include Guards */
 #endif
-
