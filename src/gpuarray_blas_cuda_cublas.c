@@ -176,7 +176,7 @@ static int setup(gpucontext *c) {
   if (ctx->blas_handle != NULL)
     return GA_NO_ERROR;
 
-  e = load_libcublas(ctx->minor, ctx->major);
+  e = load_libcublas(ctx->major, ctx->minor);
   if (e != GA_NO_ERROR)
     return e;
 
