@@ -25,7 +25,9 @@ void *ga_func_ptr(void *h, const char *name) {
 }
 
 #else
+
 /* Should be windows */
+#include <windows.h>
 
 void *ga_load_library(const char *name) {
   return LoadLibrary(name);

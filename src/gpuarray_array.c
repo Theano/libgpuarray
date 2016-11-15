@@ -5,14 +5,12 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <stddef.h>
-#if _MSC_VER < 1600
-#include <stdint.h>
-#endif
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 
 #include "private.h"
+#include "gpuarray/config.h"
 #include "gpuarray/array.h"
 #include "gpuarray/error.h"
 #include "gpuarray/kernel.h"

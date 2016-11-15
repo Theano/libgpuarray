@@ -265,25 +265,25 @@ GPUARRAY_LOCAL void gpukernel_source_with_line_numbers(unsigned int count,
                                                        strb *src);
 
 static inline uint16_t float_to_half(float value) {
-  static const int shift = 13;
-  static const int shiftSign = 16;
+#define ga__shift 13
+#define ga__shiftSign 16
 
-  static const int32_t infN = 0x7F800000; // flt32 infinity
-  static const int32_t maxN = 0x477FE000; // max flt16 normal as a flt32
-  static const int32_t minN = 0x38800000; // min flt16 normal as a flt32
-  static const int32_t signN = 0x80000000; // flt32 sign bit
+#define ga__infN 0x7F800000  // flt32 infinity
+#define ga__maxN 0x477FE000 // max flt16 normal as a flt32
+#define ga__minN 0x38800000 // min flt16 normal as a flt32
+#define ga__signN 0x80000000 // flt32 sign bit
 
-  static const int32_t infC = infN >> shift;
-  static const int32_t nanN = (infC + 1) << shift; // minimum flt16 nan as a flt32
-  static const int32_t maxC = maxN >> shift;
-  static const int32_t minC = minN >> shift;
+#define ga__infC (ga__infN >> ga__shift)
+#define ga__nanN ((ga__infC + 1) << ga__shift) // minimum flt16 nan as a flt32
+#define ga__maxC (ga__maxN >> ga__shift)
+#define ga__minC (ga__minN >> ga__shift)
 
-  static const int32_t mulN = 0x52000000; // (1 << 23) / minN
+#define ga__mulN 0x52000000 // (1 << 23) / minN
 
-  static const int32_t subC = 0x003FF; // max flt32 subnormal down shifted
+#define ga__subC 0x003FF // max flt32 subnormal down shifted
 
-  static const int32_t maxD = infC - maxC - 1;
-  static const int32_t minD = minC - subC - 1;
+#define ga__maxD (ga__infC - ga__maxC - 1)
+#define ga__minD (ga__minC - ga__subC - 1)
 
   union {
     float f;
@@ -294,18 +294,38 @@ static inline uint16_t float_to_half(float value) {
   uint32_t sign;
 
   v.f = value;
-  sign = v.si & signN;
+  sign = v.si & ga__signN;
   v.si ^= sign;
-  sign >>= shiftSign; // logical shift
-  s.si = mulN;
-  s.si = s.f * v.f; // correct subnormals
-  v.si ^= (s.si ^ v.si) & -(minN > v.si);
-  v.si ^= (infN ^ v.si) & -((infN > v.si) & (v.si > maxN));
-  v.si ^= (nanN ^ v.si) & -((nanN > v.si) & (v.si > infN));
-  v.ui >>= shift; // logical shift
-  v.si ^= ((v.si - maxD) ^ v.si) & -(v.si > maxC);
-  v.si ^= ((v.si - minD) ^ v.si) & -(v.si > subC);
-  return v.ui | sign;
+  sign >>= ga__shiftSign; // logical shift
+  s.si = ga__mulN;
+  s.si = (int32_t)(s.f * v.f); // correct subnormals
+  v.si ^= (s.si ^ v.si) & -(ga__minN > v.si);
+  v.si ^= (ga__infN ^ v.si) & -((ga__infN > v.si) & (v.si > ga__maxN));
+  v.si ^= (ga__nanN ^ v.si) & -((ga__nanN > v.si) & (v.si > ga__infN));
+  v.ui >>= ga__shift; // logical shift
+  v.si ^= ((v.si - ga__maxD) ^ v.si) & -(v.si > ga__maxC);
+  v.si ^= ((v.si - ga__minD) ^ v.si) & -(v.si > ga__subC);
+  return (uint16_t)(v.ui | sign);
+
+#undef ga__shift
+#undef ga__shiftSign
+
+#undef ga__infN
+#undef ga__maxN
+#undef ga__minN
+#undef ga__signN
+
+#undef ga__infC
+#undef ga__nanN
+#undef ga__maxC
+#undef ga__minC
+
+#undef ga__mulN
+
+#undef ga__subC
+
+#undef ga__maxD
+#undef ga__minD
 }
 
 #define ISSET(v, fl) ((v) & (fl))

@@ -5,7 +5,7 @@
 
 /* Includes */
 #include <stdio.h>
-#include <stdint.h>
+#include "gpuarray/config.h"
 
 #include "util/strb.h"
 
