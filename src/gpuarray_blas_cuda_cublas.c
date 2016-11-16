@@ -197,7 +197,6 @@ static int setup(gpucontext *c) {
   }
 
   cublasSetPointerMode(handle->h, CUBLAS_POINTER_MODE_HOST);
-  cublasSetAtomicsMode(handle->h, CUBLAS_ATOMICS_ALLOWED);
 
   types[0] = GA_BUFFER;
   types[1] = GA_SIZE;
