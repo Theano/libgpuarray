@@ -4,7 +4,7 @@ from .dtypes import dtype_to_ctype, get_common_dtype
 from . import gpuarray
 from ._elemwise import GpuElemwise, arg
 
-__all__ = ['GpuElemwise', 'elemwise1', 'elemwise2', 'ielemwise2', 'compare']
+__all__ = ['GpuElemwise', 'elemwise1', 'elemwise2', 'ielemwise2', 'compare', 'BroadcastError']
 
 
 def _dtype(o):
@@ -76,11 +76,28 @@ def elemwise2(a, op, b, ary, odtype=None, oper=None,
     k(res, a, b, broadcast=broadcast)
     return res
 
+class BroadcastError(ValueError):
+    pass
 
 def ielemwise2(a, op, b, oper=None, op_tmpl="a = a %(op)s b",
                broadcast=False, convert_f16=True):
     if not isinstance(b, gpuarray.GpuArray):
         b = numpy.asarray(b)
+
+    # We don't want to broadcast the output (a).
+    # So we raise an exception in any case when 
+    # a could potentially be broadcasted to b.
+    if broadcast:
+        if a.ndim < b.ndim:
+            raise BroadcastError("output has less dimensions "
+                                 "than input (%d vs %d)" %
+                                 (a.ndim, b.ndim))
+        elif a.ndim == b.ndim:
+            for i in range(a.ndim):
+                if a.shape[i] < b.shape[i]:
+                    raise BroadcastError("The dimension %d/%d in output is "
+                                    "smaller than the corresponding one "
+                                    "in input" % (i+1, a.ndim))
 
     a_arg = as_argument(a, 'a', read=True, write=True)
     b_arg = as_argument(b, 'b', read=True)

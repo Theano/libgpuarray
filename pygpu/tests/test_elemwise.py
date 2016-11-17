@@ -2,6 +2,7 @@ import operator
 import numpy
 
 from pygpu import gpuarray, ndgpuarray as elemary
+from pygpu.elemwise import BroadcastError
 
 from six import PY2
 
@@ -59,6 +60,39 @@ def test_ielemwise2_ops_array():
                 yield ielemwise2_ops_array, op, dtype1, dtype2, (50,)
 
 
+def test_ielemwise2_output_broadcast():
+    for shapea, shapeb in [((2, 5), (3, 2, 5)),
+                           ((1, 4), (6, 4)),
+                           ((2, 1, 8, 7), (2, 2, 8, 7))]:
+        yield ielemwise2_output_broadcast_should_fail, shapea, shapeb
+    for shapea, shapeb in [((2, 5),(2, 5)),
+                           ((6, 4),(1, 4)),
+                           ((2, 2, 8, 7), (2, 1, 8, 7))]:
+        yield ielemwise2_output_broadcast_should_pass, shapea, shapeb
+
+
+def ielemwise2_output_broadcast_should_fail(shapea, shapeb):
+    try:
+        ielemwise2_output_broadcast(shapea, shapeb)
+    except BroadcastError:
+        pass
+    except Exception as e:
+        # We must have a BroadcastError first, nothing else.
+        raise Exception("ielemwise2 should raise a BroadcastError "
+                        "with shapes %s and %s." % (shapea, shapeb))
+    else:
+        # We must have a BroadcastError, otherwise something's wrong.
+        raise Exception("ielemwise2 should raise a BroadcastError "
+                        "with shapes %s and %s." % (shapea, shapeb))
+
+def ielemwise2_output_broadcast_should_pass(shapea, shapeb):
+    try:
+        ielemwise2_output_broadcast(shapea, shapeb)
+    except Exception:
+        print ("Exception raised with shapes:", shapea, shapeb)
+        raise
+
+
 @guard_devsup
 def elemwise2_ops_array(op, dtype1, dtype2, shape):
     ac, ag = gen_gpuarray(shape, dtype1, ctx=context, cls=elemary)
@@ -93,6 +127,19 @@ def ielemwise2_ops_array(op, dtype1, dtype2, shape):
 
     assert out_g is ag
     assert numpy.allclose(out_c, numpy.asarray(out_g), atol=1e-6)
+
+
+@guard_devsup
+def ielemwise2_output_broadcast(shapea, shapeb):
+    na, ga = gen_gpuarray(shapea, ctx=context, cls=elemary)
+    nb, gb = gen_gpuarray(shapeb, ctx=context, cls=elemary)
+    out_g = operator.iadd(ga, gb)
+    try:
+        out_n = operator.iadd(na, nb)
+    except TypeError:
+        return
+    assert out_g is ga
+    assert numpy.allclose(out_n, numpy.asarray(out_g), atol=1e-6)
 
 
 def test_elemwise_f16():
