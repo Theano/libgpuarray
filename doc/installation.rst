@@ -6,7 +6,7 @@ frequently, on Windows.  The OS most frequently tested are:
 
  - Debian 6
  - Ubuntu 16.04
- - Mac OS X 10.12
+ - macOS 10.12
  - Windows 7
 
 It should also work on any decently recent OS not listed here. If you
@@ -124,8 +124,9 @@ can also reboot the machine to do that.
 Mac-specific instructions
 -------------------------
 
-The only supported compile is the clang version that comes with Xcode.
-Select the appropriate version of Xcode for you version of macOS.
+The only supported compiler is the clang version that comes with
+Xcode.  Select the appropriate version of Xcode for you version of
+macOS.
 
 It might be possible to use a version of gcc built using Homebrew or
 MacPorts, but this is untested and unsupported.
