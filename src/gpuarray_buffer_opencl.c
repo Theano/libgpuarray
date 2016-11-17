@@ -132,18 +132,18 @@ cl_ctx *cl_make_ctx(cl_context ctx, int flags) {
   id = get_dev(ctx, NULL);
   if (id == NULL) return NULL;
   err = clGetDeviceInfo(id, CL_DEVICE_QUEUE_PROPERTIES, sizeof(qprop),
-                         &qprop, NULL);
+                        &qprop, NULL);
   if (err != CL_SUCCESS) return NULL;
 
   err = clGetDeviceInfo(id, CL_DEVICE_VENDOR, sizeof(vendor), vendor, NULL);
   if (err != CL_SUCCESS)
     return NULL;
   err = clGetDeviceInfo(id, CL_DEVICE_VENDOR_ID, sizeof(vendor_id), &vendor_id,
-                         NULL);
+                        NULL);
   if (err != CL_SUCCESS)
     return NULL;
   err = clGetDeviceInfo(id, CL_DRIVER_VERSION, sizeof(driver_version),
-                         driver_version, NULL);
+                        driver_version, NULL);
   if (err != CL_SUCCESS)
     return NULL;
 
@@ -242,7 +242,7 @@ gpudata *cl_make_buf(gpucontext *c, cl_mem buf) {
 
   ASSERT_CTX(ctx);
   ctx->err = clGetMemObjectInfo(buf, CL_MEM_CONTEXT, sizeof(buf_ctx),
-                                 &buf_ctx, NULL);
+                                &buf_ctx, NULL);
   if (ctx->err != CL_SUCCESS) return NULL;
   if (buf_ctx != ctx->ctx) return NULL;
 
