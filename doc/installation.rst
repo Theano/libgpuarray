@@ -5,41 +5,40 @@ The library is routinely tested on OS X and linux and, less
 frequently, on Windows.  The OS most frequently tested are:
 
  - Debian 6
- - Ubuntu 14.04
- - Mac OS X 10.11
+ - Ubuntu 16.04
+ - macOS 10.12
  - Windows 7
 
 It should also work on any decently recent OS not listed here. If you
 get an error during the build on your favorite OS, please report it
 and we will attempt to fix it.
 
-Requirements
-------------
+Build Requirements
+------------------
 
  - cmake >= 3.0 (cmake_).
  - a c99-compliant compiler (or MSVC if on windows).
- - (optional) CUDA >= 6.5 (cuda_).
- - (optional) NVIDIA NCCL (nccl_).
- - (optional) OpenCL runtime.
- - (optional) clBLAS (clblas_).
  - (optional) libcheck (check_) to run the C tests.
  - (optional) python (python_) for the python bindings.
  - (optional) mako (mako_) for development or running the python bindings.
  - (optional) Cython >= 0.21 (cython_) for the python bindings.
  - (optional) nosetests (nosetests_) to run the python tests.
 
-.. note::
-   If you have neither an OpenCL runtime or a CUDA runtime, the
-   library might still build, but will be rather useless.
+Run Requirements
+----------------
 
-.. note::
-   We support CUDA GPUs with `compute capability 2.0 (Fermi)
-   <https://developer.nvidia.com/cuda-gpus>`_ and up.
+No matter what was available at build time, this library comes with
+dynamic loaders for the following library.  You don't need to have any
+of this available, but you won't be able to use associated
+functionality.
 
-.. note::
-  In the case you want to build with collective operation support for CUDA,
-  you will need CUDA GPUs with `compute capability 3.0 (Kepler)
-  <https://developer.nvidia.com/cuda-gpus>`_ and up plus CUDA >= 7.
+ * For CUDA:
+   - CUDA (cuda_) version 7.0 or more, with the appropriate driver
+   - (optional) NCCL (nccl_) for the collectives interface
+
+ * For OpenCL:
+  - OpenCL version 1.1 or more
+  - (optional) clBLAS (_clblas) or CLBlast (_clblast) for blas functionality
 
 Download
 --------
@@ -125,18 +124,9 @@ can also reboot the machine to do that.
 Mac-specific instructions
 -------------------------
 
-To get the compiler you need to install Xcode which is available for
-free from the App Store.  Don't forget to install the command-line
-tools afterwards.
-
-On Xcode 4.x these are installed by going to the download tab of the
-preferences window and selecting the "Command-line Tools" download.
-
-If you have Xcode 5, ensure you update to 5.0.2 or later.  Prior
-versions will not look in /usr/local for includes or libraries and
-this will cause a lot of errors.  You can update by using the
-"Software Update..." function of the Apple menu or by running
-'xcode-select --install' on the command line.
+The only supported compiler is the clang version that comes with
+Xcode.  Select the appropriate version of Xcode for you version of
+macOS.
 
 It might be possible to use a version of gcc built using Homebrew or
 MacPorts, but this is untested and unsupported.
@@ -177,9 +167,8 @@ Running Tests
    everything is ok even if you intend on just using the C library.
 
 To run the C tests, enter the build directory (the one where you ran
-cmake) and run 'make test'.  It will run using the first OpenCL and
-the first CUDA device it finds skipping these if the corresponding
-backend wasn't built.
+cmake), select a target device by exporting DEVICE (or
+GPUARRAY_TEST_DEVICE) and run 'make test'.
 
 If you get an error message similar to this one:
 
@@ -214,6 +203,8 @@ you can confirm which device it is running on.
 .. _cmake: http://cmake.org/
 
 .. _clblas: https://github.com/clMathLibraries/clBLAS
+
+.. _clblast: https://github.com/CNugteren/CLBlast
 
 .. _cuda: https://developer.nvidia.com/category/zone/cuda-zone
 

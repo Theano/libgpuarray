@@ -1,11 +1,7 @@
 #ifndef _PRIVATE_CUDA_H
 #define _PRIVATE_CUDA_H
 
-#ifdef __APPLE__
-#include <CUDA/cuda.h>
-#else
-#include <cuda.h>
-#endif
+#include "loaders/libcuda.h"
 
 #include <cache.h>
 
@@ -73,6 +69,8 @@ typedef struct _cuda_context {
   gpudata *freeblocks;
   cache *kernel_cache;
   unsigned int enter;
+  unsigned char major;
+  unsigned char minor;
 } cuda_context;
 
 STATIC_ASSERT(sizeof(cuda_context) <= sizeof(gpucontext),
@@ -93,11 +91,7 @@ STATIC_ASSERT(sizeof(cuda_context) <= sizeof(gpucontext),
  * flag.
  */
 
-#ifdef WITH_NVRTC
 #define ARCH_PREFIX "compute_"
-#else
-#define ARCH_PREFIX "sm_"
-#endif
 
 GPUARRAY_LOCAL cuda_context *cuda_make_ctx(CUcontext ctx, int flags);
 GPUARRAY_LOCAL CUstream cuda_get_stream(cuda_context *ctx);

@@ -2,7 +2,7 @@
 #include <limits.h>
 #include <stdlib.h>
 
-#include <nccl.h>
+#include "loaders/libnccl.h"
 
 #include "gpuarray/buffer_collectives.h"
 #include "gpuarray/config.h"
@@ -59,6 +59,19 @@ struct _gpucomm {
 #endif
 };
 
+static int setup_done = 0;
+
+static int setup_lib(void) {
+  int err;
+  if (setup_done)
+    return GA_NO_ERROR;
+  err = load_libnccl();
+  if (err != GA_NO_ERROR)
+    return err;
+  setup_done = 1;
+  return GA_NO_ERROR;
+}
+
 /**
  * \brief Helper function to dereference a `comm`'s context and free memory
  */
@@ -77,6 +90,9 @@ static int comm_new(gpucomm** comm_ptr, gpucontext* ctx,
   ncclResult_t nccl_err;
 
   ASSERT_CTX(ctx);
+
+  GA_CHECK(setup_lib());
+
   comm = calloc(1, sizeof(*comm));  // Allocate memory
   if (comm == NULL) {
     *comm_ptr = NULL;  // Set to NULL if failed
@@ -115,6 +131,8 @@ static void comm_free(gpucomm* comm) {
  */
 static int generate_clique_id(gpucontext* c, gpucommCliqueId* comm_id) {
   ASSERT_CTX(c);
+
+  GA_CHECK(setup_lib());
   NCCL_CHKFAIL(c, ncclGetUniqueId((ncclUniqueId*)comm_id));
 }
 

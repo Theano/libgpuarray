@@ -2,6 +2,7 @@
 
 #include "private.h"
 #include "private_cuda.h"
+#include "loaders/libnvrtc.h"
 
 #include <sys/types.h>
 
@@ -28,12 +29,14 @@ STATIC_ASSERT(sizeof(GpuArrayIpcMemHandle) == sizeof(CUipcMemHandle), cuda_ipcme
 /* Allocations will be made in blocks of at least this size */
 #define BLOCK_SIZE (4 * 1024 * 1024)
 
-/* No returned allocations will be smaller than this size.
-   Also, they will be aligned to this size. */
+/* No returned allocations will be smaller than this size.  Also, they
+ * will be aligned to this size.
+ *
+ * Some libraries depend on this value and will crash if it's smaller.
+ */
 #define FRAG_SIZE (64)
 
 static CUresult err;
-static int init_done = 0;
 
 GPUARRAY_LOCAL const gpuarray_buffer_ops cuda_ops;
 
@@ -57,6 +60,40 @@ static uint32_t strb_hash(void *_k) {
   return XXH32(k->s, k->l, 42);
 }
 
+static int setup_done = 0;
+static int major = -1;
+static int minor = -1;
+static int setup_lib(void) {
+  int res, tmp;
+  const char *ver;
+  if (!setup_done) {
+    res = load_libcuda();
+    if (res != GA_NO_ERROR)
+      return res;
+    err = cuInit(0);
+    if (err != CUDA_SUCCESS)
+      return GA_IMPL_ERROR;
+    ver = getenv("GPUARRAY_CUDA_VERSION");
+    if (ver == NULL || strlen(ver) != 2) {
+      err = cuDriverGetVersion(&tmp);
+      if (err != CUDA_SUCCESS)
+        return GA_IMPL_ERROR;
+      major = tmp / 1000;
+      minor = (tmp / 10) % 10;
+    } else {
+      major = ver[0] - '0';
+      minor = ver[1] - '0';
+    }
+    if (major > 9 || major < 0 || minor > 9 || minor < 0)
+      return GA_VALUE_ERROR;
+    res = load_libnvrtc(major, minor);
+    if (res != GA_NO_ERROR)
+      return res;
+    setup_done = 1;
+  }
+  return GA_NO_ERROR;
+}
+
 static int cuda_get_platform_count(unsigned int* platcount) {
   *platcount = 1;  // CUDA works on NVIDIA's GPUs
   return GA_NO_ERROR;
@@ -66,12 +103,7 @@ static int cuda_get_device_count(unsigned int platform,
                                  unsigned int* devcount) {
   int dv;
   // platform number gets ignored in CUDA implementation
-  if (!init_done) {
-    err = cuInit(0);
-    if (err != CUDA_SUCCESS)
-      return GA_IMPL_ERROR;
-    init_done = 1;
-  }
+  GA_CHECK(setup_lib());
   err = cuDeviceGetCount(&dv);
   if (err != CUDA_SUCCESS)
     return GA_IMPL_ERROR;
@@ -82,6 +114,11 @@ static int cuda_get_device_count(unsigned int platform,
 cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   cuda_context *res;
   void *p;
+  int e;
+
+  e = setup_lib();
+  if (e != GA_NO_ERROR)
+    return NULL;
 
   res = calloc(1, sizeof(*res));
   if (res == NULL)
@@ -92,6 +129,8 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   res->refcnt = 1;
   res->flags = flags;
   res->enter = 0;
+  res->major = major;
+  res->minor = minor;
   res->freeblocks = NULL;
   if (detect_arch(ARCH_PREFIX, res->bin_id, &err)) {
     goto fail_stream;
@@ -150,17 +189,15 @@ static void deallocate(gpudata *);
 static void cuda_free_ctx(cuda_context *ctx) {
   gpuarray_blas_ops *blas_ops;
   gpudata *next, *curr;
-#if CUDA_VERSION >= 7000
   CUdevice dev;
-#endif
 
   ASSERT_CTX(ctx);
   ctx->refcnt--;
   if (ctx->refcnt == 0) {
     assert(ctx->enter == 0 && "Context was active when freed!");
     if (ctx->blas_handle != NULL) {
-      ctx->err = cuda_property((gpucontext *)ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS,
-                               &blas_ops);
+      cuda_property((gpucontext *)ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS,
+                    &blas_ops);
       blas_ops->teardown((gpucontext *)ctx);
     }
     cuMemFreeHost((void *)ctx->errbuf->ptr);
@@ -179,14 +216,10 @@ static void cuda_free_ctx(cuda_context *ctx) {
     cache_destroy(ctx->kernel_cache);
 
     if (!(ctx->flags & DONTFREE)) {
-#if CUDA_VERSION < 7000
-      cuCtxDestroy(ctx->ctx);
-#else
       cuCtxPushCurrent(ctx->ctx);
       cuCtxGetDevice(&dev);
       cuCtxPopCurrent(NULL);
       cuDevicePrimaryCtxRelease(dev);
-#endif
     }
     CLEAR(ctx);
     free(ctx);
@@ -324,10 +357,8 @@ static cuda_context *do_init(CUdevice dev, int flags, int *ret) {
     cuda_context *res;
     CUcontext ctx;
     unsigned int fl = CU_CTX_SCHED_AUTO;
-#if CUDA_VERSION >= 7000
     unsigned int cur_fl;
     int act;
-#endif
     int i;
 
     CHKFAIL(NULL);
@@ -339,10 +370,6 @@ static cuda_context *do_init(CUdevice dev, int flags, int *ret) {
     CHKFAIL(NULL);
     if (i != 1)
       FAIL(NULL, GA_UNSUPPORTED_ERROR);
-#if CUDA_VERSION < 7000
-    err = cuCtxCreate(&ctx, fl, dev);
-    CHKFAIL(NULL);
-#else
     err = cuDevicePrimaryCtxGetState(dev, &cur_fl, &act);
     CHKFAIL(NULL);
     if (act == 1) {
@@ -356,14 +383,9 @@ static cuda_context *do_init(CUdevice dev, int flags, int *ret) {
     CHKFAIL(NULL);
     err = cuCtxPushCurrent(ctx);
     CHKFAIL(NULL);
-#endif
     res = cuda_make_ctx(ctx, flags);
     if (res == NULL) {
-#if CUDA_VERSION < 7000
-      cuCtxDestroy(ctx);
-#else
       cuDevicePrimaryCtxRelease(dev);
-#endif
       FAIL(NULL, GA_IMPL_ERROR);
     }
     /* Don't leave the context on the thread stack */
@@ -374,12 +396,11 @@ static cuda_context *do_init(CUdevice dev, int flags, int *ret) {
 static gpucontext *cuda_init(int ord, int flags, int *ret) {
     CUdevice dev;
     cuda_context *res;
+    int r;
 
-    if (!init_done) {
-      err = cuInit(0);
-      CHKFAIL(NULL);
-      init_done = 1;
-    }
+    r = setup_lib();
+    if (r != GA_NO_ERROR)
+      return NULL;
 
     if (ord == -1) {
       int i, c;
@@ -846,9 +867,6 @@ static int cuda_memset(gpudata *dst, size_t dstoff, int data) {
 }
 
 static CUresult get_cc(CUdevice dev, int *maj, int *min) {
-#if CUDA_VERSION < 6500
-  return cuDeviceComputeCapability(maj, min, dev);
-#else
   CUresult lerr;
   lerr = cuDeviceGetAttribute(maj,
                               CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
@@ -858,7 +876,6 @@ static CUresult get_cc(CUdevice dev, int *maj, int *min) {
   return cuDeviceGetAttribute(min,
                               CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
                               dev);
-#endif
 }
 
 static int detect_arch(const char *prefix, char *ret, CUresult *err) {
@@ -874,10 +891,6 @@ static int detect_arch(const char *prefix, char *ret, CUresult *err) {
   if (res == -1 || res > (ssize_t)sz) return GA_UNSUPPORTED_ERROR;
   return GA_NO_ERROR;
 }
-
-#ifdef WITH_NVRTC
-
-#include <nvrtc.h>
 
 static void *call_compiler(const char *src, size_t len, const char *arch_arg,
                            size_t *bin_len, char **log, size_t *log_len,
@@ -940,165 +953,6 @@ end:
   return buf;
 }
 
-#else /* WITH_NVRTC */
-
-#include <sys/stat.h>
-
-#include <fcntl.h>
-#include <limits.h>
-
-#ifdef _WIN32
-#include <process.h>
-/* I am really tired of hunting through online docs
- * to find where the define is.  256 seem to be the
- * consensus for the value so there it is.
- */
-#define PATH_MAX 256
-#else
-#include <sys/param.h>
-#include <sys/wait.h>
-#endif
-
-#ifdef _MSC_VER
-#include <io.h>
-#define read _read
-#define write _write
-#define close _close
-#define unlink _unlink
-#define fstat _fstat
-#define open _open
-#else
-#include <unistd.h>
-#endif
-
-static const char *TMP_VAR_NAMES[] = {"GPUARRAY_TMPDIR", "TMPDIR", "TMP",
-                                      "TEMP", "USERPROFILE"};
-
-
-static void *call_compiler(const char *src, size_t len, const char *arch_arg,
-                           size_t *bin_len, char **log, size_t *log_len,
-                           int *ret) {
-    char namebuf[PATH_MAX];
-    char outbuf[PATH_MAX];
-    char *tmpdir;
-    struct stat st;
-    ssize_t s;
-#ifndef _WIN32
-    pid_t p;
-#endif
-    unsigned int i;
-    int sys_err;
-    int fd;
-    char *buf;
-
-    for (i = 0; i < sizeof(TMP_VAR_NAMES)/sizeof(TMP_VAR_NAMES[0]); i++) {
-        tmpdir = getenv(TMP_VAR_NAMES[i]);
-        if (tmpdir != NULL) break;
-    }
-    if (tmpdir == NULL) {
-#ifdef _WIN32
-      tmpdir = ".";
-#else
-      tmpdir = "/tmp";
-#endif
-    }
-
-    strlcpy(namebuf, tmpdir, sizeof(namebuf));
-    strlcat(namebuf, "/gpuarray.cuda.XXXXXXXX", sizeof(namebuf));
-
-    fd = mkstemp(namebuf);
-    if (fd == -1) FAIL(NULL, GA_SYS_ERROR);
-
-    strlcpy(outbuf, namebuf, sizeof(outbuf));
-    strlcat(outbuf, ".cubin", sizeof(outbuf));
-
-    /* Don't want to write the final NUL */
-    s = write(fd, src, len-1);
-    close(fd);
-    /* fd is not non-blocking; should have complete write */
-    if (s == -1) {
-        unlink(namebuf);
-        FAIL(NULL, GA_SYS_ERROR);
-    }
-
-    /* This block executes nvcc on the written-out file */
-#ifdef DEBUG
-#define NVCC_ARGS NVCC_BIN, "-g", "-G", "-arch", arch_arg, "-x", "cu", \
-      "--cubin", namebuf, "-o", outbuf
-#else
-#define NVCC_ARGS NVCC_BIN, "-arch", arch_arg, "-x", "cu", \
-      "--cubin", namebuf, "-o", outbuf
-#endif
-#ifdef _WIN32
-    sys_err = _spawnl(_P_WAIT, NVCC_BIN, NVCC_ARGS, NULL);
-    unlink(namebuf);
-    if (sys_err == -1) FAIL(NULL, GA_SYS_ERROR);
-    if (sys_err != 0) FAIL(NULL, GA_RUN_ERROR);
-#else
-    p = fork();
-    if (p == 0) {
-        execl(NVCC_BIN, NVCC_ARGS, NULL);
-        exit(1);
-    }
-    if (p == -1) {
-        unlink(namebuf);
-        FAIL(NULL, GA_SYS_ERROR);
-    }
-
-    /* We need to wait until after the waitpid for the unlink because otherwise
-       we might delete the input file before nvcc is finished with it. */
-    if (waitpid(p, &sys_err, 0) == -1) {
-        unlink(namebuf);
-        unlink(outbuf);
-        FAIL(NULL, GA_SYS_ERROR);
-    } else {
-#ifdef DEBUG
-      /* Only cleanup if GPUARRAY_NOCLEANUP is not set */
-      if (getenv("GPUARRAY_NOCLEANUP") == NULL)
-#endif
-	unlink(namebuf);
-    }
-
-    if (WIFSIGNALED(sys_err) || WEXITSTATUS(sys_err) != 0) {
-        unlink(outbuf);
-        FAIL(NULL, GA_RUN_ERROR);
-    }
-#endif
-
-    fd = open(outbuf, O_RDONLY);
-    if (fd == -1) {
-        unlink(outbuf);
-        FAIL(NULL, GA_SYS_ERROR);
-    }
-
-    if (fstat(fd, &st) == -1) {
-        close(fd);
-        unlink(outbuf);
-        FAIL(NULL, GA_SYS_ERROR);
-    }
-
-    buf = malloc((size_t)st.st_size);
-    if (buf == NULL) {
-        close(fd);
-        unlink(outbuf);
-        FAIL(NULL, GA_SYS_ERROR);
-    }
-
-    s = read(fd, buf, (size_t)st.st_size);
-    close(fd);
-    unlink(outbuf);
-    /* fd is blocking; should have complete read */
-    if (s == -1) {
-      free(buf);
-      FAIL(NULL, GA_SYS_ERROR);
-    }
-
-    *bin_len = (size_t)st.st_size;
-    return buf;
-}
-
-#endif /* WITH_NVRTC */
-
 static void _cuda_freekernel(gpukernel *k) {
   k->refcnt--;
   if (k->refcnt == 0) {
@@ -1152,7 +1006,7 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
-    ctx->err = cuDeviceComputeCapability(&major, &minor, dev);
+    ctx->err = get_cc(dev, &major, &minor);
     if (ctx->err != CUDA_SUCCESS) {
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
@@ -1443,12 +1297,8 @@ static int cuda_transfer(gpudata *dst, size_t dstoff,
   return GA_NO_ERROR;
 }
 
-#ifdef WITH_CUDA_CUBLAS
 extern gpuarray_blas_ops cublas_ops;
-#endif  // WITH_CUDA_CUBLAS
-#ifdef WITH_CUDA_NCCL
 extern gpuarray_comm_ops nccl_ops;
-#endif  // WITH_CUDA_NCCL
 
 static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
                          void *res) {
@@ -1597,22 +1447,12 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_BLAS_OPS:
-#ifdef WITH_CUDA_CUBLAS
     *((gpuarray_blas_ops **)res) = &cublas_ops;
     return GA_NO_ERROR;
-#else
-    *((void **)res) = NULL;
-    return GA_DEVSUP_ERROR;
-#endif  // WITH_CUDA_CUBLAS
 
   case GA_CTX_PROP_COMM_OPS:
-#ifdef WITH_CUDA_NCCL
       *((gpuarray_comm_ops**)res) = &nccl_ops;
       return GA_NO_ERROR;
-#else
-      *((void**) res) = NULL;
-      return GA_DEVSUP_ERROR;
-#endif  // WITH_CUDA_NCCL
 
   case GA_CTX_PROP_BIN_ID:
     *((const char **)res) = ctx->bin_id;

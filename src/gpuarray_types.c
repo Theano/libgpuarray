@@ -40,7 +40,7 @@ typedef struct _quad {
       int16_t exp;
       uint16_t hi;
       uint32_t lo;
-    };
+    } s;
     uint128_t raw;
   } u;
 } ga_quad;

@@ -1,0 +1,53 @@
+DEF_PROC(cuInit, (int flags));
+DEF_PROC(cuDriverGetVersion, (int *driverVersion));
+DEF_PROC(cuGetErrorString, (CUresult error, const char **pStr));
+
+DEF_PROC(cuDeviceGet, (CUdevice *device, int ordinal));
+DEF_PROC(cuDeviceGetCount, (int *count));
+DEF_PROC(cuDeviceGetName, (char *name, int len, CUdevice dev));
+DEF_PROC(cuDeviceGetAttribute, (int *pi, CUdevice_attribute attrib, CUdevice dev));
+DEF_PROC(cuDeviceGetPCIBusId, (char *pciBusId, int len, CUdevice dev));
+
+DEF_PROC(cuDevicePrimaryCtxGetState, (CUdevice dev, unsigned int *flags, int *active));
+DEF_PROC(cuDevicePrimaryCtxSetFlags, (CUdevice dev, unsigned int flags));
+DEF_PROC(cuDevicePrimaryCtxRelease, (CUdevice dev));
+DEF_PROC(cuDevicePrimaryCtxRetain, (CUcontext *pctx, CUdevice dev));
+
+DEF_PROC(cuCtxGetDevice, (CUdevice *device));
+DEF_PROC_V2(cuCtxPushCurrent, (CUcontext ctx));
+DEF_PROC_V2(cuCtxPopCurrent, (CUcontext *pctx));
+
+DEF_PROC(cuModuleLoadData, (CUmodule *module, const void *image));
+DEF_PROC(cuModuleUnload, (CUmodule hmod));
+DEF_PROC(cuModuleGetFunction, (CUfunction *hfunc, CUmodule hmod, const char *name));
+
+DEF_PROC_V2(cuMemGetInfo, (size_t *free, size_t *total));
+DEF_PROC_V2(cuMemAlloc, (CUdeviceptr *dptr, size_t bytesize));
+DEF_PROC_V2(cuMemFree, (CUdeviceptr dptr));
+DEF_PROC_V2(cuMemAllocHost, (void **pp, size_t bytesize));
+DEF_PROC(cuMemFreeHost, (void *p));
+
+DEF_PROC_V2(cuMemcpyHtoDAsync, (CUdeviceptr dstDevice, const void *srcHost, size_t ByteCount, CUstream hStream));
+DEF_PROC_V2(cuMemcpyHtoD, (CUdeviceptr dstDevice, const void *srcHost, size_t ByteCount));
+DEF_PROC_V2(cuMemcpyDtoHAsync, (void *dstHost, CUdeviceptr srcDevice, size_t ByteCount, CUstream hStream));
+DEF_PROC_V2(cuMemcpyDtoDAsync, (CUdeviceptr dstDevice, CUdeviceptr srcDevice, size_t ByteCount, CUstream hStream));
+DEF_PROC(cuMemcpyPeerAsync, (CUdeviceptr dstDevice, CUcontext dstContext, CUdeviceptr srcDevice, CUcontext srcContext, size_t ByteCount, CUstream hStream));
+DEF_PROC(cuMemsetD8Async, (CUdeviceptr dstDevice, unsigned char uc, size_t N, CUstream hStream));
+
+DEF_PROC(cuLaunchKernel, (CUfunction f, unsigned int gridDimX, unsigned int gridDimY, unsigned int gridDimZ, unsigned int blockDimX, unsigned int blockDimY, unsigned int blockDimZ, unsigned int sharedMemBytes, CUstream hStream, void **kernelParams, void **extra));
+
+DEF_PROC(cuFuncGetAttribute, (int *pi, CUfunction_attribute attrib, CUfunction hfunc));
+
+DEF_PROC(cuEventCreate, (CUevent *phEvent, unsigned int Flags));
+DEF_PROC(cuEventRecord, (CUevent hEvent, CUstream hStream));
+DEF_PROC(cuEventSynchronize, (CUevent hEvent));
+DEF_PROC_V2(cuEventDestroy, (CUevent hEvent));
+
+DEF_PROC(cuStreamCreate, (CUstream *phStream, unsigned int Flags));
+DEF_PROC(cuStreamWaitEvent, (CUstream hStream, CUevent hEvent, unsigned int Flags));
+DEF_PROC(cuStreamSynchronize, (CUstream hStream));
+DEF_PROC_V2(cuStreamDestroy, (CUstream hStream));
+
+DEF_PROC(cuIpcGetMemHandle, (CUipcMemHandle *pHandle, CUdeviceptr dptr));
+DEF_PROC(cuIpcOpenMemHandle, (CUdeviceptr *pdptr, CUipcMemHandle handle, unsigned int Flags));
+DEF_PROC(cuIpcCloseMemHandle, (CUdeviceptr dptr));

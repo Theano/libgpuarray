@@ -1,0 +1,7 @@
+DEF_PROC(nvrtcCreateProgram, (nvrtcProgram *prog, const char *src, const char *name, int numHeaders, const char **headers, const char **includeNames));
+DEF_PROC(nvrtcCompileProgram, (nvrtcProgram prog, int numOptions, const char **options));
+DEF_PROC(nvrtcDestroyProgram, (nvrtcProgram *prog));
+DEF_PROC(nvrtcGetProgramLog, (nvrtcProgram prog, char *log));
+DEF_PROC(nvrtcGetProgramLogSize, (nvrtcProgram prog, size_t *logSizeRet));
+DEF_PROC(nvrtcGetPTX, (nvrtcProgram prog, char *ptx));
+DEF_PROC(nvrtcGetPTXSize, (nvrtcProgram prog, size_t *ptxSizeRet));

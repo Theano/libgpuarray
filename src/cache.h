@@ -1,8 +1,8 @@
 #ifndef CACHE_H
 #define CACHE_H
 
-#include <stdint.h>
 #include <stdlib.h>
+#include <gpuarray/config.h>
 #include "private_config.h"
 
 typedef void *cache_key_t;
