@@ -452,8 +452,8 @@ START_TEST(test_basic_broadcast) {
   ga_assert_ok(GpuArray_empty(&b, ctx, GA_UINT, 2, dims, GA_F_ORDER));
   ga_assert_ok(GpuArray_write(&b, data2, sizeof(data2)));
 
-  dims[0] = 2;
-  dims[1] = 3;
+  dims[0] = 1;
+  dims[1] = 6;
 
   ga_assert_ok(GpuArray_empty(&c, ctx, GA_UINT, 2, dims, GA_C_ORDER));
 
@@ -479,6 +479,12 @@ START_TEST(test_basic_broadcast) {
 
   ck_assert_int_eq(GpuElemwise_call(ge, rargs, GE_NOCOLLAPSE), GA_VALUE_ERROR);
 
+  ck_assert_int_eq(GpuElemwise_call(ge, rargs, GE_NOCOLLAPSE | GE_BROADCAST), GA_VALUE_ERROR);
+
+  dims[0] = 2;
+  dims[1] = 3;
+
+  ga_assert_ok(GpuArray_reshape_inplace(&c, 2, dims, GA_ANY_ORDER));
   ga_assert_ok(GpuElemwise_call(ge, rargs, GE_NOCOLLAPSE | GE_BROADCAST));
 
   ga_assert_ok(GpuArray_read(data3, sizeof(data3), &c));

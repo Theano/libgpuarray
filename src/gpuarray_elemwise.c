@@ -31,7 +31,7 @@ struct _GpuElemwise {
 STATIC_ASSERT(GEN_CONVERT_F16 == GE_CONVERT_F16, same_flags_value_elem1);
 
 #define is_array(a) (ISCLR((a).flags, GE_SCALAR))
-#define is_rw_array(a) (ISSET((a).flags, GE_READ) && ISSET((a).flags, GE_WRITE))
+#define is_output(a) (ISSET((a).flags, GE_WRITE))
 
 static inline int k_initialized(GpuKernel *k) {
   return k->k != NULL;
@@ -275,7 +275,7 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
   GpuArray *a = NULL, *v;
   unsigned int i, j, p, num_arrays = 0, nd = 0, nnd;
   int call32 = 1;
-  size_t read_write_arrays_found;
+  int output_ever_found;
 
   /* Go through the list and grab some info */
   for (i = 0; i < ge->n; i++) {
@@ -323,49 +323,40 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
   n = 1;
   for (j = 0; j < nd; j++) {
     p = 0;
-    read_write_arrays_found = 0;
+    output_ever_found = 0;
     for (i = 0; i < ge->n; i++) {
       if (is_array(ge->args[i])) {
         v = (GpuArray *)args[i];
         if (ge->dims[j] == v->dimensions[j]) {
-          /* We count the number of read-write arrays found until now
-           * that are not broadcasted. */
-          if (is_rw_array(ge->args[i]))
-            ++read_write_arrays_found;
+          /* We check if this array is an output. */
+          output_ever_found = output_ever_found || is_output(ge->args[i]);
         } else {
           if (ISCLR(flags, GE_BROADCAST)) {
             return GA_VALUE_ERROR;
           }
           /* GE_BROADCAST is set */
           if (ge->dims[j] == 1) {
-            if (read_write_arrays_found) {
-              /* There are read-write arrays before the current array,
+            if (output_ever_found) {
+              /* There are outputs before the current array,
                * and their (j+1)th dimension equals 1, so they would be
                * broadcasted. We don't want that. */
               #ifdef DEBUG
-              fprintf(stderr, "\r\n(check_basic(): read-write arrays should not be broadcasted) ");
+              fprintf(stderr, " (check_basic(): outputs should not be broadcasted) ");
               #endif
               return GA_VALUE_ERROR;
             }
-            /* There are no read-write arrays before the current array.
+            /* There are no outputs before the current array.
              * So broadcasting can be done safely. */
             ge->dims[j] = v->dimensions[j];
-            /* We still count the current array if it's a read-write array
+            /* We still check if the current array is an output
              * (useless in the current implementation, but coherent). */
-            if (is_rw_array(ge->args[i]))
-              ++read_write_arrays_found;
-          } else {
-            if (v->dimensions[j] != 1) {
-              return GA_VALUE_ERROR;
-            }
-            /* If the current array is a read-write array,
-             * we don't want it to be broadcasted. */
-            if (is_rw_array(ge->args[i])) {
-              #ifdef DEBUG
-              fprintf(stderr, "\r\n(check_basic(): a read-write array should not be broadcasted) ");
-              #endif
-              return GA_VALUE_ERROR;
-            }
+            output_ever_found = output_ever_found || is_output(ge->args[i]);
+          } else if (v->dimensions[j] != 1 || is_output(ge->args[i])) {
+            #ifdef DEBUG
+            if (is_output(ge->args[i]))
+              fprintf(stderr, " (check_basic(): an output should not be broadcasted) ");
+            #endif
+            return GA_VALUE_ERROR;
           }
         }
         /* If the dimension is 1 set the strides to 0 regardless since
