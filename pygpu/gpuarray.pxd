@@ -49,8 +49,6 @@ cdef extern from "gpuarray/types.h":
         GA_NBASE
 
 cdef extern from "gpuarray/util.h":
-    const int gpuarray_api_major
-    const int gpuarray_api_minor
     int gpuarray_register_type(gpuarray_type *t, int *ret)
     size_t gpuarray_get_elsize(int typecode)
     gpuarray_type *gpuarray_get_type(int typecode)

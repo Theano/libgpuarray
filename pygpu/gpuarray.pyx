@@ -9,10 +9,6 @@ import numpy as np
 from cpython cimport Py_INCREF, PyNumber_Index
 from cpython.object cimport Py_EQ, Py_NE
 
-def api_version():
-    # major, minor, py
-    return (gpuarray_api_major, gpuarray_api_minor, 0)
-
 np.import_array()
 
 # to export the numeric value
@@ -564,12 +560,6 @@ def init(dev, sched='default', disable_alloc_cache=False, single_stream=False):
     are no gaps in the valid numbers.
     """
     cdef int flags = 0
-    expected_version = -9997
-    if gpuarray_api_major != expected_version or gpuarray_api_minor < 0:
-        raise RuntimeError(
-            "Pygpu was expecting libgpuarray version %d, but %d is available. "
-            "Recompile it to avoid problems.",
-            expected_version, gpuarray_api_major)
     if sched == 'single':
         flags |= GA_CTX_SINGLE_THREAD
     elif sched == 'multi':
