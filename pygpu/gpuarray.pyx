@@ -9,6 +9,10 @@ import numpy as np
 from cpython cimport Py_INCREF, PyNumber_Index
 from cpython.object cimport Py_EQ, Py_NE
 
+def api_version():
+    # Those where the last defined numbers.
+    return (-9997, 1, 0)
+
 np.import_array()
 
 # to export the numeric value
