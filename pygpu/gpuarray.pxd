@@ -149,6 +149,7 @@ cdef extern from "gpuarray/array.h":
     ctypedef enum ga_order:
         GA_ANY_ORDER, GA_C_ORDER, GA_F_ORDER
 
+    void GpuArray_fix_flags(_GpuArray *a)
     int GpuArray_empty(_GpuArray *a, gpucontext *ctx,
                        int typecode, int nd, const size_t *dims, ga_order ord)
     int GpuArray_fromdata(_GpuArray *a,

@@ -234,6 +234,9 @@ cdef bint py_CHKFLAGS(GpuArray a, int flags):
 cdef bint py_ISONESEGMENT(GpuArray a):
     return GpuArray_ISONESEGMENT(&a.ga)
 
+cdef void array_fix_flags(GpuArray a):
+    GpuArray_fix_flags(&a.ga)
+
 cdef int array_empty(GpuArray a, gpucontext *ctx,
                      int typecode, unsigned int nd, const size_t *dims,
                      ga_order ord) except -1:
@@ -1943,6 +1946,7 @@ cdef class GpuArray:
                 raise ValueError("new strides are the wrong length")
             for i in range(self.ga.nd):
                 self.ga.strides[i] = newstrides[i]
+            array_fix_flags(self)
 
     property ndim:
         "The number of dimensions in this object"
