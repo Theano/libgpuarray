@@ -29,6 +29,7 @@ typedef enum CUfunction_attribute_enum CUfunction_attribute;
 typedef enum CUevent_flags_enum CUevent_flags;
 typedef enum CUctx_flags_enum CUctx_flags;
 typedef enum CUipcMem_flags_enum CUipcMem_flags;
+typedef enum CUjit_option_enum CUjit_option;
 
 #define CU_IPC_HANDLE_SIZE 64
 
@@ -182,6 +183,27 @@ enum CUctx_flags_enum {
 
 enum CUipcMem_flags_enum {
   CU_IPC_MEM_LAZY_ENABLE_PEER_ACCESS = 0x1
+};
+
+enum CUjit_option_enum {
+    CU_JIT_MAX_REGISTERS = 0,
+    CU_JIT_THREADS_PER_BLOCK,
+    CU_JIT_WALL_TIME,
+    CU_JIT_INFO_LOG_BUFFER,
+    CU_JIT_INFO_LOG_BUFFER_SIZE_BYTES,
+    CU_JIT_ERROR_LOG_BUFFER,
+    CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES,
+    CU_JIT_OPTIMIZATION_LEVEL,
+    CU_JIT_TARGET_FROM_CUCONTEXT,
+    CU_JIT_TARGET,
+    CU_JIT_FALLBACK_STRATEGY,
+    CU_JIT_GENERATE_DEBUG_INFO,
+    CU_JIT_LOG_VERBOSE,
+    CU_JIT_GENERATE_LINE_INFO,
+    CU_JIT_CACHE_MODE,
+    CU_JIT_NEW_SM3X_OPT,
+    CU_JIT_FAST_COMPILE,
+    CU_JIT_NUM_OPTIONS
 };
 
 #endif

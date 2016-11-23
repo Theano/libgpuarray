@@ -984,6 +984,22 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
     CUdevice dev;
     unsigned int i;
     int major, minor;
+    strb debug_msg = STRB_STATIC_INIT;
+
+    // options for cuModuleLoadDataEx
+    const size_t cujit_log_size = 4096;
+    char *cujit_info_log = NULL;
+    unsigned int num_cujit_opts = 4;
+    CUjit_option cujit_opts[] = {
+        CU_JIT_INFO_LOG_BUFFER_SIZE_BYTES,
+        CU_JIT_INFO_LOG_BUFFER,
+        CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES,
+        CU_JIT_ERROR_LOG_BUFFER
+    };
+    void *cujit_opt_vals[] = {
+        (void*)(size_t)cujit_log_size, NULL,
+        (void*)(size_t)cujit_log_size, NULL,
+    };
 
     if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
 
@@ -1069,10 +1085,9 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
                           &log, &log_len, ret);
       if (bin == NULL) {
         if (err_str != NULL) {
-          strb debug_msg = STRB_STATIC_INIT;
 
           // We're substituting debug_msg for a string with this first line:
-          strb_appends(&debug_msg, "CUDA kernel build failure ::\n");
+          strb_appends(&debug_msg, "CUDA kernel compile failure ::\n");
 
           /* Delete the final NUL */
           sb.l--;
@@ -1089,7 +1104,7 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
         }
         strb_clear(&sb);
         cuda_exit(ctx);
-        return NULL;
+        FAIL(NULL, GA_IMPL_ERROR);
       }
     }
 
@@ -1122,14 +1137,45 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
       FAIL(NULL, GA_MEMORY_ERROR);
     }
 
-    ctx->err = cuModuleLoadData(&res->m, bin);
+    // for both info/err log
+    cujit_info_log = (char*)malloc(2*cujit_log_size*sizeof(char));
+    if(cujit_info_log == NULL) {
+      _cuda_freekernel(res);
+      strb_clear(&sb);
+      cuda_exit(ctx);
+      FAIL(NULL, GA_MEMORY_ERROR);
+    }
+    cujit_info_log[0] = 0;
+    cujit_info_log[cujit_log_size] = 0;
+    cujit_opt_vals[1] = (void*)cujit_info_log;
+    cujit_opt_vals[3] = (void*)(cujit_info_log+cujit_log_size);
+
+    ctx->err = cuModuleLoadDataEx(
+            &res->m, bin,
+            num_cujit_opts, cujit_opts, (void**)cujit_opt_vals);
 
     if (ctx->err != CUDA_SUCCESS) {
+      if (err_str != NULL) {
+        strb_appends(&debug_msg, "CUDA kernel link failure::\n");
+        if (cujit_info_log[0]) {
+          strb_appends(&debug_msg, "\nLinker msg:\n");
+          strb_appends(&debug_msg, cujit_info_log);
+        }
+        if (cujit_info_log[cujit_log_size]) {
+          strb_appends(&debug_msg, "\nLinker error log:\n");
+          strb_appends(&debug_msg, cujit_info_log+cujit_log_size);
+        }
+        strb_append0(&debug_msg);
+        *err_str = strb_cstr(&debug_msg);
+      }
+      free(cujit_info_log);
       _cuda_freekernel(res);
       strb_clear(&sb);
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
+
+    free(cujit_info_log);
 
     ctx->err = cuModuleGetFunction(&res->k, res->m, fname);
     if (ctx->err != CUDA_SUCCESS) {
@@ -1352,7 +1398,7 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     *((char **)res) = s;
     cuda_exit(ctx);
     return GA_NO_ERROR;
-  
+
   case GA_CTX_PROP_PCIBUSID:
     cuda_enter(ctx);
     ctx->err = cuCtxGetDevice(&id);
