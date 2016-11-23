@@ -197,6 +197,13 @@ static inline int GpuArray_CHKFLAGS(const GpuArray *a, int flags) {
 #define GpuArray_ITEMSIZE(a) gpuarray_get_elsize((a)->typecode)
 
 /**
+ * Fix the flags of an array using the current strides and shape.
+ *
+ * \param a GpuArray to fix flags for
+ */
+GPUARRAY_PUBLIC void GpuArray_fix_flags(GpuArray *a);
+
+/**
  * Initialize and allocate a new empty (uninitialized data) array.
  *
  * \param a the GpuArray structure to initialize.  Content will be
