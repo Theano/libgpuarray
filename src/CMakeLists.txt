@@ -87,6 +87,7 @@ set_target_properties(gpuarray PROPERTIES
   COMPILE_FLAGS "-DGPUARRAY_BUILDING_DLL -DGPUARRAY_SHARED"
   INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/lib
   MACOSX_RPATH OFF
+  # This is the shared library version
   VERSION 0.0
   )
 
