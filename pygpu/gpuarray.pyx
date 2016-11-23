@@ -1937,6 +1937,13 @@ cdef class GpuArray:
                 res[i] = self.ga.strides[i]
             return tuple(res)
 
+        def __set__(self, newstrides):
+            cdef unsigned int i
+            if len(newstrides) != self.ga.nd:
+                raise ValueError("new strides are the wrong length")
+            for i in range(self.ga.nd):
+                self.ga.strides[i] = newstrides[i]
+
     property ndim:
         "The number of dimensions in this object"
         def __get__(self):
