@@ -399,8 +399,9 @@ static gpucontext *cuda_init(int ord, int flags, int *ret) {
     int r;
 
     r = setup_lib();
-    if (r != GA_NO_ERROR)
-      return NULL;
+    if (r != GA_NO_ERROR) {
+      FAIL(NULL, r);
+    }
 
     if (ord == -1) {
       int i, c;
