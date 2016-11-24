@@ -212,6 +212,32 @@ cdef ga_order to_ga_order(ord) except <ga_order>-2:
     else:
         raise ValueError, "Valid orders are: 'A' (any), 'C' (C), 'F' (Fortran)"
 
+cdef int strides_ok(GpuArray a, strides):
+    cdef ssize_t max_axis_offset
+    cdef size_t lower = a.ga.offset
+    cdef size_t upper = a.ga.offset
+    cdef size_t itemsize = gpuarray_get_elsize(a.ga.typecode)
+    cdef size_t size
+    cdef unsigned int i
+
+    gpudata_property(a.ga.data, GA_BUFFER_PROP_SIZE, &size)
+
+    for i in range(a.ga.nd):
+        if a.ga.dimensions[i] == 0:
+            return 1
+
+        max_axis_offset = strides[i] * (a.ga.dimensions[i] - 1)
+        if max_axis_offset > 0:
+            if upper + max_axis_offset > size:
+                return 0
+            upper += max_axis_offset
+        else:
+            if lower < -max_axis_offset:
+                return 0
+            lower += max_axis_offset
+    return (upper + itemsize) <= size
+
+
 class GpuArrayException(Exception):
     """
     Exception used for most errors related to libgpuarray.
@@ -1944,6 +1970,8 @@ cdef class GpuArray:
             cdef unsigned int i
             if len(newstrides) != self.ga.nd:
                 raise ValueError("new strides are the wrong length")
+            if not strides_ok(self,  newstrides):
+                raise ValueError("new strides go outside of allocated memory")
             for i in range(self.ga.nd):
                 self.ga.strides[i] = newstrides[i]
             array_fix_flags(self)

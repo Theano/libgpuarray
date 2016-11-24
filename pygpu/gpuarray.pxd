@@ -73,6 +73,7 @@ cdef extern from "gpuarray/buffer.h":
     gpucontext *gpucontext_init(const char *name, int devno, int flags, int *ret)
     void gpucontext_deref(gpucontext *ctx)
     char *gpucontext_error(gpucontext *ctx, int err)
+    int gpudata_property(gpudata *ctx, int prop_id, void *res)
     int gpucontext_property(gpucontext *ctx, int prop_id, void *res)
     int gpukernel_property(gpukernel *k, int prop_id, void *res)
     gpucontext *gpudata_context(gpudata *)
@@ -99,6 +100,9 @@ cdef extern from "gpuarray/buffer.h":
     int GA_CTX_PROP_MAXGSIZE0
     int GA_CTX_PROP_MAXGSIZE1
     int GA_CTX_PROP_MAXGSIZE2
+
+    int GA_BUFFER_PROP_SIZE
+
     int GA_KERNEL_PROP_MAXLSIZE
     int GA_KERNEL_PROP_PREFLSIZE
     int GA_KERNEL_PROP_NUMARGS

@@ -8,6 +8,7 @@ import pickle
 
 import numpy
 
+from nose.tools import assert_raises
 import pygpu
 from pygpu.gpuarray import GpuArray, GpuContext, GpuKernel
 
@@ -446,6 +447,32 @@ def reshape(shps, offseted, order1, order2):
     assert outc.shape == outg.shape
     assert outc.strides == outg.strides
     assert numpy.allclose(outc, numpy.asarray(outg))
+
+
+def test_strides():
+    yield strides_, (4, 4), 'c', 1, (4, 4)
+    yield strides_, (4, 4), 'c', 1, (4, 16)
+    yield strides_, (4, 4), 'c', 1, (16, 4)
+    yield strides_, (4, 4), 'c', 1, (16, 8)
+    yield strides_, (4, 4), 'c', 1, (16, 0)
+    yield strides_, (4, 4), 'c', -1, (-20, 4)
+    yield strides_, (4, 4), 'c', -1, (-12, 4)
+
+
+def set_strides(a, newstr):
+    a.strides = newstr
+
+
+def strides_(shp, order, sliced, newstr):
+    ac, ag = gen_gpuarray(shp, 'float32', sliced=sliced, order=order, ctx=ctx)
+    try:
+        ac.strides = newstr
+    except ValueError:
+        assert_raises(ValueError, set_strides, ag, newstr)
+        return
+    ag.strides = newstr
+    check_flags(ag, ac)
+    assert numpy.allclose(ac, numpy.asarray(ag))
 
 
 def test_transpose():
