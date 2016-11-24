@@ -213,6 +213,9 @@ cdef ga_order to_ga_order(ord) except <ga_order>-2:
         raise ValueError, "Valid orders are: 'A' (any), 'C' (C), 'F' (Fortran)"
 
 cdef int strides_ok(GpuArray a, strides):
+    # Check that the passed in strides will not go outside of the
+    # memory of the array.  It is assumed that the strides are of the
+    # proper length.
     cdef ssize_t max_axis_offset
     cdef size_t lower = a.ga.offset
     cdef size_t upper = a.ga.offset
