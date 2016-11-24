@@ -38,6 +38,21 @@ GPUARRAY_PUBLIC void gpublas_teardown(gpucontext *ctx);
 
 GPUARRAY_PUBLIC const char *gpublas_error(gpucontext *ctx);
 
+GPUARRAY_PUBLIC int gpublas_hdot(
+        size_t N,
+        gpudata *X, size_t offA, size_t incX,
+        gpudata *Y, size_t offB, size_t incY);
+
+GPUARRAY_PUBLIC int gpublas_sdot(
+        size_t N,
+        gpudata *X, size_t offA, size_t incX,
+        gpudata *Y, size_t offB, size_t incY);
+
+GPUARRAY_PUBLIC int gpublas_ddot(
+        size_t N,
+        gpudata *X, size_t offA, size_t incX,
+        gpudata *Y, size_t offB, size_t incY);
+
 GPUARRAY_PUBLIC int gpublas_hgemv(
   cb_order order, cb_transpose transA, size_t M, size_t N, float alpha,
   gpudata *A, size_t offA, size_t lda, gpudata *X, size_t offX, int incX,
