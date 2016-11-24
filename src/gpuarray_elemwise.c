@@ -275,13 +275,12 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
   GpuArray *a = NULL, *v;
   unsigned int i, j, p, num_arrays = 0, nd = 0, nnd;
   int call32 = 1;
-  int output_ever_found;
 
   /* Go through the list and grab some info */
   for (i = 0; i < ge->n; i++) {
     if (is_array(ge->args[i])) {
       num_arrays++;
-      if (a == NULL) {
+      if (a == NULL || !is_output(a)) {
         a = (GpuArray *)args[i];
         nd = a->nd;
       }
@@ -290,7 +289,8 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
     }
   }
 
-  if (a == NULL)
+  /* No output arrays, this is an error */
+  if (a == NULL || !is_output(a))
     return GA_VALUE_ERROR;
 
   /* Check if we need to grow the internal buffers */
@@ -302,7 +302,7 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
   }
 
   /* Now we know that all array arguments have the same number of
-     dimensions */
+     dimensions and that the expected output size is the size of a */
 
   /* And copy their initial values in */
   memcpy(ge->dims, a->dimensions, nd*sizeof(size_t));
@@ -315,47 +315,21 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
   }
 
   /* Check that all arrays are the same size (or broadcast-compatible
-     if GE_BROADCAST).  Also compute the total size and adjust strides
-     of broadcastable dimensions.
+     if GE_BROADCAST), adjust strides of broadcastable dimensions and
+     check if we can use the 32 bit address version.
 
      Basically for each dimension go over all the arguments and make
      sure that the dimension size matches. */
   n = 1;
   for (j = 0; j < nd; j++) {
     p = 0;
-    output_ever_found = 0;
     for (i = 0; i < ge->n; i++) {
       if (is_array(ge->args[i])) {
         v = (GpuArray *)args[i];
-        if (ge->dims[j] == v->dimensions[j]) {
-          /* We check if this array is an output. */
-          output_ever_found = output_ever_found || is_output(ge->args[i]);
-        } else {
-          if (ISCLR(flags, GE_BROADCAST)) {
-            return GA_VALUE_ERROR;
-          }
-          /* GE_BROADCAST is set */
-          if (ge->dims[j] == 1) {
-            if (output_ever_found) {
-              /* There are outputs before the current array,
-               * and their (j+1)th dimension equals 1, so they would be
-               * broadcasted. We don't want that. */
-              #ifdef DEBUG
-              fprintf(stderr, " (check_basic(): outputs should not be broadcasted) ");
-              #endif
-              return GA_VALUE_ERROR;
-            }
-            /* There are no outputs before the current array.
-             * So broadcasting can be done safely. */
-            ge->dims[j] = v->dimensions[j];
-            /* We still check if the current array is an output
-             * (useless in the current implementation, but coherent). */
-            output_ever_found = output_ever_found || is_output(ge->args[i]);
-          } else if (v->dimensions[j] != 1 || is_output(ge->args[i])) {
-            #ifdef DEBUG
-            if (is_output(ge->args[i]))
-              fprintf(stderr, " (check_basic(): an output should not be broadcasted) ");
-            #endif
+        if (ge->dims[j] != v->dimensions[j]) {
+          /* We can't broadcast outputs */
+          if (ISCLR(flags, GE_BROADCAST) || is_output(v) ||
+              v->dimensions[j] != 1) {
             return GA_VALUE_ERROR;
           }
         }
