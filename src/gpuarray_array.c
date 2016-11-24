@@ -85,9 +85,17 @@ static int ga_extcopy(GpuArray *dst, const GpuArray *src) {
 /* Value below which a size_t multiplication will never overflow. */
 #define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
 
-int GpuArray_empty(GpuArray *a, gpucontext *ctx,
-		   int typecode, unsigned int nd, const size_t *dims,
-                   ga_order ord) {
+void GpuArray_fix_flags(GpuArray *a) {
+  /* Only keep the writable flag */
+  a->flags &= GA_WRITEABLE;
+  /* Set the other flags if applicable */
+  if (GpuArray_is_c_contiguous(a)) a->flags |= GA_C_CONTIGUOUS;
+  if (GpuArray_is_f_contiguous(a)) a->flags |= GA_F_CONTIGUOUS;
+  if (GpuArray_is_aligned(a)) a->flags |= GA_ALIGNED;
+}
+
+int GpuArray_empty(GpuArray *a, gpucontext *ctx, int typecode,
+                   unsigned int nd, const size_t *dims, ga_order ord) {
   size_t size = gpuarray_get_elsize(typecode);
   unsigned int i;
   int res = GA_NO_ERROR;
@@ -185,9 +193,7 @@ int GpuArray_fromdata(GpuArray *a, gpudata *data, size_t offset, int typecode,
   memcpy(a->dimensions, dims, nd*sizeof(size_t));
   memcpy(a->strides, strides, nd*sizeof(ssize_t));
 
-  if (GpuArray_is_c_contiguous(a)) a->flags |= GA_C_CONTIGUOUS;
-  if (GpuArray_is_f_contiguous(a)) a->flags |= GA_F_CONTIGUOUS;
-  if (GpuArray_is_aligned(a)) a->flags |= GA_ALIGNED;
+  GpuArray_fix_flags(a);
 
   return GA_NO_ERROR;
 }
@@ -304,18 +310,7 @@ int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
   a->dimensions = newdims;
   free(a->strides);
   a->strides = newstrs;
-  if (GpuArray_is_c_contiguous(a))
-    a->flags |= GA_C_CONTIGUOUS;
-  else
-    a->flags &= ~GA_C_CONTIGUOUS;
-  if (GpuArray_is_f_contiguous(a))
-    a->flags |= GA_F_CONTIGUOUS;
-  else
-    a->flags &= ~GA_F_CONTIGUOUS;
-  if (GpuArray_is_aligned(a))
-    a->flags |= GA_ALIGNED;
-  else
-    a->flags &= ~GA_ALIGNED;
+  GpuArray_fix_flags(a);
 
   return GA_NO_ERROR;
 }
@@ -582,9 +577,8 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
   tv.nd = a->nd;
   tv.dimensions = a->dimensions;
   tv.strides = strs;
-  /* This could be optiomized by setting the right flags */
   if (tv.nd != 0)
-    tv.flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
+    GpuArray_fix_flags(&tv);
   err = ga_extcopy(a, &tv);
   free(strs);
   return err;
@@ -745,18 +739,7 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
   a->strides = newstrides;
 
  fix_flags:
-  if (GpuArray_is_c_contiguous(a))
-    a->flags |= GA_C_CONTIGUOUS;
-  else
-    a->flags &= ~GA_C_CONTIGUOUS;
-  if (GpuArray_is_f_contiguous(a))
-    a->flags |= GA_F_CONTIGUOUS;
-  else
-    a->flags &= ~GA_F_CONTIGUOUS;
-  if (GpuArray_is_aligned(a))
-    a->flags |= GA_ALIGNED;
-  else
-    a->flags &= ~GA_ALIGNED;
+  GpuArray_fix_flags(a);
   return GA_NO_ERROR;
 }
 
@@ -808,11 +791,7 @@ int GpuArray_transpose_inplace(GpuArray *a, const unsigned int *new_axes) {
   a->dimensions = newdims;
   a->strides = newstrs;
 
-  a->flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
-  if (GpuArray_is_c_contiguous(a))
-    a->flags |= GA_C_CONTIGUOUS;
-  if (GpuArray_is_f_contiguous(a))
-    a->flags |= GA_F_CONTIGUOUS;
+  GpuArray_fix_flags(a);
 
   return GA_NO_ERROR;
 }
@@ -1016,10 +995,9 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
   res_off = r->offset;
   res_dims = r->dimensions;
   res_flags = r->flags;
-  /* This could be optimized by setting the right flags */
-  r->flags &= ~(GA_C_CONTIGUOUS|GA_F_CONTIGUOUS);
   for (i = 0; i < n; i++) {
     r->dimensions = as[i]->dimensions;
+    GpuArray_fix_flags(r);
     err = ga_extcopy(r, as[i]);
     if (err != GA_NO_ERROR) {
       r->dimensions = res_dims;

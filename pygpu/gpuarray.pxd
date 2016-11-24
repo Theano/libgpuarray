@@ -49,8 +49,6 @@ cdef extern from "gpuarray/types.h":
         GA_NBASE
 
 cdef extern from "gpuarray/util.h":
-    const int gpuarray_api_major
-    const int gpuarray_api_minor
     int gpuarray_register_type(gpuarray_type *t, int *ret)
     size_t gpuarray_get_elsize(int typecode)
     gpuarray_type *gpuarray_get_type(int typecode)
@@ -75,6 +73,7 @@ cdef extern from "gpuarray/buffer.h":
     gpucontext *gpucontext_init(const char *name, int devno, int flags, int *ret)
     void gpucontext_deref(gpucontext *ctx)
     char *gpucontext_error(gpucontext *ctx, int err)
+    int gpudata_property(gpudata *ctx, int prop_id, void *res)
     int gpucontext_property(gpucontext *ctx, int prop_id, void *res)
     int gpukernel_property(gpukernel *k, int prop_id, void *res)
     gpucontext *gpudata_context(gpudata *)
@@ -101,6 +100,9 @@ cdef extern from "gpuarray/buffer.h":
     int GA_CTX_PROP_MAXGSIZE0
     int GA_CTX_PROP_MAXGSIZE1
     int GA_CTX_PROP_MAXGSIZE2
+
+    int GA_BUFFER_PROP_SIZE
+
     int GA_KERNEL_PROP_MAXLSIZE
     int GA_KERNEL_PROP_PREFLSIZE
     int GA_KERNEL_PROP_NUMARGS
@@ -151,6 +153,7 @@ cdef extern from "gpuarray/array.h":
     ctypedef enum ga_order:
         GA_ANY_ORDER, GA_C_ORDER, GA_F_ORDER
 
+    void GpuArray_fix_flags(_GpuArray *a)
     int GpuArray_empty(_GpuArray *a, gpucontext *ctx,
                        int typecode, int nd, const size_t *dims, ga_order ord)
     int GpuArray_fromdata(_GpuArray *a,
