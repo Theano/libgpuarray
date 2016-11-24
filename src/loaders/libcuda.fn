@@ -18,6 +18,7 @@ DEF_PROC_V2(cuCtxPushCurrent, (CUcontext ctx));
 DEF_PROC_V2(cuCtxPopCurrent, (CUcontext *pctx));
 
 DEF_PROC(cuModuleLoadData, (CUmodule *module, const void *image));
+DEF_PROC(cuModuleLoadDataEx, (CUmodule *module, const void *image, unsigned int numOptions, CUjit_option *options, void **optionValues));
 DEF_PROC(cuModuleUnload, (CUmodule hmod));
 DEF_PROC(cuModuleGetFunction, (CUfunction *hfunc, CUmodule hmod, const char *name));
 
