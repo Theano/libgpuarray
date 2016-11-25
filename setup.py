@@ -76,7 +76,7 @@ del to_del
 
 include_dirs = [np.get_include()]
 library_dirs = []
-if sys.platform == 'win32':
+if sys.platform == 'win32' and not os.getenv('CONDA_BUILD'):
     # This is a hack so users don't need to do many steps for windows install
     # Just use the default location.
     current_dir = os.path.abspath(os.path.dirname(__file__))
