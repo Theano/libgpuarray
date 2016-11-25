@@ -23,18 +23,30 @@ int gpublas_hdot(
         size_t N,
         gpudata *X, size_t offX, size_t incX,
         gpudata *Y, size_t offY, size_t incY,
+<<<<<<< 94b600c5db96dfc3d21c842464b194623e9af208
         gpudata *Z, size_t offZ) {
     return gpudata_context(X)->blas_ops->hdot(
             N, X, offX, incX, Y, offY, incY, Z, offZ);
+=======
+        gpudata *Z) {
+    return gpudata_context(X)->blas_ops->hdot(
+            N, X, offX, incX, Y, offY, incY, Z);
+>>>>>>> Finish BLAS dot for implementation for CUDA
 }
 
 int gpublas_sdot(
         size_t N,
         gpudata *X, size_t offX, size_t incX,
         gpudata *Y, size_t offY, size_t incY,
+<<<<<<< 94b600c5db96dfc3d21c842464b194623e9af208
         gpudata *Z, size_t offZ) {
     return gpudata_context(X)->blas_ops->sdot(
             N, X, offX, incX, Y, offY, incY, Z, offZ);
+=======
+        gpudata *Z) {
+    return gpudata_context(X)->blas_ops->sdot(
+            N, X, offX, incX, Y, offY, incY, Z);
+>>>>>>> Finish BLAS dot for implementation for CUDA
 }
 
 int gpublas_ddot(
@@ -43,7 +55,11 @@ int gpublas_ddot(
         gpudata *Y, size_t offY, size_t incY,
         gpudata *Z) {
     return gpudata_context(X)->blas_ops->ddot(
+<<<<<<< 94b600c5db96dfc3d21c842464b194623e9af208
             N, X, offX, incX, Y, offY, incY, Z, offZ);
+=======
+            N, X, offX, incX, Y, offY, incY, Z);
+>>>>>>> Finish BLAS dot for implementation for CUDA
 }
 
 int gpublas_hgemv(cb_order order, cb_transpose transA,
