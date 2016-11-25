@@ -84,7 +84,7 @@ if sys.platform == 'win32':
 
     default_bin_dir = os.path.join(current_dir, 'lib', 'Release')
     if not os.path.isdir(default_bin_dir):
-        raise RuntimeError('default binary dir {} does not exist, you may need to build the C library in release mode')
+        raise RuntimeError('default binary dir {} does not exist, you may need to build the C library in release mode'.format(default_bin_dir))
     library_dirs += [default_bin_dir]
 
 with open('pygpu/version.py', 'w') as f:
