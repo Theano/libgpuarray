@@ -194,6 +194,30 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
   return GA_DEVSUP_ERROR;
 }
 
+static int hdot(
+        size_t N,
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
+        gpudata *Z) {
+    return GA_DEVSUP_ERROR;
+}
+
+static int sdot(
+        size_t N,
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
+        gpudata *Z) {
+    return GA_DEVSUP_ERROR;
+}
+
+static int ddot(
+        size_t N,
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
+        gpudata *Z) {
+    return GA_DEVSUP_ERROR;
+}
+
 static int hgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
                  float alpha, gpudata *A, size_t offA, size_t lda,
                  gpudata *X, size_t offX, int incX, float beta,
@@ -400,6 +424,9 @@ GPUARRAY_LOCAL gpuarray_blas_ops clblas_ops = {
   setup,
   teardown,
   error,
+  hdot, /* TODO */
+  sdot,
+  ddot,
   hgemv, /* TODO */
   sgemv,
   dgemv,
