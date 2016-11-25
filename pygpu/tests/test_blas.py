@@ -14,6 +14,10 @@ except ImportError as e:
 
 import pygpu.blas as gblas
 
+def test_dot():
+    # TODO [WIP]
+    raise NotImplementedError()
+
 def test_gemv():
     for shape in [(100, 128), (128, 50)]:
         for order in ['f', 'c']:
