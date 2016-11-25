@@ -814,22 +814,21 @@ static int sdot(
 
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(X, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Y, CUDA_WAIT_READ));
-  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Z, CUDA_WAIT_ALL));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Z, CUDA_WAIT_WRITE));
 
   // we should store dot result on device
   cublasGetPointerMode(h->h, &pmode);
-  cublasSetPointerMode(h->h, CUBLAS_POINTER_MODE_HOST);
+  cublasSetPointerMode(h->h, CUBLAS_POINTER_MODE_DEVICE);
   h->err = cublasSdot(
           h->h, N,
           ((float*)X->ptr) + offX, incX,
           ((float*)Y->ptr) + offY, incY,
-          ((float*)Z->ptr)
-          );
+          ((float*)Z->ptr) + offZ);
   cublasSetPointerMode(h->h, pmode);
 
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(X, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Y, CUDA_WAIT_READ));
-  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Z, CUDA_WAIT_ALL));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Z, CUDA_WAIT_WRITE));
 
   cuda_exit(ctx);
 
@@ -855,22 +854,21 @@ static int ddot(
 
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(X, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Y, CUDA_WAIT_READ));
-  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Z, CUDA_WAIT_ALL));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Z, CUDA_WAIT_WRITE));
 
   // we should store dot result on device
   cublasGetPointerMode(h->h, &pmode);
-  cublasSetPointerMode(h->h, CUBLAS_POINTER_MODE_HOST);
+  cublasSetPointerMode(h->h, CUBLAS_POINTER_MODE_DEVICE);
   h->err = cublasDdot(
       h->h, N,
       ((double*)X->ptr) + offX, incX,
       ((double*)Y->ptr) + offY, incY,
-      ((double*)Z->ptr)
-      );
+      ((double*)Z->ptr) + offZ);
   cublasSetPointerMode(h->h, pmode);
 
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(X, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Y, CUDA_WAIT_READ));
-  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Z, CUDA_WAIT_ALL));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Z, CUDA_WAIT_WRITE));
 
   cuda_exit(ctx);
 

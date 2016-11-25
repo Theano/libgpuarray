@@ -12,9 +12,9 @@ int GpuArray_rdot( GpuArray *X, GpuArray *Y,
     GpuArray *Yp = Y;
     GpuArray copyY;
     GpuArray *Zp = Z;
+    size_t n;
     void *ctx;
     size_t elsize;
-    size_t n;
     int err;
 
   if (X->typecode != GA_HALF &&
@@ -22,13 +22,14 @@ int GpuArray_rdot( GpuArray *X, GpuArray *Y,
       X->typecode != GA_DOUBLE)
   return GA_INVALID_ERROR;
 
-  if (X->nd != 1 || X->nd != 1 || Y->nd != 0 ||
+  if (X->nd != 1 || Y->nd != 1 || Z->nd != 0 ||
       X->typecode != Y->typecode || X->typecode != Z->typecode)
     return GA_VALUE_ERROR;
+  n = X->dimensions[0];
   if (!(X->flags & GA_ALIGNED) || !(Y->flags & GA_ALIGNED) ||
       !(Z->flags & GA_ALIGNED))
     return GA_UNALIGNED_ERROR;
-  if (X->dimensions[0] != n || Y->dimensions[0] != n)
+  if (X->dimensions[0] != Y->dimensions[0])
       return GA_VALUE_ERROR;
 
   elsize = gpuarray_get_elsize(X->typecode);
@@ -52,10 +53,6 @@ int GpuArray_rdot( GpuArray *X, GpuArray *Y,
       Yp = &copyY;
     }
   }
-  if (Z->strides[0] < 0) {
-    err = GA_VALUE_ERROR;
-    goto cleanup;
-  }
 
   ctx = gpudata_context(Xp->data);
   err = gpublas_setup(ctx);
@@ -68,21 +65,21 @@ int GpuArray_rdot( GpuArray *X, GpuArray *Y,
                   n,
                   Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize,
                   Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize,
-                  Zp->data);
+                  Zp->data, Zp->offset / elsize);
           break;
       case GA_FLOAT:
           err = gpublas_sdot(
                   n,
                   Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize,
                   Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize,
-                  Zp->data);
+                  Zp->data, Zp->offset / elsize);
           break;
       case GA_DOUBLE:
-          err = gpublas_sdot(
+          err = gpublas_ddot(
                   n,
                   Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize,
                   Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize,
-                  Zp->data);
+                  Zp->data, Zp->offset / elsize);
           break;
   }
   cleanup:
