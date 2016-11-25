@@ -371,7 +371,7 @@ static int call_basic(GpuElemwise *ge, void **args, size_t n, unsigned int nd,
                       size_t *dims, ssize_t **strs, int call32) {
   GpuKernel *k;
   size_t ls = 0, gs = 0;
-  unsigned int p = 0, i, j;
+  unsigned int p = 0, i, j, l;
   int err;
 
   if (nd == 0) return GA_VALUE_ERROR;
@@ -398,6 +398,8 @@ static int call_basic(GpuElemwise *ge, void **args, size_t n, unsigned int nd,
     if (err != GA_NO_ERROR) goto error;
   }
 
+  /* l is the number of arrays to date */
+  l = 0;
   for (j = 0; j < ge->n; j++) {
     if (is_array(ge->args[j])) {
       GpuArray *v = (GpuArray *)args[j];
@@ -406,9 +408,10 @@ static int call_basic(GpuElemwise *ge, void **args, size_t n, unsigned int nd,
       err = GpuKernel_setarg(k, p++, &v->offset);
       if (err != GA_NO_ERROR) goto error;
       for (i = 0; i < nd; i++) {
-        err = GpuKernel_setarg(k, p++, &strs[j][i]);
+        err = GpuKernel_setarg(k, p++, &strs[l][i]);
         if (err != GA_NO_ERROR) goto error;
       }
+      l++;
     } else {
       err = GpuKernel_setarg(k, p++, args[j]);
       if (err != GA_NO_ERROR) goto error;
