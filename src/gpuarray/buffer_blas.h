@@ -42,19 +42,31 @@ GPUARRAY_PUBLIC int gpublas_hdot(
         size_t N,
         gpudata *X, size_t offX, size_t incX,
         gpudata *Y, size_t offY, size_t incY,
+<<<<<<< 94b600c5db96dfc3d21c842464b194623e9af208
         gpudata *Z, size_t offZ);
+=======
+        gpudata *Z);
+>>>>>>> Finish BLAS dot for implementation for CUDA
 
 GPUARRAY_PUBLIC int gpublas_sdot(
         size_t N,
         gpudata *X, size_t offX, size_t incX,
         gpudata *Y, size_t offY, size_t incY,
+<<<<<<< 94b600c5db96dfc3d21c842464b194623e9af208
         gpudata *Z, size_t offZ);
+=======
+        gpudata *Z);
+>>>>>>> Finish BLAS dot for implementation for CUDA
 
 GPUARRAY_PUBLIC int gpublas_ddot(
         size_t N,
         gpudata *X, size_t offX, size_t incX,
         gpudata *Y, size_t offY, size_t incY,
+<<<<<<< 94b600c5db96dfc3d21c842464b194623e9af208
         gpudata *Z, size_t offZ);
+=======
+        gpudata *Z);
+>>>>>>> Finish BLAS dot for implementation for CUDA
 
 GPUARRAY_PUBLIC int gpublas_hgemv(
   cb_order order, cb_transpose transA, size_t M, size_t N, float alpha,
