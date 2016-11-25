@@ -21,18 +21,30 @@ const char *gpublas_error(gpucontext *ctx) {
 
 int gpublas_hdot(
         size_t N,
-        gpudata *X, size_t offA, size_t incX,
-        gpudata *Y, size_t offB, size_t incY);
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
+        gpudata *Z) {
+    return gpudata_context(X)->blas_ops->hdot(
+            N, X, offX, incX, Y, offY, incY, Z);
+}
 
 int gpublas_sdot(
         size_t N,
-        gpudata *X, size_t offA, size_t incX,
-        gpudata *Y, size_t offB, size_t incY);
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
+        gpudata *Z) {
+    return gpudata_context(X)->blas_ops->sdot(
+            N, X, offX, incX, Y, offY, incY, Z);
+}
 
 int gpublas_ddot(
         size_t N,
-        gpudata *X, size_t offA, size_t incX,
-        gpudata *Y, size_t offB, size_t incY);
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
+        gpudata *Z) {
+    return gpudata_context(X)->blas_ops->ddot(
+            N, X, offX, incX, Y, offY, incY, Z);
+}
 
 int gpublas_hgemv(cb_order order, cb_transpose transA,
                   size_t M, size_t N, float alpha,

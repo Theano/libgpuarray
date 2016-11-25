@@ -5,6 +5,94 @@
 #include "gpuarray/util.h"
 #include "gpuarray/error.h"
 
+int GpuArray_rdot( GpuArray *X, GpuArray *Y,
+        GpuArray *Z, int nocopy) {
+    GpuArray *Xp = X;
+    GpuArray copyX;
+    GpuArray *Yp = Y;
+    GpuArray copyY;
+    GpuArray *Zp = Z;
+    void *ctx;
+    size_t elsize;
+    size_t n;
+    int err;
+
+  if (X->typecode != GA_HALF &&
+      X->typecode != GA_FLOAT &&
+      X->typecode != GA_DOUBLE)
+  return GA_INVALID_ERROR;
+
+  if (X->nd != 1 || X->nd != 1 || Y->nd != 0 ||
+      X->typecode != Y->typecode || X->typecode != Z->typecode)
+    return GA_VALUE_ERROR;
+  if (!(X->flags & GA_ALIGNED) || !(Y->flags & GA_ALIGNED) ||
+      !(Z->flags & GA_ALIGNED))
+    return GA_UNALIGNED_ERROR;
+  if (X->dimensions[0] != n || Y->dimensions[0] != n)
+      return GA_VALUE_ERROR;
+
+  elsize = gpuarray_get_elsize(X->typecode);
+  if (X->strides[0] < 0) {
+    if (nocopy)
+      return GA_COPY_ERROR;
+    else {
+      err = GpuArray_copy(&copyX, X, GA_ANY_ORDER);
+      if (err != GA_NO_ERROR)
+        goto cleanup;
+      Xp = &copyX;
+    }
+  }
+  if (Y->strides[0] < 0) {
+    if (nocopy)
+      return GA_COPY_ERROR;
+    else {
+      err = GpuArray_copy(&copyY, Y, GA_ANY_ORDER);
+      if (err != GA_NO_ERROR)
+	goto cleanup;
+      Yp = &copyY;
+    }
+  }
+  if (Z->strides[0] < 0) {
+    err = GA_VALUE_ERROR;
+    goto cleanup;
+  }
+
+  ctx = gpudata_context(Xp->data);
+  err = gpublas_setup(ctx);
+  if (err != GA_NO_ERROR)
+      goto cleanup;
+
+  switch (Xp->typecode) {
+      case GA_HALF:
+          err = gpublas_hdot(
+                  n,
+                  Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize,
+                  Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize,
+                  Zp->data);
+          break;
+      case GA_FLOAT:
+          err = gpublas_sdot(
+                  n,
+                  Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize,
+                  Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize,
+                  Zp->data);
+          break;
+      case GA_DOUBLE:
+          err = gpublas_sdot(
+                  n,
+                  Xp->data, Xp->offset / elsize, Xp->strides[0] / elsize,
+                  Yp->data, Yp->offset / elsize, Yp->strides[0] / elsize,
+                  Zp->data);
+          break;
+  }
+  cleanup:
+   if (Xp == &copyX)
+       GpuArray_clear(&copyX);
+   if (Yp == &copyY)
+       GpuArray_clear(&copyY);
+   return err;
+}
+
 int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
                    GpuArray *X, double beta, GpuArray *Y, int nocopy) {
   GpuArray *Ap = A;
@@ -24,8 +112,7 @@ int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
     return GA_INVALID_ERROR;
 
   if (A->nd != 2 || X->nd != 1 || Y->nd != 1 ||
-      A->typecode != A->typecode || X->typecode != A->typecode ||
-      Y->typecode != A->typecode)
+      X->typecode != A->typecode || Y->typecode != A->typecode)
     return GA_VALUE_ERROR;
 
   if (!(A->flags & GA_ALIGNED) || !(X->flags & GA_ALIGNED) ||

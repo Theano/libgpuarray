@@ -3,8 +3,12 @@ DEF_PROC_V2(cublasDestroy, (cublasHandle_t handle));
 
 DEF_PROC_V2(cublasSetStream, (cublasHandle_t handle, cudaStream_t streamId));
 DEF_PROC_V2(cublasSetPointerMode, (cublasHandle_t handle, cublasPointerMode_t mode));
+DEF_PROC_V2(cublasGetPointerMode, (cublasHandle_t handle, cublasPointerMode_t* mode));
 DEF_PROC(cublasSetAtomicsMode, (cublasHandle_t handle, cublasAtomicsMode_t mode));
 
+
+DEF_PROC_V2(cublasSdot, (cublasHandle_t handle, int n, const float *x, int incx, const float *y, int incy, float *result));
+DEF_PROC_V2(cublasDdot, (cublasHandle_t handle, int n, const double *x, int incx, const double *y, int incy, double *result));
 
 DEF_PROC_V2(cublasSgemm, (cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, int k, const float *alpha,  const float *A, int lda, const float *B, int ldb, const float *beta, float *C, int ldc));
 DEF_PROC_V2(cublasDgemm, (cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, int k, const double *alpha,  const double *A, int lda, const double *B, int ldb, const double *beta, double *C, int ldc));

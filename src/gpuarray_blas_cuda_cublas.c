@@ -788,6 +788,97 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   return GA_NO_ERROR;
 }
 
+static int hdot(
+        size_t N,
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
+        gpudata *Z
+        ) {
+    return GA_DEVSUP_ERROR;
+}
+
+static int sdot(
+        size_t N,
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
+        gpudata *Z) {
+  cuda_context *ctx = X->ctx;
+  blas_handle *h = (blas_handle *)ctx->blas_handle;
+  cublasPointerMode_t pmode;
+
+  ASSERT_BUF(X);
+  ASSERT_BUF(Y);
+  ASSERT_BUF(Z);
+
+  if (LARGE_VAL(N)) return GA_XLARGE_ERROR;
+
+  cuda_enter(ctx);
+
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(X, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Y, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Z, CUDA_WAIT_ALL));
+
+  // we should store dot result on device
+  cublasGetPointerMode(h->h, &pmode);
+  cublasSetPointerMode(h->h, CUBLAS_POINTER_MODE_HOST);
+  h->err = cublasSdot(
+          h->h, N,
+          ((float*)X->ptr) + offX, incX,
+          ((float*)Y->ptr) + offY, incY,
+          ((float*)Z->ptr)
+          );
+  cublasSetPointerMode(h->h, pmode);
+
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(X, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Y, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Z, CUDA_WAIT_ALL));
+
+  cuda_exit(ctx);
+
+  return GA_NO_ERROR;
+}
+
+static int ddot(
+        size_t N,
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
+        gpudata *Z) {
+  cuda_context *ctx = X->ctx;
+  blas_handle *h = (blas_handle *)ctx->blas_handle;
+  cublasPointerMode_t pmode;
+
+  ASSERT_BUF(X);
+  ASSERT_BUF(Y);
+  ASSERT_BUF(Z);
+
+  if (LARGE_VAL(N)) return GA_XLARGE_ERROR;
+
+  cuda_enter(ctx);
+
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(X, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Y, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Z, CUDA_WAIT_ALL));
+
+  // we should store dot result on device
+  cublasGetPointerMode(h->h, &pmode);
+  cublasSetPointerMode(h->h, CUBLAS_POINTER_MODE_HOST);
+  h->err = cublasDdot(
+      h->h, N,
+      ((double*)X->ptr) + offX, incX,
+      ((double*)Y->ptr) + offY, incY,
+      ((double*)Z->ptr)
+      );
+  cublasSetPointerMode(h->h, pmode);
+
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(X, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Y, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Z, CUDA_WAIT_ALL));
+
+  cuda_exit(ctx);
+
+  return GA_NO_ERROR;
+}
+
 static int hgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
                  float alpha, gpudata *A, size_t offA, size_t lda,
                  gpudata *X, size_t offX, int incX,
@@ -1560,6 +1651,9 @@ GPUARRAY_LOCAL gpuarray_blas_ops cublas_ops = {
   setup,
   teardown,
   error,
+  hdot, /* TODO */
+  sdot,
+  ddot,
   hgemv, /* TODO */
   sgemv,
   dgemv,
