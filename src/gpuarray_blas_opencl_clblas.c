@@ -198,7 +198,7 @@ static int hdot(
         size_t N,
         gpudata *X, size_t offX, size_t incX,
         gpudata *Y, size_t offY, size_t incY,
-        gpudata *Z) {
+        gpudata *Z, size_t offZ) {
     return GA_DEVSUP_ERROR;
 }
 
@@ -206,7 +206,7 @@ static int sdot(
         size_t N,
         gpudata *X, size_t offX, size_t incX,
         gpudata *Y, size_t offY, size_t incY,
-        gpudata *Z) {
+        gpudata *Z, size_t offZ) {
     return GA_DEVSUP_ERROR;
 }
 
@@ -214,7 +214,7 @@ static int ddot(
         size_t N,
         gpudata *X, size_t offX, size_t incX,
         gpudata *Y, size_t offY, size_t incY,
-        gpudata *Z) {
+        gpudata *Z, size_t offZ) {
     return GA_DEVSUP_ERROR;
 }
 
