@@ -193,27 +193,93 @@ static int hdot(
         size_t N,
         gpudata *X, size_t offX, int incX,
         gpudata *Y, size_t offY, int incY,
-        gpudata *Z, size_t offZ
-        ) {
-  return GA_DEVSUP_ERROR;
+        gpudata *Z, size_t offZ) {
+  cl_ctx *ctx = X->ctx;
+  StatusCode err;
+  cl_event ev;
+
+  ARRAY_INIT(X);
+  ARRAY_INIT(Y);
+  ARRAY_INIT(Z);
+
+  err = CLBlastHdot(
+          N,
+          Z->buf, offZ,
+          X->buf, offX, incX,
+          Y->buf, offY, incY,
+          &ctx->q, &ev);
+  if (err != kSuccess)
+      return GA_BLAS_ERROR;
+
+  ARRAY_FINI(X);
+  ARRAY_FINI(Y);
+  ARRAY_FINI(Z);
+
+  clReleaseEvent(ev);
+
+  return GA_NO_ERROR;
 }
 
 static int sdot(
         size_t N,
         gpudata *X, size_t offX, int incX,
         gpudata *Y, size_t offY, int incY,
-        gpudata *Z, size_t offZ
-        ) {
-  return GA_DEVSUP_ERROR;
+        gpudata *Z, size_t offZ) {
+  cl_ctx *ctx = X->ctx;
+  StatusCode err;
+  cl_event ev;
+
+  ARRAY_INIT(X);
+  ARRAY_INIT(Y);
+  ARRAY_INIT(Z);
+
+  err = CLBlastSdot(
+          N,
+          Z->buf, offZ,
+          X->buf, offX, incX,
+          Y->buf, offY, incY,
+          &ctx->q, &ev);
+  if (err != kSuccess)
+      return GA_BLAS_ERROR;
+
+  ARRAY_FINI(X);
+  ARRAY_FINI(Y);
+  ARRAY_FINI(Z);
+
+  clReleaseEvent(ev);
+
+  return GA_NO_ERROR;
 }
 
 static int ddot(
         size_t N,
         gpudata *X, size_t offX, int incX,
         gpudata *Y, size_t offY, int incY,
-        gpudata *Z, size_t offZ
-        ) {
-  return GA_DEVSUP_ERROR;
+        gpudata *Z, size_t offZ) {
+  cl_ctx *ctx = X->ctx;
+  StatusCode err;
+  cl_event ev;
+
+  ARRAY_INIT(X);
+  ARRAY_INIT(Y);
+  ARRAY_INIT(Z);
+
+  err = CLBlastDdot(
+          N,
+          Z->buf, offZ,
+          X->buf, offX, incX,
+          Y->buf, offY, incY,
+          &ctx->q, &ev);
+  if (err != kSuccess)
+      return GA_BLAS_ERROR;
+
+  ARRAY_FINI(X);
+  ARRAY_FINI(Y);
+  ARRAY_FINI(Z);
+
+  clReleaseEvent(ev);
+
+  return GA_NO_ERROR;
 }
 
 static int hgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
