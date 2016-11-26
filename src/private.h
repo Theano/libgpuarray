@@ -115,16 +115,16 @@ struct _gpuarray_blas_ops {
   const char *(*error)(gpucontext *ctx);
 
   int (*hdot)( size_t N,
-    gpudata *X, size_t offX, size_t incX,
-    gpudata *Y, size_t offY, size_t incY,
+    gpudata *X, size_t offX, int incX,
+    gpudata *Y, size_t offY, int incY,
     gpudata *Z, size_t offZ);
   int (*sdot)( size_t N,
-    gpudata *X, size_t offX, size_t incX,
-    gpudata *Y, size_t offY, size_t incY,
+    gpudata *X, size_t offX, int incX,
+    gpudata *Y, size_t offY, int incY,
     gpudata *Z, size_t offZ);
   int (*ddot)( size_t N,
-    gpudata *X, size_t offX, size_t incX,
-    gpudata *Y, size_t offY, size_t incY,
+    gpudata *X, size_t offX, int incX,
+    gpudata *Y, size_t offY, int incY,
     gpudata *Z, size_t offZ);
   int (*hgemv)(cb_order order, cb_transpose transA, size_t M, size_t N,
                float alpha, gpudata *A, size_t offA, size_t lda,
@@ -186,34 +186,34 @@ struct _gpuarray_blas_ops {
   int (*hgemvBatch)(cb_order order, cb_transpose transA,
                     size_t M, size_t N, float alpha,
                     gpudata **A, size_t *offA, size_t lda,
-                    gpudata **x, size_t *offX, size_t incX,
-                    float beta, gpudata **y, size_t *offY, size_t incY,
+                    gpudata **x, size_t *offX, int incX,
+                    float beta, gpudata **y, size_t *offY, int incY,
                     size_t batchCount, int flags);
   int (*sgemvBatch)(cb_order order, cb_transpose transA,
                     size_t M, size_t N, float alpha,
                     gpudata **A, size_t *offA, size_t lda,
-                    gpudata **x, size_t *offX, size_t incX,
-                    float beta, gpudata **y, size_t *offY, size_t incY,
+                    gpudata **x, size_t *offX, int incX,
+                    float beta, gpudata **y, size_t *offY, int incY,
                     size_t batchCount, int flags);
   int (*dgemvBatch)(cb_order order, cb_transpose transA,
                     size_t M, size_t N, double alpha,
                     gpudata **A, size_t *offA, size_t lda,
-                    gpudata **x, size_t *offX, size_t incX,
-                    double beta, gpudata **y, size_t *offY, size_t incY,
+                    gpudata **x, size_t *offX, int incX,
+                    double beta, gpudata **y, size_t *offY, int incY,
                     size_t batchCount, int flags);
   int (*hgerBatch)(cb_order order, size_t M, size_t N, float alpha,
-                   gpudata **x, size_t *offX, size_t incX,
-                   gpudata **y, size_t *offY, size_t incY,
+                   gpudata **x, size_t *offX, int incX,
+                   gpudata **y, size_t *offY, int incY,
                    gpudata **A, size_t *offA, size_t lda,
                    size_t batchCount, int flags);
   int (*sgerBatch)(cb_order order, size_t M, size_t N, float alpha,
-                   gpudata **x, size_t *offX, size_t incX,
-                   gpudata **y, size_t *offY, size_t incY,
+                   gpudata **x, size_t *offX, int incX,
+                   gpudata **y, size_t *offY, int incY,
                    gpudata **A, size_t *offA, size_t lda,
                    size_t batchCount, int flags);
   int (*dgerBatch)(cb_order order, size_t M, size_t N, double alpha,
-                   gpudata **x, size_t *offX, size_t incX,
-                   gpudata **y, size_t *offY, size_t incY,
+                   gpudata **x, size_t *offX, int incX,
+                   gpudata **y, size_t *offY, int incY,
                    gpudata **A, size_t *offA, size_t lda,
                    size_t batchCount, int flags);
 };
