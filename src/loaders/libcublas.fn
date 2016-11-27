@@ -3,7 +3,7 @@ DEF_PROC_V2(cublasDestroy, (cublasHandle_t handle));
 
 DEF_PROC_V2(cublasSetStream, (cublasHandle_t handle, cudaStream_t streamId));
 DEF_PROC_V2(cublasSetPointerMode, (cublasHandle_t handle, cublasPointerMode_t mode));
-DEF_PROC_V2(cublasGetPointerMode, (cublasHandle_t handle, cublasPointerMode_t* mode));
+DEF_PROC_V2(cublasGetPointerMode, (cublasHandle_t handle, cublasPointerMode_t *mode));
 DEF_PROC(cublasSetAtomicsMode, (cublasHandle_t handle, cublasAtomicsMode_t mode));
 
 

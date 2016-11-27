@@ -259,7 +259,7 @@ static int ddot(
   cl_mem scratch_mem;
 
   scratch_mem = clCreateBuffer(
-          ctx->ctx, CL_MEM_READ_WRITE, N*sizeof(float), NULL, &cl_err);
+          ctx->ctx, CL_MEM_READ_WRITE, N*sizeof(double), NULL, &cl_err);
   if (cl_err != CL_SUCCESS)
       return GA_MEMORY_ERROR;
 
