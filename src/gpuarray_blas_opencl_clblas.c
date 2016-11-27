@@ -1,6 +1,7 @@
 #include "private.h"
 #include "private_opencl.h"
 
+#include "loaders/libopencl.h"
 #include "loaders/libclblas.h"
 
 #include "gpuarray/buffer_blas.h"
@@ -207,7 +208,41 @@ static int sdot(
         gpudata *X, size_t offX, int incX,
         gpudata *Y, size_t offY, int incY,
         gpudata *Z, size_t offZ) {
-    return GA_DEVSUP_ERROR;
+  cl_ctx *ctx = X->ctx;
+  clblasStatus err;
+  cl_int cl_err;
+  cl_uint num_ev = 0;
+  cl_event evl[3];
+  cl_event ev;
+  cl_mem scratch_mem;
+
+  scratch_mem = clCreateBuffer(
+          ctx->ctx, CL_MEM_READ_WRITE, N*sizeof(float), NULL, &cl_err);
+  if (cl_err != CL_SUCCESS)
+      return GA_MEMORY_ERROR;
+
+  ARRAY_INIT(X);
+  ARRAY_INIT(Y);
+  ARRAY_INIT(Z);
+
+  // TODO: a thread-safe static buffer or allocator?
+  err = clblasSdot(
+          N, Z->buf, offZ,
+          X->buf, offX, incX,
+          Y->buf, offY, incY,
+          scratch_mem, 1, &ctx->q,
+          num_ev, num_ev ? evl : NULL, &ev);
+  if (err != clblasSuccess)
+      return GA_BLAS_ERROR;
+
+  ARRAY_FINI(X);
+  ARRAY_FINI(Y);
+  ARRAY_FINI(Z);
+
+  clReleaseMemObject(scratch_mem);
+  clReleaseEvent(ev);
+
+  return GA_NO_ERROR;
 }
 
 static int ddot(
@@ -215,7 +250,40 @@ static int ddot(
         gpudata *X, size_t offX, int incX,
         gpudata *Y, size_t offY, int incY,
         gpudata *Z, size_t offZ) {
-    return GA_DEVSUP_ERROR;
+  cl_ctx *ctx = X->ctx;
+  clblasStatus err;
+  cl_int cl_err;
+  cl_uint num_ev = 0;
+  cl_event evl[3];
+  cl_event ev;
+  cl_mem scratch_mem;
+
+  scratch_mem = clCreateBuffer(
+          ctx->ctx, CL_MEM_READ_WRITE, N*sizeof(float), NULL, &cl_err);
+  if (cl_err != CL_SUCCESS)
+      return GA_MEMORY_ERROR;
+
+  ARRAY_INIT(X);
+  ARRAY_INIT(Y);
+  ARRAY_INIT(Z);
+
+  err = clblasDdot(
+          N, Z->buf, offZ,
+          X->buf, offX, incX,
+          Y->buf, offY, incY,
+          scratch_mem, 1, &ctx->q,
+          num_ev, num_ev ? evl : NULL, &ev);
+  if (err != clblasSuccess)
+      return GA_BLAS_ERROR;
+
+  ARRAY_FINI(X);
+  ARRAY_FINI(Y);
+  ARRAY_FINI(Z);
+
+  clReleaseMemObject(scratch_mem);
+  clReleaseEvent(ev);
+
+  return GA_NO_ERROR;
 }
 
 static int hgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
