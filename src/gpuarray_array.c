@@ -336,7 +336,7 @@ static int gen_take1_kernel(GpuKernel *k, gpucontext *ctx, char **err_str,
   int flags = GA_USE_CLUDA;
   int res;
 
-  nargs = 7 + 2 * v->nd;
+  nargs = 9 + 2 * v->nd;
 
   atypes = calloc(nargs, sizeof(int));
   if (atypes == NULL)
@@ -351,11 +351,12 @@ static int gen_take1_kernel(GpuKernel *k, gpucontext *ctx, char **err_str,
   }
 
   apos = 0;
-  strb_appendf(&sb, "KERNEL void take1(GLOBAL_MEM %s *r, "
-               "GLOBAL_MEM const %s *v, ga_size off,",
+  strb_appendf(&sb, "KERNEL void take1(GLOBAL_MEM %s *r, ga_size r_off, "
+               "GLOBAL_MEM const %s *v, ga_size v_off,",
                gpuarray_get_type(a->typecode)->cluda_name,
                gpuarray_get_type(v->typecode)->cluda_name);
   atypes[apos++] = GA_BUFFER;
+  atypes[apos++] = GA_SIZE;
   atypes[apos++] = GA_BUFFER;
   atypes[apos++] = GA_SIZE;
   for (i = 0; i < v->nd; i++) {
@@ -363,10 +364,11 @@ static int gen_take1_kernel(GpuKernel *k, gpucontext *ctx, char **err_str,
     atypes[apos++] = GA_SSIZE;
     atypes[apos++] = GA_SIZE;
   }
-  strb_appendf(&sb, " GLOBAL_MEM const %s *ind, ga_size n0, ga_size n1,"
-               " GLOBAL_MEM int* err) {\n",
+  strb_appendf(&sb, " GLOBAL_MEM const %s *ind, ga_size i_off, "
+               "ga_size n0, ga_size n1, GLOBAL_MEM int* err) {\n",
                gpuarray_get_type(ind->typecode)->cluda_name);
   atypes[apos++] = GA_BUFFER;
+  atypes[apos++] = GA_SIZE;
   atypes[apos++] = GA_SIZE;
   atypes[apos++] = GA_SIZE;
   atypes[apos++] = GA_BUFFER;
@@ -376,9 +378,14 @@ static int gen_take1_kernel(GpuKernel *k, gpucontext *ctx, char **err_str,
                "  const %s idx1 = LDIM_1 * GID_1 + LID_1;\n"
                "  const %s numThreads1 = LDIM_1 * GDIM_1;\n"
                "  %s i0, i1;\n", sz, sz, sz, sz, sz);
+  strb_appends(&sb, "  if (idx0 >= n0 || idx1 >= n1) return;\n");
+  strb_appendf(&sb, "  r = (GLOBAL_MEM %s *)(((char *)r) + r_off);\n"
+               "  ind = (GLOBAL_MEM %s *)(((char *)ind) + i_off);\n",
+               gpuarray_get_type(a->typecode)->cluda_name,
+               gpuarray_get_type(ind->typecode)->cluda_name);
   strb_appendf(&sb, "  for (i0 = idx0; i0 < n0; i0 += numThreads0) {\n"
                "    %s ii0 = ind[i0];\n"
-               "    %s pos0 = off;\n"
+               "    %s pos0 = v_off;\n"
                "    if (ii0 < 0) ii0 += d0;\n"
                "    if ((ii0 < 0) || (ii0 >= d0)) {\n"
                "      *err = -1;\n"
@@ -500,13 +507,16 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
 
   argp = 0;
   GpuKernel_setarg(&k, argp++, a->data);
+  GpuKernel_setarg(&k, argp++, (void *)&a->offset);
   GpuKernel_setarg(&k, argp++, v->data);
+  /* The cast is to avoid a warning about const */
   GpuKernel_setarg(&k, argp++, (void *)&v->offset);
   for (j = 0; j < v->nd; j++) {
     GpuKernel_setarg(&k, argp++, &v->strides[j]);
     GpuKernel_setarg(&k, argp++, &v->dimensions[j]);
   }
   GpuKernel_setarg(&k, argp++, i->data);
+  GpuKernel_setarg(&k, argp++, (void *)&i->offset);
   GpuKernel_setarg(&k, argp++, &n[0]);
   GpuKernel_setarg(&k, argp++, &n[1]);
   GpuKernel_setarg(&k, argp++, errbuf);
@@ -1083,11 +1093,15 @@ int GpuArray_fdump(FILE *fd, const GpuArray *a) {
     case GA_UINT:
       fprintf(fd, "%u", *(unsigned int *)p);
       break;
+    case GA_LONG:
+      fprintf(fd, "%lld", (long long)*(int64_t *)p);
+      break;
     case GA_SSIZE:
       fprintf(fd, "%" SPREFIX "d", *(ssize_t *)p);
       break;
     default:
       free(buf);
+      fprintf(fd, "<unsupported data type %d>\n", a->typecode);
       return GA_UNSUPPORTED_ERROR;
     }
     s -= gpuarray_get_elsize(a->typecode);
