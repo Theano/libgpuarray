@@ -243,12 +243,40 @@ START_TEST(test_take1_ok) {
 }
 END_TEST
 
+START_TEST(test_take1_offset) {
+  const uint32_t data[24] = {0, 1, 2, 3};
+  const size_t data_dims[1] = {4};
+  const size_t out_dims[1] = {2};
+  const uint32_t idx[4] = {20, 3, 3, 2};
+  GpuArray v;
+  GpuArray i;
+  GpuArray r;
+
+  ga_assert_ok(GpuArray_empty(&v, ctx, GA_UINT, 1, data_dims, GA_C_ORDER));
+  ga_assert_ok(GpuArray_write(&v, data, sizeof(data)));
+
+  ga_assert_ok(GpuArray_empty(&i, ctx, GA_UINT, 1, data_dims, GA_C_ORDER));
+  ga_assert_ok(GpuArray_write(&i, idx, sizeof(idx)));
+
+  ga_assert_ok(GpuArray_empty(&r, ctx, GA_UINT, 1, out_dims, GA_C_ORDER));
+
+  /* Fake subtensor for offset */
+  i.offset = 8;
+  i.dimensions[0] = 2;
+
+  ga_assert_ok(GpuArray_take1(&r, &v, &i, 1));
+  /* The actual results are not important, this is just to check that
+     we don't trigger the out of bounds check */
+}
+END_TEST
+
 Suite *get_suite(void) {
   Suite *s = suite_create("array");
   TCase *tc = tcase_create("take1");
   tcase_add_checked_fixture(tc, setup, teardown);
   tcase_set_timeout(tc, 8.0);
   tcase_add_test(tc, test_take1_ok);
+  tcase_add_test(tc, test_take1_offset);
   suite_add_tcase(s, tc);
   return s;
 }
