@@ -16,11 +16,9 @@ distribute*egg
 distribute*tar.gz
 *.so
 *.o
-*.aux
-*.bbl
-*.blg
 *.log
 pygpu/*.c
 pygpu/*.h
+pygpu/version.py
 src/private_config.h
 Makefile.conf
