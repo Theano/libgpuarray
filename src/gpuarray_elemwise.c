@@ -31,6 +31,7 @@ struct _GpuElemwise {
 STATIC_ASSERT(GEN_CONVERT_F16 == GE_CONVERT_F16, same_flags_value_elem1);
 
 #define is_array(a) (ISCLR((a).flags, GE_SCALAR))
+#define is_output(a) (ISSET((a).flags, GE_WRITE))
 
 static inline int k_initialized(GpuKernel *k) {
   return k->k != NULL;
@@ -278,16 +279,17 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
   /* Go through the list and grab some info */
   for (i = 0; i < ge->n; i++) {
     if (is_array(ge->args[i])) {
-      num_arrays++;
-      if (a == NULL) {
-        a = (GpuArray *)args[i];
-        nd = a->nd;
-      }
-      if (((GpuArray *)args[i])->nd != nd)
+      if (num_arrays == 0)
+        nd = ((GpuArray *)args[i])->nd;
+      else if (((GpuArray *)args[i])->nd != nd)
         return GA_VALUE_ERROR;
+      ++num_arrays;
+      if (a == NULL && is_output(ge->args[i]))
+        a = (GpuArray *)args[i];
     }
   }
 
+  /* No output arrays, this is an error */
   if (a == NULL)
     return GA_VALUE_ERROR;
 
@@ -300,7 +302,7 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
   }
 
   /* Now we know that all array arguments have the same number of
-     dimensions */
+     dimensions and that the expected output size is the size of a */
 
   /* And copy their initial values in */
   memcpy(ge->dims, a->dimensions, nd*sizeof(size_t));
@@ -313,8 +315,8 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
   }
 
   /* Check that all arrays are the same size (or broadcast-compatible
-     if GE_BROADCAST).  Also compute the total size and adjust strides
-     of broadcastable dimensions.
+     if GE_BROADCAST), adjust strides of broadcastable dimensions and
+     check if we can use the 32 bit address version.
 
      Basically for each dimension go over all the arguments and make
      sure that the dimension size matches. */
@@ -325,16 +327,10 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
       if (is_array(ge->args[i])) {
         v = (GpuArray *)args[i];
         if (ge->dims[j] != v->dimensions[j]) {
-          if (ISCLR(flags, GE_BROADCAST)) {
+          /* We can't broadcast outputs */
+          if (ISCLR(flags, GE_BROADCAST) || is_output(ge->args[i]) ||
+              v->dimensions[j] != 1) {
             return GA_VALUE_ERROR;
-          }
-          /* GE_BROADCAST is set */
-          if (ge->dims[j] == 1) {
-            ge->dims[j] = v->dimensions[j];
-          } else {
-            if (v->dimensions[j] != 1) {
-              return GA_VALUE_ERROR;
-            }
           }
         }
         /* If the dimension is 1 set the strides to 0 regardless since
