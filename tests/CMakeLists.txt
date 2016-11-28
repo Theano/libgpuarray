@@ -61,6 +61,10 @@ add_executable(check_array main.c device.c check_array.c)
 target_link_libraries(check_array ${CHECK_LIBRARIES} gpuarray)
 add_test(test_array "${CMAKE_CURRENT_BINARY_DIR}/check_array")
 
+add_executable(check_blas main.c device.c check_blas.c)
+target_link_libraries(check_blas ${CHECK_LIBRARIES} gpuarray)
+add_test(test_blas "${CMAKE_CURRENT_BINARY_DIR}/check_blas")
+
 add_executable(check_elemwise main.c device.c check_elemwise.c)
 target_link_libraries(check_elemwise ${CHECK_LIBRARIES} gpuarray)
 add_test(test_elemwise "${CMAKE_CURRENT_BINARY_DIR}/check_elemwise")
