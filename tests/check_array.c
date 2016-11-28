@@ -21,12 +21,12 @@ START_TEST(test_take1_ok) {
   GpuArray v;
   GpuArray vidx;
   GpuArray vres;
-  static const uint32_t data[24] = { 0,  1,  2,  3,  4,  5,
-                                     6,  7,  8,  9, 10, 11,
-                                    12, 13, 14, 15, 16, 17,
-                                    18, 19, 20, 21, 22, 23};
+  const uint32_t data[24] = { 0,  1,  2,  3,  4,  5,
+                              6,  7,  8,  9, 10, 11,
+                              12, 13, 14, 15, 16, 17,
+                              18, 19, 20, 21, 22, 23};
   uint32_t buf[12 * 24];
-  static const size_t data_dims[1] = {24};
+  const size_t data_dims[1] = {24};
   ssize_t indexes[12];
   size_t dims[3];
 
