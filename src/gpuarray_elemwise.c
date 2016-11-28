@@ -279,18 +279,18 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
   /* Go through the list and grab some info */
   for (i = 0; i < ge->n; i++) {
     if (is_array(ge->args[i])) {
-      num_arrays++;
-      if (a == NULL || !is_output(a)) {
-        a = (GpuArray *)args[i];
-        nd = a->nd;
-      }
-      if (((GpuArray *)args[i])->nd != nd)
+      if (num_arrays == 0)
+        nd = ((GpuArray *)args[i])->nd;
+      else if (((GpuArray *)args[i])->nd != nd)
         return GA_VALUE_ERROR;
+      ++num_arrays;
+      if (a == NULL && is_output(ge->args[i]))
+        a = (GpuArray *)args[i];
     }
   }
 
   /* No output arrays, this is an error */
-  if (a == NULL || !is_output(a))
+  if (a == NULL)
     return GA_VALUE_ERROR;
 
   /* Check if we need to grow the internal buffers */
@@ -328,7 +328,7 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
         v = (GpuArray *)args[i];
         if (ge->dims[j] != v->dimensions[j]) {
           /* We can't broadcast outputs */
-          if (ISCLR(flags, GE_BROADCAST) || is_output(v) ||
+          if (ISCLR(flags, GE_BROADCAST) || is_output(ge->args[i]) ||
               v->dimensions[j] != 1) {
             return GA_VALUE_ERROR;
           }
