@@ -12,6 +12,8 @@ from .operations import (split, array_split, hsplit, vsplit, dsplit,
                          concatenate, hstack, vstack, dstack)
 from ._array import ndgpuarray
 
+from .version import fullversion as __version__
+
 from .tests import main
 if hasattr(main, "NoseTester"):
     test = main.NoseTester().test
