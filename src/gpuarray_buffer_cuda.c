@@ -1393,6 +1393,7 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     }
     ctx->err = cuDeviceGetName(s, 256, id);
     if (ctx->err != CUDA_SUCCESS) {
+      free(s);
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
@@ -1414,8 +1415,6 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     }
     ctx->err = cuDeviceGetPCIBusId(s, 13, id);
     if (ctx->err != CUDA_SUCCESS) {
-      /* PS: in GA_CTX_PROP_DEVNAME above, s is not freed here.
-       * I think it should be freed, isn't it ? */
       free(s);
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
