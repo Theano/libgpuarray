@@ -244,7 +244,7 @@ START_TEST(test_take1_ok) {
 END_TEST
 
 START_TEST(test_take1_offset) {
-  const uint32_t data[24] = {0, 1, 2, 3};
+  const uint32_t data[4] = {0, 1, 2, 3};
   const size_t data_dims[1] = {4};
   const size_t out_dims[1] = {2};
   const uint32_t idx[4] = {20, 3, 3, 2};
