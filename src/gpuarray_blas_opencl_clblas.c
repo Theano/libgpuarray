@@ -1,7 +1,6 @@
 #include "private.h"
 #include "private_opencl.h"
 
-#include "loaders/libopencl.h"
 #include "loaders/libclblas.h"
 
 #include "gpuarray/buffer_blas.h"

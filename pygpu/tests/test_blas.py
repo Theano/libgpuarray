@@ -58,7 +58,6 @@ def test_gemv():
         yield gemv, (32, 32), 'float32', 'f', False, False, 1, \
             overwrite, True, alpha, beta
 
-
 @guard_devsup
 def gemv(shp, dtype, order, trans, offseted_i, sliced,
           overwrite, init_y, alpha=1.0, beta=0.0):
