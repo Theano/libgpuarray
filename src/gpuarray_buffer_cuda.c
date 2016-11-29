@@ -443,6 +443,21 @@ static void find_best(cuda_context *ctx, gpudata **best, gpudata **prev,
   }
 }
 
+static size_t largest_size(cuda_context *ctx) {
+  gpudata *temp;
+  size_t sz, dummy;
+  cuda_enter(ctx);
+  ctx->err = cuMemGetInfo(&sz, &dummy);
+  cuda_exit(ctx);
+   /* We guess that we can allocate at least a quarter of the free size
+     in a single block. This might be wrong though. */
+  sz /= 4;
+  for (temp = ctx->freeblocks; temp; temp = temp->next) {
+    if (temp->sz > sz) sz = temp->sz;
+  }
+  return sz;
+}
+
 /*
  * Allocate a new block and place in on the freelist. Will allocate
  * the bigger of the requested size and BLOCK_SIZE to avoid allocating
@@ -1421,6 +1436,10 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     }
     *((char **)res) = s;
     cuda_exit(ctx);
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_LARGEST_MEMBLOCK:
+    *((size_t *)res) = largest_size(ctx);
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_MAXLSIZE:

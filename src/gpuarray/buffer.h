@@ -689,6 +689,13 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
  */
 #define GA_CTX_PROP_PCIBUSID 19
 
+/**
+ * Get the largest single block of memory that can be allocted.
+ *
+ * Type: `size_t`
+ */
+#define GA_CTX_PROP_LARGEST_MEMBLOCK 20
+
 /* Start at 512 for GA_BUFFER_PROP_ */
 #define GA_BUFFER_PROP_START  512
 
