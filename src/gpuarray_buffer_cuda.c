@@ -3,6 +3,7 @@
 #include "private.h"
 #include "private_cuda.h"
 #include "loaders/libnvrtc.h"
+#include "loaders/libcublas.h"
 
 #include <sys/types.h>
 
@@ -1512,6 +1513,11 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_BLAS_OPS:
+    {
+      int e = load_libcublas(major, minor);
+      if (e != GA_NO_ERROR)
+        return e;
+    }
     *((gpuarray_blas_ops **)res) = &cublas_ops;
     return GA_NO_ERROR;
 
