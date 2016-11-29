@@ -6,6 +6,8 @@
 #include "gpuarray/buffer_blas.h"
 #include "gpuarray/error.h"
 
+extern const gpuarray_buffer_ops opencl_ops;
+
 static inline clblasOrder convO(cb_order order) {
   switch (order) {
   case cb_row:
@@ -192,6 +194,99 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
                      gpudata **A, size_t *offA, size_t lda,
                      size_t batchCount, int flags) {
   return GA_DEVSUP_ERROR;
+}
+
+static int hdot(
+        size_t N,
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
+        gpudata *Z, size_t offZ) {
+    return GA_DEVSUP_ERROR;
+}
+
+static int sdot(
+        size_t N,
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
+        gpudata *Z, size_t offZ) {
+  cl_ctx *ctx = X->ctx;
+  clblasStatus err;
+  cl_uint num_ev = 0;
+  cl_event evl[3];
+  cl_event ev;
+  gpudata *wbuf;
+  int alloc_err;
+
+  wbuf = opencl_ops.buffer_alloc(
+          (gpucontext*)ctx,
+          N*sizeof(float), NULL, GA_BUFFER_READ_WRITE, &alloc_err);
+  if (alloc_err != GA_NO_ERROR)
+      return alloc_err;
+
+  ARRAY_INIT(X);
+  ARRAY_INIT(Y);
+  ARRAY_INIT(Z);
+
+  // TODO: a thread-safe static buffer or allocator?
+  err = clblasSdot(
+          N, Z->buf, offZ,
+          X->buf, offX, incX,
+          Y->buf, offY, incY,
+          wbuf->buf, 1, &ctx->q,
+          num_ev, num_ev ? evl : NULL, &ev);
+  if (err != clblasSuccess)
+      return GA_BLAS_ERROR;
+
+  ARRAY_FINI(X);
+  ARRAY_FINI(Y);
+  ARRAY_FINI(Z);
+
+  opencl_ops.buffer_release(wbuf);
+  clReleaseEvent(ev);
+
+  return GA_NO_ERROR;
+}
+
+static int ddot(
+        size_t N,
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
+        gpudata *Z, size_t offZ) {
+  cl_ctx *ctx = X->ctx;
+  clblasStatus err;
+  cl_uint num_ev = 0;
+  cl_event evl[3];
+  cl_event ev;
+  gpudata *wbuf;
+  int alloc_err;
+
+  wbuf = opencl_ops.buffer_alloc(
+          (gpucontext*)ctx,
+          N*sizeof(double), NULL, GA_BUFFER_READ_WRITE, &alloc_err);
+  if (alloc_err != GA_NO_ERROR)
+      return alloc_err;
+
+  ARRAY_INIT(X);
+  ARRAY_INIT(Y);
+  ARRAY_INIT(Z);
+
+  err = clblasDdot(
+          N, Z->buf, offZ,
+          X->buf, offX, incX,
+          Y->buf, offY, incY,
+          wbuf->buf, 1, &ctx->q,
+          num_ev, num_ev ? evl : NULL, &ev);
+  if (err != clblasSuccess)
+      return GA_BLAS_ERROR;
+
+  ARRAY_FINI(X);
+  ARRAY_FINI(Y);
+  ARRAY_FINI(Z);
+
+  opencl_ops.buffer_release(wbuf);
+  clReleaseEvent(ev);
+
+  return GA_NO_ERROR;
 }
 
 static int hgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
@@ -400,6 +495,9 @@ GPUARRAY_LOCAL gpuarray_blas_ops clblas_ops = {
   setup,
   teardown,
   error,
+  hdot, /* TODO */
+  sdot,
+  ddot,
   hgemv, /* TODO */
   sgemv,
   dgemv,

@@ -10,6 +10,7 @@ cdef extern from "gpuarray/buffer_blas.h":
         cb_conj_trans
 
 cdef extern from "gpuarray/blas.h":
+    int GpuArray_rdot(_GpuArray *X, _GpuArray *Y, _GpuArray *Z, int nocopy)
     int GpuArray_rgemv(cb_transpose transA, double alpha, _GpuArray *A,
                        _GpuArray *X, double beta, _GpuArray *Y, int nocopy)
     int GpuArray_rgemm(cb_transpose transA, cb_transpose transB,
@@ -17,6 +18,13 @@ cdef extern from "gpuarray/blas.h":
                        double beta, _GpuArray *C, int nocopy)
     int GpuArray_rger(double alpha, _GpuArray *X, _GpuArray *Y, _GpuArray *A,
                       int nocopy)
+
+cdef api int pygpu_blas_rdot(GpuArray X, GpuArray Y, GpuArray Z, bint nocopy) except -1:
+    cdef int err
+    err = GpuArray_rdot(&X.ga, &Y.ga, &Z.ga, nocopy)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(GpuArray_error(&X.ga, err), err)
+    return 0
 
 cdef api int pygpu_blas_rgemv(cb_transpose transA, double alpha, GpuArray A,
                               GpuArray X, double beta, GpuArray Y,
@@ -44,6 +52,16 @@ cdef api int pygpu_blas_rger(double alpha, GpuArray X, GpuArray Y, GpuArray A,
         raise GpuArrayException(GpuArray_error(&X.ga, err), err)
     return 0
 
+
+def dot(GpuArray X, GpuArray Y, GpuArray Z=None, overwrite_z=False):
+    if Z is None:
+        Z = pygpu_empty(0, NULL, X.typecode, GA_ANY_ORDER, X.context, None)
+        overwrite_z = True
+
+    if not overwrite_z:
+        Z = pygpu_copy(Z, GA_ANY_ORDER)
+    pygpu_blas_rdot(X, Y, Z, 0)
+    return Z
 
 def gemv(double alpha, GpuArray A, GpuArray X, double beta=0.0,
          GpuArray Y=None, trans_a=False, overwrite_y=False):

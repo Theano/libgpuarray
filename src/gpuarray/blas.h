@@ -8,6 +8,12 @@
 extern "C" {
 #endif
 
+// only for vector-vector dot
+GPUARRAY_PUBLIC int GpuArray_rdot( GpuArray *X, GpuArray *Y,
+                                   GpuArray *Z, int nocopy);
+#define GpuArray_hdot GpuArray_rdot
+#define GpuArray_sdot GpuArray_rdot
+#define GpuArray_ddot GpuArray_rdot
 GPUARRAY_PUBLIC int GpuArray_rgemv(cb_transpose transA, double alpha,
                                    GpuArray *A, GpuArray *X, double beta,
                                    GpuArray *Y, int nocopy);

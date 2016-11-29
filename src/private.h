@@ -113,6 +113,19 @@ struct _gpuarray_blas_ops {
   int (*setup)(gpucontext *ctx);
   void (*teardown)(gpucontext *ctx);
   const char *(*error)(gpucontext *ctx);
+
+  int (*hdot)( size_t N,
+    gpudata *X, size_t offX, size_t incX,
+    gpudata *Y, size_t offY, size_t incY,
+    gpudata *Z, size_t offZ);
+  int (*sdot)( size_t N,
+    gpudata *X, size_t offX, size_t incX,
+    gpudata *Y, size_t offY, size_t incY,
+    gpudata *Z, size_t offZ);
+  int (*ddot)( size_t N,
+    gpudata *X, size_t offX, size_t incX,
+    gpudata *Y, size_t offY, size_t incY,
+    gpudata *Z, size_t offZ);
   int (*hgemv)(cb_order order, cb_transpose transA, size_t M, size_t N,
                float alpha, gpudata *A, size_t offA, size_t lda,
                gpudata *X, size_t offX, int incX, float beta,
