@@ -39,8 +39,8 @@ typedef struct _blas_handle {
 
 static const char *code_sgemvBH_N_a1_b1_small =                         \
   "extern \"C\"__global__ void sgemv(const float *A[], size_t lda, "    \
-  "                                  const float *x[], int incx, "   \
-  "                                  float *y[], int incy, "         \
+  "                                  const float *x[], size_t incx, "   \
+  "                                  float *y[], size_t incy, "         \
   "                                  size_t b, size_t m, size_t n) {"   \
   "  for (size_t p = blockIdx.y * blockDim.y + threadIdx.y; p < b;"     \
   "       p += gridDim.y * blockDim.y) {"                               \
@@ -62,8 +62,8 @@ static const char *code_sgemvBH_N_a1_b1_small =                         \
 
 static const char *code_sgemvBH_T_a1_b1_small =                         \
   "extern \"C\" __global__ void sgemv(const float *A[], size_t lda, "   \
-  "                                   const float *x[], int incx, "  \
-  "                                   float *y[], int incy, "        \
+  "                                   const float *x[], size_t incx, "  \
+  "                                   float *y[], size_t incy, "        \
   "                                   size_t b, size_t m, size_t n) {"  \
   "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;"                 \
   "  size_t p = blockIdx.y * blockDim.y + threadIdx.y;"                 \
@@ -97,8 +97,8 @@ static const char *atomicadd_double =                                   \
 
 static const char *code_dgemvBH_N_a1_b1_small =                         \
   "extern \"C\" __global__ void dgemv(const double *A[], size_t lda, "  \
-  "                                   const double *x[], int incx, " \
-  "                                   double *y[], int incy, "       \
+  "                                   const double *x[], size_t incx, " \
+  "                                   double *y[], size_t incy, "       \
   "                                   size_t b, size_t m, size_t n) {"  \
   "  for (size_t p = blockIdx.y * blockDim.y + threadIdx.y; p < b;"     \
   "       p += gridDim.y * blockDim.y) {"                               \
@@ -120,8 +120,8 @@ static const char *code_dgemvBH_N_a1_b1_small =                         \
 
 static const char *code_dgemvBH_T_a1_b1_small =                         \
   "extern \"C\" __global__ void dgemv(const double *A[], size_t lda, "  \
-  "                                   const double *x[], int incx, " \
-  "                                   double *y[], int incy, "       \
+  "                                   const double *x[], size_t incx, " \
+  "                                   double *y[], size_t incy, "       \
   "                                   size_t b, size_t m, size_t n) {"  \
   "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;"                 \
   "  size_t p = blockIdx.y * blockDim.y + threadIdx.y;"                 \
@@ -139,8 +139,8 @@ static const char *code_dgemvBH_T_a1_b1_small =                         \
 
 static const char *code_sgerBH_gen_small =                              \
   "extern \"C\" __global__ void _sgerBH_gen_small("                     \
-  "    const float *x[], int incx,"                                  \
-  "    const float *y[], int incy,"                                  \
+  "    const float *x[], size_t incx,"                                  \
+  "    const float *y[], size_t incy,"                                  \
   "    float alpha, float *A[], size_t lda,"                            \
   "    size_t b, size_t m, size_t n) {"                                 \
   "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;"                 \
@@ -154,8 +154,8 @@ static const char *code_sgerBH_gen_small =                              \
 
 static const char *code_dgerBH_gen_small =                              \
   "extern \"C\" __global__ void _dgerBH_gen_small("                     \
-  "      const double *x[], int incx, "                              \
-  "      const double *y[], int incy,"                               \
+  "      const double *x[], size_t incx, "                              \
+  "      const double *y[], size_t incy,"                               \
   "      double alpha, double *A[], size_t lda,"                        \
   "      size_t b, size_t m, size_t n) {"                               \
   "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;"                 \
@@ -790,16 +790,16 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
 
 static int hdot(
         size_t N,
-        gpudata *X, size_t offX, int incX,
-        gpudata *Y, size_t offY, int incY,
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
         gpudata *Z, size_t offZ) {
     return GA_DEVSUP_ERROR;
 }
 
 static int sdot(
         size_t N,
-        gpudata *X, size_t offX, int incX,
-        gpudata *Y, size_t offY, int incY,
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
         gpudata *Z, size_t offZ) {
   cuda_context *ctx = X->ctx;
   blas_handle *h = (blas_handle *)ctx->blas_handle;
@@ -838,8 +838,8 @@ static int sdot(
 
 static int ddot(
         size_t N,
-        gpudata *X, size_t offX, int incX,
-        gpudata *Y, size_t offY, int incY,
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
         gpudata *Z, size_t offZ) {
   cuda_context *ctx = X->ctx;
   blas_handle *h = (blas_handle *)ctx->blas_handle;
@@ -878,15 +878,15 @@ static int ddot(
 
 static int hgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
                  float alpha, gpudata *A, size_t offA, size_t lda,
-                 gpudata *X, size_t offX, int incX,
-                 float beta, gpudata *Y, size_t offY, int incY) {
+                 gpudata *X, size_t offX, size_t incX,
+                 float beta, gpudata *Y, size_t offY, size_t incY) {
   return GA_DEVSUP_ERROR;
 }
 
 static int sgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
                  float alpha, gpudata *A, size_t offA, size_t lda,
-                 gpudata *X, size_t offX, int incX,
-                 float beta, gpudata *Y, size_t offY, int incY) {
+                 gpudata *X, size_t offX, size_t incX,
+                 float beta, gpudata *Y, size_t offY, size_t incY) {
   cuda_context *ctx = A->ctx;
   blas_handle *h = (blas_handle *)ctx->blas_handle;
   size_t t;
@@ -940,8 +940,8 @@ static int sgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
 
 static int dgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
                  double alpha, gpudata *A, size_t offA, size_t lda,
-                 gpudata *X, size_t offX, int incX,
-                 double beta, gpudata *Y, size_t offY, int incY) {
+                 gpudata *X, size_t offX, size_t incX,
+                 double beta, gpudata *Y, size_t offY, size_t incY) {
   cuda_context *ctx = A->ctx;
   blas_handle *h = (blas_handle *)ctx->blas_handle;
   size_t t;
@@ -996,8 +996,8 @@ static int dgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
 static int hgemvBatch(cb_order order, cb_transpose transA,
                       size_t M, size_t N, float alpha,
                       gpudata **A, size_t *offA, size_t lda,
-                      gpudata **x, size_t *offX, int incX,
-                      float beta, gpudata **y, size_t *offY, int incY,
+                      gpudata **x, size_t *offX, size_t incX,
+                      float beta, gpudata **y, size_t *offY, size_t incY,
                       size_t batchCount, int flags) {
   return GA_DEVSUP_ERROR;
 }
@@ -1005,8 +1005,8 @@ static int hgemvBatch(cb_order order, cb_transpose transA,
 static int sgemvBatch(cb_order order, cb_transpose transA,
                       size_t M, size_t N, float alpha,
                       gpudata **A, size_t *offA, size_t lda,
-                      gpudata **x, size_t *offX, int incX,
-                      float beta, gpudata **y, size_t *offY, int incY,
+                      gpudata **x, size_t *offX, size_t incX,
+                      float beta, gpudata **y, size_t *offY, size_t incY,
                       size_t batchCount, int flags) {
   /* Flags is there for possible future implementations where we might
      not use atomics or have some alternate implemntation. */
@@ -1131,8 +1131,8 @@ static int sgemvBatch(cb_order order, cb_transpose transA,
 static int dgemvBatch(cb_order order, cb_transpose transA,
                       size_t M, size_t N, double alpha,
                       gpudata **A, size_t *offA, size_t lda,
-                      gpudata **x, size_t *offX, int incX,
-                      double beta, gpudata **y, size_t *offY, int incY,
+                      gpudata **x, size_t *offX, size_t incX,
+                      double beta, gpudata **y, size_t *offY, size_t incY,
                       size_t batchCount, int flags) {
   cuda_context *ctx;
   size_t t, i;
@@ -1253,13 +1253,13 @@ static int dgemvBatch(cb_order order, cb_transpose transA,
 
 
 static int hger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
-                size_t offX, int incX, gpudata *Y, size_t offY, int incY,
+                size_t offX, size_t incX, gpudata *Y, size_t offY, size_t incY,
                 gpudata *A, size_t offA, size_t lda) {
   return GA_DEVSUP_ERROR;
 }
 
 static int sger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
-                size_t offX, int incX, gpudata *Y, size_t offY, int incY,
+                size_t offX, size_t incX, gpudata *Y, size_t offY, size_t incY,
                 gpudata *A, size_t offA, size_t lda) {
   cuda_context *ctx = X->ctx;
   blas_handle *h = (blas_handle *)ctx->blas_handle;
@@ -1316,7 +1316,7 @@ static int sger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
 }
 
 static int dger(cb_order order, size_t M, size_t N, double alpha, gpudata *X,
-                size_t offX, int incX, gpudata *Y, size_t offY, int incY,
+                size_t offX, size_t incX, gpudata *Y, size_t offY, size_t incY,
                 gpudata *A, size_t offA, size_t lda) {
   cuda_context *ctx = X->ctx;
   blas_handle *h = (blas_handle *)ctx->blas_handle;
@@ -1373,16 +1373,16 @@ static int dger(cb_order order, size_t M, size_t N, double alpha, gpudata *X,
 }
 
 static int hgerBatch(cb_order order, size_t M, size_t N, float alpha,
-                     gpudata **x, size_t *offX, int incX,
-                     gpudata **y, size_t *offY, int incY,
+                     gpudata **x, size_t *offX, size_t incX,
+                     gpudata **y, size_t *offY, size_t incY,
                      gpudata **A, size_t *offA, size_t lda,
                      size_t batchCount, int flags) {
   return GA_DEVSUP_ERROR;
 }
 
 static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
-                     gpudata **x, size_t *offX, int incX,
-                     gpudata **y, size_t *offY, int incY,
+                     gpudata **x, size_t *offX, size_t incX,
+                     gpudata **y, size_t *offY, size_t incY,
                      gpudata **A, size_t *offA, size_t lda,
                      size_t batchCount, int flags) {
   cuda_context *ctx;
@@ -1513,8 +1513,8 @@ static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
 }
 
 static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
-                     gpudata **x, size_t *offX, int incX,
-                     gpudata **y, size_t *offY, int incY,
+                     gpudata **x, size_t *offX, size_t incX,
+                     gpudata **y, size_t *offY, size_t incY,
                      gpudata **A, size_t *offA, size_t lda,
                      size_t batchCount, int flags) {
   cuda_context *ctx;
