@@ -141,8 +141,8 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
 static int hgemvBatch(cb_order order, cb_transpose transA,
                       size_t M, size_t N, float alpha,
                       gpudata **A, size_t *offA, size_t lda,
-                      gpudata **x, size_t *offX, int incX,
-                      float beta, gpudata **y, size_t *offY, int incY,
+                      gpudata **x, size_t *offX, size_t incX,
+                      float beta, gpudata **y, size_t *offY, size_t incY,
                       size_t batchCount, int flags) {
   return GA_DEVSUP_ERROR;
 }
@@ -150,8 +150,8 @@ static int hgemvBatch(cb_order order, cb_transpose transA,
 static int sgemvBatch(cb_order order, cb_transpose transA,
                       size_t M, size_t N, float alpha,
                       gpudata **A, size_t *offA, size_t lda,
-                      gpudata **x, size_t *offX, int incX,
-                      float beta, gpudata **y, size_t *offY, int incY,
+                      gpudata **x, size_t *offX, size_t incX,
+                      float beta, gpudata **y, size_t *offY, size_t incY,
                       size_t batchCount, int flags) {
   return GA_DEVSUP_ERROR;
 }
@@ -159,31 +159,31 @@ static int sgemvBatch(cb_order order, cb_transpose transA,
 static int dgemvBatch(cb_order order, cb_transpose transA,
                       size_t M, size_t N, double alpha,
                       gpudata **A, size_t *offA, size_t lda,
-                      gpudata **x, size_t *offX, int incX,
-                      double beta, gpudata **y, size_t *offY, int incY,
+                      gpudata **x, size_t *offX, size_t incX,
+                      double beta, gpudata **y, size_t *offY, size_t incY,
                       size_t batchCount, int flags) {
   return GA_DEVSUP_ERROR;
 }
 
 static int hgerBatch(cb_order order, size_t M, size_t N, float alpha,
-                     gpudata **x, size_t *offX, int incX,
-                     gpudata **y, size_t *offY, int incY,
+                     gpudata **x, size_t *offX, size_t incX,
+                     gpudata **y, size_t *offY, size_t incY,
                      gpudata **A, size_t *offA, size_t lda,
                      size_t batchCount, int flags) {
   return GA_DEVSUP_ERROR;
 }
 
 static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
-                     gpudata **x, size_t *offX, int incX,
-                     gpudata **y, size_t *offY, int incY,
+                     gpudata **x, size_t *offX, size_t incX,
+                     gpudata **y, size_t *offY, size_t incY,
                      gpudata **A, size_t *offA, size_t lda,
                      size_t batchCount, int flags) {
   return GA_DEVSUP_ERROR;
 }
 
 static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
-                     gpudata **x, size_t *offX, int incX,
-                     gpudata **y, size_t *offY, int incY,
+                     gpudata **x, size_t *offX, size_t incX,
+                     gpudata **y, size_t *offY, size_t incY,
                      gpudata **A, size_t *offA, size_t lda,
                      size_t batchCount, int flags) {
   return GA_DEVSUP_ERROR;
@@ -191,8 +191,8 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
 
 static int hdot(
         size_t N,
-        gpudata *X, size_t offX, int incX,
-        gpudata *Y, size_t offY, int incY,
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
         gpudata *Z, size_t offZ) {
   cl_ctx *ctx = X->ctx;
   StatusCode err;
@@ -222,8 +222,8 @@ static int hdot(
 
 static int sdot(
         size_t N,
-        gpudata *X, size_t offX, int incX,
-        gpudata *Y, size_t offY, int incY,
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
         gpudata *Z, size_t offZ) {
   cl_ctx *ctx = X->ctx;
   StatusCode err;
@@ -253,8 +253,8 @@ static int sdot(
 
 static int ddot(
         size_t N,
-        gpudata *X, size_t offX, int incX,
-        gpudata *Y, size_t offY, int incY,
+        gpudata *X, size_t offX, size_t incX,
+        gpudata *Y, size_t offY, size_t incY,
         gpudata *Z, size_t offZ) {
   cl_ctx *ctx = X->ctx;
   StatusCode err;
@@ -284,8 +284,8 @@ static int ddot(
 
 static int hgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
                  float alpha, gpudata *A, size_t offA, size_t lda,
-                 gpudata *X, size_t offX, int incX, float beta,
-                 gpudata *Y, size_t offY, int incY) {
+                 gpudata *X, size_t offX, size_t incX, float beta,
+                 gpudata *Y, size_t offY, size_t incY) {
   cl_ctx *ctx = A->ctx;
   StatusCode err;
   cl_event ev;
@@ -311,8 +311,8 @@ static int hgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
 
 static int sgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
                  float alpha, gpudata *A, size_t offA, size_t lda,
-                 gpudata *X, size_t offX, int incX, float beta,
-                 gpudata *Y, size_t offY, int incY) {
+                 gpudata *X, size_t offX, size_t incX, float beta,
+                 gpudata *Y, size_t offY, size_t incY) {
   cl_ctx *ctx = A->ctx;
   StatusCode err;
   cl_event ev;
@@ -338,8 +338,8 @@ static int sgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
 
 static int dgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
                  double alpha, gpudata *A, size_t offA, size_t lda,
-                 gpudata *X, size_t offX, int incX, double beta,
-                 gpudata *Y, size_t offY, int incY) {
+                 gpudata *X, size_t offX, size_t incX, double beta,
+                 gpudata *Y, size_t offY, size_t incY) {
   cl_ctx *ctx = A->ctx;
   StatusCode err;
   cl_event ev;
@@ -448,8 +448,8 @@ static int dgemm(cb_order order, cb_transpose transA, cb_transpose transB,
 }
 
 static int hger(cb_order order, size_t M, size_t N, float alpha,
-                gpudata *X, size_t offX, int incX,
-                gpudata *Y, size_t offY, int incY,
+                gpudata *X, size_t offX, size_t incX,
+                gpudata *Y, size_t offY, size_t incY,
                 gpudata *A, size_t offA, size_t lda) {
   cl_ctx *ctx = X->ctx;
   cl_event ev;
@@ -474,8 +474,8 @@ static int hger(cb_order order, size_t M, size_t N, float alpha,
 }
 
 static int sger(cb_order order, size_t M, size_t N, float alpha,
-                gpudata *X, size_t offX, int incX,
-                gpudata *Y, size_t offY, int incY,
+                gpudata *X, size_t offX, size_t incX,
+                gpudata *Y, size_t offY, size_t incY,
                 gpudata *A, size_t offA, size_t lda) {
   cl_ctx *ctx = X->ctx;
   cl_event ev;
@@ -500,8 +500,8 @@ static int sger(cb_order order, size_t M, size_t N, float alpha,
 }
 
 static int dger(cb_order order, size_t M, size_t N, double alpha,
-                gpudata *X, size_t offX, int incX,
-                gpudata *Y, size_t offY, int incY,
+                gpudata *X, size_t offX, size_t incX,
+                gpudata *Y, size_t offY, size_t incY,
                 gpudata *A, size_t offA, size_t lda) {
   cl_ctx *ctx = X->ctx;
   cl_event ev;
@@ -529,9 +529,9 @@ GPUARRAY_LOCAL gpuarray_blas_ops clblast_ops = {
   setup,
   teardown,
   error,
-  hdot, /* TODO */
-  sdot, /* TODO */
-  ddot, /* TODO */
+  hdot,
+  sdot,
+  ddot,
   hgemv,
   sgemv,
   dgemv,
