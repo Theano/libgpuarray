@@ -7,6 +7,8 @@
 #include "gpuarray/buffer_blas.h"
 #include "gpuarray/error.h"
 
+extern const gpuarray_buffer_ops opencl_ops;
+
 static inline clblasOrder convO(cb_order order) {
   switch (order) {
   case cb_row:
@@ -210,16 +212,17 @@ static int sdot(
         gpudata *Z, size_t offZ) {
   cl_ctx *ctx = X->ctx;
   clblasStatus err;
-  cl_int cl_err;
   cl_uint num_ev = 0;
   cl_event evl[3];
   cl_event ev;
-  cl_mem scratch_mem;
+  gpudata *wbuf;
+  int alloc_err;
 
-  scratch_mem = clCreateBuffer(
-          ctx->ctx, CL_MEM_READ_WRITE, N*sizeof(float), NULL, &cl_err);
-  if (cl_err != CL_SUCCESS)
-      return GA_MEMORY_ERROR;
+  wbuf = opencl_ops.buffer_alloc(
+          (gpucontext*)ctx,
+          N*sizeof(float), NULL, GA_BUFFER_READ_WRITE, &alloc_err);
+  if (alloc_err != GA_NO_ERROR)
+      return alloc_err;
 
   ARRAY_INIT(X);
   ARRAY_INIT(Y);
@@ -230,7 +233,7 @@ static int sdot(
           N, Z->buf, offZ,
           X->buf, offX, incX,
           Y->buf, offY, incY,
-          scratch_mem, 1, &ctx->q,
+          wbuf->buf, 1, &ctx->q,
           num_ev, num_ev ? evl : NULL, &ev);
   if (err != clblasSuccess)
       return GA_BLAS_ERROR;
@@ -239,7 +242,7 @@ static int sdot(
   ARRAY_FINI(Y);
   ARRAY_FINI(Z);
 
-  clReleaseMemObject(scratch_mem);
+  opencl_ops.buffer_release(wbuf);
   clReleaseEvent(ev);
 
   return GA_NO_ERROR;
@@ -252,16 +255,17 @@ static int ddot(
         gpudata *Z, size_t offZ) {
   cl_ctx *ctx = X->ctx;
   clblasStatus err;
-  cl_int cl_err;
   cl_uint num_ev = 0;
   cl_event evl[3];
   cl_event ev;
-  cl_mem scratch_mem;
+  gpudata *wbuf;
+  int alloc_err;
 
-  scratch_mem = clCreateBuffer(
-          ctx->ctx, CL_MEM_READ_WRITE, N*sizeof(double), NULL, &cl_err);
-  if (cl_err != CL_SUCCESS)
-      return GA_MEMORY_ERROR;
+  wbuf = opencl_ops.buffer_alloc(
+          (gpucontext*)ctx,
+          N*sizeof(double), NULL, GA_BUFFER_READ_WRITE, &alloc_err);
+  if (alloc_err != GA_NO_ERROR)
+      return alloc_err;
 
   ARRAY_INIT(X);
   ARRAY_INIT(Y);
@@ -271,7 +275,7 @@ static int ddot(
           N, Z->buf, offZ,
           X->buf, offX, incX,
           Y->buf, offY, incY,
-          scratch_mem, 1, &ctx->q,
+          wbuf->buf, 1, &ctx->q,
           num_ev, num_ev ? evl : NULL, &ev);
   if (err != clblasSuccess)
       return GA_BLAS_ERROR;
@@ -280,7 +284,7 @@ static int ddot(
   ARRAY_FINI(Y);
   ARRAY_FINI(Z);
 
-  clReleaseMemObject(scratch_mem);
+  opencl_ops.buffer_release(wbuf);
   clReleaseEvent(ev);
 
   return GA_NO_ERROR;
