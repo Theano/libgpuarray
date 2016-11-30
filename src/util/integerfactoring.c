@@ -1,6 +1,7 @@
 /* Includes */
 #include <stdio.h>
 #include <stdlib.h>
+#include <gpuarray/config.h>
 #include <string.h>
 #include "integerfactoring.h"
 

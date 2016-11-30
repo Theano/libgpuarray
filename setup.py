@@ -76,7 +76,7 @@ del to_del
 
 include_dirs = [np.get_include()]
 library_dirs = []
-if sys.platform == 'win32':
+if sys.platform == 'win32' and not os.getenv('CONDA_BUILD'):
     # This is a hack so users don't need to do many steps for windows install
     # Just use the default location.
     current_dir = os.path.abspath(os.path.dirname(__file__))
@@ -84,7 +84,7 @@ if sys.platform == 'win32':
 
     default_bin_dir = os.path.join(current_dir, 'lib', 'Release')
     if not os.path.isdir(default_bin_dir):
-        raise RuntimeError('default binary dir {} does not exist, you may need to build the C library in release mode')
+        raise RuntimeError('default binary dir {} does not exist, you may need to build the C library in release mode'.format(default_bin_dir))
     library_dirs += [default_bin_dir]
 
 with open('pygpu/version.py', 'w') as f:
