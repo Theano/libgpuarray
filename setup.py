@@ -97,11 +97,17 @@ suffix = "%s"
 fullversion = "%s"
 """ % (MAJOR, MINOR, PATCH, SUFFIX, FULLVERSION))
 
+ea = []
+if sys.platform in ('darwin', 'linux'):
+    # Silence unused stuff warnings
+    ea = ["-Wno-unused-variable", "-Wno-unused-function"]
+
 exts = [Extension('pygpu.gpuarray',
                   sources=['pygpu/gpuarray.pyx'],
                   include_dirs=include_dirs,
                   libraries=['gpuarray'],
                   library_dirs=library_dirs,
+                  extra_compile_args=ea,
                   define_macros=[('GPUARRAY_SHARED', None)]
                   ),
         Extension('pygpu.blas',
@@ -109,6 +115,7 @@ exts = [Extension('pygpu.gpuarray',
                   include_dirs=include_dirs,
                   libraries=['gpuarray'],
                   library_dirs=library_dirs,
+                  extra_compile_args=ea,
                   define_macros=[('GPUARRAY_SHARED', None)]
                   ),
         Extension('pygpu._elemwise',
@@ -116,6 +123,7 @@ exts = [Extension('pygpu.gpuarray',
                   include_dirs=include_dirs,
                   libraries=['gpuarray'],
                   library_dirs=library_dirs,
+                  extra_compile_args=ea,
                   define_macros=[('GPUARRAY_SHARED', None)]
                   ),
         Extension('pygpu.collectives',
@@ -123,6 +131,7 @@ exts = [Extension('pygpu.gpuarray',
                   include_dirs=include_dirs,
                   libraries=['gpuarray'],
                   library_dirs=library_dirs,
+                  extra_compile_args=ea,
                   define_macros=[('GPUARRAY_SHARED', None)]
                   )]
 

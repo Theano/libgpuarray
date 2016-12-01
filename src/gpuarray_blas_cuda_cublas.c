@@ -172,15 +172,11 @@ static int setup(gpucontext *c) {
   blas_handle *handle;
   const char *tmp[2];
   cublasStatus_t err;
-  int e;
   int types[10];
+  int e;
 
   if (ctx->blas_handle != NULL)
     return GA_NO_ERROR;
-
-  e = load_libcublas(ctx->major, ctx->minor);
-  if (e != GA_NO_ERROR)
-    return e;
 
   handle = calloc(1, sizeof(*handle));
   if (handle == NULL)

@@ -10,8 +10,8 @@ from cpython cimport Py_INCREF, PyNumber_Index
 from cpython.object cimport Py_EQ, Py_NE
 
 def api_version():
-    # Those where the last defined numbers.
-    return (-9997, 1, 0)
+    # (library version, module version)
+    return (GPUARRAY_API_VERSION, 0)
 
 np.import_array()
 
@@ -235,7 +235,7 @@ cdef int strides_ok(GpuArray a, strides):
                 return 0
             upper += max_axis_offset
         else:
-            if lower < -max_axis_offset:
+            if lower < <size_t>(-max_axis_offset):
                 return 0
             lower += max_axis_offset
     return (upper + itemsize) <= size
@@ -874,7 +874,7 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
         free(cdims)
         free(cstrides)
 
-def array(proto, dtype=None, copy=True, order=None, int ndmin=0,
+def array(proto, dtype=None, copy=True, order=None, unsigned int ndmin=0,
           GpuContext context=None, cls=None):
     """
     array(obj, dtype='float64', copy=True, order=None, ndmin=0, context=None, cls=None)
@@ -890,7 +890,7 @@ def array(proto, dtype=None, copy=True, order=None, int ndmin=0,
     :param order: memory layout of the result
     :type order: string
     :param ndmin: minimum number of result dimensions
-    :type ndmin: int
+    :type ndmin: unsigned int
     :param context: allocation context
     :type context: GpuContext
     :param cls: result class (must inherit from GpuArray)
@@ -1146,6 +1146,13 @@ cdef class GpuContext:
             ctx_property(self, GA_CTX_PROP_MAXGSIZE2, &res)
             return res
 
+    property largest_memblock:
+        "Size of the largest memory block you can allocate"
+        def __get__(self):
+            cdef size_t res
+            ctx_property(self, GA_CTX_PROP_LARGEST_MEMBLOCK, &res)
+            return res
+
 
 cdef class flags(object):
     cdef int fl
@@ -1377,21 +1384,24 @@ cdef GpuArray pygpu_reshape(GpuArray a, unsigned int nd, const size_t *newdims,
     if compute_axis < 0:
         array_reshape(res, a, nd, newdims, ord, nocopy)
         return res
-    if compute_axis >= nd:
+    cdef unsigned int caxis = <unsigned int>compute_axis
+    if caxis >= nd:
         raise ValueError("You wanted us to compute the shape of a dimensions that don't exist")
 
     cdef size_t *cdims
     cdef size_t tot = 1
+    cdef unsigned int i
     for i in range(nd):
-        if i != compute_axis:
+        if i != caxis:
             tot *= newdims[i]
     cdims = <size_t *>calloc(nd, sizeof(size_t))
     if cdims == NULL:
         raise MemoryError, "could not allocate cdims"
 
+    cdef size_t d
     for i in range(nd):
         d = newdims[i]
-        if i == compute_axis:
+        if i == caxis:
             d = a.size // tot
 
             if d * tot != a.size:
@@ -1530,7 +1540,7 @@ cdef class GpuArray:
             k = PyNumber_Index(key)
             if k < 0:
                 k += self.ga.dimensions[i]
-            if k < 0 or k >= self.ga.dimensions[i]:
+            if k < 0 or (<size_t>k) >= self.ga.dimensions[i]:
                 raise IndexError, "index %d out of bounds" % (i,)
             start[0] = k
             step[0] = 0
@@ -1539,9 +1549,7 @@ cdef class GpuArray:
             pass
 
         if isinstance(key, slice):
-            # C compiler complains about argument 1 (key) because it's
-            # declared as a PyObject.  But we know it's a slice so it's ok.
-            PySlice_GetIndicesEx(<slice_object>key, self.ga.dimensions[i],
+            PySlice_GetIndicesEx(key, self.ga.dimensions[i],
                                  start, stop, step, &dummy)
             if stop[0] < start[0] and step[0] > 0:
                 stop[0] = start[0]

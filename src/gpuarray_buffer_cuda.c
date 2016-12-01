@@ -3,6 +3,7 @@
 #include "private.h"
 #include "private_cuda.h"
 #include "loaders/libnvrtc.h"
+#include "loaders/libcublas.h"
 
 #include <sys/types.h>
 
@@ -441,6 +442,21 @@ static void find_best(cuda_context *ctx, gpudata **best, gpudata **prev,
     }
     tempPrev = temp;
   }
+}
+
+static size_t largest_size(cuda_context *ctx) {
+  gpudata *temp;
+  size_t sz, dummy;
+  cuda_enter(ctx);
+  ctx->err = cuMemGetInfo(&sz, &dummy);
+  cuda_exit(ctx);
+   /* We guess that we can allocate at least a quarter of the free size
+     in a single block. This might be wrong though. */
+  sz /= 4;
+  for (temp = ctx->freeblocks; temp; temp = temp->next) {
+    if (temp->sz > sz) sz = temp->sz;
+  }
+  return sz;
 }
 
 /*
@@ -1393,6 +1409,7 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     }
     ctx->err = cuDeviceGetName(s, 256, id);
     if (ctx->err != CUDA_SUCCESS) {
+      free(s);
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
@@ -1414,14 +1431,16 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     }
     ctx->err = cuDeviceGetPCIBusId(s, 13, id);
     if (ctx->err != CUDA_SUCCESS) {
-      /* PS: in GA_CTX_PROP_DEVNAME above, s is not freed here.
-       * I think it should be freed, isn't it ? */
       free(s);
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
     *((char **)res) = s;
     cuda_exit(ctx);
+    return GA_NO_ERROR;
+
+  case GA_CTX_PROP_LARGEST_MEMBLOCK:
+    *((size_t *)res) = largest_size(ctx);
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_MAXLSIZE:
@@ -1494,6 +1513,11 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_BLAS_OPS:
+    {
+      int e = load_libcublas(major, minor);
+      if (e != GA_NO_ERROR)
+        return e;
+    }
     *((gpuarray_blas_ops **)res) = &cublas_ops;
     return GA_NO_ERROR;
 

@@ -1292,12 +1292,13 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_FREE_GMEM:
+    /* There is no way to query free memory so we just return the
+        largest block size */
+  case GA_CTX_PROP_LARGEST_MEMBLOCK:
     ctx->err = clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES, sizeof(id), &id,
                                 NULL);
     if (ctx->err != GA_NO_ERROR)
       return GA_IMPL_ERROR;
-    /* XXX: This is not exaclty the amount of free memory but there is
-       no way to query that in the OpenCL API. */
     ctx->err = clGetDeviceInfo(id, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(sz),
                                &sz, NULL);
     if (ctx->err != GA_NO_ERROR)

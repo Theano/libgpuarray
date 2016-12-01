@@ -16,10 +16,13 @@ cdef extern from "numpy/arrayobject.h":
 cdef object PyArray_Empty(int a, np.npy_intp *b, np.dtype c, int d)
 
 cdef extern from "Python.h":
-    int PySlice_GetIndicesEx(slice_object slice, Py_ssize_t length,
+    int PySlice_GetIndicesEx(object slice, Py_ssize_t length,
                              Py_ssize_t *start, Py_ssize_t *stop,
                              Py_ssize_t *step,
                              Py_ssize_t *slicelength) except -1
+
+cdef extern from "gpuarray/config.h":
+    int GPUARRAY_API_VERSION
 
 cdef extern from "gpuarray/types.h":
     ctypedef struct gpuarray_type:
@@ -100,6 +103,7 @@ cdef extern from "gpuarray/buffer.h":
     int GA_CTX_PROP_MAXGSIZE0
     int GA_CTX_PROP_MAXGSIZE1
     int GA_CTX_PROP_MAXGSIZE2
+    int GA_CTX_PROP_LARGEST_MEMBLOCK
 
     int GA_BUFFER_PROP_SIZE
 
@@ -318,8 +322,10 @@ cdef api GpuArray pygpu_concatenate(const _GpuArray **a, size_t n,
                                     object cls, GpuContext context)
 
 cdef api class GpuContext [type PyGpuContextType, object PyGpuContextObject]:
+    cdef dict __dict__
     cdef gpucontext* ctx
     cdef readonly bytes kind
+    cdef object __weakref__
 
 cdef GpuArray new_GpuArray(object cls, GpuContext ctx, object base)
 
