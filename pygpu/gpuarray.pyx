@@ -1146,6 +1146,13 @@ cdef class GpuContext:
             ctx_property(self, GA_CTX_PROP_MAXGSIZE2, &res)
             return res
 
+    property largest_memblock:
+        "Size of the largest memory block you can allocate"
+        def __get__(self):
+            cdef size_t res
+            ctx_property(self, GA_CTX_PROP_LARGEST_MEMBLOCK, &res)
+            return res
+
 
 cdef class flags(object):
     cdef int fl
