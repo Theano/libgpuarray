@@ -173,6 +173,7 @@ static int setup(gpucontext *c) {
   const char *tmp[2];
   cublasStatus_t err;
   int types[10];
+  int e;
 
   if (ctx->blas_handle != NULL)
     return GA_NO_ERROR;
