@@ -16,7 +16,7 @@ cdef extern from "numpy/arrayobject.h":
 cdef object PyArray_Empty(int a, np.npy_intp *b, np.dtype c, int d)
 
 cdef extern from "Python.h":
-    int PySlice_GetIndicesEx(slice_object slice, Py_ssize_t length,
+    int PySlice_GetIndicesEx(object slice, Py_ssize_t length,
                              Py_ssize_t *start, Py_ssize_t *stop,
                              Py_ssize_t *step,
                              Py_ssize_t *slicelength) except -1
