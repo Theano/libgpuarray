@@ -21,6 +21,9 @@ cdef extern from "Python.h":
                              Py_ssize_t *step,
                              Py_ssize_t *slicelength) except -1
 
+cdef extern from "gpuarray/config.h":
+    int GPUARRAY_API_VERSION
+
 cdef extern from "gpuarray/types.h":
     ctypedef struct gpuarray_type:
         const char *cluda_name
