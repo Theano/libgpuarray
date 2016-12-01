@@ -321,8 +321,10 @@ cdef api GpuArray pygpu_concatenate(const _GpuArray **a, size_t n,
                                     object cls, GpuContext context)
 
 cdef api class GpuContext [type PyGpuContextType, object PyGpuContextObject]:
+    cdef dict __dict__
     cdef gpucontext* ctx
     cdef readonly bytes kind
+    cdef object __weakref__
 
 cdef GpuArray new_GpuArray(object cls, GpuContext ctx, object base)
 
