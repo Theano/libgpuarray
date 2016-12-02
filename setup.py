@@ -11,9 +11,9 @@ FULLVERSION = '%d.%d.%d%s' % (MAJOR, MINOR, PATCH, SUFFIX)
 
 try:
     import Cython
-    if Cython.__version__ < '0.21':
+    if Cython.__version__ < '0.25':
         raise Exception('cython is too old or not installed '
-                        '(at least 0.21 required)')
+                        '(at least 0.25 required)')
     from Cython.Build import cythonize
     have_cython = True
 except Exception:
