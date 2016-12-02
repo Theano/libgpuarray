@@ -907,6 +907,10 @@ def array(proto, dtype=None, copy=True, order=None, unsigned int ndmin=0,
     This function is similar to :meth:`numpy.array` except that it returns
     GpuArrays.
     """
+    return carray(proto, dtype, copy, order, ndmin, context, cls)
+
+cdef carray(proto, dtype, copy, order, unsigned int ndmin,
+            GpuContext context, cls):
     cdef GpuArray res
     cdef GpuArray arg
     cdef GpuArray tmp
@@ -1823,6 +1827,9 @@ cdef class GpuArray:
             raise TypeError, "len() of unsized object"
 
     def __getitem__(self, key):
+        return self.__cgetitem__(key)
+
+    cdef __cgetitem__(self, key):
         cdef ssize_t *starts
         cdef ssize_t *stops
         cdef ssize_t *steps
@@ -1886,9 +1893,9 @@ cdef class GpuArray:
             free(steps)
 
     def __setitem__(self, idx, v):
-        cdef GpuArray tmp = self.__getitem__(idx)
-        cdef GpuArray gv = asarray(v, dtype=self.dtype,
-                                   context=self.context)
+        cdef GpuArray tmp = self.__cgetitem__(idx)
+        cdef GpuArray gv = carray(v, self.ga.typecode, False, 'A', 0,
+                                  self.context, GpuArray)
 
         array_setarray(tmp, gv)
 
