@@ -337,6 +337,7 @@ cdef api class GpuArray [type PyGpuArrayType, object PyGpuArrayObject]:
 
     cdef __index_helper(self, key, unsigned int i, ssize_t *start,
                         ssize_t *stop, ssize_t *step)
+    cdef __cgetitem__(self, idx)
 
 cdef api class GpuKernel [type PyGpuKernelType, object PyGpuKernelObject]:
     cdef _GpuKernel k
