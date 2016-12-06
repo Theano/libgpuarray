@@ -162,6 +162,13 @@ static inline void strb_appendb(strb *sb, strb *sb2) {
 GPUARRAY_LOCAL void strb_appendf(strb *, const char *f, ...);
 
 /*
+ * Reads from the file specified by the given file descriptor.
+ *
+ * A read error will place the strb in error mode.
+ */
+GPUARRAY_LOCAL void strb_read(strb *, int fd, size_t sz);
+
+/*
  * Returns a C string from the content of the strb.
  *
  * Returns the `s` member of the strb after ensuring that a

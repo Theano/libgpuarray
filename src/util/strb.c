@@ -1,5 +1,7 @@
-
+#include <errno.h>
 #include <stdarg.h>
+#include <unistd.h>
+
 #include "util/strb.h"
 
 strb *strb_alloc(size_t i) {
@@ -54,4 +56,18 @@ void strb_appendf(strb *sb, const char *f, ...) {
   s = vsnprintf(sb->s+sb->l, s, f, ap);
   va_end(ap);
   sb->l += s;
+}
+
+void strb_read(strb *sb, int fd, size_t sz) {
+  ssize_t res;
+  char *b;
+  if (strb_ensure(sb, sz)) return;
+  b = sb->s + sb->l;
+  sb->l += sz;
+  while (sz) {
+    res = read(fd, b, sz);
+    if (res == -1 && !(errno == EAGAIN || errno == EINTR)) { strb_seterror(sb); return; }
+    sz -= (size_t)res;
+    b += (size_t)res;
+  }
 }
