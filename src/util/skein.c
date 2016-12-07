@@ -307,3 +307,11 @@ int Skein_512_Final(Skein_512_Ctxt_t *ctx, u08b_t *hashVal) {
   }
   return SKEIN_SUCCESS;
 }
+
+int Skein_512(const u08b_t *msg, size_t msgByteCnt, u08b_t *hashVal) {
+  Skein_512_Ctxt_t ctx;
+  if (Skein_512_Init(&ctx)) return SKEIN_FAIL;
+  if (Skein_512_Update(&ctx, msg, msgByteCnt)) return SKEIN_FAIL;
+  if (Skein_512_Final(&ctx, hashVal)) return SKEIN_FAIL;
+  return SKEIN_SUCCESS;
+}

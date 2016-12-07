@@ -63,6 +63,7 @@ typedef struct {                     /* 512-bit Skein hash context structure */
 int  Skein_512_Init  (Skein_512_Ctxt_t *ctx);
 int  Skein_512_Update(Skein_512_Ctxt_t *ctx, const u08b_t *msg, size_t msgByteCnt);
 int  Skein_512_Final (Skein_512_Ctxt_t *ctx, u08b_t * hashVal);
+int  Skein_512(const u08b_t *msg, size_t msgByteCnt, u08b_t *hashVal);
 
 /*****************************************************************
 ** "Internal" Skein definitions
