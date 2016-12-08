@@ -39,12 +39,12 @@ extern "C" {
 #define nelems(a) (sizeof(a)/sizeof(a[0]))
 
 #ifndef HAVE_MKSTEMP
-GPUARRAY_LOCAL int mkstemp(char *path);
+int mkstemp(char *path);
 #endif
 
 #ifndef HAVE_STRL
-GPUARRAY_LOCAL size_t strlcpy(char *dst, const char *src, size_t size);
-GPUARRAY_LOCAL size_t strlcat(char *dst, const char *src, size_t size);
+size_t strlcpy(char *dst, const char *src, size_t size);
+size_t strlcat(char *dst, const char *src, size_t size);
 #endif
 
 #ifdef __cplusplus

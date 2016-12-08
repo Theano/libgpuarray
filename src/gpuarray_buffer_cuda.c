@@ -39,7 +39,7 @@ STATIC_ASSERT(sizeof(GpuArrayIpcMemHandle) == sizeof(CUipcMemHandle), cuda_ipcme
 
 static CUresult err;
 
-GPUARRAY_LOCAL const gpuarray_buffer_ops cuda_ops;
+const gpuarray_buffer_ops cuda_ops;
 
 static void cuda_freekernel(gpukernel *);
 static int cuda_property(gpucontext *, gpudata *, gpukernel *, int, void *);
@@ -1689,7 +1689,6 @@ static const char *cuda_error(gpucontext *c) {
   return errstr;
 }
 
-GPUARRAY_LOCAL
 const gpuarray_buffer_ops cuda_ops = {cuda_get_platform_count,
                                       cuda_get_device_count,
                                       cuda_init,

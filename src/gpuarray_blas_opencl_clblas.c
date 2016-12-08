@@ -491,7 +491,7 @@ static int dger(cb_order order, size_t M, size_t N, double alpha,
   return GA_NO_ERROR;
 }
 
-GPUARRAY_LOCAL gpuarray_blas_ops clblas_ops = {
+gpuarray_blas_ops clblas_ops = {
   setup,
   teardown,
   error,

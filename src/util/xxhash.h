@@ -106,7 +106,7 @@ They will be automatically translated by this header.
 *  Simple Hash Functions
 *****************************/
 
-GPUARRAY_LOCAL unsigned int XXH32 (const void* input, size_t length, unsigned seed);
+unsigned int XXH32 (const void* input, size_t length, unsigned seed);
 
 /*
 XXH32() :
@@ -129,9 +129,9 @@ These structures allow static allocation of XXH states.
 States must then be initialized using XXH32_reset() before first use.
 */
 
-GPUARRAY_LOCAL XXH_errorcode XXH32_reset  (XXH32_state_t* statePtr, unsigned seed);
-GPUARRAY_LOCAL XXH_errorcode XXH32_update (XXH32_state_t* statePtr, const void* input, size_t length);
-GPUARRAY_LOCAL unsigned int  XXH32_digest (const XXH32_state_t* statePtr);
+XXH_errorcode XXH32_reset  (XXH32_state_t* statePtr, unsigned seed);
+XXH_errorcode XXH32_update (XXH32_state_t* statePtr, const void* input, size_t length);
+unsigned int  XXH32_digest (const XXH32_state_t* statePtr);
 
 /*
 These functions calculate the xxHash of an input provided in multiple smaller packets,

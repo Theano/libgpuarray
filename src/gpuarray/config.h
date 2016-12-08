@@ -12,19 +12,15 @@
   #else
    #define GPUARRAY_PUBLIC __declspec(dllimport)
   #endif
-  #define GPUARRAY_LOCAL
  #else
   #if __GNUC__ >= 4
    #define GPUARRAY_PUBLIC __attribute__((visibility ("default")))
-   #define GPUARRAY_LOCAL  __attribute__((visibility ("hidden")))
   #else
-   #define GPUARRAY_PUBLIC
-   #define GPUARRAY_LOCAL
+   #error "Don't know how to export symbols on this platform"
   #endif
  #endif
 #else
  #define GPUARRAY_PUBLIC
- #define GPUARRAY_LOCAL
 #endif
 
 #ifdef _MSC_VER

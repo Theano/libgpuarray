@@ -67,9 +67,9 @@ struct _gpukernel {
 #endif
 };
 
-GPUARRAY_LOCAL cl_ctx *cl_make_ctx(cl_context ctx, int flags);
-GPUARRAY_LOCAL cl_command_queue cl_get_stream(gpucontext *ctx);
-GPUARRAY_LOCAL gpudata *cl_make_buf(gpucontext *c, cl_mem buf);
-GPUARRAY_LOCAL cl_mem cl_get_buf(gpudata *g);
+cl_ctx *cl_make_ctx(cl_context ctx, int flags);
+cl_command_queue cl_get_stream(gpucontext *ctx);
+gpudata *cl_make_buf(gpucontext *c, cl_mem buf);
+cl_mem cl_get_buf(gpudata *g);
 
 #endif

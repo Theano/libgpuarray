@@ -256,26 +256,26 @@ static inline void *memdup(const void *p, size_t s) {
   return res;
 }
 
-GPUARRAY_LOCAL int GpuArray_is_c_contiguous(const GpuArray *a);
-GPUARRAY_LOCAL int GpuArray_is_f_contiguous(const GpuArray *a);
-GPUARRAY_LOCAL int GpuArray_is_aligned(const GpuArray *a);
+int GpuArray_is_c_contiguous(const GpuArray *a);
+int GpuArray_is_f_contiguous(const GpuArray *a);
+int GpuArray_is_aligned(const GpuArray *a);
 
-GPUARRAY_LOCAL extern const gpuarray_type scalar_types[];
-GPUARRAY_LOCAL extern const gpuarray_type vector_types[];
+extern const gpuarray_type scalar_types[];
+extern const gpuarray_type vector_types[];
 
 /*
  * This function generates the kernel code to perform indexing on var id
  * from planar index 'i' using the dimensions and strides provided.
  */
-GPUARRAY_LOCAL void gpuarray_elem_perdim(strb *sb, unsigned int nd,
-                                         const size_t *dims,
-                                         const ssize_t *str,
-                                         const char *id);
+void gpuarray_elem_perdim(strb *sb, unsigned int nd,
+                          const size_t *dims,
+                          const ssize_t *str,
+                          const char *id);
 
-GPUARRAY_LOCAL void gpukernel_source_with_line_numbers(unsigned int count,
-                                                       const char **news,
-                                                       size_t *newl,
-                                                       strb *src);
+void gpukernel_source_with_line_numbers(unsigned int count,
+                                        const char **news,
+                                        size_t *newl,
+                                        strb *src);
 
 static inline uint16_t float_to_half(float value) {
 #define ga__shift 13
