@@ -31,39 +31,6 @@ You can contact the author at :
 - xxHash source repository : https://github.com/Cyan4973/xxHash
 */
 
-
-/**************************************
-*  Tuning parameters
-**************************************/
-/* XXH_FORCE_MEMORY_ACCESS
- * By default, access to unaligned memory is controlled by `memcpy()`, which is safe and portable.
- * Unfortunately, on some target/compiler combinations, the generated assembly is sub-optimal.
- * The below switch allow to select different access method for improved performance.
- * Method 0 (default) : use `memcpy()`. Safe and portable.
- * Method 1 : `__packed` statement. It depends on compiler extension (ie, not portable).
- *            This method is safe if your compiler supports it, and *generally* as fast or faster than `memcpy`.
- * Method 2 : direct access. This method is portable but violate C standard.
- *            It can generate buggy code on targets which generate assembly depending on alignment.
- *            But in some circumstances, it's the only known way to get the most performance (ie GCC + ARMv6)
- * See http://stackoverflow.com/a/32095106/646947 for details.
- * Prefer these methods in priority order (0 > 1 > 2)
- */
-#ifndef XXH_FORCE_MEMORY_ACCESS   /* can be defined externally, on command line for example */
-#  if defined(__GNUC__) && ( defined(__ARM_ARCH_6__) || defined(__ARM_ARCH_6J__) || defined(__ARM_ARCH_6K__) || defined(__ARM_ARCH_6Z__) || defined(__ARM_ARCH_6ZK__) || defined(__ARM_ARCH_6T2__) )
-#    define XXH_FORCE_MEMORY_ACCESS 2
-#  elif defined(__INTEL_COMPILER) || \
-  (defined(__GNUC__) && ( defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_7A__) || defined(__ARM_ARCH_7R__) || defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7S__) ))
-#    define XXH_FORCE_MEMORY_ACCESS 1
-#  endif
-#endif
-
-/* XXH_ACCEPT_NULL_INPUT_POINTER :
- * If the input pointer is a null pointer, xxHash default behavior is to trigger a memory access error, since it is a bad pointer.
- * When this option is enabled, xxHash output for null input pointers will be the same as a null-length input.
- * By default, this option is disabled. To enable it, uncomment below define :
- */
-/* #define XXH_ACCEPT_NULL_INPUT_POINTER 1 */
-
 /* XXH_FORCE_NATIVE_FORMAT :
  * By default, xxHash library provides endian-independant Hash values, based on little-endian convention.
  * Results are therefore identical for little-endian and big-endian CPU.
@@ -72,7 +39,7 @@ You can contact the author at :
  * to improve speed for Big-endian CPU.
  * This option has no impact on Little_Endian CPU.
  */
-#define XXH_FORCE_NATIVE_FORMAT 0
+#define XXH_FORCE_NATIVE_FORMAT 1
 
 /* XXH_USELESS_ALIGN_BRANCH :
  * This is a minor performance trick, only useful with lots of very small keys.
@@ -132,33 +99,12 @@ static void* XXH_memcpy(void* dest, const void* src, size_t size) { return memcp
 #endif
 
 
-#if (defined(XXH_FORCE_MEMORY_ACCESS) && (XXH_FORCE_MEMORY_ACCESS==2))
-
-/* Force direct memory access. Only works on CPU which support unaligned memory access in hardware */
-static U32 XXH_read32(const void* memPtr) { return *(const U32*) memPtr; }
-
-#elif (defined(XXH_FORCE_MEMORY_ACCESS) && (XXH_FORCE_MEMORY_ACCESS==1))
-
-/* __pack instructions are safer, but compiler specific, hence potentially problematic for some compilers */
-/* currently only defined for gcc and icc */
-typedef union { U32 u32; U64 u64; } __attribute__((packed)) unalign;
-
-static U32 XXH_read32(const void* ptr) { return ((const unalign*)ptr)->u32; }
-
-#else
-
-/* portable and safe solution. Generally efficient.
- * see : http://stackoverflow.com/a/32095106/646947
- */
-
 static U32 XXH_read32(const void* memPtr)
 {
     U32 val;
     memcpy(&val, memPtr, sizeof(val));
     return val;
 }
-
-#endif // XXH_FORCE_DIRECT_MEMORY_ACCESS
 
 
 /******************************************
@@ -242,14 +188,6 @@ FORCE_INLINE U32 XXH32_endian_align(const void* input, size_t len, U32 seed, XXH
     const BYTE* bEnd = p + len;
     U32 h32;
 #define XXH_get32bits(p) XXH_readLE32_align(p, endian, align)
-
-#ifdef XXH_ACCEPT_NULL_INPUT_POINTER
-    if (p==NULL)
-    {
-        len=0;
-        bEnd=p=(const BYTE*)(size_t)16;
-    }
-#endif
 
     if (len>=16)
     {
