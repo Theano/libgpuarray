@@ -169,6 +169,13 @@ GPUARRAY_LOCAL void strb_appendf(strb *, const char *f, ...);
 GPUARRAY_LOCAL void strb_read(strb *, int fd, size_t sz);
 
 /*
+ * Write the content of an strb to the specified file descriptor.
+ *
+ * Write errors will be signaled by a nonzero return value.
+ */
+GPUARRAY_LOCAL int strb_write(int fd, strb *sb);
+
+/*
  * Returns a C string from the content of the strb.
  *
  * Returns the `s` member of the strb after ensuring that a

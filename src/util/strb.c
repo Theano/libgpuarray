@@ -66,8 +66,30 @@ void strb_read(strb *sb, int fd, size_t sz) {
   sb->l += sz;
   while (sz) {
     res = read(fd, b, sz);
-    if (res == -1 && !(errno == EAGAIN || errno == EINTR)) { strb_seterror(sb); return; }
+    if (res == -1) {
+      if (errno == EAGAIN || errno == EINTR)
+        continue;
+      strb_seterror(sb);
+      return;
+    }
     sz -= (size_t)res;
     b += (size_t)res;
   }
+}
+
+int strb_write(int fd, strb *sb) {
+  ssize_t res;
+  size_t l = sb->l;
+  char *b = sb->s;
+  while (l) {
+    res = write(fd, b, l);
+    if (res == -1) {
+      if (errno == EAGAIN || errno == EINTR)
+        continue;
+      return -1;
+    }
+    l -= (size_t)res;
+    b += (size_t)res;
+  }
+  return 0;
 }
