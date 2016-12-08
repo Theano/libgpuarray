@@ -35,6 +35,7 @@ endmacro()
 set(_GPUARRAY_SRC
 cache/lru.c
 cache/twoq.c
+cache/disk.c
 gpuarray_types.c
 gpuarray_error.c
 gpuarray_util.c
