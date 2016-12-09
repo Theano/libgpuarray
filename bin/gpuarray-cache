@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+
+import os
+
+def clean(max_size):
+    content = []
+    for root, dirs, files in os.walk(os.environ.get('GPUARRAY_CACHE',
+                                                    '~/.gpuarray/cache/')):
+        for file in files:
+            fpath = os.path.join(root, file)
+            st = os.stat(fpath)
+            content.append((st.st_atime, st.st_size, fpath))
+
+    content.sort()
+    cur_size = 0
+    for _, size, path in content:
+        cur_size += size
+        if cur_size > max_size:
+            os.remove(path)
+
+
+SUFFIXES = {'B': 1, 'K': 1 << 10, 'M': 1 < 20, 'G': 1 << 30, 'T': 1 << 40,
+            'P': 1 << 50, 'E': 1 << 60, 'Z': 1 << 70, 'Y': 1 << 80}
+
+
+def get_size(s):
+    i = 0
+    while i < len(s) and (s[i].isdigit() or s[i] == '.'):
+        i += 1
+    num = s[:i]
+    suf = s[i:]
+    num = float(num)
+    if suf != "":
+        letter = suf.strip().upper()
+        if letter not in SUFFIXES:
+            raise ValueError("can't interpret %r" % init)
+        mult = SUFFIXES[letter]
+    else:
+        mult = 0
+    return int(num * mult)
+
+
+if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description='libgpuarray cache maintenance utility')
+    parser.add_argument('-s', '--max_size', help='Set the maximum size for pruning')
+    args = parser.parse_args()
+
+    clean(get_size(args.max_size))
+
