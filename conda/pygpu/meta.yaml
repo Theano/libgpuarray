@@ -24,7 +24,7 @@ requirements:
         - six
         - nose
         - mako >=0.7
-        - numpy
+        - numpy x.x
         - libgpuarray ==0.6.0rc1
 
 test:
