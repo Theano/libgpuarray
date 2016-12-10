@@ -1036,28 +1036,18 @@ cdef class GpuContext:
     property devname:
         "Device name for this context"
         def __get__(self):
-            cdef char *tmp
-            cdef unicode res
+            cdef char tmp[256]
 
-            ctx_property(self, GA_CTX_PROP_DEVNAME, &tmp)
-            try:
-                res = tmp.decode('ascii')
-            finally:
-                free(tmp)
-            return res
+            ctx_property(self, GA_CTX_PROP_DEVNAME, tmp)
+            return tmp.decode('ascii')
 
     property pcibusid:
         "Device PCI Bus ID for this context"
         def __get__(self):
-            cdef char *tmp
-            cdef unicode res
+            cdef char tmp[16]
 
-            ctx_property(self, GA_CTX_PROP_PCIBUSID, &tmp)
-            try:
-                res = tmp.decode('ascii')
-            finally:
-                free(tmp)
-            return res
+            ctx_property(self, GA_CTX_PROP_PCIBUSID, tmp)
+            return tmp.decode('ascii')
 
     property maxlsize:
         "Maximum size of thread block (local size) for this context"

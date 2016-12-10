@@ -1389,7 +1389,6 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
   }
 
   switch (prop_id) {
-    char *s;
     CUdevice id;
     int i;
     size_t sz;
@@ -1401,21 +1400,9 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
-    /* 256 is what the CUDA API uses so it's good enough for me */
-    s = malloc(256);
-    if (s == NULL) {
-      cuda_exit(ctx);
-      return GA_MEMORY_ERROR;
-    }
-    ctx->err = cuDeviceGetName(s, 256, id);
-    if (ctx->err != CUDA_SUCCESS) {
-      free(s);
-      cuda_exit(ctx);
-      return GA_IMPL_ERROR;
-    }
-    *((char **)res) = s;
+    ctx->err = cuDeviceGetName((char *)res, 256, id);
     cuda_exit(ctx);
-    return GA_NO_ERROR;
+    return (ctx->err != CUDA_SUCCESS) ? GA_IMPL_ERROR : GA_NO_ERROR;
 
   case GA_CTX_PROP_PCIBUSID:
     cuda_enter(ctx);
@@ -1424,20 +1411,9 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
       cuda_exit(ctx);
       return GA_IMPL_ERROR;
     }
-    s = malloc(13);
-    if (s == NULL) {
-      cuda_exit(ctx);
-      return GA_MEMORY_ERROR;
-    }
-    ctx->err = cuDeviceGetPCIBusId(s, 13, id);
-    if (ctx->err != CUDA_SUCCESS) {
-      free(s);
-      cuda_exit(ctx);
-      return GA_IMPL_ERROR;
-    }
-    *((char **)res) = s;
+    ctx->err = cuDeviceGetPCIBusId((char *)res, 13, id);
     cuda_exit(ctx);
-    return GA_NO_ERROR;
+    return (ctx->err != CUDA_SUCCESS) ? GA_IMPL_ERROR : GA_NO_ERROR;
 
   case GA_CTX_PROP_LARGEST_MEMBLOCK:
     *((size_t *)res) = largest_size(ctx);

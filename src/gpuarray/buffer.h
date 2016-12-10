@@ -494,7 +494,9 @@ GPUARRAY_PUBLIC int gpukernel_call(gpukernel *k, unsigned int n,
                                    size_t shared, void **args);
 
 /**
- * Get the kernel binary.
+ * (Deprecated) Get the kernel binary.
+ *
+ * This function is deprecated and will be removed in the next release.
  *
  * This can be use to cache kernel binaries after compilation of a
  * specific device.  The kernel can be recreated by calling
@@ -537,9 +539,7 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
 /**
  * Get the device name for the context.
  *
- * \note The returned string is allocated and must be freed by the caller.
- *
- * Type: `char *`
+ * Type: `char [256]`
  */
 #define GA_CTX_PROP_DEVNAME  1
 
@@ -683,9 +683,7 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
 /**
  * Get the device PCI Bus ID for the context.
  *
- * \note The returned string is allocated and must be freed by the caller.
- *
- * Type: `char *`
+ * Type: `char [16]`
  */
 #define GA_CTX_PROP_PCIBUSID 19
 
