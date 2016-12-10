@@ -8,15 +8,9 @@
 
 #include "cache.h"
 #include "private_config.h"
-#include "util/strb.h"
 #include "util/skein.h"
 
 #define HEXP_LEN (128 + 2)
-
-typedef int (*kwrite_fn)(strb *res, cache_key_t key);
-typedef int (*vwrite_fn)(strb *res, cache_value_t val);
-typedef cache_key_t (*kread_fn)(const strb *b);
-typedef cache_value_t (*vread_fn)(const strb *b);
 
 typedef struct _disk_cache {
   cache c;
