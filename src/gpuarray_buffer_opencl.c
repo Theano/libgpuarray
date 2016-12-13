@@ -1157,7 +1157,6 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
   }
 
   switch (prop_id) {
-    char *s;
     size_t sz;
     size_t *psz;
     cl_device_id id;
@@ -1168,23 +1167,11 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
                                 &id, NULL);
     if (ctx->err != CL_SUCCESS)
       return GA_IMPL_ERROR;
-    ctx->err = clGetDeviceInfo(id, CL_DEVICE_NAME, 0, NULL, &sz);
-    if (ctx->err != CL_SUCCESS)
-      return GA_IMPL_ERROR;
-    s = malloc(sz);
-    if (s == NULL)
-      return GA_MEMORY_ERROR;
-    ctx->err = clGetDeviceInfo(id, CL_DEVICE_NAME, sz, s, NULL);
-    if (ctx->err != CL_SUCCESS) {
-      free(s);
-      return GA_IMPL_ERROR;
-    }
-    *((char **)res) = s;
-    return GA_NO_ERROR;
+    ctx->err = clGetDeviceInfo(id, CL_DEVICE_NAME, 256, (char *)res, NULL);
+    return (ctx->err != CL_SUCCESS) ? GA_IMPL_ERROR : GA_NO_ERROR;
 
   case GA_CTX_PROP_PCIBUSID:
     /* For the moment, PCI Bus ID is not supported for OpenCL. */
-    *((void **)res) = NULL;
     return GA_DEVSUP_ERROR;
 
   case GA_CTX_PROP_MAXLSIZE:
