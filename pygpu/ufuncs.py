@@ -677,7 +677,15 @@ def binary_ufunc(a, b, ufunc_name, out=None):
 
     # TODO: can CPU memory handed directly to kernels?
     if not isinstance(a, GpuArray):
-        a = numpy.asarray(a)
+        if numpy.isscalar(a):
+            # TODO: this is quite hacky, perhaps mixed input signatures
+            # should be handled in ufunc_dtypes?
+            if ufunc_name == 'ldexp':
+                # Want signed type
+                a = numpy.asarray(a, dtype=numpy.min_scalar_type(-abs(a)))
+            else:
+                a = numpy.asarray(a, dtype=numpy.result_type(a, b))
+
         if a.flags.f_contiguous and not a.flags.c_contiguous:
             order = 'F'
         else:
@@ -685,7 +693,15 @@ def binary_ufunc(a, b, ufunc_name, out=None):
         a = array(a, dtype=a.dtype, copy=False, order=order, context=ctx,
                   cls=cls)
     if not isinstance(b, GpuArray):
-        b = numpy.asarray(b)
+        if numpy.isscalar(b):
+            # TODO: this is quite hacky, perhaps mixed input signatures
+            # should be handled in ufunc_dtypes?
+            if ufunc_name == 'ldexp':
+                # Want signed type
+                b = numpy.asarray(b, dtype=numpy.min_scalar_type(-abs(b)))
+            else:
+                b = numpy.asarray(b, dtype=numpy.result_type(a, b))
+
         if b.flags.f_contiguous and not b.flags.c_contiguous:
             order = 'F'
         else:
@@ -746,8 +762,9 @@ def binary_ufunc(a, b, ufunc_name, out=None):
         if ufunc_name == 'power':
             # Arguments to `pow` cannot be integer, need to cast
             if numpy.issubsctype(result_dtype, numpy.integer):
-                tpl = 'res = ({rt}) (long) (pow((double) a, (double) b) + 0.5)'
-                oper = tpl.format(rt=c_res_dtype)
+                eps = 0.001
+                tpl = 'res = ({rt}) (long) (pow((double) a, (double) b) + {})'
+                oper = tpl.format(eps, rt=c_res_dtype)
             else:
                 oper = 'res = ({rt}) pow(({rt}) a, ({rt}) b)'.format(
                     rt=c_res_dtype)
@@ -772,7 +789,18 @@ def binary_ufunc(a, b, ufunc_name, out=None):
     else:
         # Other cases: specific functions
         if ufunc_name == 'floor_divide':
-            oper = 'res = ({}) (long)(a / b)'.format(c_res_dtype)
+            # implement as sign(a/b) * int(abs(a/b) + shift(a,b))
+            # where shift(a,b) = 0 if sign(a) == sign(b) else 1 - epsilon
+            sign_part = '(((a < 0) != (b < 0)) ? -1 : 1)'
+            # TODO: this computes twice - better solution?
+            abs_div_part = ('(((double)a / b < 0) ? ' +
+                            '-(double)a / b : ' +
+                            '(double)a / b)')
+            shift_part = '(((a < 0) != (b < 0)) ? 0.999 : 0)'
+            oper = 'res = ({}) ({} * (long)({} + {}))'.format(c_res_dtype,
+                                                              sign_part,
+                                                              abs_div_part,
+                                                              shift_part)
 
         if ufunc_name == 'true_divide':
             if result_dtype == numpy.dtype('float64'):
@@ -792,13 +820,19 @@ def binary_ufunc(a, b, ufunc_name, out=None):
             oper = 'res = ({}) ((a < b) ? a : b)'.format(c_res_dtype)
 
         elif ufunc_name == 'remainder':
-            # Cannot use `out` in the first call since the dtype may differ
-            # from `result_dtype`, and `copysign` has no integer signature.
-            # TODO: doable in one call?
-            res = binary_ufunc(a, b, 'fmod')
-            res = binary_ufunc(res, b, 'copysign')
-            out[:] = res.astype(result_dtype)
-            return out
+            # The same as `fmod` except for b < 0, where we have
+            # remainder(a,b) = fmod(a, b)
+            if numpy.issubsctype(result_dtype, numpy.integer):
+                cast_type = 'double'
+            else:
+                cast_type = c_res_dtype
+
+            # TODO: this computes fmod(a,b) twice for b < 0, better solution?
+            mod_expr = 'fmod(({ct}) a, ({ct}) b)'.format(ct=cast_type)
+            comp_part = ('(((b < 0) && ({expr} != 0)) ? ' +
+                         '({ct})b + {expr} : ' +
+                         '{expr})').format(ct=cast_type, expr=mod_expr)
+            oper = 'res = ({rt}) {}'.format(comp_part, rt=c_res_dtype)
 
     if not oper:
         raise ValueError("`ufunc_name` '{}' does not represent a binary "

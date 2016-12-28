@@ -175,6 +175,15 @@ class test_binary_ufuncs(TestCase):
                 for dtype2 in dtypes:
                     self.check_binary_ufunc(ufunc, dtype1, dtype2)
 
+                scalars = [1, 5]
+                if ufunc not in ('fmod', 'remainder', 'floor_divide'):
+                    scalars.append(0)
+                if not numpy.issubsctype(dtype1, numpy.unsignedinteger):
+                    scalars += [-1, -2]
+
+                for scalar in scalars:
+                    self.check_binary_ufunc_scalar(ufunc, scalar, dtype1)
+
     def check_binary_ufunc(self, ufunc, dtype1, dtype2):
         """Test GpuArray binary ufunc against equivalent Numpy result."""
         gpuary_ufunc = getattr(ufuncs, ufunc)
@@ -216,3 +225,36 @@ class test_binary_ufuncs(TestCase):
             gpuary_ufunc(gpuary_arr, gpuary_arr2, out)
             assert numpy.allclose(npy_result, gpuary_result, rtol=rtol,
                                   equal_nan=True)
+
+    def check_binary_ufunc_scalar(self, ufunc, scalar, dtype):
+        """Test GpuArray binary ufunc with scalar second operand."""
+        gpuary_ufunc = getattr(ufuncs, ufunc)
+        npy_ufunc = getattr(numpy, ufunc)
+
+        npy_arr, gpuary_arr = npy_and_gpuary_arrays(shape=(2, 3),
+                                                    dtype=dtype,
+                                                    positive=True)
+
+        try:
+            res = numpy.finfo(dtype).resolution
+        except ValueError:
+            res = numpy.finfo(numpy.promote_types(dtype,
+                                                  numpy.float16)).resolution
+        rtol = 10 * res
+
+        try:
+            npy_result = npy_ufunc(npy_arr, scalar)
+        except TypeError:
+            # Make sure we raise the same error as Numpy
+            with self.assertRaises(TypeError):
+                gpuary_ufunc(gpuary_arr, scalar)
+        else:
+            if npy_result.dtype == numpy.dtype('float16'):
+                # We use float32 as minimum for GPU arrays, do the same here
+                npy_result = npy_result.astype('float32')
+
+            gpuary_result = gpuary_ufunc(gpuary_arr, scalar)
+            assert npy_result.shape == gpuary_result.shape
+            assert npy_result.dtype == gpuary_result.dtype
+            assert numpy.allclose(npy_result, gpuary_result, rtol=rtol,
+                                  atol=rtol, equal_nan=True)
