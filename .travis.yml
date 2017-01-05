@@ -1,5 +1,9 @@
 language: c
 
+os:
+  - linux
+  - osx
+
 addons:
   apt:
     sources:
@@ -8,6 +12,9 @@ addons:
     packages:
       - cmake
       - cmake-data
+
+#before_install:
+#  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew install cmake; fi
 
 compiler:
   - clang
