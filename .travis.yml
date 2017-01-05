@@ -1,17 +1,26 @@
 language: c
 
+addons:
+  apt:
+    sources:
+      - kalakris-cmake
+      - george-edison55-precise-backports
+    packages:
+      - cmake
+      - cmake-data
+
 compiler:
   - clang
   - gcc
 
 # Build with Debug and Release to flush out build problems
 script:
- - mkdir Debug
- - cd Debug
- - cmake .. -DCMAKE_BUILD_TYPE=Debug
- - make
- - cd ..
- - mkdir Release
- - cd Release
- - cmake .. -DCMAKE_BUILD_TYPE=Release
- - make
+  - mkdir Debug
+  - cd Debug
+  - cmake .. -DCMAKE_BUILD_TYPE=Debug
+  - make
+  - cd ..
+  - mkdir Release
+  - cd Release
+  - cmake .. -DCMAKE_BUILD_TYPE=Release
+  - make
