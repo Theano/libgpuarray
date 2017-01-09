@@ -131,6 +131,11 @@ macOS.
 It might be possible to use a version of gcc built using Homebrew or
 MacPorts, but this is untested and unsupported.
 
+It appears that on some versions, /usr/local is not in the default
+compiler paths so you might need to add ``-L /usr/local/lib -I
+/usr/local/include`` to the command line to build the python module.
+
+
 Windows-specific instructions
 -----------------------------
 
