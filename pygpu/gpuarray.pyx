@@ -14,8 +14,9 @@ def api_version():
     return (GPUARRAY_API_VERSION, 0)
 
 def abi_version():
-    # convert string version (e.g. "1.0") to tuple of integers.
-    return tuple(int(n) for n in GPUARRAY_ABI_VERSION.split('.'))
+    major_version = GPUARRAY_ABI_VERSION / 1000
+    minor_version = GPUARRAY_ABI_VERSION % 1000
+    return (major_version, minor_version)
 
 np.import_array()
 

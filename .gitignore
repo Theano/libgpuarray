@@ -17,9 +17,9 @@ distribute*tar.gz
 *.so
 *.o
 *.log
-src/gpuarray/abi_version.h
 pygpu/*.c
 pygpu/*.h
 pygpu/version.py
+src/gpuarray/abi_version.h
 src/private_config.h
 Makefile.conf

@@ -23,7 +23,7 @@ cdef extern from "Python.h":
 
 cdef extern from "gpuarray/config.h":
     int GPUARRAY_API_VERSION
-    const char* GPUARRAY_ABI_VERSION
+    int GPUARRAY_ABI_VERSION
 
 cdef extern from "gpuarray/types.h":
     ctypedef struct gpuarray_type:
