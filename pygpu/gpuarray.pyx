@@ -13,6 +13,11 @@ def api_version():
     # (library version, module version)
     return (GPUARRAY_API_VERSION, 0)
 
+def abi_version():
+    major_version = GPUARRAY_ABI_VERSION / 1000
+    minor_version = GPUARRAY_ABI_VERSION % 1000
+    return (major_version, minor_version)
+
 np.import_array()
 
 # to export the numeric value
