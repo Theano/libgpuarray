@@ -29,6 +29,8 @@
 #include <stddef.h>
 #if _MSC_VER < 1600
 #include <gpuarray/wincompat/stdint.h>
+#else
+#include <stdint.h>    
 #endif
 #define ssize_t intptr_t
 #define SSIZE_MAX INTPTR_MAX
