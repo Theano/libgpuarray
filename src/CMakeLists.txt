@@ -88,7 +88,7 @@ set_target_properties(gpuarray PROPERTIES
   INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/lib
   MACOSX_RPATH OFF
   # This is the shared library version
-  VERSION 1.1
+  VERSION 2.91
   )
 
 add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
@@ -105,6 +105,9 @@ math(EXPR GPUARRAY_ABI_NUMBER "1000*${GPUARRAY_ABI_VERSION_MAJOR} + ${GPUARRAY_A
 FILE(WRITE gpuarray/abi_version.h
 "\#ifndef GPUARRAY_ABI_VERSION\n\#define GPUARRAY_ABI_VERSION ${GPUARRAY_ABI_NUMBER}\n\#endif\n"
 )
+
+# set SOVERSION and ensure it is the first part of VERSION.
+set_property(TARGET gpuarray PROPERTY SOVERSION ${GPUARRAY_ABI_VERSION_MAJOR})
 
 set(headers
   gpuarray/array.h
