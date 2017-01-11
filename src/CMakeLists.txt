@@ -96,6 +96,11 @@ add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
 target_link_libraries(gpuarray ${CMAKE_DL_LIBS})
 target_link_libraries(gpuarray-static ${CMAKE_DL_LIBS})
 
+get_target_property(GPUARRAY_ABI_VERSION gpuarray VERSION)
+FILE(WRITE gpuarray/abi_version.h
+"\#ifndef GPUARRAY_ABI_VERSION\n\#define GPUARRAY_ABI_VERSION \"${GPUARRAY_ABI_VERSION}\"\n\#endif\n"
+)
+
 set(headers
   gpuarray/array.h
   gpuarray/blas.h
@@ -103,6 +108,7 @@ set(headers
   gpuarray/buffer.h
   gpuarray/buffer_blas.h
   gpuarray/buffer_collectives.h
+  gpuarray/abi_version.h
   gpuarray/config.h
   gpuarray/elemwise.h
   gpuarray/error.h

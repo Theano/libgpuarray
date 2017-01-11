@@ -13,6 +13,10 @@ def api_version():
     # (library version, module version)
     return (GPUARRAY_API_VERSION, 0)
 
+def abi_version():
+    # convert string version (e.g. "1.0") to tuple of integers.
+    return tuple(int(n) for n in GPUARRAY_ABI_VERSION.split('.'))
+
 np.import_array()
 
 # to export the numeric value
