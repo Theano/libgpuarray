@@ -1237,7 +1237,7 @@ static int cuda_kernelsetarg(gpukernel *k, unsigned int i, void *arg) {
 }
 
 static int cuda_callkernel(gpukernel *k, unsigned int n,
-                           const size_t *bs, const size_t *gs,
+                           const size_t *gs, const size_t *ls,
                            size_t shared, void **args) {
     cuda_context *ctx = k->ctx;
     unsigned int i;
@@ -1258,15 +1258,15 @@ static int cuda_callkernel(gpukernel *k, unsigned int n,
 
     switch (n) {
     case 1:
-      ctx->err = cuLaunchKernel(k->k, gs[0], 1, 1, bs[0], 1, 1, shared,
+      ctx->err = cuLaunchKernel(k->k, gs[0], 1, 1, ls[0], 1, 1, shared,
                                 ctx->s, args, NULL);
       break;
     case 2:
-      ctx->err = cuLaunchKernel(k->k, gs[0], gs[1], 1, bs[0], bs[1], 1, shared,
+      ctx->err = cuLaunchKernel(k->k, gs[0], gs[1], 1, ls[0], ls[1], 1, shared,
                                 ctx->s, args, NULL);
       break;
     case 3:
-      ctx->err = cuLaunchKernel(k->k, gs[0], gs[1], gs[2], bs[0], bs[1], bs[2],
+      ctx->err = cuLaunchKernel(k->k, gs[0], gs[1], gs[2], ls[0], ls[1], ls[2],
                                 shared, ctx->s, args, NULL);
       break;
     default:

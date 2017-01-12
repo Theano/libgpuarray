@@ -1099,9 +1099,9 @@ static int sgemvBatch(cb_order order, cb_transpose transA,
   args[8] = &N;
 
   if (transA == cb_no_trans) {
-    err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->sgemvBH_N_a1_b1_small, 2, ls, gs, 0, args);
+    err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->sgemvBH_N_a1_b1_small, 2, gs, ls, 0, args);
   } else {
-    err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->sgemvBH_T_a1_b1_small, 2, ls, gs, 0, args);
+    err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->sgemvBH_T_a1_b1_small, 2, gs, ls, 0, args);
   }
 
   cuda_ops.buffer_release(Aa);
@@ -1223,9 +1223,9 @@ static int dgemvBatch(cb_order order, cb_transpose transA,
   args[8] = &N;
 
   if (transA == cb_no_trans) {
-    err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->dgemvBH_N_a1_b1_small, 2, ls, gs, 0, args);
+    err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->dgemvBH_N_a1_b1_small, 2, gs, ls, 0, args);
   } else {
-    err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->dgemvBH_T_a1_b1_small, 2, ls, gs, 0, args);
+    err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->dgemvBH_T_a1_b1_small, 2, gs, ls, 0, args);
   }
 
   cuda_ops.buffer_release(Aa);
@@ -1486,7 +1486,7 @@ static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
   args[8] = &M;
   args[9] = &N;
 
-  err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->sgerBH_gen_small, 3, ls, gs, 0, args);
+  err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->sgerBH_gen_small, 3, gs, ls, 0, args);
 
   cuda_ops.buffer_release(Aa);
   cuda_ops.buffer_release(xa);
@@ -1618,7 +1618,7 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
   args[8] = &M;
   args[9] = &N;
 
-  err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->sgerBH_gen_small, 3, ls, gs, 0, args);
+  err = GpuKernel_call(&((blas_handle *)ctx->blas_handle)->sgerBH_gen_small, 3, gs, ls, 0, args);
 
   cuda_ops.buffer_release(Aa);
   cuda_ops.buffer_release(xa);

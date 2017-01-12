@@ -87,24 +87,24 @@ GPUARRAY_PUBLIC int GpuKernel_setarg(GpuKernel *k, unsigned int i, void *val);
  *
  * \param k the kernel to schedule for
  * \param n number of elements to handle
- * \param ls local size (in/out)
  * \param gs grid size (in/out)
+ * \param ls local size (in/out)
  */
 GPUARRAY_PUBLIC int GpuKernel_sched(GpuKernel *k, size_t n,
-                                    size_t *ls, size_t *gs);
+                                    size_t *gs, size_t *ls);
 
 /**
  * Launch the execution of a kernel.
  *
  * \param k the kernel to launch
  * \param n dimensionality of the grid/blocks
- * \param ls sizes of launch blocks
  * \param gs sizes of launch grid
+ * \param ls sizes of launch blocks
  * \param amount of dynamic shared memory to allocate
  * \param args table of pointers to arguments
  */
 GPUARRAY_PUBLIC int GpuKernel_call(GpuKernel *k, unsigned int n,
-                                   const size_t *ls, const size_t *gs,
+                                   const size_t *gs, const size_t *ls,
                                    size_t shared, void **args);
 
 GPUARRAY_PUBLIC int GpuKernel_binary(const GpuKernel *k, size_t *sz,

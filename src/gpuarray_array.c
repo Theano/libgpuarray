@@ -487,7 +487,7 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
   if (err != GA_NO_ERROR)
     return err;
 
-  err = GpuKernel_sched(&k, n[0]*n[1], &ls[1], &gs[1]);
+  err = GpuKernel_sched(&k, n[0]*n[1], &gs[1], &ls[1]);
   if (err != GA_NO_ERROR)
     goto out;
 
@@ -521,7 +521,7 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
   GpuKernel_setarg(&k, argp++, &n[1]);
   GpuKernel_setarg(&k, argp++, errbuf);
 
-  err = GpuKernel_call(&k, 2, ls, gs, 0, NULL);
+  err = GpuKernel_call(&k, 2, gs, ls, 0, NULL);
   if (check_error && err == GA_NO_ERROR) {
     err = gpudata_read(&kerr, errbuf, 0, sizeof(int));
     if (err == GA_NO_ERROR && kerr != 0) {

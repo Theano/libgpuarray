@@ -815,8 +815,8 @@ static int   maxandargmaxInvoke                 (maxandargmax_ctx*  ctx){
 	   ctx->dstArgmaxStepsGD){
 		ctx->ret = GpuKernel_call(&ctx->kernel,
 		                          ctx->ndh>0 ? ctx->ndh : 1,
-		                          ctx->blockSize,
 		                          ctx->gridSize,
+		                          ctx->blockSize,
 		                          0,
 		                          args);
 	}else{

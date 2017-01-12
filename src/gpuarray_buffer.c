@@ -180,9 +180,9 @@ int gpukernel_setarg(gpukernel *k, unsigned int i, void *a) {
   return ((partial_gpukernel *)k)->ctx->ops->kernel_setarg(k, i, a);
 }
 
-int gpukernel_call(gpukernel *k, unsigned int n, const size_t *ls,
-                   const size_t *gs, size_t shared, void **args) {
-  return ((partial_gpukernel *)k)->ctx->ops->kernel_call(k, n, ls, gs,
+int gpukernel_call(gpukernel *k, unsigned int n, const size_t *gs,
+                   const size_t *ls, size_t shared, void **args) {
+  return ((partial_gpukernel *)k)->ctx->ops->kernel_call(k, n, gs, ls,
                                                          shared, args);
 }
 

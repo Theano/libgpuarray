@@ -32,7 +32,7 @@ gpucontext *GpuKernel_context(GpuKernel *k) {
   return gpukernel_context(k->k);
 }
 
-int GpuKernel_sched(GpuKernel *k, size_t n, size_t *ls, size_t *gs) {
+int GpuKernel_sched(GpuKernel *k, size_t n, size_t *gs, size_t *ls) {
   size_t min_l;
   size_t max_l;
   size_t target_l;
@@ -90,9 +90,9 @@ int GpuKernel_setarg(GpuKernel *k, unsigned int i, void *a) {
 }
 
 int GpuKernel_call(GpuKernel *k, unsigned int n,
-                   const size_t *bs, const size_t *gs,
+                   const size_t *gs, const size_t *ls,
                    size_t shared, void **args) {
-  return gpukernel_call(k->k, n, bs, gs, shared, args);
+  return gpukernel_call(k->k, n, gs, ls, shared, args);
 }
 
 int GpuKernel_binary(const GpuKernel *k, size_t *sz, void **bin) {
