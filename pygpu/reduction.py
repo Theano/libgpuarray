@@ -150,10 +150,10 @@ class ReductionKernel(object):
         else:
             self.arguments = arguments
 
-        if (self.dtype_out == np.dtype('float16') or
+        if (self.dtype_out == numpy.dtype('float16') or
                 any(ar.dtype == numpy.dtype('float16')
                     for ar in self.arguments)):
-            raise UnsupportedError('float16 not supported for the reduction interface')
+            raise NotImplementedError('float16 not supported for the reduction interface')
 
         self.reduce_expr = reduce_expr
         if map_expr is None:
