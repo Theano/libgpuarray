@@ -1,5 +1,7 @@
 import numpy
 
+from nose.tools import assert_raises
+
 from pygpu import gpuarray, ndgpuarray as elemary
 from pygpu.reduction import ReductionKernel
 
@@ -130,3 +132,9 @@ def test_reduction_0d():
     rg = g.all()
 
     assert numpy.all(rc == numpy.asarray(rg))
+
+
+def test_reduction_f16():
+    c, g = gen_gpuarray((3,), dtype='float16', ctx=context, cls=elemary)
+
+    assert_raises(NotImplementedError, g.sum)
