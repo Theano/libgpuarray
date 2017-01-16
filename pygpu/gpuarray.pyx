@@ -1658,14 +1658,12 @@ cdef class GpuArray:
         return pygpu_as_ndarray(self)
 
     def __bool__(self):
-        if self.ga.nd == 0:
-            return True
-        if self.ga.nd == 1:
-            if self.ga.dimensions[0] == 0:
-                return False
-            if self.ga.dimensions[0] == 1:
-                return bool(numpy.asarray(self))
-        raise ValueError('The truth value of a multi-element array is ambiguous')
+        if self.size == 0:
+            return False
+        elif self.size == 1:
+            return bool(numpy.asarray(self))
+        else:
+            raise ValueError('The truth value of a multi-element array is ambiguous')
 
     def _empty_like_me(self, dtype=None, order='C'):
         """
