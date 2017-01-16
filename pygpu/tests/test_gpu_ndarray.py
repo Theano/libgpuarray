@@ -47,6 +47,11 @@ def test_hash():
     assert exc is not None
 
 
+def test_bool():
+    for data in [numpy.empty((0, 33)), [[1]], [[0]], [], [0], [1], 0, 1]:
+        assert bool(pygpu.asarray(data, context=ctx)) == bool(numpy.asarray(data))
+
+
 def test_transfer():
     for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
