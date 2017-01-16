@@ -97,7 +97,7 @@ struct _gpuarray_buffer_ops {
   void (*kernel_release)(gpukernel *k);
   int (*kernel_setarg)(gpukernel *k, unsigned int i, void *a);
   int (*kernel_call)(gpukernel *k, unsigned int n,
-                     const size_t *bs, const size_t *gs,
+                     const size_t *gs, const size_t *ls,
                      size_t shared, void **args);
 
   int (*kernel_binary)(gpukernel *k, size_t *sz, void **obj);

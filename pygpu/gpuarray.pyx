@@ -446,16 +446,16 @@ cdef gpucontext *kernel_context(GpuKernel k) except NULL:
         raise GpuArrayException, "Invalid kernel or destroyed context"
     return res
 
-cdef int kernel_sched(GpuKernel k, size_t n, size_t *ls, size_t *gs) except -1:
+cdef int kernel_sched(GpuKernel k, size_t n, size_t *gs, size_t *ls) except -1:
     cdef int err
-    err = GpuKernel_sched(&k.k, n, ls, gs)
+    err = GpuKernel_sched(&k.k, n, gs, ls)
     if err != GA_NO_ERROR:
         raise get_exc(err), kernel_error(k, err)
 
-cdef int kernel_call(GpuKernel k, unsigned int n, const size_t *ls,
-                     const size_t *gs, size_t shared, void **args) except -1:
+cdef int kernel_call(GpuKernel k, unsigned int n, const size_t *gs,
+                     const size_t *ls, size_t shared, void **args) except -1:
     cdef int err
-    err = GpuKernel_call(&k.k, n, ls, gs, shared, args)
+    err = GpuKernel_call(&k.k, n, gs, ls, shared, args)
     if err != GA_NO_ERROR:
         raise get_exc(err), kernel_error(k, err)
 
@@ -2113,10 +2113,10 @@ cdef class GpuKernel:
     sure to test against the size of your data.
 
     If you want more control over thread allocation you can use the
-    `ls` and `gs` parameters like so::
+    `gs` and `ls` parameters like so::
 
         k = GpuKernel(...)
-        k(param1, param2, ls=ls, gs=gs)
+        k(param1, param2, gs=gs, ls=ls)
 
     If you choose to use this interface, make sure to stay within the
     limits of `k.maxlsize` and `ctx.maxgsize` or the call will fail.
@@ -2200,12 +2200,12 @@ cdef class GpuKernel:
         finally:
             free(_types)
 
-    def __call__(self, *args, n=None, ls=None, gs=None, shared=0):
+    def __call__(self, *args, n=None, gs=None, ls=None, shared=0):
         if n == None and (ls == None or gs == None):
             raise ValueError, "Must specify size (n) or both gs and ls"
-        self.do_call(n, ls, gs, args, shared)
+        self.do_call(n, gs, ls, args, shared)
 
-    cdef do_call(self, py_n, py_ls, py_gs, py_args, size_t shared):
+    cdef do_call(self, py_n, py_gs, py_ls, py_args, size_t shared):
         cdef size_t n
         cdef size_t gs[3]
         cdef size_t ls[3]
@@ -2272,8 +2272,8 @@ cdef class GpuKernel:
             if nd != 1:
                 raise ValueError, "n is specified and nd != 1"
             n = py_n
-            kernel_sched(self, n, &ls[0], &gs[0])
-        kernel_call(self, nd, ls, gs, shared, self.callbuf)
+            kernel_sched(self, n, &gs[0], &ls[0])
+        kernel_call(self, nd, gs, ls, shared, self.callbuf)
 
     cdef _setarg(self, unsigned int index, int typecode, object o):
         if typecode == GA_BUFFER:

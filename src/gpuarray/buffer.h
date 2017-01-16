@@ -482,15 +482,15 @@ GPUARRAY_PUBLIC int gpukernel_setarg(gpukernel *k, unsigned int i, void *a);
  *
  * \param k kernel
  * \param n number of dimensions of grid/block
- * \param bs block sizes for this call (also known as local size)
  * \param gs grid sizes for this call (also known as global size)
+ * \param ls block sizes for this call (also known as local size)
  * \param shared amount of dynamic shared memory to reserve
  * \param args table of pointers to each argument (optional).
  *
  * \returns GA_NO_ERROR or an error code if an error occurred.
  */
 GPUARRAY_PUBLIC int gpukernel_call(gpukernel *k, unsigned int n,
-                                   const size_t *ls, const size_t *gs,
+                                   const size_t *gs, const size_t *ls,
                                    size_t shared, void **args);
 
 /**

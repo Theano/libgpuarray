@@ -282,7 +282,7 @@ class ReductionKernel(object):
                 kargs.append(offsets[i])
                 kargs.extend(strs[i])
 
-        k(*kargs, ls=ls, gs=gs)
+        k(*kargs, gs=gs, ls=ls)
 
         return out
 

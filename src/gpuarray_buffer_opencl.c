@@ -274,7 +274,7 @@ cl_mem cl_get_buf(gpudata *g) { ASSERT_BUF(g); return g->buf; }
 
 static void cl_releasekernel(gpukernel *k);
 static int cl_callkernel(gpukernel *k, unsigned int n,
-                         const size_t *bs, const size_t *gs,
+                         const size_t *gs, const size_t *ls,
                          size_t shared, void **args);
 
 static const char CL_PREAMBLE[] =
@@ -748,7 +748,7 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
   if (res != GA_NO_ERROR) goto fail;
   gs = ((n-1) / ls) + 1;
   args[0] = dst;
-  res = cl_callkernel(m, 1, &ls, &gs, 0, args);
+  res = cl_callkernel(m, 1, &gs, &ls, 0, args);
 
  fail:
   cl_releasekernel(m);
@@ -998,7 +998,7 @@ static int cl_setkernelarg(gpukernel *k, unsigned int i, void *a) {
 }
 
 static int cl_callkernel(gpukernel *k, unsigned int n,
-                         const size_t *ls, const size_t *gs,
+                         const size_t *gs, const size_t *ls,
                          size_t shared, void **args) {
   cl_ctx *ctx = k->ctx;
   size_t _gs[3];

@@ -414,10 +414,10 @@ static int call_basic(GpuElemwise *ge, void **args, size_t n, unsigned int nd,
     }
   }
 
-  err = GpuKernel_sched(k, n, &ls, &gs);
+  err = GpuKernel_sched(k, n, &gs, &ls);
   if (err != GA_NO_ERROR) goto error;
 
-  err = GpuKernel_call(k, 1, &ls, &gs, 0, NULL);
+  err = GpuKernel_call(k, 1, &gs, &ls, 0, NULL);
  error:
   return err;
 }
@@ -572,9 +572,9 @@ static int call_contig(GpuElemwise *ge, void **args, size_t n) {
       if (err != GA_NO_ERROR) return err;
     }
   }
-  err = GpuKernel_sched(&ge->k_contig, n, &ls, &gs);
+  err = GpuKernel_sched(&ge->k_contig, n, &gs, &ls);
   if (err != GA_NO_ERROR) return err;
-  return GpuKernel_call(&ge->k_contig, 1, &ls, &gs, 0, NULL);
+  return GpuKernel_call(&ge->k_contig, 1, &gs, &ls, 0, NULL);
 }
 
 GpuElemwise *GpuElemwise_new(gpucontext *ctx,
