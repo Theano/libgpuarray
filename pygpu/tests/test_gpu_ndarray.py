@@ -49,7 +49,7 @@ def test_hash():
 
 def test_bool():
     for data in [numpy.empty((0, 33)), [[1]], [[0]], [], [0], [1], 0, 1]:
-        assert bool(pygpu.asarray(data)) == bool(numpy.asarray(data))
+        assert bool(pygpu.asarray(data, context=ctx)) == bool(numpy.asarray(data))
 
 
 def test_transfer():
