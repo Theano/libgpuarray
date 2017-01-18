@@ -146,7 +146,7 @@ static inline void strb_appends(strb *sb, const char *s) {
 /*
  * Appends the content of another strb.
  */
-static inline void strb_appendb(strb *sb, strb *sb2) {
+static inline void strb_appendb(strb *sb, const strb *sb2) {
   strb_appendn(sb, sb2->s, sb2->l);
 }
 

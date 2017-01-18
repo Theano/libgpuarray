@@ -68,6 +68,7 @@ typedef struct _cuda_context {
   CUstream mem_s;
   gpudata *freeblocks;
   cache *kernel_cache;
+  cache *disk_cache;
   unsigned int enter;
   unsigned char major;
   unsigned char minor;

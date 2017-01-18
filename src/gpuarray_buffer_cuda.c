@@ -49,16 +49,70 @@ static int cuda_records(gpudata *, int, CUstream);
 static int detect_arch(const char *prefix, char *ret, CUresult *err);
 static gpudata *new_gpudata(cuda_context *ctx, CUdeviceptr ptr, size_t size);
 
-static int strb_eq(void *_k1, void *_k2) {
-  strb *k1 = (strb *)_k1;
-  strb *k2 = (strb *)_k2;
+typedef struct _kernel_key {
+  char bin_id[64];
+  strb *src;
+} kernel_key;
+
+static void key_free(cache_key_t _k) {
+  kernel_key *k = (kernel_key *)_k;
+  strb_free(k->src);
+  free(k);
+}
+
+static int strb_eq(strb *k1, strb *k2) {
   return (k1->l == k2->l &&
           memcmp(k1->s, k2->s, k1->l) == 0);
 }
 
-static uint32_t strb_hash(void *_k) {
-  strb *k = (strb *)_k;
+static uint32_t strb_hash(strb *k) {
   return XXH32(k->s, k->l, 42);
+}
+
+static int key_eq(kernel_key *k1, kernel_key *k2) {
+  return (memcmp(k1->bin_id, k2->bin_id, 64) == 0 &&
+          strb_eq(k1->src, k2->src));
+}
+
+static int key_hash(kernel_key *k) {
+  XXH32_state_t state;
+  XXH32_reset(&state, 42);
+  XXH32_update(&state, k->bin_id, 64);
+  XXH32_update(&state, k->src->s, k->src->l);
+  return XXH32_digest(&state);
+}
+
+static int key_write(strb *res, kernel_key *k) {
+  strb_appendn(res, k->bin_id, 64);
+  strb_appendb(res, k->src);
+  return strb_error(res);
+}
+
+static kernel_key *key_read(const strb *b) {
+  kernel_key *k;
+  if (b->l < 64) return NULL;
+  k = malloc(sizeof(*k));
+  if (k == NULL) return NULL;
+  k->src = strb_alloc(b->l - 64);
+  if (k->src == NULL) {
+    free(k);
+    return NULL;
+  }
+  memcpy(k->bin_id, b->s, 64);
+  strb_appendn(k->src, b->s+64, b->l-64);
+  return k;
+}
+
+static int kernel_write(strb *res, strb *bin) {
+  strb_appendb(res, bin);
+  return strb_error(res);
+}
+
+static strb *kernel_read(const strb *b) {
+  strb *res = strb_alloc(b->l);
+  if (res != NULL)
+    strb_appendb(res, b);
+  return res;
 }
 
 static int setup_done = 0;
@@ -114,6 +168,8 @@ static int cuda_get_device_count(unsigned int platform,
 
 cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   cuda_context *res;
+  cache *mem_cache;
+  char *cache_path;
   void *p;
   int e;
 
@@ -152,11 +208,38 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
       goto fail_mem_stream;
     }
   }
-  res->kernel_cache = cache_twoq(64, 128, 64, 8, strb_eq, strb_hash,
+
+  res->kernel_cache = cache_twoq(64, 128, 64, 8,
+                                 (cache_eq_fn)strb_eq,
+                                 (cache_hash_fn)strb_hash,
                                  (cache_freek_fn)strb_free,
                                  (cache_freev_fn)cuda_freekernel);
   if (res->kernel_cache == NULL)
     goto fail_cache;
+
+  cache_path = getenv("GPUARRAY_CACHE_PATH");
+  if (cache_path != NULL) {
+    mem_cache = cache_lru(64, 8,
+                          (cache_eq_fn)key_eq,
+                          (cache_hash_fn)key_hash,
+                          (cache_freek_fn)key_free,
+                          (cache_freev_fn)strb_free);
+    if (mem_cache == NULL)
+      goto fail_disk_cache;
+    res->disk_cache = cache_disk(cache_path, mem_cache,
+                                 (kwrite_fn)key_write,
+                                 (vwrite_fn)kernel_write,
+                                 (kread_fn)key_read,
+                                 (vread_fn)kernel_read);
+    if (res->disk_cache == NULL) {
+      cache_destroy(mem_cache);
+      goto fail_disk_cache;
+    }
+  } else {
+  fail_disk_cache:
+    res->disk_cache = NULL;
+  }
+
   err = cuMemAllocHost(&p, 16);
   if (err != CUDA_SUCCESS) {
     goto fail_errbuf;
@@ -174,6 +257,8 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
  fail_end:
   cuMemFreeHost(p);
  fail_errbuf:
+  if (res->disk_cache)
+    cache_destroy(res->disk_cache);
   cache_destroy(res->kernel_cache);
  fail_cache:
   if (ISCLR(res->flags, GA_CTX_SINGLE_STREAM))
@@ -215,6 +300,8 @@ static void cuda_free_ctx(cuda_context *ctx) {
       deallocate(curr);
     }
     cache_destroy(ctx->kernel_cache);
+    if (ctx->disk_cache)
+      cache_destroy(ctx->disk_cache);
 
     if (!(ctx->flags & DONTFREE)) {
       cuCtxPushCurrent(ctx->ctx);
