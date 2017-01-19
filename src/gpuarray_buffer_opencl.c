@@ -1076,34 +1076,6 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
   return GA_NO_ERROR;
 }
 
-static int cl_kernelbin(gpukernel *k, size_t *sz, void **obj) {
-  cl_ctx *ctx = k->ctx;
-  cl_program p;
-  size_t rsz;
-  void *res;
-
-  ASSERT_KER(k);
-  ASSERT_CTX(ctx);
-
-  ctx->err = clGetKernelInfo(k->k, CL_KERNEL_PROGRAM, sizeof(p), &p, NULL);
-  if (ctx->err != CL_SUCCESS)
-    return GA_IMPL_ERROR;
-  ctx->err = clGetProgramInfo(p, CL_PROGRAM_BINARY_SIZES, sizeof(rsz), &rsz, NULL);
-  if (ctx->err != CL_SUCCESS)
-    return GA_IMPL_ERROR;
-  res = malloc(rsz);
-  if (res == NULL)
-    return GA_MEMORY_ERROR;
-  ctx->err = clGetProgramInfo(p, CL_PROGRAM_BINARIES, sizeof(res), &res, NULL);
-  if (ctx->err != CL_SUCCESS) {
-    free(res);
-    return GA_IMPL_ERROR;
-  }
-  *sz = rsz;
-  *obj = res;
-  return GA_NO_ERROR;
-}
-
 static int cl_sync(gpudata *b) {
   cl_ctx *ctx = (cl_ctx *)b->ctx;
 
@@ -1465,7 +1437,6 @@ const gpuarray_buffer_ops opencl_ops = {cl_get_platform_count,
                                         cl_releasekernel,
                                         cl_setkernelarg,
                                         cl_callkernel,
-                                        cl_kernelbin,
                                         cl_sync,
                                         cl_transfer,
                                         cl_property,

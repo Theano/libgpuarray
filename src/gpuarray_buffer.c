@@ -187,7 +187,7 @@ int gpukernel_call(gpukernel *k, unsigned int n, const size_t *gs,
 }
 
 int gpukernel_binary(gpukernel *k, size_t *sz, void **obj) {
-  return ((partial_gpukernel *)k)->ctx->ops->kernel_binary(k, sz, obj);
+  return GA_DEPRECATED_ERROR;
 }
 
 int gpukernel_property(gpukernel *k, int prop_id, void *res) {

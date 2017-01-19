@@ -17,6 +17,10 @@ DEF_PROC(cuCtxGetDevice, (CUdevice *device));
 DEF_PROC_V2(cuCtxPushCurrent, (CUcontext ctx));
 DEF_PROC_V2(cuCtxPopCurrent, (CUcontext *pctx));
 
+DEF_PROC(cuLinkCreate, (unsigned int numOptions, CUjit_option *options, void **optionValues, CUlinkState *stateOut));
+DEF_PROC(cuLinkAddData, (CUlinkState state, CUjitInputType type, void *data, size_t size, const char *name, unsigned int numOptions, CUjit_option *options, void **optionValues));
+DEF_PROC(cuLinkComplete, (CUlinkState state, void **cubinOut, size_t *sizeOut));
+DEF_PROC(cuLinkDestroy, (CUlinkState state));
 DEF_PROC(cuModuleLoadData, (CUmodule *module, const void *image));
 DEF_PROC(cuModuleLoadDataEx, (CUmodule *module, const void *image, unsigned int numOptions, CUjit_option *options, void **optionValues));
 DEF_PROC(cuModuleUnload, (CUmodule hmod));

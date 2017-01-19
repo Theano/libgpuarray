@@ -100,7 +100,6 @@ struct _gpuarray_buffer_ops {
                      const size_t *gs, const size_t *ls,
                      size_t shared, void **args);
 
-  int (*kernel_binary)(gpukernel *k, size_t *sz, void **obj);
   int (*buffer_sync)(gpudata *b);
   int (*buffer_transfer)(gpudata *dst, size_t dstoff,
                          gpudata *src, size_t srcoff, size_t sz);
