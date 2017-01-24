@@ -316,7 +316,7 @@ static const char CL_PREAMBLE[] =
   "#define ga_ssize long\n"
   "#define load_half(p) vload_half(0, p)\n"
   "#define store_half(p, v) vstore_half_rtn(v, 0, p)\n"
-  "#define GA_DECL_SHARED_PARAM(type, name) , __local type name[]\n"
+  "#define GA_DECL_SHARED_PARAM(type, name) , __local type *name\n"
   "#define GA_DECL_SHARED_BODY(type, name)\n";
 
 /* XXX: add complex types, quad types, and longlong */
