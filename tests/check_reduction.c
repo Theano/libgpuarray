@@ -67,15 +67,14 @@ static       double   pcgRand01(void){
  * Test cases.
  */
 
-START_TEST(test_reduction){
+START_TEST(test_maxandargmax_reduction){
+	pcgSeed(1);
+
 	/**
 	 * We test here a reduction of some random 3D tensor on the first and
 	 * third dimensions.
 	 */
 
-	GpuArray gaSrc;
-	GpuArray gaMax;
-	GpuArray gaArgmax;
 	size_t i,j,k;
 	size_t dims[3]  = {32,50,79};
 	size_t prodDims = dims[0]*dims[1]*dims[2];
@@ -94,7 +93,6 @@ START_TEST(test_reduction){
 	 * Initialize source data.
 	 */
 
-	pcgSeed(1);
 	for(i=0;i<prodDims;i++){
 		pSrc[i] = pcgRand01();
 	}
@@ -103,6 +101,10 @@ START_TEST(test_reduction){
 	/**
 	 * Run the kernel.
 	 */
+
+	GpuArray gaSrc;
+	GpuArray gaMax;
+	GpuArray gaArgmax;
 
 	ga_assert_ok(GpuArray_empty(&gaSrc,    ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaMax,    ctx, GA_FLOAT, 1, &dims[1], GA_C_ORDER));
@@ -153,7 +155,9 @@ START_TEST(test_reduction){
 	GpuArray_clear(&gaArgmax);
 }END_TEST
 
-START_TEST(test_idxtranspose){
+START_TEST(test_maxandargmax_idxtranspose){
+	pcgSeed(1);
+
 	/**
 	 * We test here the same reduction as test_reduction, except with a
 	 * reversed reduxList {2,0} instead of {0,2}. That should lead to a
@@ -161,9 +165,6 @@ START_TEST(test_idxtranspose){
 	 * "flattened" output version.
 	 */
 
-	GpuArray gaSrc;
-	GpuArray gaMax;
-	GpuArray gaArgmax;
 	size_t i,j,k;
 	size_t dims[3]     = {32,50,79};
 	size_t prodDims    = dims[0]*dims[1]*dims[2];
@@ -184,7 +185,6 @@ START_TEST(test_idxtranspose){
 	 * Initialize source data.
 	 */
 
-	pcgSeed(1);
 	for(i=0;i<prodDims;i++){
 		pSrc[i] = pcgRand01();
 	}
@@ -193,6 +193,10 @@ START_TEST(test_idxtranspose){
 	/**
 	 * Run the kernel.
 	 */
+
+	GpuArray gaSrc;
+	GpuArray gaMax;
+	GpuArray gaArgmax;
 
 	ga_assert_ok(GpuArray_empty(&gaSrc,    ctx, GA_FLOAT, 3, dims,    GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaMax,    ctx, GA_FLOAT, 1, rdxDims, GA_C_ORDER));
@@ -243,15 +247,13 @@ START_TEST(test_idxtranspose){
 	GpuArray_clear(&gaArgmax);
 }END_TEST
 
-START_TEST(test_veryhighrank){
+START_TEST(test_maxandargmax_veryhighrank){
+	pcgSeed(1);
+
 	/**
 	 * Here we test a reduction of a random 8D tensor on four dimensions.
 	 */
 
-	GpuArray gaSrc;
-	GpuArray gaMax;
-	GpuArray gaArgmax;
-	size_t dstIdx;
 	size_t i,j,k,l,m,n,o,p;
 	size_t dims   [8]  = {1171,373,2,1,2,1,2,1};
 	size_t prodDims    = dims[0]*dims[1]*dims[2]*dims[3]*dims[4]*dims[5]*dims[6]*dims[7];
@@ -272,7 +274,6 @@ START_TEST(test_veryhighrank){
 	 * Initialize source data.
 	 */
 
-	pcgSeed(1);
 	for(i=0;i<prodDims;i++){
 		pSrc[i] = pcgRand01();
 	}
@@ -281,6 +282,10 @@ START_TEST(test_veryhighrank){
 	/**
 	 * Run the kernel.
 	 */
+
+	GpuArray gaSrc;
+	GpuArray gaMax;
+	GpuArray gaArgmax;
 
 	ga_assert_ok(GpuArray_empty(&gaSrc,    ctx, GA_FLOAT, 8, dims,    GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaMax,    ctx, GA_FLOAT, 4, rdxDims, GA_C_ORDER));
@@ -322,7 +327,7 @@ START_TEST(test_veryhighrank){
 						}
 					}
 
-					dstIdx = (((i)*dims[1] + j)*dims[3] + l)*dims[6] + o;
+					size_t dstIdx = (((i)*dims[1] + j)*dims[3] + l)*dims[6] + o;
 					ck_assert_msg(gtMax    == pMax[dstIdx],    "Max value mismatch!");
 					ck_assert_msg(gtArgmax == pArgmax[dstIdx], "Argmax value mismatch!");
 				}
@@ -343,20 +348,17 @@ START_TEST(test_veryhighrank){
 	GpuArray_clear(&gaArgmax);
 }END_TEST
 
-START_TEST(test_alldimsreduced){
+START_TEST(test_maxandargmax_alldimsreduced){
+	pcgSeed(1);
+
 	/**
 	 * We test here a reduction of some random 3D tensor on all dimensions.
 	 */
 
-	GpuArray gaSrc;
-	GpuArray gaMax;
-	GpuArray gaArgmax;
 	size_t i,j,k;
 	size_t dims[3]  = {32,50,79};
 	size_t prodDims = dims[0]*dims[1]*dims[2];
 	const unsigned reduxList[] = {0,1,2};
-	size_t gtArgmax;
-	float  gtMax;
 
 	float *pSrc    = calloc(sizeof(*pSrc), prodDims);
 	float *pMax    = calloc(1, sizeof(*pMax));
@@ -371,7 +373,6 @@ START_TEST(test_alldimsreduced){
 	 * Initialize source data.
 	 */
 
-	pcgSeed(1);
 	for(i=0;i<prodDims;i++){
 		pSrc[i] = pcgRand01();
 	}
@@ -380,6 +381,10 @@ START_TEST(test_alldimsreduced){
 	/**
 	 * Run the kernel.
 	 */
+
+	GpuArray gaSrc;
+	GpuArray gaMax;
+	GpuArray gaArgmax;
 
 	ga_assert_ok(GpuArray_empty(&gaSrc,    ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaMax,    ctx, GA_FLOAT, 0, NULL,     GA_C_ORDER));
@@ -399,8 +404,8 @@ START_TEST(test_alldimsreduced){
 	 * Check that the destination tensors are correct.
 	 */
 
-	gtArgmax = 0;
-	gtMax    = pSrc[0];
+	size_t gtArgmax = 0;
+	float  gtMax    = pSrc[0];
 
 	for(i=0;i<dims[0];i++){
 		for(j=0;j<dims[1];j++){
@@ -430,16 +435,193 @@ START_TEST(test_alldimsreduced){
 	GpuArray_clear(&gaArgmax);
 }END_TEST
 
+START_TEST(test_minandargmin_reduction){
+	pcgSeed(1);
+
+	/**
+	 * We test here a reduction of some random 3D tensor on the first and
+	 * third dimensions.
+	 */
+
+	size_t i,j,k;
+	size_t dims[3]  = {32,50,79};
+	size_t prodDims = dims[0]*dims[1]*dims[2];
+	const unsigned reduxList[] = {0,2};
+
+	float*  pSrc    = calloc(1, sizeof(*pSrc)    * dims[0]*dims[1]*dims[2]);
+	float*  pMin    = calloc(1, sizeof(*pMin)    *         dims[1]        );
+	size_t* pArgmin = calloc(1, sizeof(*pArgmin) *         dims[1]        );
+
+	ck_assert_ptr_ne(pSrc,    NULL);
+	ck_assert_ptr_ne(pMin,    NULL);
+	ck_assert_ptr_ne(pArgmin, NULL);
+
+
+	/**
+	 * Initialize source data.
+	 */
+
+	for(i=0;i<prodDims;i++){
+		pSrc[i] = pcgRand01();
+	}
+
+
+	/**
+	 * Run the kernel.
+	 */
+
+	GpuArray gaSrc;
+	GpuArray gaMin;
+	GpuArray gaArgmin;
+
+	ga_assert_ok(GpuArray_empty(&gaSrc,    ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaMin,    ctx, GA_FLOAT, 1, &dims[1], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaArgmin, ctx, GA_SIZE,  1, &dims[1], GA_C_ORDER));
+
+	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
+	ga_assert_ok(GpuArray_memset(&gaMin,    -1));  /* 0xFFFFFFFF is a qNaN. */
+	ga_assert_ok(GpuArray_memset(&gaArgmin, -1));
+
+	ga_assert_ok(GpuArray_minandargmin(&gaMin, &gaArgmin, &gaSrc, 2, reduxList));
+
+	ga_assert_ok(GpuArray_read(pMin,    sizeof(*pMin)   *dims[1], &gaMin));
+	ga_assert_ok(GpuArray_read(pArgmin, sizeof(*pArgmin)*dims[1], &gaArgmin));
+
+
+	/**
+	 * Check that the destination tensors are correct.
+	 */
+
+	for(j=0;j<dims[1];j++){
+		size_t gtArgmin = 0;
+		float  gtMin    = pSrc[(0*dims[1] + j)*dims[2] + 0];
+
+		for(i=0;i<dims[0];i++){
+			for(k=0;k<dims[2];k++){
+				float v = pSrc[(i*dims[1] + j)*dims[2] + k];
+
+				if(v < gtMin){
+					gtMin    = v;
+					gtArgmin = i*dims[2] + k;
+				}
+			}
+		}
+
+		ck_assert_msg(gtMin    == pMin[j],    "Min value mismatch!");
+		ck_assert_msg(gtArgmin == pArgmin[j], "Argmin value mismatch!");
+	}
+
+	/**
+	 * Deallocate.
+	 */
+
+	free(pSrc);
+	free(pMin);
+	free(pArgmin);
+	GpuArray_clear(&gaSrc);
+	GpuArray_clear(&gaMin);
+	GpuArray_clear(&gaArgmin);
+}END_TEST
+
+START_TEST(test_minandargmin_alldimsreduced){
+	pcgSeed(1);
+
+	/**
+	 * We test here a reduction of some random 3D tensor on all dimensions.
+	 */
+
+	size_t i,j,k;
+	size_t dims[3]  = {32,50,79};
+	size_t prodDims = dims[0]*dims[1]*dims[2];
+	const unsigned reduxList[] = {0,1,2};
+
+	float*  pSrc    = calloc(1, sizeof(*pSrc)    * dims[0]*dims[1]*dims[2]);
+	float*  pMin    = calloc(1, sizeof(*pMin)                             );
+	size_t* pArgmin = calloc(1, sizeof(*pArgmin)                          );
+
+	ck_assert_ptr_ne(pSrc,    NULL);
+	ck_assert_ptr_ne(pMin,    NULL);
+	ck_assert_ptr_ne(pArgmin, NULL);
+
+
+	/**
+	 * Initialize source data.
+	 */
+
+	for(i=0;i<prodDims;i++){
+		pSrc[i] = pcgRand01();
+	}
+
+
+	/**
+	 * Run the kernel.
+	 */
+
+	GpuArray gaSrc;
+	GpuArray gaMin;
+	GpuArray gaArgmin;
+
+	ga_assert_ok(GpuArray_empty(&gaSrc,    ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaMin,    ctx, GA_FLOAT, 0, NULL,     GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaArgmin, ctx, GA_SIZE,  0, NULL,     GA_C_ORDER));
+
+	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
+	ga_assert_ok(GpuArray_memset(&gaMin,    -1));  /* 0xFFFFFFFF is a qNaN. */
+	ga_assert_ok(GpuArray_memset(&gaArgmin, -1));
+
+	ga_assert_ok(GpuArray_minandargmin(&gaMin, &gaArgmin, &gaSrc, 3, reduxList));
+
+	ga_assert_ok(GpuArray_read(pMin,    sizeof(*pMin),    &gaMin));
+	ga_assert_ok(GpuArray_read(pArgmin, sizeof(*pArgmin), &gaArgmin));
+
+
+	/**
+	 * Check that the destination tensors are correct.
+	 */
+
+	size_t gtArgmin = 0;
+	float  gtMin    = pSrc[0];
+
+	for(i=0;i<dims[0];i++){
+		for(j=0;j<dims[1];j++){
+			for(k=0;k<dims[2];k++){
+				float v = pSrc[(i*dims[1] + j)*dims[2] + k];
+
+				if(v < gtMin){
+					gtMin    = v;
+					gtArgmin = (i*dims[1] + j)*dims[2] + k;
+				}
+			}
+		}
+	}
+
+	ck_assert_msg(gtMin    == pMin[0],    "Min value mismatch!");
+	ck_assert_msg(gtArgmin == pArgmin[0], "Argmin value mismatch!");
+
+	/**
+	 * Deallocate.
+	 */
+
+	free(pSrc);
+	free(pMin);
+	free(pArgmin);
+	GpuArray_clear(&gaSrc);
+	GpuArray_clear(&gaMin);
+	GpuArray_clear(&gaArgmin);
+}END_TEST
+
 Suite *get_suite(void) {
 	Suite *s  = suite_create("reduction");
 	TCase *tc = tcase_create("basic");
 	tcase_add_checked_fixture(tc, setup, teardown);
 	tcase_set_timeout(tc, 15.0);
 
-	tcase_add_test(tc, test_reduction);
-	tcase_add_test(tc, test_idxtranspose);
-	tcase_add_test(tc, test_veryhighrank);
-	tcase_add_test(tc, test_alldimsreduced);
+	tcase_add_test(tc, test_maxandargmax_reduction);
+	tcase_add_test(tc, test_maxandargmax_idxtranspose);
+	tcase_add_test(tc, test_maxandargmax_veryhighrank);
+	tcase_add_test(tc, test_maxandargmax_alldimsreduced);
+	tcase_add_test(tc, test_minandargmin_reduction);
+	tcase_add_test(tc, test_minandargmin_alldimsreduced);
 
 	suite_add_tcase(s, tc);
 	return s;
