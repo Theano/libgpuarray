@@ -81,6 +81,27 @@ static int mkstempat(int dfd, char *template) {
   return -1;
 }
 
+/* Ensure that a path exists by creating all intermediate directories */
+static int ensureat(int dfd, char *path) {
+  char *curp;
+  char *pos;
+
+  curp = path;
+
+  while ((pos = strchr(curp, '/')) != NULL) {
+    *pos = '\0';
+    if (mkdirat(dfd, path, 0777)) {
+      if (errno != EEXIST) return -1;
+      /* For now we suppose that EEXIST means that the directory is
+       * already there.*/
+    }
+    curp = pos + 1;
+    *pos = '/';
+  }
+
+  return 0;
+}
+
 static int key_path(disk_cache *c, const cache_key_t key, char *out) {
   strb kb = STRB_STATIC_INIT;
   unsigned char hash[64];
@@ -88,8 +109,8 @@ static int key_path(disk_cache *c, const cache_key_t key, char *out) {
 
   if (c->kwrite(&kb, key)) return -1;
   if (Skein_512((unsigned char *)kb.s, kb.l, hash)) return -1;
-  if (snprintf(out, 6, "%02x%02x/%02x%02x",
-               hash[0], hash[1], hash[2], hash[3]) != 5)
+  if (snprintf(out, 10, "%02x%02x/%02x%02x",
+               hash[0], hash[1], hash[2], hash[3]) != 9)
     return -1;
   for (i = 4; i < 64; i += 4) {
     if (snprintf(out+(i * 2 + 1), 9, "%02x%02x%02x%02x",
@@ -109,7 +130,9 @@ static int write_entry(disk_cache *c, const cache_key_t k,
 
   if (key_path(c, k, hexp)) return -1;
 
-  if (!strb_ensure(&b, 16)) return -1;
+  if (ensureat(c->dirfd, hexp)) return -1;
+
+  if (strb_ensure(&b, 16)) return -1;
   b.l = 16;
   c->kwrite(&b, k);
   kl = b.l - 16;
@@ -135,7 +158,7 @@ static int write_entry(disk_cache *c, const cache_key_t k,
     unlinkat(c->dirfd, tmp_path, 0);
     return -1;
   }
-  
+
   if (renameat(c->dirfd, tmp_path, c->dirfd, hexp)) {
     unlinkat(c->dirfd, tmp_path, 0);
     return -1;
@@ -227,7 +250,7 @@ static int disk_add(cache *_c, cache_key_t k, cache_value_t v) {
 static int disk_del(cache *_c, const cache_key_t key) {
   disk_cache *c = (disk_cache *)_c;
   char hexp[HEXP_LEN] = {0};
-  
+
   cache_del(c->mem, key);
 
   key_path(c, key, hexp);
@@ -262,17 +285,29 @@ cache *cache_disk(const char *dirpath, cache *mem,
                   kread_fn kread, vread_fn vread) {
   struct stat st;
   disk_cache *res;
+  char *dirp = strdup(dirpath);
 
-  mkdir(dirpath, 0777); /* This may fail, but we don't care */
+  if (dirp == NULL) return NULL;
+
+  if (ensureat(AT_FDCWD, dirp) != 0) {
+    free(dirp);
+    return NULL;
+  }
+  free(dirp);
+
+  mkdir(dirpath, 0777); /* This may fail, but it's ok */
+
   if (lstat(dirpath, &st) != 0)
     return NULL;
+
   if (!(st.st_mode & S_IFDIR))
     return NULL;
 
   res = calloc(sizeof(*res), 1);
-  if (res == NULL) return NULL;
+  if (res == NULL)
+    return NULL;
 
-  res->dirfd = open(dirpath, O_RDWR|O_CLOEXEC);
+  res->dirfd = open(dirpath, O_RDONLY|O_CLOEXEC);
   if (res->dirfd == -1) {
     free(res);
     return NULL;
