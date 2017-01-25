@@ -1011,9 +1011,6 @@ static int call_compiler(cuda_context *ctx, strb *src, strb *ptx, strb *log) {
 
   opts[1] = ctx->bin_id;
 
-  strb_append0(src);
-  if (strb_error(src))
-    return GA_MEMORY_ERROR;
   err = nvrtcCreateProgram(&prog, src->s, NULL, 0, NULL, NULL);
   if (err != NVRTC_SUCCESS) return GA_SYS_ERROR;
 
@@ -1035,8 +1032,10 @@ static int call_compiler(cuda_context *ctx, strb *src, strb *ptx, strb *log) {
   err = nvrtcGetPTXSize(prog, &buflen);
   if (err != NVRTC_SUCCESS) goto end;
 
-  if (strb_ensure(ptx, buflen) == 0)
+  if (strb_ensure(ptx, buflen) == 0) {
     err = nvrtcGetPTX(prog, ptx->s+ptx->l);
+    if (err == NVRTC_SUCCESS) ptx->l = buflen;
+  }
 
 end:
   nvrtcDestroyProgram(&prog);
@@ -1069,6 +1068,7 @@ static int make_bin(cuda_context *ctx, const strb *ptx, strb *bin, strb *log) {
     (void *)0, (void *)0, (void *)0
 #endif
   };
+  int err = GA_NO_ERROR;
 
   ctx->err = cuLinkCreate(sizeof(cujit_opts)/sizeof(cujit_opts[0]),
                           cujit_opts, cujit_opt_vals, &st);
@@ -1077,22 +1077,23 @@ static int make_bin(cuda_context *ctx, const strb *ptx, strb *bin, strb *log) {
   ctx->err = cuLinkAddData(st, CU_JIT_INPUT_PTX, ptx->s, ptx->l,
                            "kernel code", 0, NULL, NULL);
   if (ctx->err != CUDA_SUCCESS) {
-    cuLinkDestroy(st);
-    return GA_IMPL_ERROR;
+    err = GA_IMPL_ERROR;
+    goto out;
   }
   ctx->err = cuLinkComplete(st, &out, &out_size);
   if (ctx->err != CUDA_SUCCESS) {
-    cuLinkDestroy(st);
-    return GA_IMPL_ERROR;
+    err = GA_IMPL_ERROR;
+    goto out;
   }
   strb_appendn(bin, out, out_size);
+out:
   cuLinkDestroy(st);
   strb_appends(log, "Link info log::\n");
   strb_appends(log, info_log);
   strb_appends(log, "\nLink error log::\n");
   strb_appends(log, error_log);
   strb_appendc(log, '\n');
-  return GA_NO_ERROR;
+  return err;
 }
 
 static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
@@ -1106,33 +1107,37 @@ static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
   memcpy(&k.src, src, sizeof(strb));
 
   // Look up the binary in the disk cache
-  cbin = cache_get(ctx->disk_cache, &k);
-  if (cbin != NULL) {
-    strb_appendb(bin, cbin);
-    return GA_NO_ERROR;
+  if (ctx->disk_cache) {
+    cbin = cache_get(ctx->disk_cache, &k);
+    if (cbin != NULL) {
+      strb_appendb(bin, cbin);
+      return GA_NO_ERROR;
+    }
   }
 
   err = call_compiler(ctx, src, &ptx, log);
   if (err != GA_NO_ERROR) return err;
   err = make_bin(ctx, &ptx, bin, log);
   if (err != GA_NO_ERROR) return err;
-  pk = memdup(&k, sizeof(k));
-  if (pk == NULL)
-    return err;
-  cbin = strb_alloc(bin->l);
-  if (cbin == NULL) {
-    free(pk);
-    return err;
+  if (ctx->disk_cache) {
+    pk = memdup(&k, sizeof(k));
+    if (pk == NULL)
+      return GA_NO_ERROR;
+    cbin = strb_alloc(bin->l);
+    if (cbin == NULL) {
+      free(pk);
+      return GA_NO_ERROR;
+    }
+    strb_appendb(cbin, bin);
+    if (strb_error(cbin)) {
+      free(pk);
+      strb_free(cbin);
+      return GA_NO_ERROR;
+    }
+    cache_add(ctx->disk_cache, pk, cbin);
   }
-  strb_appendb(cbin, bin);
-  if (strb_error(cbin)) {
-    free(pk);
-    strb_free(cbin);
-    return err;
-  }
-  cache_add(ctx->disk_cache, pk, cbin);
 
-  return err;
+  return GA_NO_ERROR;
 }
 
 static void _cuda_freekernel(gpukernel *k) {
