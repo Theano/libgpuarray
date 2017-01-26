@@ -459,26 +459,36 @@ static int   reduxGetMinInit               (int typecode, const char** property)
 		case GA_BYTE4:
 		case GA_BYTE8:
 		case GA_BYTE16:
-		case GA_BYTE:               *property = "SCHAR_MIN"; break;
+		case GA_BYTE:
+		  *property = "SCHAR_MIN";
+		break;
 		case GA_SHORT2:
 		case GA_SHORT3:
 		case GA_SHORT4:
 		case GA_SHORT8:
 		case GA_SHORT16:
-		case GA_SHORT:              *property = "SHRT_MIN"; break;
+		case GA_SHORT:
+		  *property = "SHRT_MIN";
+		break;
 		case GA_INT2:
 		case GA_INT3:
 		case GA_INT4:
 		case GA_INT8:
 		case GA_INT16:
-		case GA_INT:                *property = "INT_MIN"; break;
+		case GA_INT:
+		  *property = "INT_MIN";
+		break;
 		case GA_LONG2:
 		case GA_LONG3:
 		case GA_LONG4:
 		case GA_LONG8:
 		case GA_LONG16:
-		case GA_LONG:               *property = "LONG_MIN"; break;
-		case GA_LONGLONG:           *property = "LLONG_MIN"; break;
+		case GA_LONG:
+		  *property = "LONG_MIN";
+		break;
+		case GA_LONGLONG:
+		  *property = "LLONG_MIN";
+		break;
 		case GA_BOOL:
 		case GA_UBYTE2:
 		case GA_UBYTE3:
@@ -505,14 +515,19 @@ static int   reduxGetMinInit               (int typecode, const char** property)
 		case GA_ULONG16:
 		case GA_ULONG:
 		case GA_ULONGLONG:
-		case GA_SIZE:               *property = "0"; break;
+		case GA_SIZE:
+		  *property = "0";
+		break;
 		case GA_HALF:
 		case GA_FLOAT:
 		case GA_DOUBLE:
-		case GA_QUAD:               *property = "NAN"; break;
-		default:      return GA_UNSUPPORTED_ERROR;
+		case GA_QUAD:
+		  *property = "NAN";
+		break;
+		default:
+		  return GA_UNSUPPORTED_ERROR;
 	}
-	
+
 	return GA_NO_ERROR;
 }
 
@@ -529,64 +544,89 @@ static int   reduxGetMinInit               (int typecode, const char** property)
 
 static int   reduxGetMaxInit               (int typecode, const char** property){
 	switch (typecode){
-		case GA_BOOL:               *property = "1"; break;
+		case GA_BOOL:
+		  *property = "1";
+		break;
 		case GA_BYTE2:
 		case GA_BYTE3:
 		case GA_BYTE4:
 		case GA_BYTE8:
 		case GA_BYTE16:
-		case GA_BYTE:               *property = "SCHAR_MAX"; break;
+		case GA_BYTE:
+		  *property = "SCHAR_MAX";
+		break;
 		case GA_UBYTE2:
 		case GA_UBYTE3:
 		case GA_UBYTE4:
 		case GA_UBYTE8:
 		case GA_UBYTE16:
-		case GA_UBYTE:              *property = "UCHAR_MAX"; break;
+		case GA_UBYTE:
+		  *property = "UCHAR_MAX";
+		break;
 		case GA_SHORT2:
 		case GA_SHORT3:
 		case GA_SHORT4:
 		case GA_SHORT8:
 		case GA_SHORT16:
-		case GA_SHORT:              *property = "SHRT_MAX"; break;
+		case GA_SHORT:
+		  *property = "SHRT_MAX";
+		break;
 		case GA_USHORT2:
 		case GA_USHORT3:
 		case GA_USHORT4:
 		case GA_USHORT8:
 		case GA_USHORT16:
-		case GA_USHORT:             *property = "USHRT_MAX"; break;
+		case GA_USHORT:
+		  *property = "USHRT_MAX";
+		break;
 		case GA_INT2:
 		case GA_INT3:
 		case GA_INT4:
 		case GA_INT8:
 		case GA_INT16:
-		case GA_INT:                *property = "INT_MAX"; break;
+		case GA_INT:
+		  *property = "INT_MAX";
+		break;
 		case GA_UINT2:
 		case GA_UINT3:
 		case GA_UINT4:
 		case GA_UINT8:
 		case GA_UINT16:
-		case GA_UINT:               *property = "UINT_MAX"; break;
+		case GA_UINT:
+		  *property = "UINT_MAX";
+		break;
 		case GA_LONG2:
 		case GA_LONG3:
 		case GA_LONG4:
 		case GA_LONG8:
 		case GA_LONG16:
-		case GA_LONG:               *property = "LONG_MAX"; break;
+		case GA_LONG:
+		  *property = "LONG_MAX";
+		break;
 		case GA_ULONG2:
 		case GA_ULONG3:
 		case GA_ULONG4:
 		case GA_ULONG8:
 		case GA_ULONG16:
-		case GA_ULONG:              *property = "ULONG_MAX"; break;
-		case GA_LONGLONG:           *property = "LLONG_MAX"; break;
-		case GA_ULONGLONG:          *property = "ULLONG_MAX"; break;
+		case GA_ULONG:
+		  *property = "ULONG_MAX";
+		break;
+		case GA_LONGLONG:
+		  *property = "LLONG_MAX";
+		break;
+		case GA_ULONGLONG:
+		  *property = "ULLONG_MAX";
+		break;
 		case GA_HALF:
 		case GA_FLOAT:
 		case GA_DOUBLE:
-		case GA_QUAD:               *property = "NAN"; break;
-		default:      return GA_UNSUPPORTED_ERROR;
+		case GA_QUAD:
+		  *property = "NAN";
+		break;
+		default:
+		  return GA_UNSUPPORTED_ERROR;
 	}
-	
+
 	return GA_NO_ERROR;
 }
 
@@ -771,21 +811,34 @@ static int   reduxCheckargs                (redux_ctx*  ctx){
 
 	/* Determine initializer, and error out if reduction unsupported. */
 	switch (ctx->op){
-		case GA_REDUCE_SUM:  ret = reduxGetSumInit (ctx->accTypeCode, &ctx->initVal); break;
+		case GA_REDUCE_SUM:
+		  ret = reduxGetSumInit (ctx->accTypeCode, &ctx->initVal);
+		break;
 		case GA_REDUCE_PRODNZ:
-		case GA_REDUCE_PROD: ret = reduxGetProdInit(ctx->accTypeCode, &ctx->initVal); break;
+		case GA_REDUCE_PROD:
+		  ret = reduxGetProdInit(ctx->accTypeCode, &ctx->initVal);
+		break;
 		case GA_REDUCE_MINANDARGMIN:
 		case GA_REDUCE_ARGMIN:
-		case GA_REDUCE_MIN:  ret = reduxGetMinInit (ctx->accTypeCode, &ctx->initVal); break;
+		case GA_REDUCE_MIN:
+		  ret = reduxGetMinInit (ctx->accTypeCode, &ctx->initVal);
+		break;
 		case GA_REDUCE_MAXANDARGMAX:
 		case GA_REDUCE_ARGMAX:
-		case GA_REDUCE_MAX:  ret = reduxGetMaxInit (ctx->accTypeCode, &ctx->initVal); break;
+		case GA_REDUCE_MAX:
+		  ret = reduxGetMaxInit (ctx->accTypeCode, &ctx->initVal);
+		break;
 		case GA_REDUCE_ALL:
-		case GA_REDUCE_AND:  ret = reduxGetAndInit (ctx->accTypeCode, &ctx->initVal); break;
+		case GA_REDUCE_AND:
+		  ret = reduxGetAndInit (ctx->accTypeCode, &ctx->initVal);
+		break;
 		case GA_REDUCE_ANY:
 		case GA_REDUCE_XOR:
-		case GA_REDUCE_OR:   ret = reduxGetOrInit  (ctx->accTypeCode, &ctx->initVal); break;
-		default:             ret = GA_UNSUPPORTED_ERROR; break;
+		case GA_REDUCE_OR:
+		  ret = reduxGetOrInit  (ctx->accTypeCode, &ctx->initVal);
+		break;
+		default:
+		  ret = GA_UNSUPPORTED_ERROR;
 	}
 	if (ret != GA_NO_ERROR){
 		return reduxCleanup(ctx, ret);
@@ -809,7 +862,7 @@ static int   reduxCheckargs                (redux_ctx*  ctx){
 
 /**
  * @brief Select types for the reduction kernel's implementation.
- * 
+ *
  * There are 5 types of relevance:
  *   - Source                   (S=Source)
  *   - Destination              (T=Target)
@@ -825,14 +878,25 @@ static void  reduxSelectTypes              (redux_ctx*  ctx){
 	ctx->dstArgTypeCode = GA_SSIZE;
 	ctx->idxTypeCode    = GA_SSIZE;
 	switch (ctx->srcTypeCode){
-		case GA_HALF:   ctx->accTypeCode = GA_FLOAT;
-		case GA_HALF2:  ctx->accTypeCode = GA_FLOAT2;
-		case GA_HALF4:  ctx->accTypeCode = GA_FLOAT4;
-		case GA_HALF8:  ctx->accTypeCode = GA_FLOAT8;
-		case GA_HALF16: ctx->accTypeCode = GA_FLOAT16;
-		default:        ctx->accTypeCode = ctx->srcTypeCode;
+		case GA_HALF:
+		  ctx->accTypeCode = GA_FLOAT;
+		break;
+		case GA_HALF2:
+		  ctx->accTypeCode = GA_FLOAT2;
+		break;
+		case GA_HALF4:
+		  ctx->accTypeCode = GA_FLOAT4;
+		break;
+		case GA_HALF8:
+		  ctx->accTypeCode = GA_FLOAT8;
+		break;
+		case GA_HALF16:
+		  ctx->accTypeCode = GA_FLOAT16;
+		break;
+		default:
+		  ctx->accTypeCode = ctx->srcTypeCode;
 	}
-	
+
 	/* Get the string version as well. */
 	ctx->srcTypeStr     = gpuarray_get_type(ctx->srcTypeCode)   ->cluda_name;
 	ctx->dstTypeStr     = gpuarray_get_type(ctx->dstTypeCode)   ->cluda_name;
@@ -843,7 +907,7 @@ static void  reduxSelectTypes              (redux_ctx*  ctx){
 
 /**
  * @brief Select which code model will be used:
- * 
+ *
  *        - Large (Destination tensor >= SMALL_REDUX_THRESHOLD elements, or
  *                 destination tensor size >= # of reductions per destination
  *                 tensor element):
@@ -865,7 +929,7 @@ static int   reduxSelectModel              (redux_ctx*  ctx){
 	 * use large code model; Otherwise use small code model, where threads will
 	 * have to cooperate.
 	 */
-	
+
 	ret = gpucontext_property(ctx->gpuCtx, GA_CTX_PROP_NUMPROCS, &numProcs);
 	if (ret != GA_NO_ERROR){
 		return reduxCleanup(ctx, ret);
@@ -897,8 +961,8 @@ static int   reduxSelectModel              (redux_ctx*  ctx){
 	 *       - reduxKernelRequiresDst()
 	 *       - reduxKernelRequiresDstArg()
 	 */
-	
-	
+
+
 	return reduxSelectHwAxes(ctx);
 }
 
@@ -925,8 +989,10 @@ static int   reduxIsLargeCodeModel         (redux_ctx*  ctx){
 static int   reduxHasDst                   (redux_ctx*  ctx){
 	switch (ctx->op){
 		case GA_REDUCE_ARGMIN:
-		case GA_REDUCE_ARGMAX:       return 0;
-		default:                     return 1;
+		case GA_REDUCE_ARGMAX:
+		  return 0;
+		default:
+		  return 1;
 	}
 }
 
@@ -939,15 +1005,17 @@ static int   reduxHasDstArg                (redux_ctx*  ctx){
 		case GA_REDUCE_MINANDARGMIN:
 		case GA_REDUCE_MAXANDARGMAX:
 		case GA_REDUCE_ARGMIN:
-		case GA_REDUCE_ARGMAX:       return 1;
-		default:                     return 0;
+		case GA_REDUCE_ARGMAX:
+		  return 1;
+		default:
+		  return 0;
 	}
 }
 
 /**
  * @brief Returns whether the generated kernel internally requires a dst
  *        argument.
- * 
+ *
  * This is semantically subtly different from reduxHasDst(). The main
  * difference is in the implementation of the GA_REDUCE_ARGMIN/ARGMAX
  * reductions; Either *might* require a dst buffer, which will have to be
@@ -957,15 +1025,17 @@ static int   reduxHasDstArg                (redux_ctx*  ctx){
 static int   reduxKernelRequiresDst        (redux_ctx*  ctx){
 	switch (ctx->op){
 		case GA_REDUCE_ARGMIN:
-		case GA_REDUCE_ARGMAX:       return reduxIsSmallCodeModel(ctx);
-		default:                     return 1;
+		case GA_REDUCE_ARGMAX:
+		  return reduxIsSmallCodeModel(ctx);
+		default:
+		  return 1;
 	}
 }
 
 /**
  * @brief Returns whether the generated kernel internally requires a dstArg
  *        argument.
- * 
+ *
  * This is semantically subtly different from reduxHasDstArg(), since it asks
  * whether the reduction, even though it does not accept a dstArg argument,
  * still requires a dstArg internally.
@@ -975,11 +1045,11 @@ static int   reduxKernelRequiresDstArg     (redux_ctx*  ctx){
 	/**
 	 * At present there exists no reduction whose implementation requires
 	 * a dstArg but whose interface does not.
-	 * 
+	 *
 	 * E.g. the max() and min() reductions do NOT currently require a temporary
 	 *      buffer for indexes, and will not in the foreseeable future.
 	 */
-	
+
 	return reduxHasDstArg(ctx);
 }
 
@@ -1007,20 +1077,20 @@ static int   reduxCanAppendHwAxis          (redux_ctx* ctx, int wantReductionAxi
 static void  reduxAppendLargestAxisToHwList(redux_ctx* ctx, int wantReductionAxis){
 	int    maxI = 0, i, isInHwList, isInReduxList, isInDesiredList, isLargestSoFar;
 	size_t maxV = 0;
-	
+
 	/* Find */
 	for (i=0;i<ctx->nds;i++){
 		isInHwList      = axisInSet(i, ctx->hwAxisList, ctx->ndh, 0);
 		isInReduxList   = axisInSet(i, ctx->reduxList,  ctx->ndr, 0);
 		isInDesiredList = wantReductionAxis ? isInReduxList : !isInReduxList;
 		isLargestSoFar  = ctx->src->dimensions[i] >= maxV;
-		
+
 		if (!isInHwList && isInDesiredList && isLargestSoFar){
 			maxV = ctx->src->dimensions[i];
 			maxI = i;
 		}
 	}
-	
+
 	/* Append */
 	ctx->hwAxisList[ctx->ndh++] = maxI;
 	if (wantReductionAxis){
@@ -1033,7 +1103,7 @@ static void  reduxAppendLargestAxisToHwList(redux_ctx* ctx, int wantReductionAxi
 /**
  * @brief Select which axes (up to MAX_HW_DIMS) will be assigned to hardware
  *        dimensions.
- * 
+ *
  * For the "large" code model: The up-to-MAX_HW_DIMS largest destination tensor
  *                             dimensions are selected.
  * For the "small" code model: Up to MAX_HW_DIMS reduction dimensions (largest-
@@ -1046,37 +1116,37 @@ static void  reduxAppendLargestAxisToHwList(redux_ctx* ctx, int wantReductionAxi
 
 static int   reduxSelectHwAxes             (redux_ctx*  ctx){
 	if (reduxIsSmallCodeModel(ctx)){
-		while(reduxCanAppendHwAxis(ctx, 1)){
+		while (reduxCanAppendHwAxis(ctx, 1)){
 			reduxAppendLargestAxisToHwList(ctx, 1);
 		}
 	}
-	
-	while(reduxCanAppendHwAxis(ctx, 0)){
+
+	while (reduxCanAppendHwAxis(ctx, 0)){
 		reduxAppendLargestAxisToHwList(ctx, 0);
 	}
-	
+
 	return reduxComputeAxisList(ctx);
 }
 
 /**
  * @brief Compute the axis list.
- * 
+ *
  * The axis list describes the mapping between the nested loops of the kernel
  * as well as their accompanying indices (i0*, i1*, ..., in*) on one hand, and
  * the axes of the source tensor. The first axis in the list corresponds to the
  * outermost loop and the last axis in the list to the innermost.
- * 
+ *
  * The first ctx->ndd axes correspond to the outer loops that iterate over
  * each destination element. The last ctx->ndr axes correspond to the inner
  * loops that iterate over the dimensions of elements that are to be reduced.
- * 
+ *
  * @return GA_MEMORY_ERROR if allocating the list failed; Otherwise, returns
  *         GA_NO_ERROR.
  */
 
 static int   reduxComputeAxisList          (redux_ctx*  ctx){
 	int i, f=0;
-	
+
 	ctx->axisList = malloc(ctx->nds * sizeof(unsigned));
 	if (!ctx->axisList){
 		return reduxCleanup(ctx, GA_MEMORY_ERROR);
@@ -1088,8 +1158,8 @@ static int   reduxComputeAxisList          (redux_ctx*  ctx){
 		}
 	}
 	memcpy(&ctx->axisList[f], ctx->reduxList, ctx->ndr * sizeof(*ctx->reduxList));
-	
-	
+
+
 	return reduxGenSource(ctx);
 }
 
@@ -1105,7 +1175,7 @@ static int   reduxGenSource                (redux_ctx*  ctx){
 	if (!ctx->sourceCode){
 		return reduxCleanup(ctx, GA_MEMORY_ERROR);
 	}
-	
+
 	return reduxIsLargeCodeModel(ctx) ? reduxCompileLarge(ctx):
 	                                    reduxCompileSmall(ctx);
 }
@@ -1145,7 +1215,7 @@ static void  reduxAppendFuncGetInitVal     (redux_ctx*  ctx){
 }
 static void  reduxAppendFuncLoadVal        (redux_ctx*  ctx){
 	int i;
-	
+
 	strb_appends(&ctx->s, "/**\n");
 	strb_appends(&ctx->s, " * Multidimensional source element loader.\n");
 	strb_appends(&ctx->s, " *\n");
@@ -1162,16 +1232,16 @@ static void  reduxAppendFuncLoadVal        (redux_ctx*  ctx){
 		strb_appendf(&ctx->s, "i%d*srcSteps[%d] + \\\n\t                                                            ", i, ctx->axisList[i]);
 	}
 	strb_appends(&ctx->s, "0));\n");
-	
+
 	/* Prescalar transformations go here... */
-	
+
 	/* Return the value. */
 	strb_appends(&ctx->s, "\treturn v;\n");
 	strb_appends(&ctx->s, "}\n\n\n\n");
 }
 static void  reduxAppendFuncReduxVal       (redux_ctx*  ctx){
 	int i, anyArgsEmitted = 0;
-	
+
 	/* Function Signature. */
 	strb_appends(&ctx->s, "/**\n");
 	strb_appends(&ctx->s, " * Global memory value reduction function.\n");
@@ -1198,11 +1268,11 @@ static void  reduxAppendFuncReduxVal       (redux_ctx*  ctx){
 		strb_appends(&ctx->s, "GLOBAL_MEM A* dstArg, const GLOBAL_MEM X* dstArgSteps, X i");
 	}
 	strb_appends(&ctx->s, "){\n");
-	
-	
+
+
 	/* Post-scalar transformations go here. */
-	
-	
+
+
 	/* Write to memory. */
 	if (reduxIsLargeCodeModel(ctx)){
 		/* Large code model. Easy: just write out the data, since it's safe. */
@@ -1223,19 +1293,19 @@ static void  reduxAppendFuncReduxVal       (redux_ctx*  ctx){
 	}else{
 		/* BUG: Implement the atomic reduction, one or two CAS loops. */
 		if       ( reduxKernelRequiresDst   (ctx) && !reduxKernelRequiresDstArg(ctx)){
-			
+
 		}else if (!reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
-			
+
 		}else if ( reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
-			
+
 		}
 	}
-	
+
 	/* Close off function. */
 	strb_appends(&ctx->s, "}\n\n\n\n");
 }
 static void  reduxAppendFuncPreKernel      (redux_ctx*  ctx){
-	
+
 }
 static void  reduxAppendFuncKernel         (redux_ctx*  ctx){
 	reduxAppendPrototype        (ctx);
@@ -1247,7 +1317,7 @@ static void  reduxAppendFuncKernel         (redux_ctx*  ctx){
 	strb_appends                (&ctx->s, "}\n");
 }
 static void  reduxAppendFuncPostKernel     (redux_ctx*  ctx){
-	
+
 }
 static void  reduxAppendPrototype          (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "/**\n");
@@ -1466,30 +1536,50 @@ static void  reduxAppendLoopInner          (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "src, srcSteps);\n");
 	strb_appends(&ctx->s, "\t\t\t\n");
 	switch (ctx->op){
-		case GA_REDUCE_SUM:          strb_appends(&ctx->s, "\t\t\trdxV += v;\n"); break;
-		case GA_REDUCE_PROD:         strb_appends(&ctx->s, "\t\t\trdxV *= v;\n"); break;
-		case GA_REDUCE_PRODNZ:       strb_appends(&ctx->s, "\t\t\trdxV *= v==0 ? getInitVal() : v;\n"); break;
-		case GA_REDUCE_MIN:          strb_appends(&ctx->s, "\t\t\trdxV  = min(rdxV, v);\n"); break;
-		case GA_REDUCE_MAX:          strb_appends(&ctx->s, "\t\t\trdxV  = max(rdxV, v);\n"); break;
+		case GA_REDUCE_SUM:
+		  strb_appends(&ctx->s, "\t\t\trdxV += v;\n");
+		break;
+		case GA_REDUCE_PROD:
+		  strb_appends(&ctx->s, "\t\t\trdxV *= v;\n");
+		break;
+		case GA_REDUCE_PRODNZ:
+		  strb_appends(&ctx->s, "\t\t\trdxV *= v==0 ? getInitVal() : v;\n");
+		break;
+		case GA_REDUCE_MIN:
+		  strb_appends(&ctx->s, "\t\t\trdxV  = min(rdxV, v);\n");
+		break;
+		case GA_REDUCE_MAX:
+		  strb_appends(&ctx->s, "\t\t\trdxV  = max(rdxV, v);\n");
+		break;
 		case GA_REDUCE_ARGMIN:
 		case GA_REDUCE_MINANDARGMIN:
-			strb_appends(&ctx->s, "\t\t\trdxV  = min(rdxV, v);\n");
-			strb_appends(&ctx->s, "\t\t\tif(v == rdxV){\n");
-			appendIdxes (&ctx->s, "\t\t\t\targI = RDXINDEXER(", "i", ctx->ndd, ctx->nds, "", ");\n");
-			strb_appends(&ctx->s, "\t\t\t}\n");
+		  strb_appends(&ctx->s, "\t\t\trdxV  = min(rdxV, v);\n");
+		  strb_appends(&ctx->s, "\t\t\tif(v == rdxV){\n");
+		  appendIdxes (&ctx->s, "\t\t\t\targI = RDXINDEXER(", "i", ctx->ndd, ctx->nds, "", ");\n");
+		  strb_appends(&ctx->s, "\t\t\t}\n");
 		break;
 		case GA_REDUCE_ARGMAX:
 		case GA_REDUCE_MAXANDARGMAX:
-			strb_appends(&ctx->s, "\t\t\trdxV  = max(rdxV, v);\n");
-			strb_appends(&ctx->s, "\t\t\tif(v == rdxV){\n");
-			appendIdxes (&ctx->s, "\t\t\t\targI = RDXINDEXER(", "i", ctx->ndd, ctx->nds, "", ");\n");
-			strb_appends(&ctx->s, "\t\t\t}\n");
+		  strb_appends(&ctx->s, "\t\t\trdxV  = max(rdxV, v);\n");
+		  strb_appends(&ctx->s, "\t\t\tif(v == rdxV){\n");
+		  appendIdxes (&ctx->s, "\t\t\t\targI = RDXINDEXER(", "i", ctx->ndd, ctx->nds, "", ");\n");
+		  strb_appends(&ctx->s, "\t\t\t}\n");
 		break;
-		case GA_REDUCE_AND:          strb_appends(&ctx->s, "\t\t\trdxV &= v;\n"); break;
-		case GA_REDUCE_OR:           strb_appends(&ctx->s, "\t\t\trdxV |= v;\n"); break;
-		case GA_REDUCE_XOR:          strb_appends(&ctx->s, "\t\t\trdxV ^= v;\n"); break;
-		case GA_REDUCE_ALL:          strb_appends(&ctx->s, "\t\t\trdxV  = rdxV && v;\n"); break;
-		case GA_REDUCE_ANY:          strb_appends(&ctx->s, "\t\t\trdxV  = rdxV || v;\n"); break;
+		case GA_REDUCE_AND:
+		  strb_appends(&ctx->s, "\t\t\trdxV &= v;\n");
+		break;
+		case GA_REDUCE_OR:
+		  strb_appends(&ctx->s, "\t\t\trdxV |= v;\n");
+		break;
+		case GA_REDUCE_XOR:
+		  strb_appends(&ctx->s, "\t\t\trdxV ^= v;\n");
+		break;
+		case GA_REDUCE_ALL:
+		  strb_appends(&ctx->s, "\t\t\trdxV  = rdxV && v;\n");
+		break;
+		case GA_REDUCE_ANY:
+		  strb_appends(&ctx->s, "\t\t\trdxV  = rdxV || v;\n");
+		break;
 	}
 
 	/**
