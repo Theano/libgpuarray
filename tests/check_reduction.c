@@ -1,8 +1,7 @@
 #include <check.h>
 
-#include <gpuarray/buffer.h>
-#include <gpuarray/array.h>
 #include <gpuarray/error.h>
+#include <gpuarray/reduction.h>
 #include <gpuarray/types.h>
 
 #include <stdint.h>
@@ -610,6 +609,83 @@ START_TEST(test_minandargmin_alldimsreduced){
 	GpuArray_clear(&gaArgmin);
 }END_TEST
 
+START_TEST(test_min_alldimsreduced){
+	pcgSeed(1);
+
+	/**
+	 * We test here a reduction of some random 3D tensor on all dimensions.
+	 */
+
+	size_t i,j,k;
+	size_t dims[3]  = {32,50,79};
+	size_t prodDims = dims[0]*dims[1]*dims[2];
+	const unsigned reduxList[] = {0,1,2};
+
+	float*  pSrc    = calloc(1, sizeof(*pSrc)    * dims[0]*dims[1]*dims[2]);
+	float*  pMin    = calloc(1, sizeof(*pMin)                             );
+
+	ck_assert_ptr_ne(pSrc,    NULL);
+	ck_assert_ptr_ne(pMin,    NULL);
+
+
+	/**
+	 * Initialize source data.
+	 */
+
+	for(i=0;i<prodDims;i++){
+		pSrc[i] = pcgRand01();
+	}
+
+
+	/**
+	 * Run the kernel.
+	 */
+
+	GpuArray gaSrc;
+	GpuArray gaMin;
+
+	ga_assert_ok(GpuArray_empty(&gaSrc,    ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaMin,    ctx, GA_FLOAT, 0, NULL,     GA_C_ORDER));
+
+	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
+	ga_assert_ok(GpuArray_memset(&gaMin,    -1));  /* 0xFFFFFFFF is a qNaN. */
+
+	ga_assert_ok(GpuArray_min(&gaMin, &gaSrc, 3, reduxList));
+
+	ga_assert_ok(GpuArray_read(pMin,    sizeof(*pMin),    &gaMin));
+
+
+	/**
+	 * Check that the destination tensors are correct.
+	 */
+
+	float  gtMin    = pSrc[0];
+
+	for(i=0;i<dims[0];i++){
+		for(j=0;j<dims[1];j++){
+			for(k=0;k<dims[2];k++){
+				float v = pSrc[(i*dims[1] + j)*dims[2] + k];
+
+				if(v < gtMin){
+					gtMin    = v;
+				}
+			}
+		}
+	}
+
+	ck_assert_msg(gtMin    == pMin[0],    "Min value mismatch!");
+
+	/**
+	 * Deallocate.
+	 */
+
+	free(pSrc);
+	free(pMin);
+	GpuArray_clear(&gaSrc);
+	GpuArray_clear(&gaMin);
+}END_TEST
+
+
 Suite *get_suite(void) {
 	Suite *s  = suite_create("reduction");
 	TCase *tc = tcase_create("basic");
@@ -622,6 +698,7 @@ Suite *get_suite(void) {
 	tcase_add_test(tc, test_maxandargmax_alldimsreduced);
 	tcase_add_test(tc, test_minandargmin_reduction);
 	tcase_add_test(tc, test_minandargmin_alldimsreduced);
+	tcase_add_test(tc, test_min_alldimsreduced);
 
 	suite_add_tcase(s, tc);
 	return s;

@@ -143,6 +143,7 @@ set(headers
   gpuarray/extension.h
   gpuarray/ext_cuda.h
   gpuarray/kernel.h
+  gpuarray/reduction.h
   gpuarray/types.h
   gpuarray/util.h
 )

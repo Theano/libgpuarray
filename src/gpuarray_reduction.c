@@ -12,9 +12,9 @@
 #include <errno.h>
 
 #include "private.h"
-#include "gpuarray/array.h"
 #include "gpuarray/error.h"
 #include "gpuarray/kernel.h"
+#include "gpuarray/reduction.h"
 #include "gpuarray/util.h"
 
 #include "util/strb.h"
@@ -704,7 +704,6 @@ static void  appendIdxes                   (strb*              s,
 
 static int   reduxCheckargs                (redux_ctx*  ctx){
 	int i, ret;
-	const strb INIT_STRB = STRB_STATIC_INIT;
 
 	/**
 	 * We initialize certain parts of the context.
@@ -720,7 +719,7 @@ static int   reduxCheckargs                (redux_ctx*  ctx){
 	ctx->ndhd          = 0;
 	ctx->ndhr          = 0;
 	ctx->sourceCode    = NULL;
-	ctx->s             = INIT_STRB;
+	strb_init(&ctx->s);
 
 	for(i=0;i<MAX_HW_DIMS;i++){
 		ctx->hwAxisList[i] = 0;
@@ -1169,6 +1168,10 @@ static void  reduxAppendFuncLoadVal        (redux_ctx*  ctx){
 		strb_appendf(&ctx->s, "i%d*srcSteps[%d] + \\\n\t                                                            ", i, ctx->axisList[i]);
 	}
 	strb_appends(&ctx->s, "0));\n");
+	
+	/* Prescalar transformations go here... */
+	
+	/* Return the value. */
 	strb_appends(&ctx->s, "\treturn v;\n");
 	strb_appends(&ctx->s, "}\n");
 	strb_appends(&ctx->s, "\n");
@@ -1189,17 +1192,17 @@ static void  reduxAppendFuncReduxVal       (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "\n");
 	appendIdxes (&ctx->s, "WITHIN_KERNEL void reduxVal(", "X i", 0, ctx->ndd, "", "");
 	anyArgsEmitted = ctx->ndd>0;
-	if(anyArgsEmitted){
-		strb_appends(&ctx->s, ", ");
-	}
 	if(reduxKernelRequiresDst   (ctx)){
+		if(anyArgsEmitted){
+			strb_appends(&ctx->s, ", ");
+		}
 		anyArgsEmitted = 1;
 		strb_appends(&ctx->s, "GLOBAL_MEM T* dst,    const GLOBAL_MEM X* dstSteps,    K v");
 	}
-	if(anyArgsEmitted){
-		strb_appends(&ctx->s, ", ");
-	}
 	if(reduxKernelRequiresDstArg(ctx)){
+		if(anyArgsEmitted){
+			strb_appends(&ctx->s, ", ");
+		}
 		anyArgsEmitted = 1;
 		strb_appends(&ctx->s, "GLOBAL_MEM A* dstArg, const GLOBAL_MEM X* dstArgSteps, X i");
 	}
@@ -1248,12 +1251,12 @@ static void  reduxAppendFuncPreKernel      (redux_ctx*  ctx){
 }
 static void  reduxAppendFuncKernel         (redux_ctx*  ctx){
 	reduxAppendPrototype        (ctx);
-	strb_appends           (&ctx->s, "{\n");
+	strb_appends                (&ctx->s, "{\n");
 	reduxAppendOffsets          (ctx);
 	reduxAppendIndexDeclarations(ctx);
 	reduxAppendRangeCalculations(ctx);
 	reduxAppendLoops            (ctx);
-	strb_appends           (&ctx->s, "}\n");
+	strb_appends                (&ctx->s, "}\n");
 }
 static void  reduxAppendFuncPostKernel     (redux_ctx*  ctx){
 	
@@ -1280,8 +1283,12 @@ static void  reduxAppendPrototype          (redux_ctx*  ctx){
 static void  reduxAppendOffsets            (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "\t/* Add offsets */\n");
 	strb_appends(&ctx->s, "\tsrc    = (const GLOBAL_MEM T*)((const GLOBAL_MEM char*)src    + srcOff);\n");
-	strb_appends(&ctx->s, "\tdst    = (GLOBAL_MEM T*)      ((GLOBAL_MEM char*)      dst    + dstOff);\n");
-	strb_appends(&ctx->s, "\tdstArg = (GLOBAL_MEM X*)      ((GLOBAL_MEM char*)      dstArg + dstArgOff);\n");
+	if(reduxKernelRequiresDst(ctx)){
+		strb_appends(&ctx->s, "\tdst    = (GLOBAL_MEM T*)      ((GLOBAL_MEM char*)      dst    + dstOff);\n");
+	}
+	if(reduxKernelRequiresDstArg(ctx)){
+		strb_appends(&ctx->s, "\tdstArg = (GLOBAL_MEM X*)      ((GLOBAL_MEM char*)      dstArg + dstArgOff);\n");
+	}
 	strb_appends(&ctx->s, "\t\n");
 	strb_appends(&ctx->s, "\t\n");
 }
@@ -1448,7 +1455,9 @@ static void  reduxAppendLoopInner          (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "\t\t */\n");
 	strb_appends(&ctx->s, "\t\t\n");
 	strb_appends(&ctx->s, "\t\tK rdxV = getInitVal();\n");
-	strb_appends(&ctx->s, "\t\tX argI = 0;\n");
+	if(reduxKernelRequiresDstArg(ctx)){
+		strb_appends(&ctx->s, "\t\tX argI = 0;\n");
+	}
 	strb_appends(&ctx->s, "\t\t\n");
 	strb_appends(&ctx->s, "\t\t/**\n");
 	strb_appends(&ctx->s, "\t\t * REDUCTION LOOPS.\n");
@@ -1718,21 +1727,35 @@ static int   reduxInvokeLarge              (redux_ctx*  ctx){
 	                                   ctx->src->dimensions, flags, 0);
 	ctx->chunkSizeGD   = gpudata_alloc(ctx->gpuCtx, ctx->ndh * sizeof(size_t),
 	                                   ctx->chunkSize,       flags, 0);
-	ctx->dstStepsGD    = gpudata_alloc(ctx->gpuCtx, ctx->ndd * sizeof(size_t),
-	                                   ctx->dst->strides,    flags, 0);
-	ctx->dstArgStepsGD = gpudata_alloc(ctx->gpuCtx, ctx->ndd * sizeof(size_t),
-	                                   ctx->dstArg->strides, flags, 0);
+	if(reduxKernelRequiresDst(ctx)){
+		ctx->dstStepsGD    = gpudata_alloc(ctx->gpuCtx, ctx->ndd * sizeof(size_t),
+		                                   ctx->dst->strides,    flags, 0);
+	}
+	if(reduxKernelRequiresDstArg(ctx)){
+		ctx->dstArgStepsGD = gpudata_alloc(ctx->gpuCtx, ctx->ndd * sizeof(size_t),
+		                                   ctx->dstArg->strides, flags, 0);
+	}
 	args[ 0] = (void*) ctx->src->data;
 	args[ 1] = (void*)&ctx->src->offset;
 	args[ 2] = (void*) ctx->srcStepsGD;
 	args[ 3] = (void*) ctx->srcSizeGD;
 	args[ 4] = (void*) ctx->chunkSizeGD;
-	args[ 5] = (void*) ctx->dst->data;
-	args[ 6] = (void*)&ctx->dst->offset;
-	args[ 7] = (void*) ctx->dstStepsGD;
-	args[ 8] = (void*) ctx->dstArg->data;
-	args[ 9] = (void*)&ctx->dstArg->offset;
-	args[10] = (void*) ctx->dstArgStepsGD;
+	if      ( reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
+		args[ 5] = (void*) ctx->dst->data;
+		args[ 6] = (void*)&ctx->dst->offset;
+		args[ 7] = (void*) ctx->dstStepsGD;
+		args[ 8] = (void*) ctx->dstArg->data;
+		args[ 9] = (void*)&ctx->dstArg->offset;
+		args[10] = (void*) ctx->dstArgStepsGD;
+	}else if( reduxKernelRequiresDst   (ctx) && !reduxKernelRequiresDstArg(ctx)){
+		args[ 5] = (void*) ctx->dst->data;
+		args[ 6] = (void*)&ctx->dst->offset;
+		args[ 7] = (void*) ctx->dstStepsGD;
+	}else if(!reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
+		args[ 5] = (void*) ctx->dstArg->data;
+		args[ 6] = (void*)&ctx->dstArg->offset;
+		args[ 7] = (void*) ctx->dstArgStepsGD;
+	}
 
 	if(ctx->srcStepsGD   &&
 	   ctx->srcSizeGD    &&
