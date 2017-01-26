@@ -395,8 +395,8 @@ GPUARRAY_PUBLIC int  GpuArray_reduction   (ga_reduce_op    op,
                                            unsigned        reduxLen,
                                            const unsigned* reduxList){
 	redux_ctx  ctxSTACK = {op, dst, dstArg, src,
-	                       (int)reduxLen, (const int*)reduxList},
-	          *ctx      = &ctxSTACK;
+	                       (int)reduxLen, (const int*)reduxList};
+	redux_ctx *ctx      = &ctxSTACK;
 
 	return reduxCheckargs(ctx);
 }
@@ -413,8 +413,8 @@ GPUARRAY_PUBLIC int  GpuArray_reduction   (ga_reduce_op    op,
  */
 
 static int   reduxGetSumInit               (int typecode, const char** property){
-	if(typecode == GA_POINTER ||
-	   typecode == GA_BUFFER){
+	if (typecode == GA_POINTER ||
+	    typecode == GA_BUFFER){
 		return GA_UNSUPPORTED_ERROR;
 	}
 	*property = "0";
@@ -433,8 +433,8 @@ static int   reduxGetSumInit               (int typecode, const char** property)
  */
 
 static int   reduxGetProdInit              (int typecode, const char** property){
-	if(typecode == GA_POINTER ||
-	   typecode == GA_BUFFER){
+	if (typecode == GA_POINTER ||
+	    typecode == GA_BUFFER){
 		return GA_UNSUPPORTED_ERROR;
 	}
 	*property = "1";
@@ -453,7 +453,7 @@ static int   reduxGetProdInit              (int typecode, const char** property)
  */
 
 static int   reduxGetMinInit               (int typecode, const char** property){
-	switch(typecode){
+	switch (typecode){
 		case GA_BYTE2:
 		case GA_BYTE3:
 		case GA_BYTE4:
@@ -528,7 +528,7 @@ static int   reduxGetMinInit               (int typecode, const char** property)
  */
 
 static int   reduxGetMaxInit               (int typecode, const char** property){
-	switch(typecode){
+	switch (typecode){
 		case GA_BOOL:               *property = "1"; break;
 		case GA_BYTE2:
 		case GA_BYTE3:
@@ -602,8 +602,8 @@ static int   reduxGetMaxInit               (int typecode, const char** property)
  */
 
 static int   reduxGetAndInit               (int typecode, const char** property){
-	if(typecode == GA_POINTER ||
-	   typecode == GA_BUFFER){
+	if (typecode == GA_POINTER ||
+	    typecode == GA_BUFFER){
 		return GA_UNSUPPORTED_ERROR;
 	}
 	*property = "~0";
@@ -622,8 +622,8 @@ static int   reduxGetAndInit               (int typecode, const char** property)
  */
 
 static int   reduxGetOrInit                (int typecode, const char** property){
-	if(typecode == GA_POINTER ||
-	   typecode == GA_BUFFER){
+	if (typecode == GA_POINTER ||
+	    typecode == GA_BUFFER){
 		return GA_UNSUPPORTED_ERROR;
 	}
 	*property = "0";
@@ -646,9 +646,9 @@ static int   axisInSet                     (int                v,
                                             size_t*            where){
 	size_t i;
 
-	for(i=0;i<setLen;i++){
-		if(set[i] == v){
-			if(where){*where = i;}
+	for (i=0;i<setLen;i++){
+		if (set[i] == v){
+			if (where){*where = i;}
 			return 1;
 		}
 	}
@@ -687,7 +687,7 @@ static void  appendIdxes                   (strb*              s,
 	epilogue = epilogue ? epilogue : "";
 
 	strb_appends(s, prologue);
-	for(i=startIdx;i<endIdx;i++){
+	for (i=startIdx;i<endIdx;i++){
 		strb_appendf(s, "%s%d%s%s", prefix, i, suffix, &","[i==endIdx-1]);
 	}
 	strb_appends(s, epilogue);
@@ -721,7 +721,7 @@ static int   reduxCheckargs                (redux_ctx*  ctx){
 	ctx->sourceCode    = NULL;
 	strb_init(&ctx->s);
 
-	for(i=0;i<MAX_HW_DIMS;i++){
+	for (i=0;i<MAX_HW_DIMS;i++){
 		ctx->hwAxisList[i] = 0;
 		ctx->blockSize [i] = 1;
 		ctx->gridSize  [i] = 1;
@@ -734,21 +734,21 @@ static int   reduxCheckargs                (redux_ctx*  ctx){
 
 
 	/* Insane src, reduxLen, dst or dstArg? */
-	if(!ctx->src || ctx->src->nd <= 0 || ctx->reduxLen == 0 ||
-	   ctx->reduxLen > (int)ctx->src->nd){
+	if (!ctx->src || ctx->src->nd <= 0 || ctx->reduxLen == 0 ||
+	    ctx->reduxLen > (int)ctx->src->nd){
 		return reduxCleanup(ctx, GA_INVALID_ERROR);
 	}
-	if((reduxHasDst   (ctx) && !ctx->dst)   ||
-	   (reduxHasDstArg(ctx) && !ctx->dstArg)){
+	if ((reduxHasDst   (ctx) && !ctx->dst)   ||
+	    (reduxHasDstArg(ctx) && !ctx->dstArg)){
 		return reduxCleanup(ctx, GA_INVALID_ERROR);
 	}
 
 
 	/* Insane or duplicate list entry? */
-	for(i=0;i<ctx->reduxLen;i++){
-		if(ctx->reduxList[i] <  0                            ||
-		   ctx->reduxList[i] >= (int)ctx->src->nd            ||
-		   axisInSet(ctx->reduxList[i], ctx->reduxList, i, 0)){
+	for (i=0;i<ctx->reduxLen;i++){
+		if (ctx->reduxList[i] <  0                            ||
+		    ctx->reduxList[i] >= (int)ctx->src->nd            ||
+		    axisInSet(ctx->reduxList[i], ctx->reduxList, i, 0)){
 			return reduxCleanup(ctx, GA_INVALID_ERROR);
 		}
 	}
@@ -756,21 +756,21 @@ static int   reduxCheckargs                (redux_ctx*  ctx){
 
 	/* GPU context non-existent? */
 	ctx->gpuCtx     = GpuArray_context(ctx->src);
-	if(!ctx->gpuCtx){
+	if (!ctx->gpuCtx){
 		return reduxCleanup(ctx, GA_INVALID_ERROR);
 	}
 
 
 	/* Unknown type? */
 	reduxSelectTypes(ctx);
-	if(!ctx->srcTypeStr || !ctx->dstTypeStr || !ctx->dstArgTypeStr ||
-	   !ctx->accTypeStr){
+	if (!ctx->srcTypeStr || !ctx->dstTypeStr || !ctx->dstArgTypeStr ||
+	    !ctx->accTypeStr){
 		return reduxCleanup(ctx, GA_INVALID_ERROR);
 	}
 
 
 	/* Determine initializer, and error out if reduction unsupported. */
-	switch(ctx->op){
+	switch (ctx->op){
 		case GA_REDUCE_SUM:  ret = reduxGetSumInit (ctx->accTypeCode, &ctx->initVal); break;
 		case GA_REDUCE_PRODNZ:
 		case GA_REDUCE_PROD: ret = reduxGetProdInit(ctx->accTypeCode, &ctx->initVal); break;
@@ -787,7 +787,7 @@ static int   reduxCheckargs                (redux_ctx*  ctx){
 		case GA_REDUCE_OR:   ret = reduxGetOrInit  (ctx->accTypeCode, &ctx->initVal); break;
 		default:             ret = GA_UNSUPPORTED_ERROR; break;
 	}
-	if(ret != GA_NO_ERROR){
+	if (ret != GA_NO_ERROR){
 		return reduxCleanup(ctx, ret);
 	}
 
@@ -824,7 +824,7 @@ static void  reduxSelectTypes              (redux_ctx*  ctx){
 	ctx->dstTypeCode    = ctx->srcTypeCode;
 	ctx->dstArgTypeCode = GA_SSIZE;
 	ctx->idxTypeCode    = GA_SSIZE;
-	switch(ctx->srcTypeCode){
+	switch (ctx->srcTypeCode){
 		case GA_HALF:   ctx->accTypeCode = GA_FLOAT;
 		case GA_HALF2:  ctx->accTypeCode = GA_FLOAT2;
 		case GA_HALF4:  ctx->accTypeCode = GA_FLOAT4;
@@ -867,11 +867,11 @@ static int   reduxSelectModel              (redux_ctx*  ctx){
 	 */
 	
 	ret = gpucontext_property(ctx->gpuCtx, GA_CTX_PROP_NUMPROCS, &numProcs);
-	if(ret != GA_NO_ERROR){
+	if (ret != GA_NO_ERROR){
 		return reduxCleanup(ctx, ret);
 	}
 	ret = gpucontext_property(ctx->gpuCtx, GA_CTX_PROP_MAXLSIZE, &localSize);
-	if(ret != GA_NO_ERROR){
+	if (ret != GA_NO_ERROR){
 		return reduxCleanup(ctx, ret);
 	}
 
@@ -880,8 +880,8 @@ static int   reduxSelectModel              (redux_ctx*  ctx){
 	 * Compute #elems in dst and # reductions per dst element.
 	 */
 
-	for(i=0;i<ctx->nds;i++){
-		if(axisInSet(i, ctx->reduxList, ctx->nds, NULL)){
+	for (i=0;i<ctx->nds;i++){
+		if (axisInSet(i, ctx->reduxList, ctx->nds, NULL)){
 			reduxPerElem *= ctx->src->dimensions[i];
 		}else{
 			dstNumElem   *= ctx->src->dimensions[i];
@@ -923,7 +923,7 @@ static int   reduxIsLargeCodeModel         (redux_ctx*  ctx){
  */
 
 static int   reduxHasDst                   (redux_ctx*  ctx){
-	switch(ctx->op){
+	switch (ctx->op){
 		case GA_REDUCE_ARGMIN:
 		case GA_REDUCE_ARGMAX:       return 0;
 		default:                     return 1;
@@ -935,7 +935,7 @@ static int   reduxHasDst                   (redux_ctx*  ctx){
  */
 
 static int   reduxHasDstArg                (redux_ctx*  ctx){
-	switch(ctx->op){
+	switch (ctx->op){
 		case GA_REDUCE_MINANDARGMIN:
 		case GA_REDUCE_MAXANDARGMAX:
 		case GA_REDUCE_ARGMIN:
@@ -955,7 +955,7 @@ static int   reduxHasDstArg                (redux_ctx*  ctx){
  */
 
 static int   reduxKernelRequiresDst        (redux_ctx*  ctx){
-	switch(ctx->op){
+	switch (ctx->op){
 		case GA_REDUCE_ARGMIN:
 		case GA_REDUCE_ARGMAX:       return reduxIsSmallCodeModel(ctx);
 		default:                     return 1;
@@ -990,7 +990,7 @@ static int   reduxKernelRequiresDstArg     (redux_ctx*  ctx){
  */
 
 static int   reduxCanAppendHwAxis          (redux_ctx* ctx, int wantReductionAxis){
-	if(ctx->ndh >= MAX_HW_DIMS){
+	if (ctx->ndh >= MAX_HW_DIMS){
 		return 0;
 	}else{
 		return wantReductionAxis ? ctx->ndhr < ctx->ndr:
@@ -1009,13 +1009,13 @@ static void  reduxAppendLargestAxisToHwList(redux_ctx* ctx, int wantReductionAxi
 	size_t maxV = 0;
 	
 	/* Find */
-	for(i=0;i<ctx->nds;i++){
+	for (i=0;i<ctx->nds;i++){
 		isInHwList      = axisInSet(i, ctx->hwAxisList, ctx->ndh, 0);
 		isInReduxList   = axisInSet(i, ctx->reduxList,  ctx->ndr, 0);
 		isInDesiredList = wantReductionAxis ? isInReduxList : !isInReduxList;
 		isLargestSoFar  = ctx->src->dimensions[i] >= maxV;
 		
-		if(!isInHwList && isInDesiredList && isLargestSoFar){
+		if (!isInHwList && isInDesiredList && isLargestSoFar){
 			maxV = ctx->src->dimensions[i];
 			maxI = i;
 		}
@@ -1023,7 +1023,7 @@ static void  reduxAppendLargestAxisToHwList(redux_ctx* ctx, int wantReductionAxi
 	
 	/* Append */
 	ctx->hwAxisList[ctx->ndh++] = maxI;
-	if(wantReductionAxis){
+	if (wantReductionAxis){
 		ctx->ndhr++;
 	}else{
 		ctx->ndhd++;
@@ -1045,7 +1045,7 @@ static void  reduxAppendLargestAxisToHwList(redux_ctx* ctx, int wantReductionAxi
  */
 
 static int   reduxSelectHwAxes             (redux_ctx*  ctx){
-	if(reduxIsSmallCodeModel(ctx)){
+	if (reduxIsSmallCodeModel(ctx)){
 		while(reduxCanAppendHwAxis(ctx, 1)){
 			reduxAppendLargestAxisToHwList(ctx, 1);
 		}
@@ -1078,12 +1078,12 @@ static int   reduxComputeAxisList          (redux_ctx*  ctx){
 	int i, f=0;
 	
 	ctx->axisList = malloc(ctx->nds * sizeof(unsigned));
-	if(!ctx->axisList){
+	if (!ctx->axisList){
 		return reduxCleanup(ctx, GA_MEMORY_ERROR);
 	}
 
-	for(i=0;i<ctx->nds;i++){
-		if(!axisInSet(i, ctx->reduxList, ctx->ndr, 0)){
+	for (i=0;i<ctx->nds;i++){
+		if (!axisInSet(i, ctx->reduxList, ctx->ndr, 0)){
 			ctx->axisList[f++] = i;
 		}
 	}
@@ -1102,7 +1102,7 @@ static int   reduxComputeAxisList          (redux_ctx*  ctx){
 static int   reduxGenSource                (redux_ctx*  ctx){
 	reduxAppendSource(ctx);
 	ctx->sourceCode = strb_cstr(&ctx->s);
-	if(!ctx->sourceCode){
+	if (!ctx->sourceCode){
 		return reduxCleanup(ctx, GA_MEMORY_ERROR);
 	}
 	
@@ -1133,21 +1133,15 @@ static void  reduxAppendTypedefs           (redux_ctx*  ctx){
 	strb_appendf(&ctx->s, "typedef %s     A;/* The type of the destination argument array. */\n",  ctx->dstArgTypeStr);
 	strb_appendf(&ctx->s, "typedef %s     X;/* The type of the indices: signed 32/64-bit. */\n",   ctx->idxTypeStr);
 	strb_appendf(&ctx->s, "typedef %s     K;/* The type of the accumulator variable. */\n",        ctx->accTypeStr);
-	strb_appends(&ctx->s, "\n");
-	strb_appends(&ctx->s, "\n");
-	strb_appends(&ctx->s, "\n");
+	strb_appends(&ctx->s, "\n\n\n");
 }
 static void  reduxAppendFuncGetInitVal     (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "/**\n");
 	strb_appends(&ctx->s, " * Initial value function.\n");
-	strb_appends(&ctx->s, " */\n");
-	strb_appends(&ctx->s, "\n");
+	strb_appends(&ctx->s, " */\n\n");
 	strb_appends(&ctx->s, "WITHIN_KERNEL K    getInitVal(void){\n");
 	strb_appendf(&ctx->s, "\treturn (%s);\n", ctx->initVal);
-	strb_appends(&ctx->s, "}\n");
-	strb_appends(&ctx->s, "\n");
-	strb_appends(&ctx->s, "\n");
-	strb_appends(&ctx->s, "\n");
+	strb_appends(&ctx->s, "}\n\n\n\n");
 }
 static void  reduxAppendFuncLoadVal        (redux_ctx*  ctx){
 	int i;
@@ -1159,12 +1153,12 @@ static void  reduxAppendFuncLoadVal        (redux_ctx*  ctx){
 	strb_appends(&ctx->s, " */\n");
 	strb_appends(&ctx->s, "\n");
 	appendIdxes (&ctx->s, "WITHIN_KERNEL K    loadVal(", "X i", 0, ctx->nds, "", "");
-	if(ctx->nds > 0){
+	if (ctx->nds > 0){
 		strb_appends(&ctx->s, ", ");
 	}
 	strb_appends(&ctx->s, "const GLOBAL_MEM S* src, const GLOBAL_MEM X* srcSteps){\n");
 	strb_appends(&ctx->s, "\tS v = (*(const GLOBAL_MEM S*)((const GLOBAL_MEM char*)src + ");
-	for(i=0;i<ctx->nds;i++){
+	for (i=0;i<ctx->nds;i++){
 		strb_appendf(&ctx->s, "i%d*srcSteps[%d] + \\\n\t                                                            ", i, ctx->axisList[i]);
 	}
 	strb_appends(&ctx->s, "0));\n");
@@ -1173,10 +1167,7 @@ static void  reduxAppendFuncLoadVal        (redux_ctx*  ctx){
 	
 	/* Return the value. */
 	strb_appends(&ctx->s, "\treturn v;\n");
-	strb_appends(&ctx->s, "}\n");
-	strb_appends(&ctx->s, "\n");
-	strb_appends(&ctx->s, "\n");
-	strb_appends(&ctx->s, "\n");
+	strb_appends(&ctx->s, "}\n\n\n\n");
 }
 static void  reduxAppendFuncReduxVal       (redux_ctx*  ctx){
 	int i, anyArgsEmitted = 0;
@@ -1192,15 +1183,15 @@ static void  reduxAppendFuncReduxVal       (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "\n");
 	appendIdxes (&ctx->s, "WITHIN_KERNEL void reduxVal(", "X i", 0, ctx->ndd, "", "");
 	anyArgsEmitted = ctx->ndd>0;
-	if(reduxKernelRequiresDst   (ctx)){
-		if(anyArgsEmitted){
+	if (reduxKernelRequiresDst   (ctx)){
+		if (anyArgsEmitted){
 			strb_appends(&ctx->s, ", ");
 		}
 		anyArgsEmitted = 1;
 		strb_appends(&ctx->s, "GLOBAL_MEM T* dst,    const GLOBAL_MEM X* dstSteps,    K v");
 	}
-	if(reduxKernelRequiresDstArg(ctx)){
-		if(anyArgsEmitted){
+	if (reduxKernelRequiresDstArg(ctx)){
+		if (anyArgsEmitted){
 			strb_appends(&ctx->s, ", ");
 		}
 		anyArgsEmitted = 1;
@@ -1213,38 +1204,35 @@ static void  reduxAppendFuncReduxVal       (redux_ctx*  ctx){
 	
 	
 	/* Write to memory. */
-	if(reduxIsLargeCodeModel(ctx)){
+	if (reduxIsLargeCodeModel(ctx)){
 		/* Large code model. Easy: just write out the data, since it's safe. */
-		if(reduxKernelRequiresDst   (ctx)){
+		if (reduxKernelRequiresDst   (ctx)){
 			strb_appends(&ctx->s, "\t(*(GLOBAL_MEM T*)((GLOBAL_MEM char*)dst + ");
-			for(i=0;i<ctx->ndd;i++){
+			for (i=0;i<ctx->ndd;i++){
 				strb_appendf(&ctx->s, "i%d*dstSteps[%d] +\n\t                                          ", i, i);
 			}
 			strb_appends(&ctx->s, "0)) = v;\n");
 		}
-		if(reduxKernelRequiresDstArg(ctx)){
+		if (reduxKernelRequiresDstArg(ctx)){
 			strb_appends(&ctx->s, "\t(*(GLOBAL_MEM A*)((GLOBAL_MEM char*)dstArg + ");
-			for(i=0;i<ctx->ndd;i++){
+			for (i=0;i<ctx->ndd;i++){
 				strb_appendf(&ctx->s, "i%d*dstArgSteps[%d] +\n\t                                             ", i, i);
 			}
 			strb_appends(&ctx->s, "0)) = i;\n");
 		}
 	}else{
 		/* BUG: Implement the atomic reduction, one or two CAS loops. */
-		if      ( reduxKernelRequiresDst   (ctx) && !reduxKernelRequiresDstArg(ctx)){
+		if       ( reduxKernelRequiresDst   (ctx) && !reduxKernelRequiresDstArg(ctx)){
 			
-		}else if(!reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
+		}else if (!reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
 			
-		}else if( reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
+		}else if ( reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
 			
 		}
 	}
 	
 	/* Close off function. */
-	strb_appends(&ctx->s, "}\n");
-	strb_appends(&ctx->s, "\n");
-	strb_appends(&ctx->s, "\n");
-	strb_appends(&ctx->s, "\n");
+	strb_appends(&ctx->s, "}\n\n\n\n");
 }
 static void  reduxAppendFuncPreKernel      (redux_ctx*  ctx){
 	
@@ -1266,8 +1254,7 @@ static void  reduxAppendPrototype          (redux_ctx*  ctx){
 	strb_appends(&ctx->s, " * Reduction Kernel.\n");
 	strb_appends(&ctx->s, " *\n");
 	strb_appends(&ctx->s, " * Implements actual reduction operation.\n");
-	strb_appends(&ctx->s, " */\n");
-	strb_appends(&ctx->s, "\n");
+	strb_appends(&ctx->s, " */\n\n");
 	strb_appends(&ctx->s, "KERNEL void redux(const GLOBAL_MEM S*        src,\n");
 	strb_appends(&ctx->s, "                  const X                    srcOff,\n");
 	strb_appends(&ctx->s, "                  const GLOBAL_MEM X*        srcSteps,\n");
@@ -1283,14 +1270,13 @@ static void  reduxAppendPrototype          (redux_ctx*  ctx){
 static void  reduxAppendOffsets            (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "\t/* Add offsets */\n");
 	strb_appends(&ctx->s, "\tsrc    = (const GLOBAL_MEM T*)((const GLOBAL_MEM char*)src    + srcOff);\n");
-	if(reduxKernelRequiresDst(ctx)){
+	if (reduxKernelRequiresDst(ctx)){
 		strb_appends(&ctx->s, "\tdst    = (GLOBAL_MEM T*)      ((GLOBAL_MEM char*)      dst    + dstOff);\n");
 	}
-	if(reduxKernelRequiresDstArg(ctx)){
+	if (reduxKernelRequiresDstArg(ctx)){
 		strb_appends(&ctx->s, "\tdstArg = (GLOBAL_MEM X*)      ((GLOBAL_MEM char*)      dstArg + dstArgOff);\n");
 	}
-	strb_appends(&ctx->s, "\t\n");
-	strb_appends(&ctx->s, "\t\n");
+	strb_appends(&ctx->s, "\t\n\t\n");
 }
 static void  reduxAppendIndexDeclarations  (redux_ctx*  ctx){
 	int i;
@@ -1300,29 +1286,27 @@ static void  reduxAppendIndexDeclarations  (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "\tX bd0 = LDIM_0,       bd1 = LDIM_1,       bd2 = LDIM_2;\n");
 	strb_appends(&ctx->s, "\tX ti0 = LID_0,        ti1 = LID_1,        ti2 = LID_2;\n");
 	strb_appends(&ctx->s, "\tX gi0 = bi0*bd0+ti0,  gi1 = bi1*bd1+ti1,  gi2 = bi2*bd2+ti2;\n");
-	if(ctx->ndh>0){
+	if (ctx->ndh>0){
 		strb_appends(&ctx->s, "\tX ");
-		for(i=0;i<ctx->ndh;i++){
+		for (i=0;i<ctx->ndh;i++){
 			strb_appendf(&ctx->s, "ci%u = chunkSize[%u]%s",
 			             i, i, (i==ctx->ndh-1) ? ";\n" : ", ");
 		}
 	}
 
-	strb_appends(&ctx->s, "\t\n");
-	strb_appends(&ctx->s, "\t\n");
+	strb_appends(&ctx->s, "\t\n\t\n");
 	strb_appends(&ctx->s, "\t/* Free indices & Reduction indices */\n");
 
-	if(ctx->nds > 0){appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->nds, "",        ";\n");}
-	if(ctx->nds > 0){appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->nds, "Dim",     ";\n");}
-	if(ctx->nds > 0){appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->nds, "Start",   ";\n");}
-	if(ctx->nds > 0){appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->nds, "End",     ";\n");}
-	if(ctx->nds > 0){appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->nds, "SStep",   ";\n");}
-	if(ctx->ndd > 0){appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->ndd, "MStep",   ";\n");}
-	if(ctx->ndd > 0){appendIdxes (&ctx->s, "\tX ", "i", 0,               ctx->ndd, "AStep",   ";\n");}
-	if(ctx->nds > ctx->ndd){appendIdxes (&ctx->s, "\tX ", "i", ctx->ndd, ctx->nds, "PDim",    ";\n");}
+	if (ctx->nds >        0){appendIdxes (&ctx->s, "\tX ", "i", 0,        ctx->nds, "",        ";\n");}
+	if (ctx->nds >        0){appendIdxes (&ctx->s, "\tX ", "i", 0,        ctx->nds, "Dim",     ";\n");}
+	if (ctx->nds >        0){appendIdxes (&ctx->s, "\tX ", "i", 0,        ctx->nds, "Start",   ";\n");}
+	if (ctx->nds >        0){appendIdxes (&ctx->s, "\tX ", "i", 0,        ctx->nds, "End",     ";\n");}
+	if (ctx->nds >        0){appendIdxes (&ctx->s, "\tX ", "i", 0,        ctx->nds, "SStep",   ";\n");}
+	if (ctx->ndd >        0){appendIdxes (&ctx->s, "\tX ", "i", 0,        ctx->ndd, "MStep",   ";\n");}
+	if (ctx->ndd >        0){appendIdxes (&ctx->s, "\tX ", "i", 0,        ctx->ndd, "AStep",   ";\n");}
+	if (ctx->nds > ctx->ndd){appendIdxes (&ctx->s, "\tX ", "i", ctx->ndd, ctx->nds, "PDim",    ";\n");}
 
-	strb_appends(&ctx->s, "\t\n");
-	strb_appends(&ctx->s, "\t\n");
+	strb_appends(&ctx->s, "\t\n\t\n");
 }
 static void  reduxAppendRangeCalculations  (redux_ctx*  ctx){
 	size_t hwDim;
@@ -1331,57 +1315,56 @@ static void  reduxAppendRangeCalculations  (redux_ctx*  ctx){
 	/* Use internal remapping when computing the ranges for this thread. */
 	strb_appends(&ctx->s, "\t/* Compute ranges for this thread. */\n");
 
-	for(i=0;i<ctx->nds;i++){
+	for (i=0;i<ctx->nds;i++){
 		strb_appendf(&ctx->s, "\ti%dDim     = srcSize[%d];\n", i, ctx->axisList[i]);
 	}
-	for(i=0;i<ctx->nds;i++){
+	for (i=0;i<ctx->nds;i++){
 		strb_appendf(&ctx->s, "\ti%dSStep   = srcSteps[%d];\n", i, ctx->axisList[i]);
 	}
-	for(i=0;i<ctx->ndd;i++){
+	for (i=0;i<ctx->ndd;i++){
 		strb_appendf(&ctx->s, "\ti%dMStep   = dstSteps[%d];\n", i, i);
 	}
-	for(i=0;i<ctx->ndd;i++){
+	for (i=0;i<ctx->ndd;i++){
 		strb_appendf(&ctx->s, "\ti%dAStep   = dstArgSteps[%d];\n", i, i);
 	}
-	for(i=ctx->nds-1;i>=ctx->ndd;i--){
+	for (i=ctx->nds-1;i>=ctx->ndd;i--){
 		/**
 		 * If this is the last index, it's the first cumulative dimension
 		 * product we generate, and thus we initialize to 1.
 		 */
 
-		if(i == ctx->nds-1){
+		if (i == ctx->nds-1){
 			strb_appendf(&ctx->s, "\ti%dPDim    = 1;\n", i);
 		}else{
 			strb_appendf(&ctx->s, "\ti%dPDim    = i%dPDim * i%dDim;\n", i, i+1, i+1);
 		}
 	}
-	for(i=0;i<ctx->nds;i++){
+	for (i=0;i<ctx->nds;i++){
 		/**
 		 * Up to MAX_HW_DIMS dimensions get to rely on hardware loops.
 		 * The others, if any, have to use software looping beginning at 0.
 		 */
 
-		if(axisInSet(ctx->axisList[i], ctx->hwAxisList, ctx->ndh, &hwDim)){
+		if (axisInSet(ctx->axisList[i], ctx->hwAxisList, ctx->ndh, &hwDim)){
 			strb_appendf(&ctx->s, "\ti%dStart   = gi%d * ci%d;\n", i, hwDim, hwDim);
 		}else{
 			strb_appendf(&ctx->s, "\ti%dStart   = 0;\n", i);
 		}
 	}
-	for(i=0;i<ctx->nds;i++){
+	for (i=0;i<ctx->nds;i++){
 		/**
 		 * Up to MAX_HW_DIMS dimensions get to rely on hardware loops.
 		 * The others, if any, have to use software looping beginning at 0.
 		 */
 
-		if(axisInSet(ctx->axisList[i], ctx->hwAxisList, ctx->ndh, &hwDim)){
+		if (axisInSet(ctx->axisList[i], ctx->hwAxisList, ctx->ndh, &hwDim)){
 			strb_appendf(&ctx->s, "\ti%dEnd     = i%dStart + ci%d;\n", i, i, hwDim);
 		}else{
 			strb_appendf(&ctx->s, "\ti%dEnd     = i%dStart + i%dDim;\n", i, i, i);
 		}
 	}
 
-	strb_appends(&ctx->s, "\t\n");
-	strb_appends(&ctx->s, "\t\n");
+	strb_appends(&ctx->s, "\t\n\t\n");
 }
 static void  reduxAppendLoops              (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "\t/**\n");
@@ -1413,7 +1396,7 @@ static void  reduxAppendLoopMacroDefs      (redux_ctx*  ctx){
 	 */
 
 	appendIdxes (&ctx->s, "#define RDXINDEXER(", "i", ctx->ndd, ctx->nds, "", ")              (");
-	for(i=ctx->ndd;i<ctx->nds;i++){
+	for (i=ctx->ndd;i<ctx->nds;i++){
 		strb_appendf(&ctx->s, "i%d*i%dPDim + \\\n                                        ", i, i);
 	}
 	strb_appends(&ctx->s, "0)\n");
@@ -1425,7 +1408,7 @@ static void  reduxAppendLoopOuter          (redux_ctx*  ctx){
 	 * Outer Loop Header Generation
 	 */
 
-	for(i=0;i<ctx->ndd;i++){
+	for (i=0;i<ctx->ndd;i++){
 		strb_appendf(&ctx->s, "\tFOROVER(%d){ESCAPE(%d)\n", i, i);
 	}
 
@@ -1439,7 +1422,7 @@ static void  reduxAppendLoopOuter          (redux_ctx*  ctx){
 	 * Outer Loop Trailer Generation
 	 */
 
-	for(i=0;i<ctx->ndd;i++){
+	for (i=0;i<ctx->ndd;i++){
 		strb_appends(&ctx->s, "\t}\n");
 	}
 }
@@ -1455,7 +1438,7 @@ static void  reduxAppendLoopInner          (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "\t\t */\n");
 	strb_appends(&ctx->s, "\t\t\n");
 	strb_appends(&ctx->s, "\t\tK rdxV = getInitVal();\n");
-	if(reduxKernelRequiresDstArg(ctx)){
+	if (reduxKernelRequiresDstArg(ctx)){
 		strb_appends(&ctx->s, "\t\tX argI = 0;\n");
 	}
 	strb_appends(&ctx->s, "\t\t\n");
@@ -1468,7 +1451,7 @@ static void  reduxAppendLoopInner          (redux_ctx*  ctx){
 	 * Inner Loop Header Generation
 	 */
 
-	for(i=ctx->ndd;i<ctx->nds;i++){
+	for (i=ctx->ndd;i<ctx->nds;i++){
 		strb_appendf(&ctx->s, "\t\tFOROVER(%d){ESCAPE(%d)\n", i, i);
 	}
 
@@ -1477,12 +1460,12 @@ static void  reduxAppendLoopInner          (redux_ctx*  ctx){
 	 */
 
 	appendIdxes (&ctx->s, "\t\t\tK v = loadVal(", "i", 0, ctx->nds, "", "");
-	if(ctx->nds > 0){
+	if (ctx->nds > 0){
 		strb_appends(&ctx->s, ", ");
 	}
 	strb_appends(&ctx->s, "src, srcSteps);\n");
 	strb_appends(&ctx->s, "\t\t\t\n");
-	switch(ctx->op){
+	switch (ctx->op){
 		case GA_REDUCE_SUM:          strb_appends(&ctx->s, "\t\t\trdxV += v;\n"); break;
 		case GA_REDUCE_PROD:         strb_appends(&ctx->s, "\t\t\trdxV *= v;\n"); break;
 		case GA_REDUCE_PRODNZ:       strb_appends(&ctx->s, "\t\t\trdxV *= v==0 ? getInitVal() : v;\n"); break;
@@ -1513,7 +1496,7 @@ static void  reduxAppendLoopInner          (redux_ctx*  ctx){
 	 * Inner Loop Trailer Generation
 	 */
 
-	for(i=ctx->ndd;i<ctx->nds;i++){
+	for (i=ctx->ndd;i<ctx->nds;i++){
 		strb_appends(&ctx->s, "\t\t}\n");
 	}
 	strb_appends(&ctx->s, "\t\t\n");
@@ -1526,21 +1509,21 @@ static void  reduxAppendLoopInner          (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "\t\t * Destination writeback.\n");
 	strb_appends(&ctx->s, "\t\t */\n");
 	strb_appends(&ctx->s, "\t\t\n");
-	if      ( reduxKernelRequiresDst   (ctx) && !reduxKernelRequiresDstArg(ctx)){
+	if       ( reduxKernelRequiresDst   (ctx) && !reduxKernelRequiresDstArg(ctx)){
 		appendIdxes (&ctx->s, "\t\treduxVal(", "i", 0, ctx->ndd, "", "");
-		if(ctx->ndd > 0){
+		if (ctx->ndd > 0){
 			strb_appends(&ctx->s, ", ");
 		}
 		strb_appends(&ctx->s, "dst, dstSteps, rdxV);\n");
-	}else if(!reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
+	}else if (!reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
 		appendIdxes (&ctx->s, "\t\treduxVal(", "i", 0, ctx->ndd, "", "");
-		if(ctx->ndd > 0){
+		if (ctx->ndd > 0){
 			strb_appends(&ctx->s, ", ");
 		}
 		strb_appends(&ctx->s, "dstArg, dstArgSteps, argI);\n");
-	}else if( reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
+	}else if ( reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
 		appendIdxes (&ctx->s, "\t\treduxVal(", "i", 0, ctx->ndd, "", "");
-		if(ctx->ndd > 0){
+		if (ctx->ndd > 0){
 			strb_appends(&ctx->s, ", ");
 		}
 		strb_appends(&ctx->s, "dst, dstSteps, rdxV, dstArg, dstArgSteps, argI);\n");
@@ -1560,23 +1543,23 @@ static void  reduxAppendLoopMacroUndefs    (redux_ctx*  ctx){
 
 static int   reduxCompileLarge             (redux_ctx*  ctx){
 	const int    ARG_TYPECODES[]   = {
-		GA_BUFFER, /* src */
-		GA_SIZE,   /* srcOff */
-		GA_BUFFER, /* srcSteps */
-		GA_BUFFER, /* srcSize */
-		GA_BUFFER, /* chnkSize */
-		GA_BUFFER, /* dst */
-		GA_SIZE,   /* dstOff */
-		GA_BUFFER, /* dstSteps */
-		GA_BUFFER, /* dstArg */
-		GA_SIZE,   /* dstArgOff */
-		GA_BUFFER  /* dstArgSteps */
+	    GA_BUFFER, /* src */
+	    GA_SIZE,   /* srcOff */
+	    GA_BUFFER, /* srcSteps */
+	    GA_BUFFER, /* srcSize */
+	    GA_BUFFER, /* chnkSize */
+	    GA_BUFFER, /* dst */
+	    GA_SIZE,   /* dstOff */
+	    GA_BUFFER, /* dstSteps */
+	    GA_BUFFER, /* dstArg */
+	    GA_SIZE,   /* dstArgOff */
+	    GA_BUFFER  /* dstArgSteps */
 	};
 	const size_t ARG_TYPECODES_LEN = sizeof(ARG_TYPECODES)/sizeof(*ARG_TYPECODES);
 	const char*  SRCS[1]           = {ctx->sourceCode};
 	const size_t SRC_LENS[1]       = {strlen(ctx->sourceCode)};
 	const size_t SRCS_LEN          = sizeof(SRCS)/sizeof(*SRCS);
-	
+
 	int ret  = GpuKernel_init(&ctx->kernel,
 	                          ctx->gpuCtx,
 	                          SRCS_LEN,
@@ -1588,7 +1571,7 @@ static int   reduxCompileLarge             (redux_ctx*  ctx){
 	                          0,
 	                          (char**)0);
 
-	if(ret != GA_NO_ERROR){
+	if (ret != GA_NO_ERROR){
 		return reduxCleanup(ctx, ret);
 	}else{
 		return reduxScheduleLarge(ctx);
@@ -1652,20 +1635,20 @@ static int   reduxScheduleLarge            (redux_ctx*  ctx){
 	dims[0]  = dims[1]  = dims[2]  = 1;
 	slack[0] = slack[1] = slack[2] = 1.1;
 
-	for(i=0;i<ctx->ndh;i++){
+	for (i=0;i<ctx->ndh;i++){
 		dims[i] = ctx->src->dimensions[ctx->hwAxisList[i]];
 		gaIFLInit(&factBS[i]);
 		gaIFLInit(&factGS[i]);
 		gaIFLInit(&factCS[i]);
 
 		warpMod = dims[i]%warpSize;
-		if(bestWarpMod>0 && (warpMod==0 || warpMod>=bestWarpMod)){
+		if (bestWarpMod>0 && (warpMod==0 || warpMod>=bestWarpMod)){
 			bestWarpAxis = i;
 			bestWarpMod  = warpMod;
 		}
 	}
 
-	if(ctx->ndh > 0){
+	if (ctx->ndh > 0){
 		dims[bestWarpAxis] = (dims[bestWarpAxis] + warpSize - 1)/warpSize;
 		gaIFactorize(warpSize, 0, 0, &factBS[bestWarpAxis]);
 	}
@@ -1676,8 +1659,8 @@ static int   reduxScheduleLarge            (redux_ctx*  ctx){
 	 * chunkSize.
 	 */
 
-	for(i=0;i<ctx->ndh;i++){
-		while(!gaIFactorize(dims[i], (uint64_t)(dims[i]*slack[i]), maxLs[i], &factCS[i])){
+	for (i=0;i<ctx->ndh;i++){
+		while (!gaIFactorize(dims[i], (uint64_t)(dims[i]*slack[i]), maxLs[i], &factCS[i])){
 			/**
 			 * Error! Failed to factorize dimension i with given slack and
 			 * k-smoothness constraints! Increase slack. Once slack reaches
@@ -1698,7 +1681,7 @@ static int   reduxScheduleLarge            (redux_ctx*  ctx){
 	gaIFLSchedule(ctx->ndh, maxLg, maxLs, maxGg, maxGs, factBS, factGS, factCS);
 
 	/* Output. */
-	for(i=0;i<ctx->ndh;i++){
+	for (i=0;i<ctx->ndh;i++){
 		ctx->blockSize[i] = gaIFLGetProduct(&factBS[i]);
 		ctx->gridSize [i] = gaIFLGetProduct(&factGS[i]);
 		ctx->chunkSize[i] = gaIFLGetProduct(&factCS[i]);
@@ -1727,11 +1710,11 @@ static int   reduxInvokeLarge              (redux_ctx*  ctx){
 	                                   ctx->src->dimensions, flags, 0);
 	ctx->chunkSizeGD   = gpudata_alloc(ctx->gpuCtx, ctx->ndh * sizeof(size_t),
 	                                   ctx->chunkSize,       flags, 0);
-	if(reduxKernelRequiresDst(ctx)){
+	if (reduxKernelRequiresDst(ctx)){
 		ctx->dstStepsGD    = gpudata_alloc(ctx->gpuCtx, ctx->ndd * sizeof(size_t),
 		                                   ctx->dst->strides,    flags, 0);
 	}
-	if(reduxKernelRequiresDstArg(ctx)){
+	if (reduxKernelRequiresDstArg(ctx)){
 		ctx->dstArgStepsGD = gpudata_alloc(ctx->gpuCtx, ctx->ndd * sizeof(size_t),
 		                                   ctx->dstArg->strides, flags, 0);
 	}
@@ -1740,28 +1723,28 @@ static int   reduxInvokeLarge              (redux_ctx*  ctx){
 	args[ 2] = (void*) ctx->srcStepsGD;
 	args[ 3] = (void*) ctx->srcSizeGD;
 	args[ 4] = (void*) ctx->chunkSizeGD;
-	if      ( reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
+	if       ( reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
 		args[ 5] = (void*) ctx->dst->data;
 		args[ 6] = (void*)&ctx->dst->offset;
 		args[ 7] = (void*) ctx->dstStepsGD;
 		args[ 8] = (void*) ctx->dstArg->data;
 		args[ 9] = (void*)&ctx->dstArg->offset;
 		args[10] = (void*) ctx->dstArgStepsGD;
-	}else if( reduxKernelRequiresDst   (ctx) && !reduxKernelRequiresDstArg(ctx)){
+	}else if ( reduxKernelRequiresDst   (ctx) && !reduxKernelRequiresDstArg(ctx)){
 		args[ 5] = (void*) ctx->dst->data;
 		args[ 6] = (void*)&ctx->dst->offset;
 		args[ 7] = (void*) ctx->dstStepsGD;
-	}else if(!reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
+	}else if (!reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
 		args[ 5] = (void*) ctx->dstArg->data;
 		args[ 6] = (void*)&ctx->dstArg->offset;
 		args[ 7] = (void*) ctx->dstArgStepsGD;
 	}
 
-	if(ctx->srcStepsGD   &&
-	   ctx->srcSizeGD    &&
-	   ctx->chunkSizeGD  &&
-	   ctx->dstStepsGD   &&
-	   ctx->dstArgStepsGD){
+	if (ctx->srcStepsGD   &&
+	    ctx->srcSizeGD    &&
+	    ctx->chunkSizeGD  &&
+	    ctx->dstStepsGD   &&
+	    ctx->dstArgStepsGD){
 		ret = GpuKernel_call(&ctx->kernel,
 		                     ctx->ndh>0 ? ctx->ndh : 1,
 		                     ctx->gridSize,
