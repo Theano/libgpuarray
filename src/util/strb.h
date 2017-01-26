@@ -77,6 +77,15 @@ static inline int strb_error(strb *sb) {
   return sb->l == (size_t)-1;
 }
 
+/*
+ * Initialize at runtime an strb.
+ */
+
+static inline void strb_init(strb* sb){
+  const strb s = STRB_STATIC_INIT;
+  *sb = s;
+}
+
 
 /*
  * Clear any allocation the strb may have done and reset all of its
