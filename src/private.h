@@ -17,6 +17,7 @@
 #include <gpuarray/buffer_collectives.h>
 
 #include "util/strb.h"
+#include "util/error.h"
 #include "cache.h"
 
 #ifdef __cplusplus
@@ -44,7 +45,7 @@ typedef struct _gpuarray_comm_ops gpuarray_comm_ops;
   const gpuarray_blas_ops *blas_ops;            \
   const gpuarray_comm_ops *comm_ops;            \
   void *blas_handle;                            \
-  const char* error_msg;                        \
+  error* msg;                                   \
   unsigned int refcnt;                          \
   int flags;                                    \
   struct _gpudata *errbuf;                      \

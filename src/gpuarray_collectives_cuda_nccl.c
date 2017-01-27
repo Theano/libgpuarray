@@ -16,14 +16,13 @@
  * Execute `cmd` and return appropriate code. Save a describing error message in
  * context.
  */
-#define NCCL_CHKFAIL(ctx, cmd)                         \
-  do {                                                 \
-    ncclResult_t nccl_err = (cmd);                     \
-    if (nccl_err != ncclSuccess) {                     \
-      (ctx)->error_msg = ncclGetErrorString(nccl_err); \
-      return GA_COMM_ERROR;                            \
-    }                                                  \
-    return GA_NO_ERROR;                                \
+#define NCCL_CHKFAIL(ctx, cmd)                                          \
+  do {                                                                  \
+    ncclResult_t nccl_err = (cmd);                                      \
+    if (nccl_err != ncclSuccess) {                                      \
+      return error_sets((ctx)->msg, GA_COMM_ERROR, ncclGetErrorString(nccl_err)); \
+    }                                                                   \
+    return GA_NO_ERROR;                                                 \
   } while (0)
 
 /**
@@ -31,14 +30,13 @@
  * context. Exit from context and return \ref GA_COMM_ERROR if nccl does not
  * succeed.
  */
-#define NCCL_EXIT_ON_ERROR(ctx, cmd)                   \
-  do {                                                 \
-    ncclResult_t nccl_err = (cmd);                     \
-    if (nccl_err != ncclSuccess) {                     \
-      cuda_exit((ctx));                                \
-      (ctx)->error_msg = ncclGetErrorString(nccl_err); \
-      return GA_COMM_ERROR;                            \
-    }                                                  \
+#define NCCL_EXIT_ON_ERROR(ctx, cmd)                                    \
+  do {                                                                  \
+    ncclResult_t nccl_err = (cmd);                                      \
+    if (nccl_err != ncclSuccess) {                                      \
+      cuda_exit((ctx));                                                 \
+      return error_sets((ctx)->msg, GA_COMM_ERROR, ncclGetErrorString(nccl_err)); \
+    }                                                                   \
   } while (0)
 
 //!< Link wrapped cuda core operations
@@ -108,8 +106,7 @@ static int comm_new(gpucomm** comm_ptr, gpucontext* ctx,
   if (nccl_err != ncclSuccess) {
     *comm_ptr = NULL;  // Set to NULL if failed
     comm_clear(comm);
-    ctx->error_msg = ncclGetErrorString(nccl_err);
-    return GA_COMM_ERROR;
+    return error_sets(ctx->msg, GA_COMM_ERROR, ncclGetErrorString(nccl_err));
   }
   *comm_ptr = comm;
   return GA_NO_ERROR;

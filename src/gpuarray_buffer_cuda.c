@@ -201,6 +201,10 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   res->major = major;
   res->minor = minor;
   res->freeblocks = NULL;
+  if (error_alloc(&res->msg)) {
+    error_sets(global_ctx, GA_SYS_ERROR, "Could not create error context");
+    goto fail_errmsg;
+  }
   if (detect_arch(ARCH_PREFIX, res->bin_id, &err)) {
     goto fail_stream;
   }
@@ -283,6 +287,8 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
  fail_mem_stream:
   cuStreamDestroy(res->s);
  fail_stream:
+  error_free(res->msg);
+ fail_errmsg:
   free(res);
   return NULL;
 }
@@ -319,6 +325,7 @@ static void cuda_free_ctx(cuda_context *ctx) {
     cache_destroy(ctx->kernel_cache);
     if (ctx->disk_cache)
       cache_destroy(ctx->disk_cache);
+    error_free(ctx->msg);
 
     if (!(ctx->flags & DONTFREE)) {
       cuCtxPushCurrent(ctx->ctx);

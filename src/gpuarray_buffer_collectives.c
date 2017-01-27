@@ -23,7 +23,7 @@ void gpucomm_free(gpucomm* comm) {
 
 const char* gpucomm_error(gpucontext* ctx) {
   if (ctx->comm_ops != NULL)
-    return ctx->error_msg;
+    return ctx->error->msg;
   return "No collective ops available, API error. Is a collectives library "
          "installed?";
 }
