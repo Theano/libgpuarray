@@ -1,6 +1,6 @@
 package:
     name: "pygpu"
-    version: "0.6.0rc1"
+    version: "0.6.0"
 
 source:
     git_url: https://github.com/Theano/libgpuarray.git
@@ -17,7 +17,7 @@ requirements:
         - cython
         - mako >=0.7
         - numpy
-        - libgpuarray ==0.6.0rc1
+        - libgpuarray ==0.6.0
 
     run:
         - python
@@ -25,7 +25,7 @@ requirements:
         - nose
         - mako >=0.7
         - numpy x.x
-        - libgpuarray ==0.6.0rc1
+        - libgpuarray ==0.6.0
 
 test:
     imports:
