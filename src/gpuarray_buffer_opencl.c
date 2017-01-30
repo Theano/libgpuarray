@@ -432,7 +432,7 @@ static gpucontext *cl_init(int devno, int flags, int *ret) {
 
   e = setup_lib();
   if (e != GA_NO_ERROR)
-    return NULL;
+    FAIL(NULL, e);
 
   err = clGetPlatformIDs(0, NULL, &nump);
   CHKFAIL(NULL);
