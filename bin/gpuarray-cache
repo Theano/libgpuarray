@@ -19,7 +19,7 @@ def clean(max_size):
             os.remove(path)
 
 
-SUFFIXES = {'B': 1, 'K': 1 << 10, 'M': 1 < 20, 'G': 1 << 30, 'T': 1 << 40,
+SUFFIXES = {'B': 1, 'K': 1 << 10, 'M': 1 << 20, 'G': 1 << 30, 'T': 1 << 40,
             'P': 1 << 50, 'E': 1 << 60, 'Z': 1 << 70, 'Y': 1 << 80}
 
 
@@ -44,7 +44,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='libgpuarray cache maintenance utility')
-    parser.add_argument('-s', '--max_size', help='Set the maximum size for pruning')
+    parser.add_argument('-s', '--max_size', help='Set the maximum size for pruning (in bytes with suffixes: K, M, G, ...)')
     args = parser.parse_args()
 
     clean(get_size(args.max_size))
