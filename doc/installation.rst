@@ -131,6 +131,10 @@ macOS.
 It might be possible to use a version of gcc built using Homebrew or
 MacPorts, but this is untested and unsupported.
 
+If on OS X 10.11 or macOS 10.12 and later and using the system python,
+you will have to use a virtualenv to use the python module.  This is
+due to a restriction of the new SIP feature about loading libraries.
+
 It appears that on some versions, /usr/local is not in the default
 compiler paths so you might need to add ``-L /usr/local/lib -I
 /usr/local/include`` to the ``setup.py build`` command.
