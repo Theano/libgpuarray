@@ -1352,7 +1352,10 @@ cdef GpuArray pygpu_empty_like(GpuArray a, ga_order ord, int typecode):
                 a.ga.nd, a.ga.dimensions, ord)
     return res
 
-cdef np.ndarray pygpu_as_ndarray(GpuArray a, np.dtype ldtype):
+cdef np.ndarray pygpu_as_ndarray(GpuArray a):
+    return _pygpu_as_ndarray(a, None)
+
+cdef np.ndarray _pygpu_as_ndarray(GpuArray a, np.dtype ldtype):
     cdef np.ndarray res
 
     if not py_ISONESEGMENT(a):
@@ -1658,7 +1661,7 @@ cdef class GpuArray:
 
         Automatically used by :meth:`numpy.asarray`.
         """
-        return pygpu_as_ndarray(self, ldtype)
+        return _pygpu_as_ndarray(self, ldtype)
 
     def __bool__(self):
         if self.size == 0:
