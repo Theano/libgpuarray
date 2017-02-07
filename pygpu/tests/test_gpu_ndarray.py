@@ -61,6 +61,8 @@ def test_transfer():
 
 def transfer(shp, dtype, offseted):
     a, b = gen_gpuarray(shp, dtype, offseted, ctx=ctx)
+    # Test that passing dtype doesn't break.
+    c = numpy.asarray(b, dtype=dtype)
     c = numpy.asarray(b)
 
     assert numpy.allclose(c, a)
