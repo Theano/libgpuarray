@@ -307,7 +307,8 @@ cdef api int pygpu_sync(GpuArray a) except -1
 
 cdef api GpuArray pygpu_empty_like(GpuArray a, ga_order ord, int typecode)
 
-cdef api np.ndarray pygpu_as_ndarray(GpuArray a, np.dtype ldtype)
+cdef api np.ndarray pygpu_as_ndarray(GpuArray a)
+cdef np.ndarray _pygpu_as_ndarray(GpuArray a, np.dtype ldtype)
 
 cdef api GpuArray pygpu_index(GpuArray a, const ssize_t *starts,
                               const ssize_t *stops, const ssize_t *steps)
