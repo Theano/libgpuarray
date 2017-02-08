@@ -48,8 +48,8 @@ Download
   git clone https://github.com/Theano/libgpuarray.git
   cd libgpuarray
 
-Step-by-step install
---------------------
+Step-by-step install: system library (as admin)
+-----------------------------------------------
 
 extract/clone the source to <dir>
 
@@ -79,6 +79,18 @@ like this:
 
   python setup.py build_ext -L $MY_PREFIX/lib -I $MY_PREFIX/include
 
+If installed globally under Linux (in /usr/local), you might have to run:
+
+.. code-block:: bash
+
+   $ sudo ldconfig
+
+to make the linker know that there are new libraries available.  You
+can also reboot the machine to do that.
+
+
+Step-by-step install: user library
+----------------------------------
 
 If you can not or do not want to install it for every user of that
 computer, you can install them in your home directory like this:
@@ -91,13 +103,11 @@ computer, you can install them in your home directory like this:
   cmake .. -DCMAKE_INSTALL_PREFIX=~/.local -DCMAKE_BUILD_TYPE=Release
   make
   make install
-  make test
+  DEVICE="<test device>" make test
 
   cd ..
 
   # Run the following export and add them in your ~/.bashrc file
-  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/.local/lib64/
-  export LIBRARY_PATH=$LIBRARY_PATH:~/.local/lib64/
   export CPATH=$CPATH:~/.local/include
   export LIBRARY_PATH=$LIBRARY_PATH:~/.local/lib
   export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/.local/lib
@@ -105,21 +115,9 @@ computer, you can install them in your home directory like this:
   python setup.py build
   python setup.py install --user
   cd
-  python -c "import pygpu;pygpu.test()"
+  DEVICE="<test device>" python -c "import pygpu;pygpu.test()"
 
-
-Linux-specific instructions
----------------------------
-
-If installed globally (in /usr/local), you might have to run:
-
-.. code-block:: bash
-
-   $ sudo ldconfig
-
-to make the linker know that there are new libraries available.  You
-can also reboot the machine to do that.
-
+Change ``DEVICE="<test device>"`` to the GPU device you want to use for testing.
 
 Mac-specific instructions
 -------------------------
