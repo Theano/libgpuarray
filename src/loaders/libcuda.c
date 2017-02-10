@@ -1,4 +1,4 @@
-#include <stdlib.h>
+#include <stdio.h>
 
 #include "libcuda.h"
 #include "dyn_load.h"
@@ -41,6 +41,7 @@ static int loaded = 0;
 
 int load_libcuda(void) {
   void *lib;
+  float v;
 
   if (loaded)
     return GA_NO_ERROR;
@@ -50,6 +51,15 @@ int load_libcuda(void) {
     return GA_LOAD_ERROR;
 
   #include "libcuda.fn"
+
+  v = ga_lib_version(lib, cuInit);
+  if (v == -1)
+    fprintf(stderr, "WARNING: could not determine cuda driver version.  Some versions return bad results, make sure your version is fine\n");
+
+  if (v > 373.06) {
+    fprintf(stderr, "ERROR: refusing to load cuda driver library because the version is blacklisted\n");
+    return GA_LOAD_ERROR;
+  }
 
   loaded = 1;
   return GA_NO_ERROR;
