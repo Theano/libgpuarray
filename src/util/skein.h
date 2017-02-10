@@ -56,7 +56,10 @@ typedef struct {
 typedef struct {                     /* 512-bit Skein hash context structure */
   Skein_Ctxt_Hdr_t h;                     /* common header context variables */
   u64b_t  X[SKEIN_512_STATE_WORDS];                    /* chaining variables */
-  u08b_t  b[SKEIN_512_BLOCK_BYTES]; /* partial block buffer (8-byte aligned) */
+  union Skein_512_Ctxt_b_u {
+    u08b_t b[SKEIN_512_BLOCK_BYTES]; /* partial block buffer (8-byte aligned) */
+    u64b_t l[SKEIN_512_BLOCK_BYTES/8];
+  } bb;
 } Skein_512_Ctxt_t;
 
 /*   Skein APIs for (incremental) "straight hashing" */

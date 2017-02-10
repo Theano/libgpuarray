@@ -247,13 +247,13 @@ int Skein_512_Update(Skein_512_Ctxt_t *ctx, const u08b_t *msg,
       n = SKEIN_512_BLOCK_BYTES - ctx->h.bCnt;  /* # bytes free in buffer b[] */
       if (n) {
         Skein_assert(n < msgByteCnt);         /* check on our logic here */
-        memcpy(&ctx->b[ctx->h.bCnt],msg,n);
+        memcpy(&ctx->bb.b[ctx->h.bCnt],msg,n);
         msgByteCnt  -= n;
         msg         += n;
         ctx->h.bCnt += n;
       }
       Skein_assert(ctx->h.bCnt == SKEIN_512_BLOCK_BYTES);
-      Skein_512_Process_Block(ctx,ctx->b,1,SKEIN_512_BLOCK_BYTES);
+      Skein_512_Process_Block(ctx,ctx->bb.b,1,SKEIN_512_BLOCK_BYTES);
       ctx->h.bCnt = 0;
     }
     /* now process any remaining full blocks, directly from input message data */
@@ -269,7 +269,7 @@ int Skein_512_Update(Skein_512_Ctxt_t *ctx, const u08b_t *msg,
   /* copy any remaining source message data bytes into b[] */
   if (msgByteCnt) {
     Skein_assert(msgByteCnt + ctx->h.bCnt <= SKEIN_512_BLOCK_BYTES);
-    memcpy(&ctx->b[ctx->h.bCnt],msg,msgByteCnt);
+    memcpy(&ctx->bb.b[ctx->h.bCnt],msg,msgByteCnt);
     ctx->h.bCnt += msgByteCnt;
   }
 
@@ -285,20 +285,20 @@ int Skein_512_Final(Skein_512_Ctxt_t *ctx, u08b_t *hashVal) {
 
   ctx->h.T[1] |= SKEIN_T1_FLAG_FINAL;                 /* tag as the final block */
   if (ctx->h.bCnt < SKEIN_512_BLOCK_BYTES)            /* zero pad b[] if necessary */
-    memset(&ctx->b[ctx->h.bCnt],0,SKEIN_512_BLOCK_BYTES - ctx->h.bCnt);
+    memset(&ctx->bb.b[ctx->h.bCnt],0,SKEIN_512_BLOCK_BYTES - ctx->h.bCnt);
 
-  Skein_512_Process_Block(ctx,ctx->b,1,ctx->h.bCnt);  /* process the final block */
+  Skein_512_Process_Block(ctx,ctx->bb.b,1,ctx->h.bCnt);  /* process the final block */
 
   /* now output the result */
   byteCnt = (ctx->h.hashBitLen + 7) >> 3;             /* total number of output bytes */
 
   /* run Threefish in "counter mode" to generate output */
-  memset(ctx->b,0,sizeof(ctx->b));  /* zero out b[], so it can hold the counter */
+  memset(ctx->bb.b,0,sizeof(ctx->bb.b));  /* zero out b[], so it can hold the counter */
   memcpy(X,ctx->X,sizeof(X));       /* keep a local copy of counter mode "key" */
   for (i=0;i*SKEIN_512_BLOCK_BYTES < byteCnt;i++) {
-    ((u64b_t *)ctx->b)[0]= Skein_Swap64((u64b_t) i); /* build the counter block */
+    ctx->bb.l[0] = Skein_Swap64((u64b_t) i); /* build the counter block */
     Skein_Start_New_Type(ctx,OUT_FINAL);
-    Skein_512_Process_Block(ctx,ctx->b,1,sizeof(u64b_t)); /* run "counter mode" */
+    Skein_512_Process_Block(ctx,ctx->bb.b,1,sizeof(u64b_t)); /* run "counter mode" */
     n = byteCnt - i*SKEIN_512_BLOCK_BYTES;   /* number of output bytes left to go */
     if (n >= SKEIN_512_BLOCK_BYTES)
       n  = SKEIN_512_BLOCK_BYTES;
