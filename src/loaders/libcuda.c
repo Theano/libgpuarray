@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "libcuda.h"
 #include "dyn_load.h"
@@ -56,7 +57,7 @@ int load_libcuda(void) {
   if (v == -1)
     fprintf(stderr, "WARNING: could not determine cuda driver version.  Some versions return bad results, make sure your version is fine\n");
 
-  if (v > 373.06)
+  if (v > 373.06) {
     if (getenv("GPUARRAY_FORCE_CUDA_DRIVER_LOAD") != NULL) {
       fprintf(stderr, "WARNING: loading blacklisted driver because the load was forced.\n");
     } else {
