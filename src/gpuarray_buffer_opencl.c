@@ -1245,10 +1245,14 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
   case GA_CTX_PROP_BLAS_OPS:
   {
     int e;
-    if ((e = load_libclblas()) == GA_NO_ERROR)
+    if ((e = load_libclblas()) == GA_NO_ERROR) {
       *((gpuarray_blas_ops **)res) = &clblas_ops;
-    if ((e = load_libclblast()) == GA_NO_ERROR)
+      return e;
+    }
+    if ((e = load_libclblast()) == GA_NO_ERROR) {
       *((gpuarray_blas_ops **)res) = &clblast_ops;
+      return e;
+    }
     return e;
   }
 
