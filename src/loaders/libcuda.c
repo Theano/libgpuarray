@@ -56,9 +56,17 @@ int load_libcuda(void) {
   if (v == -1)
     fprintf(stderr, "WARNING: could not determine cuda driver version.  Some versions return bad results, make sure your version is fine\n");
 
-  if (v > 373.06) {
-    fprintf(stderr, "ERROR: refusing to load cuda driver library because the version is blacklisted\n");
-    return GA_LOAD_ERROR;
+  if (v > 373.06)
+    if (getenv("GPUARRAY_FORCE_CUDA_DRIVER_LOAD") != NULL) {
+      fprintf(stderr, "WARNING: loading blacklisted driver because the load was forced.\n");
+    } else {
+      fprintf(stderr, "ERROR: refusing to load cuda driver library "
+              "because the version is blacklisted.  "
+              "Versions below 373.06 are known to be ok.\n"
+              "If you want to bypass this check and force the driver load "
+              "define GPUARRAY_FORCE_CUDA_DRIVER_LOAD in your environement.\n");
+      return GA_LOAD_ERROR;
+    }
   }
 
   loaded = 1;
