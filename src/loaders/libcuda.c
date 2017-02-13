@@ -10,7 +10,7 @@
 static char libname[] = "nvcuda.dll";
 #else /* Unix */
 #ifdef __APPLE__
-static char libname[] = "CUDA.framework/CUDA";
+static char libname[] = "/Library/Frameworks/CUDA.framework/CUDA";
 #else
 static char libname[] = "libcuda.so";
 #endif
@@ -42,7 +42,9 @@ static int loaded = 0;
 
 int load_libcuda(void) {
   void *lib;
+#ifndef __APPLE__
   float v;
+#endif
 
   if (loaded)
     return GA_NO_ERROR;
@@ -53,6 +55,10 @@ int load_libcuda(void) {
 
   #include "libcuda.fn"
 
+/*
+ * The blacklisted versions of cuda are not available on mac as far as I know.
+ */
+#ifndef __APPLE__
   v = ga_lib_version(lib, cuInit);
   if (v == -1)
     fprintf(stderr, "WARNING: could not determine cuda driver version.  Some versions return bad results, make sure your version is fine\n");
@@ -72,6 +78,7 @@ int load_libcuda(void) {
       return GA_LOAD_ERROR;
     }
   }
+#endif
 
   loaded = 1;
   return GA_NO_ERROR;

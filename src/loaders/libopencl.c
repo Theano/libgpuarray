@@ -8,7 +8,7 @@
 static char libname[] = "OpenCL.dll";
 #else /* Unix */
 #ifdef __APPLE__
-static char libname[] = "OpenCL.framework/OpenCL";
+static char libname[] = "/System/Library/Frameworks/OpenCL.framework/OpenCL";
 #else
 static char libname[] = "libOpenCL.so";
 #endif

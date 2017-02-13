@@ -37,19 +37,19 @@ float ga_lib_version(void *h, void *sym) {
   if (!dladdr(sym, &dli))
     return -1;
 
-  real_path = realpath(dli.dli_fname,NULL);
+  real_path = realpath(dli.dli_fname, NULL);
   if (real_path == NULL)
     return -1;
 
   dot1 = strrchr(real_path, '.');
-  if (dot1 == real_path) {
+  if (dot1 == NULL) {
     free(real_path);
     return -1;
   }
   dot1[0] = '\0';
 
   dot2 = strrchr(real_path, '.');
-  if (dot2 == real_path) {
+  if (dot2 == NULL) {
     free(real_path);
     return -1;
   }
