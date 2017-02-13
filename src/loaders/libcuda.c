@@ -56,6 +56,9 @@ int load_libcuda(void) {
   v = ga_lib_version(lib, cuInit);
   if (v == -1)
     fprintf(stderr, "WARNING: could not determine cuda driver version.  Some versions return bad results, make sure your version is fine\n");
+  #ifdef DEBUG
+  fprintf(stderr, "CUDA driver version detected: %.2f\n", v);
+  #endif
 
   if (v > 373.06) {
     if (getenv("GPUARRAY_FORCE_CUDA_DRIVER_LOAD") != NULL) {

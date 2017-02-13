@@ -69,6 +69,7 @@ float ga_lib_version(void *h, void *sym) {
 
 /* Should be windows */
 #include <windows.h>
+#pragma comment(lib,"Version.lib")
 
 void *ga_load_library(const char *name) {
   return LoadLibrary(name);
@@ -107,7 +108,7 @@ float ga_lib_version(void *h, void *sym) {
     return -1;
   }
 
-  res = HIWORD(vp->dwFileVersionMS) + (LOWORD(vp->dwFileVersionMS) / 100.0);
+  res = ( ((HIWORD(vp->dwFileVersionLS) - 10) * 10000) + LOWORD(vp->dwFileVersionLS) ) / 100.0;
 
   free(vinfo);
   return res;
