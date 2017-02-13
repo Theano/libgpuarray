@@ -63,7 +63,7 @@ int load_libcuda(void) {
     } else {
       fprintf(stderr, "ERROR: refusing to load cuda driver library "
               "because the version is blacklisted.  "
-              "Versions below 373.06 are known to be ok.\n"
+              "Versions 373.06 and below are known to be ok.\n"
               "If you want to bypass this check and force the driver load "
               "define GPUARRAY_FORCE_CUDA_DRIVER_LOAD in your environement.\n");
       return GA_LOAD_ERROR;
