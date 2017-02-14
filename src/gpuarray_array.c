@@ -1118,7 +1118,7 @@ int GpuArray_is_c_contiguous(const GpuArray *a) {
   int i;
 
   for (i = a->nd - 1; i >= 0; i--) {
-    if (a->strides[i] != (ssize_t)size) return 0;
+    if (a->strides[i] != (ssize_t)size && a->dimensions[i] != 1) return 0;
     // We suppose that overflow will not happen since data has to fit in memory
     size *= a->dimensions[i];
   }
@@ -1130,7 +1130,7 @@ int GpuArray_is_f_contiguous(const GpuArray *a) {
   unsigned int i;
 
   for (i = 0; i < a->nd; i++) {
-    if (a->strides[i] != (ssize_t)size) return 0;
+    if (a->strides[i] != (ssize_t)size && a->dimensions[i] != 1) return 0;
     // We suppose that overflow will not happen since data has to fit in memory
     size *= a->dimensions[i];
   }
