@@ -11,10 +11,8 @@ debug: install-debugc py
 
 .PHONY: install-debugc py debug install-relc rel config
 
-Debug:
-	mkdir Debug
-
-Debug/Makefile: Debug config
+Debug/Makefile: Debug Makefile.conf
+	mkdir -p Debug
 ifndef INSTALL_PREFIX
 	(cd Debug && NUM_DEVS=${NUM_DEVS} DEV_NAMES=${DEV_NAMES} cmake .. -DCMAKE_BUILD_TYPE=Debug)
 else
@@ -34,10 +32,8 @@ endif
 install-debugc: debugc
 	(cd Debug && ${SUDO} make install)
 
-Release:
-	mkdir Release
-
-Release/Makefile: Release config
+Release/Makefile: Makefile.conf
+	mkdir -p Release
 ifndef INSTALL_PREFIX
 	(cd Release && NUM_DEVS=${NUM_DEVS} DEV_NAMES=${DEV_NAMES} cmake .. -DCMAKE_BUILD_TYPE=Release)
 else
@@ -57,5 +53,5 @@ endif
 install-relc: relc
 	(cd Release && ${SUDO} make install)
 
-py: config
+py: Makefile.conf
 	python setup.py build_ext --inplace
