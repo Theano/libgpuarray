@@ -5,8 +5,8 @@ have_cython = False
 
 MAJOR = 0
 MINOR = 6
-PATCH = 0
-SUFFIX = ''
+PATCH = 1
+SUFFIX = 'rc1'
 FULLVERSION = '%d.%d.%d%s' % (MAJOR, MINOR, PATCH, SUFFIX)
 
 try:
