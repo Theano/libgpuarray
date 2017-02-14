@@ -16,7 +16,9 @@ from pygpu.gpuarray import GpuArrayException
 COMM_ID_BYTES = GA_COMM_ID_BYTES
 
 cdef class GpuCommCliqueId:
-    """Represents a unique id shared among :ref:`GpuComm` communicators which
+    """GpuCommCliqueId(context=None, comm_id=None)
+
+    Represents a unique id shared among :ref:`GpuComm` communicators which
     participate in a multi-gpu clique.
 
     Parameters
@@ -115,7 +117,9 @@ cdef class GpuCommCliqueId:
 
 
 cdef class GpuComm:
-    """Represents a communicator which participates in a multi-gpu clique.
+    """GpuComm(cid, ndev, rank)
+
+    Represents a communicator which participates in a multi-gpu clique.
 
     It is used to invoke collective operations to gpus inside its clique.
 
@@ -156,8 +160,11 @@ cdef class GpuComm:
             comm_get_rank(self, &gpurank)
             return gpurank
 
-    def reduce(self, GpuArray src not None, op, GpuArray dest=None, int root=-1):
-        """Reduce collective operation for ranks in a communicator world.
+    def reduce(self, GpuArray src not None, op, GpuArray dest=None,
+               int root=-1):
+        """reduce(self, src, op, dest=None, root=-1)
+
+        Reduce collective operation for ranks in a communicator world.
 
         Parameters
         ----------
@@ -172,10 +179,11 @@ cdef class GpuComm:
 
         Notes
         -----
-        * `root` is necessary when invoking from a non-root rank. Root caller
-        does not need to provide `root` argument.
-        * Not providing `dest` argument for a root caller will result in creating
-        a new compatible :ref:`GpuArray` and returning result in it.
+        * `root` is necessary when invoking from a non-root rank. Root
+          caller does not need to provide `root` argument.
+        * Not providing `dest` argument for a root caller will result
+          in creating a new compatible :ref:`GpuArray` and returning
+          result in it.
 
         """
         cdef int srank
@@ -193,7 +201,9 @@ cdef class GpuComm:
         comm_reduce(self, src, dest, to_reduce_opcode(op), root)
 
     def all_reduce(self, GpuArray src not None, op, GpuArray dest=None):
-        """AllReduce collective operation for ranks in a communicator world.
+        """all_reduce(self, src, op, dest=None)
+
+        AllReduce collective operation for ranks in a communicator world.
 
         Parameters
         ----------
@@ -207,7 +217,7 @@ cdef class GpuComm:
         Notes
         -----
         * Not providing `dest` argument for a caller will result in creating
-        a new compatible :ref:`GpuArray` and returning result in it.
+          a new compatible :ref:`GpuArray` and returning result in it.
 
         """
         if dest is None:
@@ -215,7 +225,9 @@ cdef class GpuComm:
         comm_all_reduce(self, src, dest, to_reduce_opcode(op))
 
     def reduce_scatter(self, GpuArray src not None, op, GpuArray dest=None):
-        """ReduceScatter collective operation for ranks in a communicator world.
+        """reduce_scatter(self, src, op, dest=None)
+
+        ReduceScatter collective operation for ranks in a communicator world.
 
         Parameters
         ----------
@@ -229,7 +241,7 @@ cdef class GpuComm:
         Notes
         -----
         * Not providing `dest` argument for a caller will result in creating
-        a new compatible :ref:`GpuArray` and returning result in it.
+          a new compatible :ref:`GpuArray` and returning result in it.
 
         """
         if dest is None:
@@ -237,7 +249,9 @@ cdef class GpuComm:
         comm_reduce_scatter(self, src, dest, to_reduce_opcode(op))
 
     def broadcast(self, GpuArray array not None, int root=-1):
-        """Broadcast collective operation for ranks in a communicator world.
+        """broadcast(self, array, root=-1)
+
+        Broadcast collective operation for ranks in a communicator world.
 
         Parameters
         ----------
@@ -249,7 +263,7 @@ cdef class GpuComm:
         Notes
         -----
         * `root` is necessary when invoking from a non-root rank. Root caller
-        does not need to provide `root` argument.
+          does not need to provide `root` argument.
 
         """
         if root == -1:
@@ -258,7 +272,9 @@ cdef class GpuComm:
 
     def all_gather(self, GpuArray src not None, GpuArray dest=None,
                    unsigned int nd_up=1):
-        """AllGather collective operation for ranks in a communicator world.
+        """all_gather(self, src, dest=None, nd_up=1)
+
+        AllGather collective operation for ranks in a communicator world.
 
         Parameters
         ----------
@@ -274,7 +290,7 @@ cdef class GpuComm:
         Notes
         -----
         * Providing `nd_up` == 0 means that gathered arrays will be appended to
-        the dimension with the largest stride.
+          the dimension with the largest stride.
 
         """
         if dest is None:
