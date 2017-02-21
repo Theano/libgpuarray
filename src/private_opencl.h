@@ -5,6 +5,7 @@
 
 #include "loaders/libopencl.h"
 
+/** @cond NEVER */
 #ifdef DEBUG
 #include <assert.h>
 
@@ -29,6 +30,7 @@
 #define ASSERT_KER(k)
 #define CLEAR(o)
 #endif
+/** @endcond */
 
 const char *cl_error_string(cl_int);
 
