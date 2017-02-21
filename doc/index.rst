@@ -13,7 +13,7 @@ Contents:
 
    why
    installation
-   pyapi
+   pyapi/pygpu
    c_api
 
 Indices and tables
