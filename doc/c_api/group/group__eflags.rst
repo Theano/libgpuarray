@@ -1,0 +1,4 @@
+Group eflags
+============
+
+.. doxygengroup:: eflags

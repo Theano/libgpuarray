@@ -1,0 +1,4 @@
+Struct GpuKernel
+================
+
+.. doxygenstruct:: GpuKernel

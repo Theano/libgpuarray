@@ -1,0 +1,4 @@
+Struct GpuArray
+===============
+
+.. doxygenstruct:: GpuArray

@@ -1,0 +1,4 @@
+Struct gpucommCliqueId
+======================
+
+.. doxygenstruct:: gpucommCliqueId

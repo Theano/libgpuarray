@@ -1,0 +1,4 @@
+Struct GpuArrayIpcMemHandle
+===========================
+
+.. doxygenstruct:: GpuArrayIpcMemHandle

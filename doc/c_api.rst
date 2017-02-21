@@ -1,5 +1,8 @@
 C library reference
 ===================
 
-.. doxygenindex::
-   :project: gpuarray
+.. toctree::
+
+   c_api/grouplist
+   c_api/structlist
+   c_api/filelist
