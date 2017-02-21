@@ -165,7 +165,6 @@ typedef struct _gpuarray_type {
  * List of all built-in types.
  */
 enum GPUARRAY_TYPES {
-  GA_POINTER = -2,
   GA_BUFFER = -1,
 % for i, v in sorted(TYPEMAP.items()):
   GA_${v[1].upper()} = ${i},

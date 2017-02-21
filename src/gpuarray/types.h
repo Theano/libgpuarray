@@ -43,7 +43,6 @@ typedef struct _gpuarray_type {
  * List of all built-in types.
  */
 enum GPUARRAY_TYPES {
-  GA_POINTER = -2,
   GA_BUFFER = -1,
   GA_BOOL = 0,
   GA_BYTE = 1,

@@ -1017,8 +1017,6 @@ static int cl_setkernelarg(gpukernel *k, unsigned int i, void *a) {
   cl_ulong temp;
   cl_long stemp;
   switch (k->types[i]) {
-  case GA_POINTER:
-    return error_set(ctx->err, GA_DEVSUP_ERROR, "Cannot set raw pointers as kernel arguments");
   case GA_BUFFER:
     btmp = (gpudata *)a;
     CL_CHECK(ctx->err, clSetKernelArg(k->k, i, sizeof(cl_mem), &btmp->buf));
