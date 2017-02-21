@@ -33,12 +33,14 @@ of this available, but you won't be able to use associated
 functionality.
 
  * For CUDA:
+
    - CUDA (cuda_) version 7.0 or more, with the appropriate driver
    - (optional) NCCL (nccl_) for the collectives interface
 
  * For OpenCL:
-  - OpenCL version 1.1 or more
-  - (optional) clBLAS (_clblas) or CLBlast (_clblast) for blas functionality
+
+   - OpenCL version 1.1 or more
+   - (optional) clBLAS (clblas_) or CLBlast (clblast_) for blas functionality
 
 Download
 --------
