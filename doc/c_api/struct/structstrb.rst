@@ -1,4 +1,0 @@
-Struct strb
-===========
-
-.. doxygenstruct:: strb

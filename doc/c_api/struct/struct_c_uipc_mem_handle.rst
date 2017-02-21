@@ -1,4 +1,0 @@
-Struct CUipcMemHandle
-=====================
-
-.. doxygenstruct:: CUipcMemHandle

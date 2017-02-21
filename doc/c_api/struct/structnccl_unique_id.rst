@@ -1,4 +1,0 @@
-Struct ncclUniqueId
-===================
-
-.. doxygenstruct:: ncclUniqueId
