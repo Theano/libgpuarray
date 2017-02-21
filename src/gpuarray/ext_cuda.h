@@ -11,6 +11,7 @@
 extern "C" {
 #endif
 
+/** @cond NEVER */
 static void (*cuda_enter)(gpucontext *);
 static void (*cuda_exit)(gpucontext *);
 static gpucontext *(*cuda_make_ctx)(CUcontext, int);
@@ -22,6 +23,7 @@ static int (*cuda_record)(gpudata *, int);
 static CUipcMemHandle (*cuda_get_ipc_handle)(gpudata *d);
 static gpudata *(*cuda_open_ipc_handle)(gpucontext *c, CUipcMemHandle h,
                                         size_t sz);
+/** @endcond */
 
 static void setup_ext_cuda(void) {
   // The casts are necessary to reassure C++ compilers
