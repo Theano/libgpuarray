@@ -41,6 +41,8 @@ typedef struct _GpuKernel {
  * \param strs C array of source code strings
  * \param lens C array with the size of each string or NULL
  * \param name name of the kernel function
+ * \param argcount number of kerner arguments
+ * \param types typecode for each argument
  * \param flags kernel use flags (see \ref ga_usefl)
  * \param err_str (if not NULL) location to write GPU-backend provided debug info 
  * 
@@ -100,7 +102,7 @@ GPUARRAY_PUBLIC int GpuKernel_sched(GpuKernel *k, size_t n,
  * \param n dimensionality of the grid/blocks
  * \param gs sizes of launch grid
  * \param ls sizes of launch blocks
- * \param amount of dynamic shared memory to allocate
+ * \param shared of dynamic shared memory to allocate
  * \param args table of pointers to arguments
  */
 GPUARRAY_PUBLIC int GpuKernel_call(GpuKernel *k, unsigned int n,
