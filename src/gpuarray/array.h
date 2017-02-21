@@ -537,7 +537,7 @@ GPUARRAY_PUBLIC int GpuArray_copy(GpuArray *res, const GpuArray *a,
  * Source and target arrays must be contiguous.  This restriction may
  * be lifted in the future.
  *
- * \param r result array
+ * \param res result array
  * \param a array to transfer
  *
  * \return GA_NO_ERROR if the operation was succesful.

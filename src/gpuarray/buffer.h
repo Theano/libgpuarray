@@ -422,6 +422,8 @@ GPUARRAY_PUBLIC gpucontext *gpudata_context(gpudata *b);
  * \param strings table of string pointers
  * \param lengths (optional) length for each string in the table
  * \param fname name of the kernel function (as defined in the code)
+ * \param numargs number of kernel arguments
+ * \param typecodes the type of each argument
  * \param flags flags for compilation (see #ga_usefl)
  * \param ret error return pointer
  * \param err_str returns pointer to debug message from GPU backend
