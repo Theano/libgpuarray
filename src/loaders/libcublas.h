@@ -3,6 +3,8 @@
 
 #include "util/error.h"
 
+/** @cond NEVER */
+
 #ifdef _WIN32
 #define CUBLASWINAPI __stdcall
 #else
@@ -60,7 +62,11 @@ typedef enum {
 
 typedef struct cublasContext *cublasHandle_t;
 
+/** @endcond */
+
 int load_libcublas(int major, int minor, error *e);
+
+/** @cond NEVER */
 
 #define DEF_PROC(name, args) typedef cublasStatus_t CUBLASWINAPI t##name args
 #define DEF_PROC_V2(name, args) DEF_PROC(name, args)
@@ -81,5 +87,7 @@ int load_libcublas(int major, int minor, error *e);
 #undef DEF_PROC_OPT
 #undef DEF_PROC_V2
 #undef DEF_PROC
+
+/** @endcond */
 
 #endif

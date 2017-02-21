@@ -3,13 +3,19 @@
 
 #include "util/error.h"
 
+/** @cond NEVER */
+
 typedef enum {
   NVRTC_SUCCESS = 0,
 } nvrtcResult;
 
 typedef struct _nvrtcProgram *nvrtcProgram;
 
+/** @endcond */
+
 int load_libnvrtc(int major, int minor, error *e);
+
+/** @cond NEVER */
 
 #define DEF_PROC(rt, name, args) typedef rt t##name args
 
@@ -22,5 +28,7 @@ int load_libnvrtc(int major, int minor, error *e);
 #include "libnvrtc.fn"
 
 #undef DEF_PROC
+
+/** @endcond */
 
 #endif

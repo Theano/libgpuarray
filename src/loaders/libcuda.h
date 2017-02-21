@@ -3,6 +3,8 @@
 
 #include "util/error.h"
 
+/** @cond NEVER */
+
 #ifdef _WIN32
 #define CUDAAPI __stdcall
 #else
@@ -41,7 +43,11 @@ typedef struct CUipcMemHandle_st {
   char reserved[CU_IPC_HANDLE_SIZE];
 } CUipcMemHandle;
 
+/** @endcond */
+
 int load_libcuda(error *);
+
+/** @cond NEVER */
 
 #define DEF_PROC(name, args) typedef CUresult CUDAAPI t##name args
 #define DEF_PROC_V2(name, args) DEF_PROC(name, args)
@@ -218,5 +224,7 @@ enum CUjitInputType_enum {
     CU_JIT_INPUT_LIBRARY,
     CU_JIT_NUM_INPUT_TYPES
 };
+
+/** @endcond */
 
 #endif

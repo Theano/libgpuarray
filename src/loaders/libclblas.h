@@ -4,6 +4,7 @@
 #include "util/error.h"
 #include "libopencl.h"
 
+/** @cond NEVER */
 typedef enum clblasOrder_ {
   clblasRowMajor,
   clblasColumnMajor
@@ -38,8 +39,11 @@ typedef enum clblasStatus_ {
   clblasInsufficientMemVecY,
 } clblasStatus;
 
+/** @endcond */
+
 int load_libclblas(error *);
 
+/** @cond NEVER */
 #define DEF_PROC(ret, name, args) typedef ret t##name args
 
 #include "libclblas.fn"
@@ -51,5 +55,7 @@ int load_libclblas(error *);
 #include "libclblas.fn"
 
 #undef DEF_PROC
+
+/** @endcond */
 
 #endif

@@ -3,6 +3,8 @@
 
 #include "util/error.h"
 
+/** @cond NEVER */
+
 #if defined(_WIN32)
     #define CL_API_CALL     __stdcall
     #define CL_CALLBACK     __stdcall
@@ -56,7 +58,11 @@ typedef cl_uint cl_program_build_info;
 typedef cl_uint cl_kernel_info;
 typedef cl_uint cl_kernel_work_group_info;
 
+/** @endcond */
+
 int load_libopencl(error *);
+
+/** @cond NEVER */
 
 #define DEF_PROC(ret, name, args) typedef ret CL_API_CALL t##name args
 
@@ -325,5 +331,7 @@ int load_libopencl(error *);
 #define CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE 0x11B3
 #define CL_KERNEL_PRIVATE_MEM_SIZE                  0x11B4
 #define CL_KERNEL_GLOBAL_WORK_SIZE                  0x11B5
+
+/** @endcond */
 
 #endif

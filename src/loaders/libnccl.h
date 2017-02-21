@@ -3,6 +3,8 @@
 
 #include "util/error.h"
 
+/** @cond NEVER */
+
 typedef struct CUstream_st *cudaStream_t;
 typedef struct ncclComm* ncclComm_t;
 
@@ -27,7 +29,11 @@ typedef enum { ncclChar       = 0,
                ncclUint64     = 6,
                nccl_NUM_TYPES = 7 } ncclDataType_t;
 
+/** @endcond */
+
 int load_libnccl(error *e);
+
+/* @cond NEVER */
 
 #define DEF_PROC(ret, name, args) typedef ret t##name args
 
@@ -40,5 +46,7 @@ int load_libnccl(error *e);
 #include "libnccl.fn"
 
 #undef DEF_PROC
+
+/** @endcond */
 
 #endif

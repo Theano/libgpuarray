@@ -4,6 +4,8 @@
 #include "util/error.h"
 #include "libopencl.h"
 
+/** @cond NEVER */
+
 typedef enum Layout_ {
   kRowMajor = 101,
   kColMajor = 102
@@ -46,7 +48,11 @@ typedef enum CLBLastStatusCode_ {
   CLBlastUnexpectedError           = -2039,
 } CLBlastStatusCode;
 
+/** @endcond */
+
 int load_libclblast(error *);
+
+/** @cond NEVER */
 
 #define DEF_PROC(ret, name, args) typedef ret t##name args
 
@@ -59,5 +65,7 @@ int load_libclblast(error *);
 #include "libclblast.fn"
 
 #undef DEF_PROC
+
+/** @endcond */
 
 #endif
