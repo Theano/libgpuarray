@@ -134,9 +134,8 @@ GPUARRAY_PUBLIC int gpucomm_get_rank(gpucomm* comm, int* rank);
  * \param offdest memory offset after which data will be saved in
  * buffer `dest`
  * \param count number of elements to be reduced in each array
- * \param typecode code for elements' data type, see \ref enum
- * GPUARRAY_TYPES
- * \param opcode reduce operation code, see \ref enum _gpucomm_reduce_ops
+ * \param typecode code for elements' data type, see \ref GPUARRAY_TYPES
+ * \param opcode reduce operation code, see \ref _gpucomm_reduce_ops
  * \param root rank in `comm` which will collect result
  * \param comm gpu communicator
  *
@@ -166,9 +165,8 @@ GPUARRAY_PUBLIC int gpucomm_reduce(gpudata* src, size_t offsrc, gpudata* dest,
  * \param offdest memory offset after which data will be saved in
  * buffer `dest`
  * \param count number of elements to be reduced in each array
- * \param typecode code for elements' data type, see \ref enum
- * GPUARRAY_TYPES
- * \param opcode reduce operation code, see \ref enum _gpucomm_reduce_ops
+ * \param typecode code for elements' data type, see \ref GPUARRAY_TYPES
+ * \param opcode reduce operation code, see \ref _gpucomm_reduce_ops
  * \param comm gpu communicator
  *
  * \note Must be called separately for each rank in `comm`.
@@ -195,9 +193,8 @@ GPUARRAY_PUBLIC int gpucomm_all_reduce(gpudata* src, size_t offsrc,
  * \param offdest memory offset after which data will be saved in
  * buffer `dest`
  * \param count number of elements to be contained in result `dest`
- * \param typecode code for elements' data type, see \ref enum
- * GPUARRAY_TYPES
- * \param opcode reduce operation code, see \ref enum _gpucomm_reduce_ops
+ * \param typecode code for elements' data type, see \ref GPUARRAY_TYPES
+ * \param opcode reduce operation code, see \ref _gpucomm_reduce_ops
  * \param comm gpu communicator
  *
  * \note Must be called separately for each rank in `comm`.
@@ -218,8 +215,7 @@ GPUARRAY_PUBLIC int gpucomm_reduce_scatter(gpudata* src, size_t offsrc,
  * \param array data in device's buffer to get copied or be received
  * \param offset memory offset after which data in `array` begin
  * \param count number of elements to be contained in `array`
- * \param typecode code for elements' data type, see \ref enum
- * GPUARRAY_TYPES
+ * \param typecode code for elements' data type, see \ref GPUARRAY_TYPES
  * \param root rank in `comm` which broadcasts its array
  * \param comm gpu communicator
  *
@@ -243,8 +239,7 @@ GPUARRAY_PUBLIC int gpucomm_broadcast(gpudata* array, size_t offset,
  * \param offdest memory offset after which data in `dest` begin
  * \param count number of elements to be gathered from each rank in
  * `src`
- * \param typecode code for elements' data type, see \ref enum
- * GPUARRAY_TYPES
+ * \param typecode code for elements' data type, see \ref GPUARRAY_TYPES
  * \param comm gpu communicator
  *
  * \note Must be called separately for each rank in `comm`.
