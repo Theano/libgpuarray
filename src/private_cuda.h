@@ -80,8 +80,10 @@ typedef struct _cuda_context {
   unsigned char minor;
 } cuda_context;
 
+/** @cond NEVER */
 STATIC_ASSERT(sizeof(cuda_context) <= sizeof(gpucontext),
               sizeof_struct_gpucontext_cuda);
+/** @endcond */
 
 /*
  * About freeblocks.

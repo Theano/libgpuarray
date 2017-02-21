@@ -74,7 +74,9 @@ typedef struct _cl_ctx {
   char *preamble;
 } cl_ctx;
 
+/** @cond NEVER */
 STATIC_ASSERT(sizeof(cl_ctx) <= sizeof(gpucontext), sizeof_struct_gpucontext_cl);
+/** @endcond */
 
 struct _gpudata {
   cl_mem buf;
