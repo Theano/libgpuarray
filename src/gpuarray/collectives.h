@@ -21,14 +21,14 @@ extern "C" {
  * communicator world.
  *
  * \param src array to be reduced
- * \param opcode reduce operation code, see \ref _gpucomm_reduce_ops
+ * \param opcode reduce operation code, see #gpucomm_reduce_ops
  * \param root rank in `comm` which will collect result
  * \param comm gpu communicator
  *
  * \note Root rank of reduce operation must call GpuArray_reduce().
  * \note Must be called separately for each rank in `comm`, except root rank.
  *
- * \return int error code, \ref GA_NO_ERROR if success
+ * \return error code or #GA_NO_ERROR if success
  */
 GPUARRAY_PUBLIC int GpuArray_reduce_from(const GpuArray* src, int opcode,
                                          int root, gpucomm* comm);
@@ -38,18 +38,17 @@ GPUARRAY_PUBLIC int GpuArray_reduce_from(const GpuArray* src, int opcode,
  *
  * \param src array to be reduced
  * \param dest array to collect reduce operation result
- * \param opcode reduce operation code, see \ref _gpucomm_reduce_ops
+ * \param opcode reduce operation code, see #gpucomm_reduce_ops
  * \param root rank in `comm` which will collect result
  * \param comm gpu communicator
  *
  * \note Can be used by root and non root ranks alike.
  *
  * \note Non root ranks can call this, using a NULL `dest`.
- *
  * \note Must be called separately for each rank in `comm` (non root
- * can call GpuArray_reduce_from() instead).
+ *       can call GpuArray_reduce_from() instead).
  *
- * \return int error code, \ref GA_NO_ERROR if success
+ * \return error code or #GA_NO_ERROR if success
  */
 GPUARRAY_PUBLIC int GpuArray_reduce(const GpuArray* src, GpuArray* dest,
                                     int opcode, int root, gpucomm* comm);
@@ -62,12 +61,12 @@ GPUARRAY_PUBLIC int GpuArray_reduce(const GpuArray* src, GpuArray* dest,
  *
  * \param src array to be reduced
  * \param dest array to collect reduce operation result
- * \param opcode reduce operation code, see \ref _gpucomm_reduce_ops
+ * \param opcode reduce operation code, see #gpucomm_reduce_ops
  * \param comm gpu communicator
  *
  * \note Must be called separately for each rank in `comm`.
  *
- * \return int error code, \ref GA_NO_ERROR if success
+ * \return error code or #GA_NO_ERROR if success
  */
 GPUARRAY_PUBLIC int GpuArray_all_reduce(const GpuArray* src, GpuArray* dest,
                                         int opcode, gpucomm* comm);
@@ -81,12 +80,12 @@ GPUARRAY_PUBLIC int GpuArray_all_reduce(const GpuArray* src, GpuArray* dest,
  *
  * \param src array to be reduced
  * \param dest array to collect reduce operation scattered result
- * \param opcode reduce operation code, see \ref _gpucomm_reduce_ops
+ * \param opcode reduce operation code, see #gpucomm_reduce_ops
  * \param comm gpu communicator
  *
  * \note Must be called separately for each rank in `comm`.
  *
- * \return int error code, \ref GA_NO_ERROR if success
+ * \return error code or #GA_NO_ERROR if success
  */
 GPUARRAY_PUBLIC int GpuArray_reduce_scatter(const GpuArray* src, GpuArray* dest,
                                             int opcode, gpucomm* comm);
@@ -102,7 +101,7 @@ GPUARRAY_PUBLIC int GpuArray_reduce_scatter(const GpuArray* src, GpuArray* dest,
  *
  * \note Must be called separately for each rank in `comm`.
  *
- * \return int error code, \ref GA_NO_ERROR if success
+ * \return error code or #GA_NO_ERROR if success
  */
 GPUARRAY_PUBLIC int GpuArray_broadcast(GpuArray* array, int root,
                                        gpucomm* comm);
@@ -120,7 +119,7 @@ GPUARRAY_PUBLIC int GpuArray_broadcast(GpuArray* array, int root,
  *
  * \note Must be called separately for each rank in `comm`.
  *
- * \return int error code, \ref GA_NO_ERROR if success
+ * \return error code or #GA_NO_ERROR if success
  */
 GPUARRAY_PUBLIC int GpuArray_all_gather(const GpuArray* src, GpuArray* dest,
                                         gpucomm* comm);
