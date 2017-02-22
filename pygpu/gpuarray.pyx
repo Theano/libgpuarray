@@ -10,10 +10,14 @@ from cpython cimport Py_INCREF, PyNumber_Index
 from cpython.object cimport Py_EQ, Py_NE
 
 def api_version():
+    """api_version()
+    """
     # (library version, module version)
     return (GPUARRAY_API_VERSION, 0)
 
 def abi_version():
+    """abi_version()
+    """
     major_version = GPUARRAY_ABI_VERSION / 1000
     minor_version = GPUARRAY_ABI_VERSION % 1000
     return (major_version, minor_version)
@@ -526,7 +530,10 @@ cdef bint pygpu_GpuArray_Check(object o):
     return isinstance(o, GpuArray)
 
 def count_platforms(kind):
-    """Return number of host's platforms compatible with `kind`.
+    """
+    count_platforms(kind)
+
+    Return number of host's platforms compatible with `kind`.
     """
     cdef unsigned int platcount
     cdef int err
@@ -536,7 +543,10 @@ def count_platforms(kind):
     return platcount
 
 def count_devices(kind, unsigned int platform):
-    """Returns number of devices in host's `platform` compatible with `kind`.
+    """
+    count_devices(kind, platform)
+
+    Returns number of devices in host's `platform` compatible with `kind`.
     """
     cdef unsigned int devcount
     cdef int err
@@ -886,22 +896,6 @@ def array(proto, dtype=None, copy=True, order=None, unsigned int ndmin=0,
 
     Create a GpuArray from existing data
 
-    :param obj: data to initialize the result
-    :type obj: array-like
-    :param dtype: data type of the result elements
-    :type dtype: string or numpy.dtype or int
-    :param copy: return a copy?
-    :type copy: bool
-    :param order: memory layout of the result
-    :type order: string
-    :param ndmin: minimum number of result dimensions
-    :type ndmin: unsigned int
-    :param context: allocation context
-    :type context: GpuContext
-    :param cls: result class (must inherit from GpuArray)
-    :type cls: class
-    :rtype: GpuArray
-
     This function creates a new GpuArray from the data provided in
     `obj` except if `obj` is already a GpuArray and all the parameters
     match its properties and `copy` is False.
@@ -911,6 +905,29 @@ def array(proto, dtype=None, copy=True, order=None, unsigned int ndmin=0,
 
     This function is similar to :meth:`numpy.array` except that it returns
     GpuArrays.
+
+    Parameters
+    ----------
+    obj: array-like
+        data to initialize the result
+    dtype: string or numpy.dtype or int
+        data type of the result elements
+    copy: bool
+        return a copy?
+    order: str
+        memory layout of the result
+    ndmin: int
+        minimum number of result dimensions
+    context: GpuContext
+        allocation context
+    cls: class
+        result class (must inherit from GpuArray)
+
+    Returns
+    -------
+    GpuArray
+        new array
+
     """
     return carray(proto, dtype, copy, order, ndmin, context, cls)
 
@@ -979,11 +996,9 @@ cuda_exit = <void (*)(gpucontext *)>gpuarray_get_extension("cuda_exit")
 
 cdef class GpuContext:
     """
+    GpuContext(kind, devno, flags)
+
     Class that holds all the information pertaining to a context.
-
-    .. code-block:: python
-
-        GpuContext(kind, devno, flags)
 
     :param kind: module name for the context
     :type kind: string
@@ -1428,6 +1443,9 @@ cdef int pygpu_transfer(GpuArray res, GpuArray a) except -1:
     return 0
 
 def _split(GpuArray a, ind, unsigned int axis):
+    """
+    _split(a, ind, axis)
+    """
     cdef list r = [None] * (len(ind) + 1)
     cdef Py_ssize_t i
     if not axis < a.ga.nd:
@@ -1464,6 +1482,9 @@ cdef GpuArray pygpu_concatenate(const _GpuArray **a, size_t n,
 
 def _concatenate(list al, unsigned int axis, int restype, object cls,
                  GpuContext context):
+    """
+    _concatenate(al, axis, restype, cls, context)
+    """
     cdef Py_ssize_t i
     context = ensure_context(context)
     cdef const _GpuArray **als = <const _GpuArray **>PyMem_Malloc(sizeof(_GpuArray *) * len(al))
@@ -1486,6 +1507,8 @@ cuda_open_ipc_handle = <gpudata *(*)(gpucontext *, GpuArrayIpcMemHandle *, size_
 
 def open_ipc_handle(GpuContext c, bytes hpy, size_t l):
     """
+    open_ipc_handle(c, hpy, l)
+
     Open an IPC handle to get a new GpuArray from it.
 
     :param c: context
@@ -1566,7 +1589,10 @@ cdef class GpuArray:
             raise IndexError, "cannot index with: %s" % (key,)
 
     def write(self, np.ndarray src not None):
-        """Writes host's Numpy array to device's GpuArray.
+        """
+        write(src)
+
+        Writes host's Numpy array to device's GpuArray.
 
         This method is as fast as or even faster than :ref:asarray, because it
         skips possible allocation of a buffer in device's memory. It uses this
@@ -1605,7 +1631,10 @@ cdef class GpuArray:
         array_write(self, np.PyArray_DATA(src), sz)
 
     def read(self, np.ndarray dst not None):
-        """Reads from this GpuArray into host's Numpy array.
+        """
+        read(dst)
+
+        Reads from this GpuArray into host's Numpy array.
 
         This method is as fast as or even faster than :ref:__array__ method and
         thus :ref:numpy.asarray. This is because it skips allocation of a new
@@ -1641,6 +1670,9 @@ cdef class GpuArray:
         array_read(np.PyArray_DATA(dst), sz, self)
 
     def get_ipc_handle(self):
+        """
+        get_ipc_handle()
+        """
         cdef GpuArrayIpcMemHandle h
         cdef int err
         if cuda_get_ipc_handle is NULL:
@@ -1664,6 +1696,9 @@ cdef class GpuArray:
         return _pygpu_as_ndarray(self, ldtype)
 
     def __bool__(self):
+        """
+        __bool__()
+        """
         if self.size == 0:
             return False
         elif self.size == 1:
@@ -1700,6 +1735,9 @@ cdef class GpuArray:
         return pygpu_copy(self, to_ga_order(order))
 
     def transfer(self, GpuContext new_ctx):
+        """
+        transfer(new_ctx)
+        """
         cdef GpuArray r
         if not GpuArray_ISONESEGMENT(&self.ga):
             # For now raise an error, may make it work later
@@ -1812,6 +1850,9 @@ cdef class GpuArray:
             free(newdims)
 
     def transpose(self, *params):
+        """
+        transpose(*params)
+        """
         cdef unsigned int *new_axes
         cdef unsigned int i
         if len(params) is 1 and isinstance(params[0], (tuple, list)):
@@ -2006,6 +2047,9 @@ cdef class GpuArray:
         array_setarray(tmp, gv)
 
     def take1(self, GpuArray idx):
+        """
+        take1(idx)
+        """
         cdef GpuArray res
         cdef size_t odim
         if idx.ga.nd != 1:
@@ -2157,9 +2201,7 @@ cdef class GpuArray:
 
 cdef class GpuKernel:
     """
-    .. code-block:: python
-
-        GpuKernel(source, name, types, context=None, cluda=True, have_double=False, have_small=False, have_complex=False, have_half=False)
+    GpuKernel(source, name, types, context=None, cluda=True, have_double=False, have_small=False, have_complex=False, have_half=False, binary=False, cuda=False, opencl=False)
 
     Compile a kernel on the device
 
@@ -2177,7 +2219,6 @@ cdef class GpuKernel:
     :param have_complex: ensure complex types will work?
     :param have_half: ensure half-floats will work?
     :param binary: kernel is pre-compiled binary blob?
-    :param ptx: kernel is PTX code?
     :param cuda: kernel is cuda code?
     :param opencl: kernel is opencl code?
 
@@ -2304,6 +2345,9 @@ cdef class GpuKernel:
             free(_types)
 
     def __call__(self, *args, n=None, gs=None, ls=None, shared=0):
+        """
+        __call__(*args, n=None, gs=None, ls=None, shared=0)
+        """
         if n == None and (ls == None or gs == None):
             raise ValueError, "Must specify size (n) or both gs and ls"
         self.do_call(n, gs, ls, args, shared)

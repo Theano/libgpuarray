@@ -23,9 +23,9 @@ cdef class GpuCommCliqueId:
 
     Parameters
     ----------
-    context: :ref:`GpuContext`, optional
-        Reference to which gpu this `GpuCommCliqueId` object belongs.
-    comm_id: bytes-like, optional
+    context: GpuContext
+        Reference to which gpu this GpuCommCliqueId object belongs.
+    comm_id: bytes
         Existing unique id to be passed in this object.
 
     """
@@ -125,13 +125,13 @@ cdef class GpuComm:
 
     Parameters
     ----------
-    cid: :ref:`GpuCommCliqueId`
+    cid: GpuCommCliqueId
         Unique id shared among participating communicators.
     ndev: int
         Number of communicators inside the clique.
     rank: int
-        User-defined rank of this communicator inside the clique. It influences
-        order of collective operations.
+        User-defined rank of this communicator inside the clique. It
+        influences order of collective operations.
 
     """
     def __dealloc__(self):
@@ -162,17 +162,18 @@ cdef class GpuComm:
 
     def reduce(self, GpuArray src not None, op, GpuArray dest=None,
                int root=-1):
-        """reduce(self, src, op, dest=None, root=-1)
+        """
+        reduce(self, src, op, dest=None, root=-1)
 
         Reduce collective operation for ranks in a communicator world.
 
         Parameters
         ----------
-        src: :ref:`GpuArray`
+        src: GpuArray
             Array to be reduced.
-        op: string
+        op: str
             Key indicating operation type.
-        dest: :ref:`GpuArray`, optional
+        dest: GpuArray
             Array to collecti reduce operation result.
         root: int
             Rank in `GpuComm` which will collect result.
@@ -201,17 +202,18 @@ cdef class GpuComm:
         comm_reduce(self, src, dest, to_reduce_opcode(op), root)
 
     def all_reduce(self, GpuArray src not None, op, GpuArray dest=None):
-        """all_reduce(self, src, op, dest=None)
+        """
+        all_reduce(self, src, op, dest=None)
 
         AllReduce collective operation for ranks in a communicator world.
 
         Parameters
         ----------
-        src: :ref:`GpuArray`
+        src: GpuArray
             Array to be reduced.
-        op: string
+        op: str
             Key indicating operation type.
-        dest: :ref:`GpuArray`, optional
+        dest: GpuArray
             Array to collect reduce operation result.
 
         Notes
@@ -225,17 +227,18 @@ cdef class GpuComm:
         comm_all_reduce(self, src, dest, to_reduce_opcode(op))
 
     def reduce_scatter(self, GpuArray src not None, op, GpuArray dest=None):
-        """reduce_scatter(self, src, op, dest=None)
+        """
+        reduce_scatter(self, src, op, dest=None)
 
         ReduceScatter collective operation for ranks in a communicator world.
 
         Parameters
         ----------
-        src: :ref:`GpuArray`
+        src: GpuArray
             Array to be reduced.
-        op: string
+        op: str
             Key indicating operation type.
-        dest: :ref:`GpuArray`, optional
+        dest: GpuArray
             Array to collect reduce operation scattered result.
 
         Notes
@@ -249,13 +252,14 @@ cdef class GpuComm:
         comm_reduce_scatter(self, src, dest, to_reduce_opcode(op))
 
     def broadcast(self, GpuArray array not None, int root=-1):
-        """broadcast(self, array, root=-1)
+        """
+        broadcast(self, array, root=-1)
 
         Broadcast collective operation for ranks in a communicator world.
 
         Parameters
         ----------
-        array: :ref:`GpuArray`
+        array: GpuArray
             Array to be reduced.
         root: int
             Rank in `GpuComm` which broadcasts its `array`.
@@ -272,20 +276,22 @@ cdef class GpuComm:
 
     def all_gather(self, GpuArray src not None, GpuArray dest=None,
                    unsigned int nd_up=1):
-        """all_gather(self, src, dest=None, nd_up=1)
+        """
+        all_gather(self, src, dest=None, nd_up=1)
 
         AllGather collective operation for ranks in a communicator world.
 
         Parameters
         ----------
-        src: :ref:`GpuArray`
+        src: GpuArray
             Array to be gathered.
-        dest: :ref:`GpuArray`, optional
+        dest: GpuArray
             Array to receive all gathered arrays from ranks in `GpuComm`.
-        nd_up: unsigned int
-            Used when creating result array. Indicates how many extra dimensions
-            user wants result to have. Default is 1, which means that the result
-            will store each rank's gathered array in one extra new dimension.
+        nd_up: int
+            Used when creating result array. Indicates how many extra
+            dimensions user wants result to have. Default is 1, which
+            means that the result will store each rank's gathered
+            array in one extra new dimension.
 
         Notes
         -----

@@ -10,7 +10,7 @@ import numpy
 from .dtypes import dtype_to_ctype, _fill_dtype_registry
 from .gpuarray import GpuArray
 
-_fill_dtype_registry(respect_windows=False)
+_fill_dtype_registry()
 
 
 def as_argument(obj, name):

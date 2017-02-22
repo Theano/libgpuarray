@@ -67,7 +67,7 @@ def register_dtype(dtype, c_names):
         NAME_TO_DTYPE[nm] = dtype
 
 
-def _fill_dtype_registry(respect_windows):
+def _fill_dtype_registry():
     from sys import platform
 
     register_dtype(np.bool, ["ga_bool", "bool"])
@@ -80,28 +80,8 @@ def _fill_dtype_registry(respect_windows):
 
     register_dtype(np.int64, ["ga_long"])
     register_dtype(np.uint64, ["ga_ulong"])
-    is_64_bit = tuple.__itemsize__ * 8 == 64
-    if is_64_bit:
-        if 'win32' in platform and respect_windows:
-            i64_name = "long long"
-        else:
-            i64_name = "long"
-        register_dtype(np.int64, [i64_name, "%s int" % i64_name,
-                                  "signed %s int" % i64_name,
-                                  "%s signed int" % i64_name])
-        register_dtype(np.uint64, ["unsigned %s" % i64_name,
-                                   "unsigned %s int" % i64_name,
-                                   "%s unsigned int" % i64_name])
-
-    # According to this uintp may not have the same hash as uint32:
-    # http://projects.scipy.org/numpy/ticket/2017
-    # Failing tests tell me this is the case for intp too.
-    if is_64_bit:
-        register_dtype(np.intp, ["ga_long"])
-        register_dtype(np.uintp, ["ga_ulong"])
-    else:
-        register_dtype(np.intp, ["ga_int"])
-        register_dtype(np.uintp, ["ga_uint"])
+    register_dtype(np.intp, ["ga_ssize"])
+    register_dtype(np.uintp, ["ga_size"])
 
     register_dtype(np.float32, ["ga_float", "float"])
     register_dtype(np.float64, ["ga_double", "double"])
@@ -111,21 +91,19 @@ def _fill_dtype_registry(respect_windows):
 # {{{ dtype -> ctype
 
 
-def dtype_to_ctype(dtype, with_fp_tex_hack=False):
+def dtype_to_ctype(dtype):
     """
     Return the C type that corresponds to `dtype`.
 
-    :param dtype: a numpy dtype
+    Parameters
+    ----------
+    dtype: data type
+        a numpy dtype
     """
     if dtype is None:
         raise ValueError("dtype may not be None")
 
     dtype = np.dtype(dtype)
-    if with_fp_tex_hack:
-        if dtype == np.float32:
-            return "fp_tex_float"
-        elif dtype == np.float64:
-            return "fp_tex_double"
 
     return gpuarray.dtype_to_ctype(dtype)
 
