@@ -17,9 +17,10 @@ addons:
     packages:
       - cmake
       - cmake-data
+      - doxygen
 
-#before_install:
-#  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew install cmake; fi
+before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew install doxygen; fi
 
 # Build with Debug and Release to flush out build problems
 script:
@@ -32,3 +33,4 @@ script:
   - cd Release
   - cmake .. -DCMAKE_BUILD_TYPE=Release
   - make
+  - cd doc && make html
