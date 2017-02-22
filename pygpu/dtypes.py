@@ -39,16 +39,19 @@ def register_dtype(dtype, c_names):
     """
     Associate a numpy dtype with its C equivalents.
 
-    :param dtype: type to associate
-    :type dtype: numpy.dtype or string
-    :param c_names: list of C type names
-    :type c_names: str or list
-
     Will register `dtype` for use with the gpuarray module.  If the
     c_names argument is a list then the first element of that list is
     taken as the primary association and will be used for generated C
     code.  The other types will be mapped to the provided dtype when
     going in the other direction.
+
+    Parameters
+    ----------
+    dtype: numpy.dtype or string
+        type to associate
+    c_names: str or list
+        list of C type names
+
     """
     if isinstance(c_names, str):
         c_names = [c_names]
