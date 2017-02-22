@@ -78,10 +78,11 @@ def _fill_dtype_registry():
     register_dtype(np.int32, ["ga_int", "int", "signed int"])
     register_dtype(np.uint32, ["ga_uint", "unsigned", "unsigned int"])
 
-    register_dtype(np.int64, ["ga_long"])
-    register_dtype(np.uint64, ["ga_ulong"])
-    register_dtype(np.intp, ["ga_ssize"])
-    register_dtype(np.uintp, ["ga_size"])
+    register_dtype(np.int64, ["ga_long", "long int", "signed long int", "long signed int"])
+    register_dtype(np.uint64, ["ga_ulong", "unsigned long", "unsigned long int", "long unsigned int"])
+
+    register_dtype(np.intp, ["ga_ssize", "ssize_t"])
+    register_dtype(np.uintp, ["ga_size", "size_t"])
 
     register_dtype(np.float32, ["ga_float", "float"])
     register_dtype(np.float64, ["ga_double", "double"])
