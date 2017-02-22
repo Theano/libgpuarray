@@ -18,7 +18,7 @@ COMM_ID_BYTES = GA_COMM_ID_BYTES
 cdef class GpuCommCliqueId:
     """GpuCommCliqueId(context=None, comm_id=None)
 
-    Represents a unique id shared among :ref:`GpuComm` communicators which
+    Represents a unique id shared among :class:`GpuComm` communicators which
     participate in a multi-gpu clique.
 
     Parameters
@@ -102,7 +102,7 @@ cdef class GpuCommCliqueId:
         raise RuntimeError, "Cannot pickle %s object" % self.__class__.__name__
 
     property comm_id:
-        "Unique clique id to be used by each :ref:`GpuComm` in a group of devices"
+        "Unique clique id to be used by each :class:`GpuComm` in a group of devices"
         def __get__(self):
             cdef bytearray res
             res = self.c_comm_id.internal[:GA_COMM_ID_BYTES]
@@ -174,16 +174,16 @@ cdef class GpuComm:
         op: str
             Key indicating operation type.
         dest: GpuArray
-            Array to collecti reduce operation result.
+            Array to collect reduce operation result.
         root: int
-            Rank in `GpuComm` which will collect result.
+            Rank in GpuComm which will collect result.
 
         Notes
         -----
         * `root` is necessary when invoking from a non-root rank. Root
           caller does not need to provide `root` argument.
         * Not providing `dest` argument for a root caller will result
-          in creating a new compatible :ref:`GpuArray` and returning
+          in creating a new compatible :class:`GpuArray` and returning
           result in it.
 
         """
@@ -219,7 +219,7 @@ cdef class GpuComm:
         Notes
         -----
         * Not providing `dest` argument for a caller will result in creating
-          a new compatible :ref:`GpuArray` and returning result in it.
+          a new compatible :class:`GpuArray` and returning result in it.
 
         """
         if dest is None:
@@ -244,7 +244,7 @@ cdef class GpuComm:
         Notes
         -----
         * Not providing `dest` argument for a caller will result in creating
-          a new compatible :ref:`GpuArray` and returning result in it.
+          a new compatible :class:`GpuArray` and returning result in it.
 
         """
         if dest is None:
