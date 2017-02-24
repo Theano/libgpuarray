@@ -102,9 +102,7 @@ string(REPLACE "." ";" GPUARRAY_ABI_VERSION_NUMBERS ${GPUARRAY_ABI_VERSION})
 list(GET GPUARRAY_ABI_VERSION_NUMBERS 0 GPUARRAY_ABI_VERSION_MAJOR)
 list(GET GPUARRAY_ABI_VERSION_NUMBERS 1 GPUARRAY_ABI_VERSION_MINOR)
 math(EXPR GPUARRAY_ABI_NUMBER "1000*${GPUARRAY_ABI_VERSION_MAJOR} + ${GPUARRAY_ABI_VERSION_MINOR}")
-FILE(WRITE gpuarray/abi_version.h
-"\#ifndef GPUARRAY_ABI_VERSION\n\#define GPUARRAY_ABI_VERSION ${GPUARRAY_ABI_NUMBER}\n\#endif\n"
-)
+configure_file(gpuarray/abi_version.h.in gpuarray/abi_version.h @ONLY)
 
 # set SOVERSION and ensure it is the first part of VERSION.
 set_property(TARGET gpuarray PROPERTY SOVERSION ${GPUARRAY_ABI_VERSION_MAJOR})
@@ -116,7 +114,7 @@ set(headers
   gpuarray/buffer.h
   gpuarray/buffer_blas.h
   gpuarray/buffer_collectives.h
-  gpuarray/abi_version.h
+  ${CMAKE_CURRENT_BINARY_DIR}/gpuarray/abi_version.h
   gpuarray/config.h
   gpuarray/elemwise.h
   gpuarray/error.h
