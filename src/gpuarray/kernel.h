@@ -102,7 +102,7 @@ GPUARRAY_PUBLIC int GpuKernel_sched(GpuKernel *k, size_t n,
  * \param n dimensionality of the grid/blocks
  * \param gs sizes of launch grid
  * \param ls sizes of launch blocks
- * \param shared of dynamic shared memory to allocate
+ * \param shared amount of dynamic shared memory to allocate
  * \param args table of pointers to arguments
  */
 GPUARRAY_PUBLIC int GpuKernel_call(GpuKernel *k, unsigned int n,
