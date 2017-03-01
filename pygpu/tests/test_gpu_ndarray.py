@@ -273,7 +273,7 @@ def test_empty_no_params():
 
 
 def test_mapping_getitem_ellipsis():
-    for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
+    for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             for offseted in [True, False]:
                 yield mapping_getitem_ellipsis, shp, dtype, offseted
@@ -287,6 +287,27 @@ def mapping_getitem_ellipsis(shp, dtype, offseted):
     assert b.shape == a.shape
     b_cpu = numpy.asarray(b)
     assert numpy.allclose(a, b_cpu)
+
+
+def test_getitem_none():
+    for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
+        yield getitem_none, shp
+
+
+def getitem_none(shp):
+    a, a_gpu = gen_gpuarray(shp, ctx=ctx)
+
+    assert numpy.allclose(a_gpu[..., None], a[..., None])
+
+    for _ in range(5):
+        # Choose something to slice with, always works
+        indcs = tuple(numpy.random.choice([0, slice(None), slice(1, None)],
+                                          size=len(shp)))
+        indcs = indcs[:1] + (None,) + indcs[1:]
+        assert numpy.allclose(a_gpu[indcs], a[indcs])
+
+    if shp:
+        assert numpy.allclose(a_gpu[1:, None], a[1:, None])
 
 
 def test_mapping_setitem_ellipsis():
