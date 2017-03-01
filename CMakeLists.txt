@@ -7,7 +7,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMakeModules/")
 # -Wall is unbelieveably noisy with Visual Studio:
 # http://stackoverflow.com/q/4001736/3257826
 if(MSVC)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -W4 -D_CRT_SECURE_NO_WARNINGS")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -W3 -D_CRT_SECURE_NO_WARNINGS")
 else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 endif()
