@@ -1,6 +1,13 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <errno.h>
 #include <stdarg.h>
+#ifdef _MSC_VER
+#include <io.h>
+#define read _read
+#define write _write
+#else
 #include <unistd.h>
+#endif
 
 #include "util/strb.h"
 

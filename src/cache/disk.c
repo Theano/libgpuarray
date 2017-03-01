@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -11,7 +12,10 @@
 #include <Windows.h>
 
 #include <process.h>
+#include <direct.h>
 #include <io.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 struct timezone;
 
@@ -43,13 +47,22 @@ static int gettimeofday(struct timeval *tp, struct timezone *tzp) {
   return 0;
 }
 
+#define open _open
+#define unlink _unlink
+#define mkdir(p, f) _mkdir(p)
+#define close _close
+#define strdup _strdup
+#define lstat _stat64
+#define fstat _fstat64
+#define stat __stat64
+
 #else
 #define PATH_MAX 1024
 #include <unistd.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #endif
 
-#include <sys/stat.h>
 
 #include "cache.h"
 #include "util/skein.h"

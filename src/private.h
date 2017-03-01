@@ -26,9 +26,9 @@ extern "C" {
 }
 #endif
 
-#define ADDR32_MAX   4294967295
-#define SADDR32_MIN -2147483648
-#define SADDR32_MAX  2147483647
+#define ADDR32_MAX   4294967295L
+#define SADDR32_MIN -2147483648L
+#define SADDR32_MAX  2147483647L
 
 struct _gpuarray_buffer_ops;
 typedef struct _gpuarray_buffer_ops gpuarray_buffer_ops;

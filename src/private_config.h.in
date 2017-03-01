@@ -22,9 +22,7 @@ extern "C" {
 #ifdef _MSC_VER
 /* God damn Microsoft ... */
 #define snprintf _snprintf
-#endif
-
-#ifdef _MSC_VER
+#define strdup _strdup
 /* MS VC++ 2008 does not support inline */
 #define inline __inline
 #define alloca _alloca

@@ -10,7 +10,7 @@ int gpublas_setup(gpucontext *ctx) {
 
 void gpublas_teardown(gpucontext *ctx) {
   if (ctx->blas_ops != NULL)
-    return ctx->blas_ops->teardown(ctx);
+    ctx->blas_ops->teardown(ctx);
 }
 
 const char *gpublas_error(gpucontext *ctx) {

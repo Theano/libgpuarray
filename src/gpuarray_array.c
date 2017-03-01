@@ -83,7 +83,7 @@ static int ga_extcopy(GpuArray *dst, const GpuArray *src) {
 }
 
 /* Value below which a size_t multiplication will never overflow. */
-#define MUL_NO_OVERFLOW (1UL << (sizeof(size_t) * 4))
+#define MUL_NO_OVERFLOW (1ULL << (sizeof(size_t) * 4))
 
 void GpuArray_fix_flags(GpuArray *a) {
   /* Only keep the writable flag */
@@ -330,9 +330,9 @@ static int gen_take1_kernel(GpuKernel *k, gpucontext *ctx, char **err_str,
                             const GpuArray *ind, int addr32) {
   strb sb = STRB_STATIC_INIT;
   int *atypes;
-  size_t nargs, apos;
   char *sz, *ssz;
   unsigned int i, i2;
+  unsigned int nargs, apos;
   int flags = GA_USE_CLUDA;
   int res;
 
@@ -432,9 +432,9 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
 #if DEBUG
   char *errstr = NULL;
 #endif
-  size_t argp;
   GpuKernel k;
   unsigned int j;
+  unsigned int argp;
   int err, kerr = 0;
   int addr32 = 0;
 
