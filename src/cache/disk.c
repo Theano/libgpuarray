@@ -1,13 +1,57 @@
-#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <stdlib.h>
+
+#include "private_config.h"
+
+#ifdef _WIN32
+#define PATH_MAX 255
+
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+
+#include <process.h>
+#include <io.h>
+
+struct timezone;
+
+struct timeval {
+  long tv_sec;
+  long tv_usec;
+} timeval;
+
+static int gettimeofday(struct timeval *tp, struct timezone *tzp) {
+  /*
+   * Note: some broken versions only have 8 trailing zero's, the
+   * correct epoch has 9 trailing zero's This magic number is the
+   * number of 100 nanosecond intervals since January 1, 1601 (UTC)
+   * until 00:00:00 January 1, 1970
+   */
+  static const uint64_t EPOCH = ((uint64_t)116444736000000000ULL);
+
+  SYSTEMTIME system_time;
+  FILETIME file_time;
+  uint64_t time;
+
+  GetSystemTime(&system_time);
+  SystemTimeToFileTime(&system_time, &file_time);
+  time = ((uint64_t)file_time.dwLowDateTime);
+  time += ((uint64_t)file_time.dwHighDateTime) << 32;
+
+  tp->tv_sec = (long)((time - EPOCH) / 10000000L);
+  tp->tv_usec = (long)(system_time.wMilliseconds * 1000);
+  return 0;
+}
+
+#else
+#define PATH_MAX 1024
+#include <unistd.h>
 #include <sys/time.h>
+#endif
+
 #include <sys/stat.h>
 
 #include "cache.h"
-#include "private_config.h"
 #include "util/skein.h"
 
 #define HEXP_LEN (128 + 2)
@@ -19,7 +63,7 @@ typedef struct _disk_cache {
   vwrite_fn vwrite;
   kread_fn kread;
   vread_fn vread;
-  int dirfd;
+  const char *dirp;
 } disk_cache;
 
 
@@ -31,72 +75,112 @@ static unsigned long long ntohull(const char *in) {
 }
 
 static void htonull(unsigned long long in, char *out) {
-  out[0] = in >> 56;
-  out[1] = in >> 48;
-  out[2] = in >> 40;
-  out[3] = in >> 32;
-  out[4] = in >> 24;
-  out[5] = in >> 16;
-  out[6] = in >> 8;
-  out[7] = in;
+  out[0] = (char)(in >> 56);
+  out[1] = (char)(in >> 48);
+  out[2] = (char)(in >> 40);
+  out[3] = (char)(in >> 32);
+  out[4] = (char)(in >> 24);
+  out[5] = (char)(in >> 16);
+  out[6] = (char)(in >> 8);
+  out[7] = (char)(in);
 }
 
-static int mkstempat(int dfd, char *template) {
-  static const char letters[] =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  size_t length;
-  char *XXXXXX;
-  struct timeval tv;
-  unsigned long long  randnum, working;
-  int i, tries, fd;
-
-  length = strlen(template);
-  if (length < 6) {
-    errno = EINVAL;
+static int catp(char *path, const char *dirp, const char *rpath) {
+  if (strlcpy(path, dirp, PATH_MAX) >= PATH_MAX) {
+    errno = ENAMETOOLONG;
     return -1;
   }
-  XXXXXX = template + length - 6;
-  if (strcmp(XXXXXX, "XXXXXX") != 0) {
-    errno = EINVAL;
+  if (strlcat(path, rpath, PATH_MAX) >= PATH_MAX) {
+    errno = ENAMETOOLONG;
     return -1;
   }
+  return 0;
+}
 
-  /* This is kind of crappy, but the point is to not step on each
-     other's feet */
-  gettimeofday(&tv, NULL);
-  randnum = ((unsigned long long) tv.tv_usec << 16) ^ tv.tv_sec ^ getpid();
+static int openp(const char *dirp, const char *rpath, int flags, int mode) {
+  char path[PATH_MAX];
 
-  for (tries = 0; tries < TMP_MAX; tries++) {
-    for (working = randnum, i = 0; i < 6; i++) {
-      XXXXXX[i] = letters[working % 62];
-      working /= 62;
-    }
-    fd = openat(dfd, template, O_RDWR | O_CREAT | O_EXCL, 0600);
-    if (fd >= 0 || (errno != EEXIST && errno != EISDIR))
-      return fd;
+  if (catp(path, dirp, rpath))
+    return -1;
 
-    randnum += (tv.tv_usec >> 10) & 0xfff;
-  }
-  errno = EEXIST;
-  return -1;
+  return open(path, flags, mode);
+}
+
+static int mkstempp(const char *dirp, char *template) {
+  char path[PATH_MAX];
+  int res;
+
+  if (catp(path, dirp, template))
+    return -1;
+
+  res = mkstemp(path);
+
+  /* We need to copy the result path back */
+  if (res == 0)
+    memcpy(template, &path[strlen(dirp)], strlen(template));
+
+  return res;
+}
+
+static int unlinkp(const char *dirp, const char *rpath) {
+  char path[PATH_MAX];
+
+  if (catp(path, dirp, rpath))
+    return -1;
+
+  return unlink(path);
+}
+
+static int renamep(const char *dirp, const char *ropath, const char *rnpath) {
+  char opath[PATH_MAX];
+  char npath[PATH_MAX];
+
+  if (catp(opath, dirp, ropath))
+    return -1;
+  if (catp(npath, dirp, rnpath))
+    return -1;
+
+  return rename(opath, npath);
 }
 
 /* Ensure that a path exists by creating all intermediate directories */
-static int ensureat(int dfd, char *path) {
-  char *curp;
-  char *pos;
+int ensurep(const char *dirp, const char *rpath) {
+  char path[PATH_MAX];
+  char *pp;
+  char sep;
 
-  curp = path;
+  if (dirp == NULL) {
+    if (strlcpy(path, rpath, PATH_MAX) >= PATH_MAX) {
+      errno = ENAMETOOLONG;
+      return -1;
+    }
+#ifdef _WIN32
+    /* Skip root dir (windows) */
+    pp = strchr(path, '\\');
+    if (pp)
+      while (*pp == '\\') pp++;
+    else
+      pp = path;
+#else
+    pp = path;
+    /* Skip root dir (unix) */
+    while (*pp == '/') pp++;
+#endif
+  } else {
+    if (catp(path, dirp, rpath))
+      return -1;
 
-  while ((pos = strchr(curp, '/')) != NULL) {
-    *pos = '\0';
-    if (mkdirat(dfd, path, 0777)) {
+    pp = path + strlen(dirp);
+  }
+  while ((pp = strpbrk(pp + 1, "\\/")) != NULL) {
+    sep = *pp;
+    *pp = '\0';
+    if (mkdir(path, 0777)) {
       if (errno != EEXIST) return -1;
       /* For now we suppose that EEXIST means that the directory is
-       * already there.*/
+       * already there. */
     }
-    curp = pos + 1;
-    *pos = '/';
+    *pp = sep;
   }
 
   return 0;
@@ -130,7 +214,7 @@ static int write_entry(disk_cache *c, const cache_key_t k,
 
   if (key_path(c, k, hexp)) return -1;
 
-  if (ensureat(c->dirfd, hexp)) return -1;
+  if (ensurep(c->dirp, hexp)) return -1;
 
   if (strb_ensure(&b, 16)) return -1;
   b.l = 16;
@@ -145,7 +229,7 @@ static int write_entry(disk_cache *c, const cache_key_t k,
     return -1;
   }
 
-  fd = mkstempat(c->dirfd, tmp_path);
+  fd = mkstempp(c->dirp, tmp_path);
   if (fd == -1) {
     strb_clear(&b);
     return -1;
@@ -155,13 +239,18 @@ static int write_entry(disk_cache *c, const cache_key_t k,
   strb_clear(&b);
   close(fd);
   if (err) {
-    unlinkat(c->dirfd, tmp_path, 0);
+    unlinkp(c->dirp, tmp_path);
     return -1;
   }
 
-  if (renameat(c->dirfd, tmp_path, c->dirfd, hexp)) {
-    unlinkat(c->dirfd, tmp_path, 0);
+  if (renamep(c->dirp, tmp_path, hexp)) {
+    unlinkp(c->dirp, tmp_path);
+#ifdef _WIN32
+    /* On windows we can't rename over an existing file */
+    return (errno != EACCES) ? -1 : 0;
+#else
     return -1;
+#endif
   }
 
   return 0;
@@ -179,7 +268,7 @@ static int find_entry(disk_cache *c, const cache_key_t key,
 
   if (key_path(c, key, hexp)) return 0;
 
-  fd = openat(c->dirfd, hexp, O_RDONLY);
+  fd = openp(c->dirp, hexp, O_RDONLY, 0);
 
   if (fd == -1) return 0;
 
@@ -255,7 +344,7 @@ static int disk_del(cache *_c, const cache_key_t key) {
 
   key_path(c, key, hexp);
 
-  return (unlinkat(c->dirfd, hexp, 0) == 0);
+  return (unlinkp(c->dirp, hexp) == 0);
 }
 
 static cache_value_t disk_get(cache *_c, const cache_key_t key) {
@@ -277,7 +366,7 @@ static cache_value_t disk_get(cache *_c, const cache_key_t key) {
 static void disk_destroy(cache *_c) {
   disk_cache *c = (disk_cache *)_c;
   cache_destroy(c->mem);
-  close(c->dirfd);
+  free((void *)c->dirp);
 }
 
 cache *cache_disk(const char *dirpath, cache *mem,
@@ -289,11 +378,10 @@ cache *cache_disk(const char *dirpath, cache *mem,
 
   if (dirp == NULL) return NULL;
 
-  if (ensureat(AT_FDCWD, dirp) != 0) {
+  if (ensurep(NULL, dirp) != 0) {
     free(dirp);
     return NULL;
   }
-  free(dirp);
 
   mkdir(dirpath, 0777); /* This may fail, but it's ok */
 
@@ -307,12 +395,7 @@ cache *cache_disk(const char *dirpath, cache *mem,
   if (res == NULL)
     return NULL;
 
-  res->dirfd = open(dirpath, O_RDONLY|O_CLOEXEC);
-  if (res->dirfd == -1) {
-    free(res);
-    return NULL;
-  }
-
+  res->dirp = dirp;
   res->mem = mem;
   res->kwrite = kwrite;
   res->vwrite = vwrite;
