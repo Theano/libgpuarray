@@ -1836,7 +1836,83 @@ cdef class GpuArray:
             raise TypeError, "len() of unsized object"
 
     def __getitem__(self, key):
-        return self.__cgetitem__(key)
+        cdef unsigned int i
+
+        if key is Ellipsis:
+            return self.__cgetitem__(key)
+
+        # A list or a sequence of list should trigger "fancy" indexing.
+        # This is not implemented yet.
+        # Conversely, if a list contains slice or Ellipsis objects, it behaves
+        # the same as a tuple.
+        if isinstance(key, list):
+            if any(isinstance(k, slice) or k is Ellipsis for k in key):
+                return self.__getitem__(tuple(key))
+            else:
+                raise NotImplementedError, "fancy indexing not supported"
+
+        try:
+            iter(key)
+        except TypeError:
+            key = (key,)
+        else:
+            if all(isinstance(k, list) for k in key):
+                raise NotImplementedError, "fancy indexing not supported"
+
+            key = tuple(key)
+
+        # Need to massage Ellipsis here, to avoid packing it into a tuple.
+        if key.count(Ellipsis) > 1:
+            raise IndexError, "cannot use more than one Ellipsis"
+
+        # The following code replaces an Ellipsis found in the key by
+        # the corresponding number of slice(None) objects, depending on the
+        # number of dimensions.  As example, this allows indexing on the last
+        # dimension with a[..., 1:] on any array (including 1-dim).  This
+        # is also required for numpy compat.
+        try:
+            ell_idx = key.index(Ellipsis)
+        except ValueError:
+            pass
+        else:
+            # Need number of axes minus missing dimensions extra slice(None)
+            # objects, not counting None entries and the Ellipsis itself
+            num_slcs = self.ga.nd - (len(key) - key.count(None) - 1)
+            fill_slices = (slice(None),) * num_slcs
+            key = key[:ell_idx] + fill_slices + key[ell_idx + 1:]
+
+        # Remove the None entries for indexing
+        getitem_idcs = tuple(k for k in key if k is not None)
+
+        # For less than 1 index, fill up with slice(None) to the right.
+        # This allows indexing a[1:] in multi-dimensional arrays, where the
+        # slice is applied along the first axis only. It also allows
+        # a[()], which simply is a view in Numpy.
+        if len(getitem_idcs) <= 1:
+            getitem_idcs = (getitem_idcs +
+                            (slice(None),) * (self.ga.nd - len(getitem_idcs)))
+
+        # Slice into array, then reshape, accommodating for None entries in key
+        sliced = self.__cgetitem__(getitem_idcs)
+        if key.count(None) == 0:
+            # Avoid unnecessary reshaping if there was no None
+            return sliced
+        else:
+            new_shape = []
+            i = 0
+            if sliced.shape:
+                for k in key:
+                    if isinstance(k, int):
+                        continue
+                    elif k is None:
+                        new_shape.append(1)
+                    else:
+                        new_shape.append(sliced.shape[i])
+                        i += 1
+            # Add remaining entries from sliced.shape if existing (happens
+            # for 1 index or less if ndim >= 2).
+            new_shape.extend(sliced.shape[i:])
+            return sliced.reshape(new_shape)
 
     cdef __cgetitem__(self, key):
         cdef ssize_t *starts
@@ -1896,16 +1972,37 @@ cdef class GpuArray:
                 steps[i] = 1
 
             return pygpu_index(self, starts, stops, steps)
+
         finally:
             free(starts)
             free(stops)
             free(steps)
 
     def __setitem__(self, idx, v):
-        cdef GpuArray tmp = self.__cgetitem__(idx)
-        cdef GpuArray gv = carray(v, self.ga.typecode, False, 'A', 0,
-                                  self.context, GpuArray)
+        cdef GpuArray tmp, gv
 
+        if isinstance(idx, list):
+            if any(isinstance(i, slice) or i is Ellipsis for i in idx):
+                self.__setitem__(tuple(idx), v)
+            else:
+                raise NotImplementedError, "fancy indexing not supported"
+        try:
+            iter(idx)
+        except TypeError:
+            idx = (idx,)
+        else:
+            if all(isinstance(i, list) for i in idx):
+                raise NotImplementedError, "fancy indexing not supported"
+
+            idx = tuple(idx)
+
+        if idx.count(Ellipsis) > 1:
+            raise IndexError, "cannot use more than one Ellipsis"
+
+        # Remove None entries, they should be ignored (as in Numpy)
+        idx = tuple(i for i in idx if i is not None)
+        tmp = self.__cgetitem__(idx)
+        gv = carray(v, self.ga.typecode, False, 'A', 0, self.context, GpuArray)
         array_setarray(tmp, gv)
 
     def take1(self, GpuArray idx):

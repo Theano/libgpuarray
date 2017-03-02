@@ -273,7 +273,7 @@ def test_empty_no_params():
 
 
 def test_mapping_getitem_ellipsis():
-    for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
+    for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             for offseted in [True, False]:
                 yield mapping_getitem_ellipsis, shp, dtype, offseted
@@ -289,12 +289,35 @@ def mapping_getitem_ellipsis(shp, dtype, offseted):
     assert numpy.allclose(a, b_cpu)
 
 
-def test_mapping_setitem_ellipsis():
+def test_getitem_none():
+    for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
+        yield getitem_none, shp
+
+
+def getitem_none(shp):
+    a, a_gpu = gen_gpuarray(shp, ctx=ctx)
+
+    assert numpy.allclose(a_gpu[..., None], a[..., None])
+
+    for _ in range(5):
+        # Choose something to slice with, always works
+        indcs = tuple(numpy.random.choice([0, slice(None), slice(1, None)],
+                                          size=len(shp)))
+        indcs = indcs[:1] + (None,) + indcs[1:]
+        assert numpy.allclose(a_gpu[indcs], a[indcs])
+
+    if shp:
+        assert numpy.allclose(a_gpu[1:, None], a[1:, None])
+
+
+def test_mapping_setitem():
     for shp in [(9,), (8, 9), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
             for offseted in [True, False]:
                 yield mapping_setitem_ellipsis, shp, dtype, offseted
                 yield mapping_setitem_ellipsis2, shp, dtype, offseted
+                yield mapping_setitem_firstaxis, shp, dtype, offseted
+
 
 @guard_devsup
 def mapping_setitem_ellipsis(shp, dtype, offseted):
@@ -303,13 +326,24 @@ def mapping_setitem_ellipsis(shp, dtype, offseted):
     a_gpu[...] = 2
     assert numpy.allclose(a, numpy.asarray(a_gpu))
 
+
 @guard_devsup
 def mapping_setitem_ellipsis2(shp, dtype, offseted):
     a, a_gpu = gen_gpuarray(shp, dtype, offseted, ctx=ctx)
     b, b_gpu = gen_gpuarray(shp[1:], dtype, False, ctx=ctx)
     a[:] = b
     a_gpu[:] = b_gpu
-    assert numpy.allclose(a, numpy.asarray(b_gpu))
+    assert numpy.allclose(a, numpy.asarray(a_gpu))
+
+
+@guard_devsup
+def mapping_setitem_firstaxis(shp, dtype, offseted):
+    a, a_gpu = gen_gpuarray(shp, dtype, offseted, ctx=ctx)
+    b, b_gpu = gen_gpuarray(shp[1:], dtype, False, ctx=ctx)
+    a[0] = b
+    a_gpu[0] = b_gpu
+    assert numpy.allclose(a, numpy.asarray(a_gpu))
+
 
 class WriteReadTest(unittest.TestCase):
     def setUp(self):
