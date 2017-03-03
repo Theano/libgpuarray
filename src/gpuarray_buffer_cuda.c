@@ -1076,6 +1076,8 @@ static int call_compiler(cuda_context *ctx, strb *src, strb *ptx, strb *log) {
     , "-G", "-lineinfo"
   };
   nvrtcResult err;
+  // DEBUG: print the kernel source
+  // printf("%s\n", src);
 
   opts[1] = ctx->bin_id;
 
