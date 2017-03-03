@@ -18,6 +18,8 @@ requirements:
         - mako >=0.7
         - numpy
         - libgpuarray ==0.6.1
+        # Avoid mkl download during build phase
+        - nomkl # [not win]
 
     run:
         - python
@@ -30,6 +32,9 @@ requirements:
 test:
     imports:
         - pygpu
+    requires:
+        # Avoid mkl download during testing
+        - nomkl # [not win]
 
 about:
     home: https://github.com/Theano/libgpuarray
