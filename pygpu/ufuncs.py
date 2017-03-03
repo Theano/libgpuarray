@@ -151,10 +151,34 @@ def prod(a, axis=None, dtype=None, out=None, keepdims=False):
     --------
     numpy.prod
     """
+    # Do what Numpy does with booleans, sensible or not
+    if a.dtype == bool and dtype is None:
+        dtype = int
     return reduce_with_op(a, '*', 1, axis, dtype, out, keepdims)
 
 
+def all(a, axis=None, out=None, keepdims=False):
+    """Test whether all array elements along a given axis evaluate to True.
+
+    See Also
+    --------
+    numpy.all
+    """
+    return reduce_with_op(a, '&&', 1, axis, numpy.bool, out, keepdims)
+
+
+def any(a, axis=None, out=None, keepdims=False):
+    """Test whether all array elements along a given axis evaluate to True.
+
+    See Also
+    --------
+    numpy.all
+    """
+    return reduce_with_op(a, '||', 0, axis, numpy.bool, out, keepdims)
+
+
 # --- Reductions with comparison operators --- #
+
 
 def reduce_with_cmp(a, cmp, neutral, axis=None, out=None, keepdims=False):
     """Reduce ``a`` by comparison using ``cmp``.
@@ -385,6 +409,7 @@ def ufunc_dtypes(ufunc_name, dtypes_in):
     >>> ufunc_dtypes('power', [numpy.dtype('int8'), numpy.dtype('float32')])
     ((dtype('float32'), dtype('float32')), (dtype('float32'),))
     """
+    from builtins import all, any
     npy_ufunc = getattr(numpy, ufunc_name)
     supported_dtypes = set(NAME_TO_DTYPE.values())
 
@@ -653,6 +678,7 @@ def binary_ufunc(a, b, ufunc_name, out=None):
     --------
     pygpu.gpuarray.set_default_context
     """
+    from builtins import any
     # Get a context and an array class to work with
     need_context = True
     for ary in (a, b, out):
