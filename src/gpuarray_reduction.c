@@ -23,6 +23,10 @@
 
 /* Defines */
 #define  MAX_HW_DIMS                   3
+#define  KERNEL_PRIMARY                0
+#define  KERNEL_AUXILIARY              1
+#define  AXIS_FREE                     0
+#define  AXIS_REDUX                    1
 
 
 
@@ -185,7 +189,8 @@ struct redux_ctx{
 	const int*      reduxList;
 
 	/* General. */
-	int*            axisList;
+	int*            srcAxisList;
+	int*            dstAxisList;
 	gpucontext*     gpuCtx;
 
 	/* Source code Generator. */
@@ -203,21 +208,40 @@ struct redux_ctx{
 	int             ndd;
 	int             ndr;
 	int             nds;
-	int             ndh;
-	int             ndhd;
-	int             ndhr;
 	int             largeCodeModel;
 	strb            s;
 	char*           sourceCode;
+	size_t          sourceCodeLen;
+	char*           errorString0;
+	char*           errorString1;
+	char*           errorString2;
 	GpuKernel       preKernel;
 	GpuKernel       kernel;
 	GpuKernel       postKernel;
 
-	/* Scheduler */
-	int             hwAxisList[MAX_HW_DIMS];
-	size_t          blockSize [MAX_HW_DIMS];
-	size_t          gridSize  [MAX_HW_DIMS];
-	size_t          chunkSize [MAX_HW_DIMS];
+	/**
+	 * Scheduler
+	 *
+	 * There are two sets of kernels that may be scheduled:
+	 *   1) The reduction kernel. This is the only kernel scheduled in the
+	 *      large code model.
+	 *   2) The initialization and post-scalar kernels. These are scheduled
+	 *      only in the small code model.
+	 *
+	 * The reduction kernel is the "primary" kernel. The other two, if needed,
+	 * are referred to as "auxiliary" kernels.
+	 */
+
+	struct{
+		int         ndh;
+		int         ndhd;
+		int         ndhr;
+		int         axisList   [MAX_HW_DIMS];
+		size_t      bs         [MAX_HW_DIMS];
+		size_t      gs         [MAX_HW_DIMS];
+		size_t      cs         [MAX_HW_DIMS];
+		gpudata*    chunkSizeGD;
+	} pri, aux;
 
 	/* Invoker */
 	gpudata*        srcStepsGD;
@@ -257,8 +281,12 @@ static int   reduxHasDst                   (redux_ctx*  ctx);
 static int   reduxHasDstArg                (redux_ctx*  ctx);
 static int   reduxKernelRequiresDst        (redux_ctx*  ctx);
 static int   reduxKernelRequiresDstArg     (redux_ctx*  ctx);
-static int   reduxCanAppendHwAxis          (redux_ctx* ctx, int wantReductionAxis);
-static void  reduxAppendLargestAxisToHwList(redux_ctx* ctx, int wantReductionAxis);
+static int   reduxCanAppendHwAxis          (redux_ctx* ctx,
+                                            int        kernelType,
+                                            int        axisType);
+static void  reduxAppendLargestAxisToHwList(redux_ctx* ctx,
+                                            int        kernelType,
+                                            int        axisType);
 static int   reduxSelectHwAxes             (redux_ctx*  ctx);
 static int   reduxComputeAxisList          (redux_ctx*  ctx);
 static int   reduxGenSource                (redux_ctx*  ctx);
@@ -280,10 +308,19 @@ static void  reduxAppendLoopMacroDefs      (redux_ctx*  ctx);
 static void  reduxAppendLoopOuter          (redux_ctx*  ctx);
 static void  reduxAppendLoopInner          (redux_ctx*  ctx);
 static void  reduxAppendLoopMacroUndefs    (redux_ctx*  ctx);
-static int   reduxCompileLarge             (redux_ctx*  ctx);
-static int   reduxCompileSmall             (redux_ctx*  ctx);
-static int   reduxScheduleLarge            (redux_ctx*  ctx);
-static int   reduxInvokeLarge              (redux_ctx*  ctx);
+static int   reduxCompile                  (redux_ctx*  ctx);
+static int   reduxSchedule                 (redux_ctx*  ctx);
+static void  reduxScheduleKernel           (int         ndims,
+                                            uint64_t*   dims,
+                                            uint64_t    warpSize,
+                                            uint64_t    maxLg,
+                                            uint64_t*   maxLs,
+                                            uint64_t    maxGg,
+                                            uint64_t*   maxGs,
+                                            uint64_t*   bs,
+                                            uint64_t*   gs,
+                                            uint64_t*   cs);
+static int   reduxInvoke                   (redux_ctx*  ctx);
 static int   reduxCleanup                  (redux_ctx*  ctx, int ret);
 
 
@@ -749,27 +786,33 @@ static int   reduxCheckargs                (redux_ctx*  ctx){
 	 * We initialize certain parts of the context.
 	 */
 
-	ctx->axisList      = NULL;
+	ctx->srcAxisList   = NULL;
+	ctx->dstAxisList   = NULL;
 	ctx->gpuCtx        = NULL;
 
 	ctx->srcTypeStr    = ctx->dstTypeStr    = ctx->dstArgTypeStr =
 	ctx->accTypeStr    = ctx->idxTypeStr    = NULL;
 	ctx->initVal       = NULL;
-	ctx->ndh           = 0;
-	ctx->ndhd          = 0;
-	ctx->ndhr          = 0;
+	ctx->pri.ndh       = ctx->aux.ndh  = 0;
+	ctx->pri.ndhd      = ctx->aux.ndhd = 0;
+	ctx->pri.ndhr      = ctx->aux.ndhr = 0;
 	ctx->sourceCode    = NULL;
+	ctx->sourceCodeLen = 0;
+	ctx->errorString0  = NULL;
+	ctx->errorString1  = NULL;
+	ctx->errorString2  = NULL;
 	strb_init(&ctx->s);
 
 	for (i=0;i<MAX_HW_DIMS;i++){
-		ctx->hwAxisList[i] = 0;
-		ctx->blockSize [i] = 1;
-		ctx->gridSize  [i] = 1;
-		ctx->chunkSize [i] = 1;
+		ctx->aux.axisList[i] = ctx->pri.axisList[i] = 0;
+		ctx->aux.bs      [i] = ctx->pri.bs      [i] = 1;
+		ctx->aux.gs      [i] = ctx->pri.gs      [i] = 1;
+		ctx->aux.cs      [i] = ctx->pri.cs      [i] = 1;
 	}
 
-	ctx->srcStepsGD = ctx->srcSizeGD     = ctx->chunkSizeGD   =
-	ctx->dstStepsGD = ctx->dstArgStepsGD = NULL;
+	ctx->srcStepsGD      = ctx->srcSizeGD       =
+	ctx->dstStepsGD      = ctx->dstArgStepsGD   =
+	ctx->pri.chunkSizeGD = ctx->aux.chunkSizeGD = NULL;
 	/* *** IT IS NOW SAFE TO CALL reduxCleanup() *** */
 
 
@@ -1054,75 +1097,108 @@ static int   reduxKernelRequiresDstArg     (redux_ctx*  ctx){
 }
 
 /**
- * @brief Check whether we can add another reduction axis
- *        (wantReductionAxis=1) or destination axis (wantReductionAxis=0) to
- *        the hardware axis list.
+ * @brief Check whether we can add another reduction axis or free axis
+ *        to the hardware axis list for either the primary or secondary kernel.
  */
 
-static int   reduxCanAppendHwAxis          (redux_ctx* ctx, int wantReductionAxis){
-	if (ctx->ndh >= MAX_HW_DIMS){
+static int   reduxCanAppendHwAxis          (redux_ctx* ctx,
+                                            int        kernelType,
+                                            int        axisType){
+	int kernelNdh  = kernelType == KERNEL_PRIMARY ? ctx->pri.ndh  : ctx->aux.ndh;
+	int kernelNdhr = kernelType == KERNEL_PRIMARY ? ctx->pri.ndhr : ctx->aux.ndhr;
+	int kernelNdhd = kernelType == KERNEL_PRIMARY ? ctx->pri.ndhd : ctx->aux.ndhd;
+	
+	if(kernelNdh >= MAX_HW_DIMS){
 		return 0;
 	}else{
-		return wantReductionAxis ? ctx->ndhr < ctx->ndr:
-		                           ctx->ndhd < ctx->ndd;
+		return axisType == AXIS_REDUX ? kernelNdhr < ctx->ndr:
+		                                kernelNdhd < ctx->ndd;
 	}
 }
 
 /**
- * @brief Append the largest reduction axis (wantReductionAxis=1) or
- *        destination axis (wantReductionAxis=0) that isn't yet in the hardware
- *        axis list into said hardware axis list.
+ * @brief Append the largest reduction axis or free axis that isn't yet
+ *        in the hardware axis list for either the primary or secondary kernel
+ *        into said hardware axis list.
  */
 
-static void  reduxAppendLargestAxisToHwList(redux_ctx* ctx, int wantReductionAxis){
+static void  reduxAppendLargestAxisToHwList(redux_ctx* ctx,
+                                            int        kernelType,
+                                            int        axisType){
 	int    maxI = 0, i, isInHwList, isInReduxList, isInDesiredList, isLargestSoFar;
-	size_t maxV = 0;
+	int*   hwAxisList, * ndh, * ndhr, * ndhd;
+	size_t v, maxV = 0;
+
+	/* Get pointers to the correct kernel's variables */
+	hwAxisList = kernelType == KERNEL_PRIMARY ?  ctx->pri.axisList:
+	                                             ctx->aux.axisList;
+	ndh        = kernelType == KERNEL_PRIMARY ? &ctx->pri.ndh:
+	                                            &ctx->aux.ndh;
+	ndhr       = kernelType == KERNEL_PRIMARY ? &ctx->pri.ndhr:
+	                                            &ctx->aux.ndhr;
+	ndhd       = kernelType == KERNEL_PRIMARY ? &ctx->pri.ndhd:
+	                                            &ctx->aux.ndhd;
 
 	/* Find */
 	for (i=0;i<ctx->nds;i++){
-		isInHwList      = axisInSet(i, ctx->hwAxisList, ctx->ndh, 0);
-		isInReduxList   = axisInSet(i, ctx->reduxList,  ctx->ndr, 0);
-		isInDesiredList = wantReductionAxis ? isInReduxList : !isInReduxList;
-		isLargestSoFar  = ctx->src->dimensions[i] >= maxV;
+		isInHwList      = axisInSet(i, hwAxisList,     *ndh,     0);
+		isInReduxList   = axisInSet(i, ctx->reduxList, ctx->ndr, 0);
+		isInDesiredList = axisType == AXIS_REDUX ?  isInReduxList:
+		                                           !isInReduxList;
+		v               = ctx->src->dimensions[i];
+		isLargestSoFar  = v >= maxV;
 
 		if (!isInHwList && isInDesiredList && isLargestSoFar){
-			maxV = ctx->src->dimensions[i];
+			maxV = v;
 			maxI = i;
 		}
 	}
 
 	/* Append */
-	ctx->hwAxisList[ctx->ndh++] = maxI;
-	if (wantReductionAxis){
-		ctx->ndhr++;
+	hwAxisList[(*ndh)++] = maxI;
+	if (axisType == AXIS_REDUX){
+		(*ndhr)++;
 	}else{
-		ctx->ndhd++;
+		(*ndhd)++;
 	}
 }
 
 /**
  * @brief Select which axes (up to MAX_HW_DIMS) will be assigned to hardware
- *        dimensions.
+ *        dimensions for both the primary and auxiliary kernels.
  *
- * For the "large" code model: The up-to-MAX_HW_DIMS largest destination tensor
- *                             dimensions are selected.
- * For the "small" code model: Up to MAX_HW_DIMS reduction dimensions (largest-
- *                             to-smallest) are selected. If less than
- *                             MAX_HW_DIMS dimensions were selected,
- *                             destination tensor dimensions are selected until
- *                             MAX_HW_DIMS total dimensions are selected, or no
- *                             destination tensors are left.
+ * LARGE code model: Up to the MAX_HW_DIMS largest free axes are selected.
+ *                   Because the primary reduction kernel does everything, it's
+ *                   not necessary to compute an auxiliary kernel axis
+ *                   selection (or at least, one distinct from the primary
+ *                   kernel's).
+ *
+ * SMALL code model: For the primary reduction kernel, up to MAX_HW_DIMS
+ *                   reduction axes (largest-to-smallest) are selected. If less
+ *                   than MAX_HW_DIMS axes were selected, free axes are
+ *                   selected until MAX_HW_DIMS total axes are selected, or no
+ *                   free axes are left.
+ *
+ *                   For the auxiliary reduction kernel, up to the MAX_HW_DIMS
+ *                   largest free axes are selected.
  */
 
 static int   reduxSelectHwAxes             (redux_ctx*  ctx){
-	if (reduxIsSmallCodeModel(ctx)){
-		while (reduxCanAppendHwAxis(ctx, 1)){
-			reduxAppendLargestAxisToHwList(ctx, 1);
+	if (reduxIsLargeCodeModel(ctx)){
+		while (reduxCanAppendHwAxis       (ctx, KERNEL_PRIMARY,   AXIS_FREE)){
+			reduxAppendLargestAxisToHwList(ctx, KERNEL_PRIMARY,   AXIS_FREE);
 		}
-	}
+	}else{
+		while (reduxCanAppendHwAxis       (ctx, KERNEL_PRIMARY,   AXIS_REDUX)){
+			reduxAppendLargestAxisToHwList(ctx, KERNEL_PRIMARY,   AXIS_REDUX);
+		}
+		while (reduxCanAppendHwAxis       (ctx, KERNEL_PRIMARY,   AXIS_FREE)){
+			reduxAppendLargestAxisToHwList(ctx, KERNEL_PRIMARY,   AXIS_FREE);
+		}
 
-	while (reduxCanAppendHwAxis(ctx, 0)){
-		reduxAppendLargestAxisToHwList(ctx, 0);
+		while (reduxCanAppendHwAxis       (ctx, KERNEL_AUXILIARY, AXIS_FREE)){
+			reduxAppendLargestAxisToHwList(ctx, KERNEL_AUXILIARY, AXIS_FREE);
+		}
 	}
 
 	return reduxComputeAxisList(ctx);
@@ -1147,17 +1223,17 @@ static int   reduxSelectHwAxes             (redux_ctx*  ctx){
 static int   reduxComputeAxisList          (redux_ctx*  ctx){
 	int i, f=0;
 
-	ctx->axisList = malloc(ctx->nds * sizeof(unsigned));
-	if (!ctx->axisList){
+	ctx->srcAxisList = malloc(ctx->nds * sizeof(unsigned));
+	if (!ctx->srcAxisList){
 		return reduxCleanup(ctx, GA_MEMORY_ERROR);
 	}
 
 	for (i=0;i<ctx->nds;i++){
 		if (!axisInSet(i, ctx->reduxList, ctx->ndr, 0)){
-			ctx->axisList[f++] = i;
+			ctx->srcAxisList[f++] = i;
 		}
 	}
-	memcpy(&ctx->axisList[f], ctx->reduxList, ctx->ndr * sizeof(*ctx->reduxList));
+	memcpy(&ctx->srcAxisList[f], ctx->reduxList, ctx->ndr * sizeof(*ctx->reduxList));
 
 
 	return reduxGenSource(ctx);
@@ -1171,13 +1247,13 @@ static int   reduxComputeAxisList          (redux_ctx*  ctx){
 
 static int   reduxGenSource                (redux_ctx*  ctx){
 	reduxAppendSource(ctx);
-	ctx->sourceCode = strb_cstr(&ctx->s);
+	ctx->sourceCodeLen = ctx->s.l;
+	ctx->sourceCode    = strb_cstr(&ctx->s);
 	if (!ctx->sourceCode){
 		return reduxCleanup(ctx, GA_MEMORY_ERROR);
 	}
 
-	return reduxIsLargeCodeModel(ctx) ? reduxCompileLarge(ctx):
-	                                    reduxCompileSmall(ctx);
+	return reduxCompile(ctx);
 }
 static void  reduxAppendSource             (redux_ctx*  ctx){
 	reduxAppendIncludes         (ctx);
@@ -1185,9 +1261,11 @@ static void  reduxAppendSource             (redux_ctx*  ctx){
 	reduxAppendFuncGetInitVal   (ctx);
 	reduxAppendFuncLoadVal      (ctx);
 	reduxAppendFuncReduxVal     (ctx);
-	reduxAppendFuncPreKernel    (ctx);
+	if(reduxIsSmallCodeModel(ctx)){
+		reduxAppendFuncPreKernel    (ctx);
+		reduxAppendFuncPostKernel   (ctx);
+	}
 	reduxAppendFuncKernel       (ctx);
-	reduxAppendFuncPostKernel   (ctx);
 }
 static void  reduxAppendIncludes           (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "/* Includes */\n");
@@ -1197,31 +1275,30 @@ static void  reduxAppendIncludes           (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "\n");
 }
 static void  reduxAppendTypedefs           (redux_ctx*  ctx){
-	strb_appends(&ctx->s, "/* Typedefs */\n");
-	strb_appendf(&ctx->s, "typedef %s     S;/* The type of the source array. */\n",                ctx->srcTypeStr);
-	strb_appendf(&ctx->s, "typedef %s     T;/* The type of the destination array. */\n",           ctx->dstTypeStr);
-	strb_appendf(&ctx->s, "typedef %s     A;/* The type of the destination argument array. */\n",  ctx->dstArgTypeStr);
-	strb_appendf(&ctx->s, "typedef %s     X;/* The type of the indices: signed 32/64-bit. */\n",   ctx->idxTypeStr);
-	strb_appendf(&ctx->s, "typedef %s     K;/* The type of the accumulator variable. */\n",        ctx->accTypeStr);
-	strb_appends(&ctx->s, "\n\n\n");
+	strb_appendf(&ctx->s, "typedef %s S;\n", ctx->srcTypeStr);   /* The type of the source array. */
+	strb_appendf(&ctx->s, "typedef %s T;\n", ctx->dstTypeStr);   /* The type of the destination array. */
+	strb_appendf(&ctx->s, "typedef %s A;\n", ctx->dstArgTypeStr);/* The type of the destination argument array. */
+	strb_appendf(&ctx->s, "typedef %s X;\n", ctx->idxTypeStr);   /* The type of the indices: signed 32/64-bit. */
+	strb_appendf(&ctx->s, "typedef %s K;\n", ctx->accTypeStr);   /* The type of the accumulator variable. */
 }
 static void  reduxAppendFuncGetInitVal     (redux_ctx*  ctx){
-	strb_appends(&ctx->s, "/**\n");
-	strb_appends(&ctx->s, " * Initial value function.\n");
-	strb_appends(&ctx->s, " */\n\n");
-	strb_appends(&ctx->s, "WITHIN_KERNEL K    getInitVal(void){\n");
-	strb_appendf(&ctx->s, "\treturn (%s);\n", ctx->initVal);
-	strb_appends(&ctx->s, "}\n\n\n\n");
+	/**
+	 * Initial value function.
+	 */
+
+	strb_appendf(&ctx->s, "WITHIN_KERNEL K    getInitVal(void){\n"
+	                      "\treturn (%s);\n"
+	                      "}\n\n\n\n", ctx->initVal);
 }
 static void  reduxAppendFuncLoadVal        (redux_ctx*  ctx){
 	int i;
 
-	strb_appends(&ctx->s, "/**\n");
-	strb_appends(&ctx->s, " * Multidimensional source element loader.\n");
-	strb_appends(&ctx->s, " *\n");
-	strb_appends(&ctx->s, " * Also implements prescalar transformations if any.\n");
-	strb_appends(&ctx->s, " */\n");
-	strb_appends(&ctx->s, "\n");
+	/**
+	 * Multidimensional source element loader.
+	 *
+	 * Also implements prescalar transformations if any.
+	 */
+
 	appendIdxes (&ctx->s, "WITHIN_KERNEL K    loadVal(", "X i", 0, ctx->nds, "", "");
 	if (ctx->nds > 0){
 		strb_appends(&ctx->s, ", ");
@@ -1229,7 +1306,7 @@ static void  reduxAppendFuncLoadVal        (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "const GLOBAL_MEM S* src, const GLOBAL_MEM X* srcSteps){\n");
 	strb_appends(&ctx->s, "\tS v = (*(const GLOBAL_MEM S*)((const GLOBAL_MEM char*)src + ");
 	for (i=0;i<ctx->nds;i++){
-		strb_appendf(&ctx->s, "i%d*srcSteps[%d] + \\\n\t                                                            ", i, ctx->axisList[i]);
+		strb_appendf(&ctx->s, "i%d*srcSteps[%d] + \\\n\t                                                            ", i, ctx->srcAxisList[i]);
 	}
 	strb_appends(&ctx->s, "0));\n");
 
@@ -1242,15 +1319,16 @@ static void  reduxAppendFuncLoadVal        (redux_ctx*  ctx){
 static void  reduxAppendFuncReduxVal       (redux_ctx*  ctx){
 	int i, anyArgsEmitted = 0;
 
-	/* Function Signature. */
-	strb_appends(&ctx->s, "/**\n");
-	strb_appends(&ctx->s, " * Global memory value reduction function.\n");
-	strb_appends(&ctx->s, " *\n");
-	strb_appends(&ctx->s, " * Responsible for either:\n");
-	strb_appends(&ctx->s, " *   1) Safe writeback of final value to memory, or\n");
-	strb_appends(&ctx->s, " *   2) Safe atomic reduction of partial value into memory.\n");
-	strb_appends(&ctx->s, " */\n");
-	strb_appends(&ctx->s, "\n");
+	/**
+	 * Function Signature.
+	 *
+	 * Global memory value reduction function.
+	 *
+	 * Responsible for either:
+	 *   1) Safe writeback of final value to memory, or
+	 *   2) Safe atomic reduction of partial value into memory.
+	 */
+
 	appendIdxes (&ctx->s, "WITHIN_KERNEL void reduxVal(", "X i", 0, ctx->ndd, "", "");
 	anyArgsEmitted = ctx->ndd>0;
 	if (reduxKernelRequiresDst   (ctx)){
@@ -1356,11 +1434,11 @@ static void  reduxAppendIndexDeclarations  (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "\tX bd0 = LDIM_0,       bd1 = LDIM_1,       bd2 = LDIM_2;\n");
 	strb_appends(&ctx->s, "\tX ti0 = LID_0,        ti1 = LID_1,        ti2 = LID_2;\n");
 	strb_appends(&ctx->s, "\tX gi0 = bi0*bd0+ti0,  gi1 = bi1*bd1+ti1,  gi2 = bi2*bd2+ti2;\n");
-	if (ctx->ndh>0){
+	if (ctx->pri.ndh>0){
 		strb_appends(&ctx->s, "\tX ");
-		for (i=0;i<ctx->ndh;i++){
+		for (i=0;i<ctx->pri.ndh;i++){
 			strb_appendf(&ctx->s, "ci%u = chunkSize[%u]%s",
-			             i, i, (i==ctx->ndh-1) ? ";\n" : ", ");
+			             i, i, (i==ctx->pri.ndh-1) ? ";\n" : ", ");
 		}
 	}
 
@@ -1386,10 +1464,10 @@ static void  reduxAppendRangeCalculations  (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "\t/* Compute ranges for this thread. */\n");
 
 	for (i=0;i<ctx->nds;i++){
-		strb_appendf(&ctx->s, "\ti%dDim     = srcSize[%d];\n", i, ctx->axisList[i]);
+		strb_appendf(&ctx->s, "\ti%dDim     = srcSize[%d];\n", i, ctx->srcAxisList[i]);
 	}
 	for (i=0;i<ctx->nds;i++){
-		strb_appendf(&ctx->s, "\ti%dSStep   = srcSteps[%d];\n", i, ctx->axisList[i]);
+		strb_appendf(&ctx->s, "\ti%dSStep   = srcSteps[%d];\n", i, ctx->srcAxisList[i]);
 	}
 	for (i=0;i<ctx->ndd;i++){
 		strb_appendf(&ctx->s, "\ti%dMStep   = dstSteps[%d];\n", i, i);
@@ -1415,7 +1493,7 @@ static void  reduxAppendRangeCalculations  (redux_ctx*  ctx){
 		 * The others, if any, have to use software looping beginning at 0.
 		 */
 
-		if (axisInSet(ctx->axisList[i], ctx->hwAxisList, ctx->ndh, &hwDim)){
+		if (axisInSet(ctx->srcAxisList[i], ctx->pri.axisList, ctx->pri.ndh, &hwDim)){
 			strb_appendf(&ctx->s, "\ti%dStart   = gi%d * ci%d;\n", i, hwDim, hwDim);
 		}else{
 			strb_appendf(&ctx->s, "\ti%dStart   = 0;\n", i);
@@ -1427,7 +1505,7 @@ static void  reduxAppendRangeCalculations  (redux_ctx*  ctx){
 		 * The others, if any, have to use software looping beginning at 0.
 		 */
 
-		if (axisInSet(ctx->axisList[i], ctx->hwAxisList, ctx->ndh, &hwDim)){
+		if (axisInSet(ctx->srcAxisList[i], ctx->pri.axisList, ctx->pri.ndh, &hwDim)){
 			strb_appendf(&ctx->s, "\ti%dEnd     = i%dStart + ci%d;\n", i, i, hwDim);
 		}else{
 			strb_appendf(&ctx->s, "\ti%dEnd     = i%dStart + i%dDim;\n", i, i, i);
@@ -1627,119 +1705,255 @@ static void  reduxAppendLoopMacroUndefs    (redux_ctx*  ctx){
 
 /**
  * @brief Compile the kernel from source code.
- *
- * @return
  */
 
-static int   reduxCompileLarge             (redux_ctx*  ctx){
-	const int    ARG_TYPECODES[]   = {
-	    GA_BUFFER, /* src */
-	    GA_SIZE,   /* srcOff */
-	    GA_BUFFER, /* srcSteps */
-	    GA_BUFFER, /* srcSize */
-	    GA_BUFFER, /* chnkSize */
-	    GA_BUFFER, /* dst */
-	    GA_SIZE,   /* dstOff */
-	    GA_BUFFER, /* dstSteps */
-	    GA_BUFFER, /* dstArg */
-	    GA_SIZE,   /* dstArgOff */
-	    GA_BUFFER  /* dstArgSteps */
-	};
-	const size_t ARG_TYPECODES_LEN = sizeof(ARG_TYPECODES)/sizeof(*ARG_TYPECODES);
-	const char*  SRCS[1]           = {ctx->sourceCode};
-	const size_t SRC_LENS[1]       = {strlen(ctx->sourceCode)};
-	const size_t SRCS_LEN          = sizeof(SRCS)/sizeof(*SRCS);
-
-	int ret  = GpuKernel_init(&ctx->kernel,
-	                          ctx->gpuCtx,
-	                          SRCS_LEN,
-	                          SRCS,
-	                          SRC_LENS,
-	                          "redux",
-	                          ARG_TYPECODES_LEN,
-	                          ARG_TYPECODES,
-	                          0,
-	                          (char**)0);
-
-	if (ret != GA_NO_ERROR){
-		return reduxCleanup(ctx, ret);
-	}else{
-		return reduxScheduleLarge(ctx);
+static int   reduxCompile                  (redux_ctx*  ctx){
+	int    ret, i = 0;
+	int    PRI_TYPECODES[11];
+	size_t PRI_TYPECODES_LEN;
+	int*   AUX_TYPECODES;
+	size_t AUX_TYPECODES_LEN;
+	
+	
+	/**
+	 * Construct Argument Typecode Lists.
+	 */
+	
+	PRI_TYPECODES[i++] = GA_BUFFER; /* src */
+	PRI_TYPECODES[i++] = GA_SIZE;   /* srcOff */
+	PRI_TYPECODES[i++] = GA_BUFFER; /* srcSteps */
+	PRI_TYPECODES[i++] = GA_BUFFER; /* srcSize */
+	PRI_TYPECODES[i++] = GA_BUFFER; /* chnkSize */
+	if(reduxKernelRequiresDst(ctx)){
+		PRI_TYPECODES[i++] = GA_BUFFER; /* dst */
+		PRI_TYPECODES[i++] = GA_SIZE;   /* dstOff */
+		PRI_TYPECODES[i++] = GA_BUFFER; /* dstSteps */
 	}
-}
-static int   reduxCompileSmall             (redux_ctx*  ctx){
-	/* BUG: Implement small code model. */
-	return reduxCompileLarge(ctx);
+	if(reduxKernelRequiresDstArg(ctx)){
+		PRI_TYPECODES[i++] = GA_BUFFER; /* dstArg */
+		PRI_TYPECODES[i++] = GA_SIZE;   /* dstArgOff */
+		PRI_TYPECODES[i++] = GA_BUFFER; /* dstArgSteps */
+	}
+	PRI_TYPECODES_LEN  = i;
+	AUX_TYPECODES      = &PRI_TYPECODES[3];
+	AUX_TYPECODES_LEN  = PRI_TYPECODES_LEN-3;
+	
+	
+	/**
+	 * Compile the kernels.
+	 */
+	
+	{
+		ret  = GpuKernel_init(&ctx->kernel,
+		                      ctx->gpuCtx,
+		                      1,
+		                      (const char**)&ctx->sourceCode,
+		                      &ctx->sourceCodeLen,
+		                      "redux",
+		                      PRI_TYPECODES_LEN,
+		                      PRI_TYPECODES,
+		                      GA_USE_CLUDA,
+		                      &ctx->errorString0);
+		if (ret != GA_NO_ERROR){
+			return reduxCleanup(ctx, ret);
+		}
+	}
+	if(reduxIsSmallCodeModel(ctx)){
+		ret  = GpuKernel_init(&ctx->kernel,
+		                      ctx->gpuCtx,
+		                      1,
+		                      (const char**)&ctx->sourceCode,
+		                      &ctx->sourceCodeLen,
+		                      "preRedux",
+		                      AUX_TYPECODES_LEN,
+		                      AUX_TYPECODES,
+		                      GA_USE_CLUDA,
+		                      &ctx->errorString1);
+		if (ret != GA_NO_ERROR){
+			return reduxCleanup(ctx, ret);
+		}
+		ret  = GpuKernel_init(&ctx->kernel,
+		                      ctx->gpuCtx,
+		                      1,
+		                      (const char**)&ctx->sourceCode,
+		                      &ctx->sourceCodeLen,
+		                      "postRedux",
+		                      AUX_TYPECODES_LEN,
+		                      AUX_TYPECODES,
+		                      GA_USE_CLUDA,
+		                      &ctx->errorString2);
+		if (ret != GA_NO_ERROR){
+			return reduxCleanup(ctx, ret);
+		}
+	}
+
+	return reduxSchedule(ctx);
 }
 
 /**
- * Compute a good thread block size / grid size / software chunk size for Nvidia.
+ * @brief Compute a good thread block size / grid size / software chunk size
+ *        for the primary/auxilliary kernels.
  */
 
-static int   reduxScheduleLarge            (redux_ctx*  ctx){
-	int            i;
-	size_t         warpMod;
-	size_t         bestWarpMod  = 1;
-	unsigned       bestWarpAxis = 0;
-	uint64_t       maxLg;
-	uint64_t       maxLs[MAX_HW_DIMS];
-	uint64_t       maxGg;
-	uint64_t       maxGs [MAX_HW_DIMS];
-	uint64_t       dims  [MAX_HW_DIMS];
-	double         slack [MAX_HW_DIMS];
-	ga_factor_list factBS[MAX_HW_DIMS];
-	ga_factor_list factGS[MAX_HW_DIMS];
-	ga_factor_list factCS[MAX_HW_DIMS];
-
-
+static int   reduxSchedule                 (redux_ctx*  ctx){
+	int      i, priNdims, auxNdims;
+	uint64_t maxLgRdx, maxLgPre, maxLgPost;
+	uint64_t maxLgPri, maxLgAux;
+	uint64_t maxLs  [MAX_HW_DIMS];
+	uint64_t maxGg;
+	uint64_t maxGs  [MAX_HW_DIMS];
+	uint64_t priDims[MAX_HW_DIMS];
+	uint64_t auxDims[MAX_HW_DIMS];
+	uint64_t bs     [MAX_HW_DIMS];
+	uint64_t gs     [MAX_HW_DIMS];
+	uint64_t cs     [MAX_HW_DIMS];
+	size_t   warpSize,
+	         maxL, maxL0, maxL1, maxL2,
+	         maxG, maxG0, maxG1, maxG2;
+	
+	
 	/**
 	 * Obtain the constraints of our problem.
 	 */
 
-	size_t warpSize,
-	       maxL, maxL0, maxL1, maxL2,  /* Maximum total and per-dimension thread/block sizes */
-	       maxG, maxG0, maxG1, maxG2;  /* Maximum total and per-dimension block /grid  sizes */
-	gpukernel_property(ctx->kernel.k,  GA_KERNEL_PROP_PREFLSIZE, &warpSize);
-	gpukernel_property(ctx->kernel.k,  GA_KERNEL_PROP_MAXLSIZE,  &maxL);
-	gpudata_property  (ctx->src->data, GA_CTX_PROP_MAXLSIZE0,    &maxL0);
-	gpudata_property  (ctx->src->data, GA_CTX_PROP_MAXLSIZE1,    &maxL1);
-	gpudata_property  (ctx->src->data, GA_CTX_PROP_MAXLSIZE2,    &maxL2);
-	gpudata_property  (ctx->src->data, GA_CTX_PROP_MAXGSIZE0,    &maxG0);
-	maxG = maxG0;
-	gpudata_property  (ctx->src->data, GA_CTX_PROP_MAXGSIZE1,    &maxG1);
-	gpudata_property  (ctx->src->data, GA_CTX_PROP_MAXGSIZE2,    &maxG2);
-
+	gpudata_property  (ctx->src->data,    GA_CTX_PROP_MAXLSIZE0,    &maxL0);
+	gpudata_property  (ctx->src->data,    GA_CTX_PROP_MAXLSIZE1,    &maxL1);
+	gpudata_property  (ctx->src->data,    GA_CTX_PROP_MAXLSIZE2,    &maxL2);
+	gpudata_property  (ctx->src->data,    GA_CTX_PROP_MAXGSIZE,     &maxG);
+	gpudata_property  (ctx->src->data,    GA_CTX_PROP_MAXGSIZE0,    &maxG0);
+	gpudata_property  (ctx->src->data,    GA_CTX_PROP_MAXGSIZE1,    &maxG1);
+	gpudata_property  (ctx->src->data,    GA_CTX_PROP_MAXGSIZE2,    &maxG2);
+	gpukernel_property(ctx->kernel.k,     GA_KERNEL_PROP_PREFLSIZE, &warpSize);
+	gpukernel_property(ctx->kernel.k,     GA_KERNEL_PROP_MAXLSIZE,  &maxL);
+	maxLgRdx  = maxL;
+	maxLgPri  = maxLgRdx;
+	if(reduxIsSmallCodeModel(ctx)){
+		gpukernel_property(ctx->preKernel.k,  GA_KERNEL_PROP_MAXLSIZE,  &maxL);
+		maxLgPre  = maxL;
+		gpukernel_property(ctx->postKernel.k, GA_KERNEL_PROP_MAXLSIZE,  &maxL);
+		maxLgPost = maxL;
+		maxLgAux  = maxLgPre<maxLgPost ? maxLgPre : maxLgPost;
+	}
+	
+	priNdims  = ctx->pri.ndh;
+	maxGs[0]  = maxG0;
+	maxGs[1]  = maxG1;
+	maxGs[2]  = maxG2;
+	maxGg     = maxG;
+	maxLs[0]  = maxL0;
+	maxLs[1]  = maxL1;
+	maxLs[2]  = maxL2;
+	for (i=0;i<priNdims;i++){
+		priDims[i] = ctx->src->dimensions[ctx->pri.axisList[i]];
+	}
+	if(reduxIsSmallCodeModel(ctx)){
+		auxNdims  = ctx->aux.ndh;
+		for (i=0;i<auxNdims;i++){
+			auxDims[i] = ctx->src->dimensions[ctx->aux.axisList[i]];
+		}
+	}
+	
+	
 	/**
-	 * Prepare inputs to the solver.
-	 *
-	 * This involves, amongst others,
-	 * - Initializing the blockSize, gridSize and chunkSize factor lists for all
-	 *   hardware dimensions.
-	 * - Finding on which hardware axis is it optimal to place the warpSize factor.
+	 * Apply the solver.
+	 */
+	
+	{
+		reduxScheduleKernel(priNdims,
+		                    priDims,
+		                    warpSize,
+		                    maxLgPri, maxLs,
+		                    maxGg,    maxGs,
+		                    bs, gs, cs);
+		for (i=0;i<priNdims;i++){
+			ctx->pri.bs[i] = bs[i];
+			ctx->pri.gs[i] = gs[i];
+			ctx->pri.cs[i] = cs[i];
+		}
+		if (priNdims <= 0){
+			ctx->pri.bs[i] = ctx->pri.gs[i] = ctx->pri.cs[i] = 1;
+		}
+	}
+	if (reduxIsSmallCodeModel(ctx)){
+		reduxScheduleKernel(auxNdims,
+		                    auxDims,
+		                    warpSize,
+		                    maxLgAux, maxLs,
+		                    maxGg,    maxGs,
+		                    bs, gs, cs);
+		for (i=0;i<auxNdims;i++){
+			ctx->aux.bs[i] = bs[i];
+			ctx->aux.gs[i] = gs[i];
+			ctx->aux.cs[i] = cs[i];
+		}
+		if (auxNdims <= 0){
+			ctx->aux.bs[i] = ctx->aux.gs[i] = ctx->aux.cs[i] = 1;
+		}
+	}
+	
+	return reduxInvoke(ctx);
+}
+
+/**
+ * @brief Given the parameters of a kernel scheduling problem, solve it as
+ *        optimally as possible.
+ * 
+ * NB: This is the only function in this entire file that should have
+ *     anything to do with the integer factorization APIs.
+ */
+
+static void  reduxScheduleKernel           (int         ndims,
+                                            uint64_t*   dims,
+                                            uint64_t    warpSize,
+                                            uint64_t    maxLg,
+                                            uint64_t*   maxLs,
+                                            uint64_t    maxGg,
+                                            uint64_t*   maxGs,
+                                            uint64_t*   bs,
+                                            uint64_t*   gs,
+                                            uint64_t*   cs){
+	uint64_t       warpMod, bestWarpMod  = 1;
+	int            i,       bestWarpAxis = 0;
+	uint64_t       roundedDims[MAX_HW_DIMS];
+	double         slack      [MAX_HW_DIMS];
+	ga_factor_list factBS     [MAX_HW_DIMS];
+	ga_factor_list factGS     [MAX_HW_DIMS];
+	ga_factor_list factCS     [MAX_HW_DIMS];
+	
+	
+	/**
+	 * Quick check for scalar case.
+	 */
+	
+	if (ndims <= 0){
+		return;
+	}
+	
+	
+	/**
+	 * Identify the dimension to which the warp factor will be given.
+	 * 
+	 * The current heuristic is to find the dimension that is either
+	 *   1) Evenly divided by the warp size, or
+	 *   2) As close to filling the last warp as possible.
 	 */
 
-	maxLg    = maxL;
-	maxLs[0] = maxL0, maxLs[1]=maxL1, maxLs[2]=maxL2;
-	maxGg    = maxG;
-	maxGs[0] = maxG0, maxGs[1]=maxG1, maxGs[2]=maxG2;
-	dims[0]  = dims[1]  = dims[2]  = 1;
-	slack[0] = slack[1] = slack[2] = 1.1;
-
-	for (i=0;i<ctx->ndh;i++){
-		dims[i] = ctx->src->dimensions[ctx->hwAxisList[i]];
+	for (i=0;i<ndims;i++){
+		roundedDims[i] = dims[i];
+		slack      [i] = 1.1;
 		gaIFLInit(&factBS[i]);
 		gaIFLInit(&factGS[i]);
 		gaIFLInit(&factCS[i]);
 
-		warpMod = dims[i]%warpSize;
+		warpMod = roundedDims[i] % warpSize;
 		if (bestWarpMod>0 && (warpMod==0 || warpMod>=bestWarpMod)){
 			bestWarpAxis = i;
 			bestWarpMod  = warpMod;
 		}
 	}
 
-	if (ctx->ndh > 0){
-		dims[bestWarpAxis] = (dims[bestWarpAxis] + warpSize - 1)/warpSize;
+	if (ndims > 0){
+		roundedDims[bestWarpAxis] = (roundedDims[bestWarpAxis] + warpSize - 1)/warpSize;
 		gaIFactorize(warpSize, 0, 0, &factBS[bestWarpAxis]);
 	}
 
@@ -1749,8 +1963,11 @@ static int   reduxScheduleLarge            (redux_ctx*  ctx){
 	 * chunkSize.
 	 */
 
-	for (i=0;i<ctx->ndh;i++){
-		while (!gaIFactorize(dims[i], (uint64_t)(dims[i]*slack[i]), maxLs[i], &factCS[i])){
+	for (i=0;i<ndims;i++){
+		while (!gaIFactorize(roundedDims[i],
+		                     roundedDims[i]*slack[i],
+		                     maxLs      [i],
+		                     &factCS    [i])){
 			/**
 			 * Error! Failed to factorize dimension i with given slack and
 			 * k-smoothness constraints! Increase slack. Once slack reaches
@@ -1768,79 +1985,122 @@ static int   reduxScheduleLarge            (redux_ctx*  ctx){
 	 * gridSize, improving performance.
 	 */
 
-	gaIFLSchedule(ctx->ndh, maxLg, maxLs, maxGg, maxGs, factBS, factGS, factCS);
-
-	/* Output. */
-	for (i=0;i<ctx->ndh;i++){
-		ctx->blockSize[i] = gaIFLGetProduct(&factBS[i]);
-		ctx->gridSize [i] = gaIFLGetProduct(&factGS[i]);
-		ctx->chunkSize[i] = gaIFLGetProduct(&factCS[i]);
+	gaIFLSchedule(ndims, maxLg, maxLs, maxGg, maxGs, factBS, factGS, factCS);
+	for (i=0;i<ndims;i++){
+		bs[i] = gaIFLGetProduct(&factBS[i]);
+		gs[i] = gaIFLGetProduct(&factGS[i]);
+		cs[i] = gaIFLGetProduct(&factCS[i]);
 	}
-
-	/* Return. */
-	return reduxInvokeLarge(ctx);
 }
 
 /**
  * Invoke the kernel.
  */
 
-static int   reduxInvokeLarge              (redux_ctx*  ctx){
-	void* args[11];
-	int   ret;
+static int   reduxInvoke                   (redux_ctx*  ctx){
+	void* priArgs[11];
+	void* auxArgs[ 8];
+	int   ret, i = 0;
+	int   failedDstSteps     = 0;
+	int   failedDstArgSteps  = 0;
+	int   failedAuxChunkSize = 0;
+
 
 	/**
 	 * Argument Marshalling. This the grossest gross thing in here.
 	 */
 
-	const int flags    = GA_BUFFER_READ_ONLY|GA_BUFFER_INIT;
-	ctx->srcStepsGD    = gpudata_alloc(ctx->gpuCtx, ctx->nds * sizeof(size_t),
-	                                   ctx->src->strides,    flags, 0);
-	ctx->srcSizeGD     = gpudata_alloc(ctx->gpuCtx, ctx->nds * sizeof(size_t),
-	                                   ctx->src->dimensions, flags, 0);
-	ctx->chunkSizeGD   = gpudata_alloc(ctx->gpuCtx, ctx->ndh * sizeof(size_t),
-	                                   ctx->chunkSize,       flags, 0);
-	if (reduxKernelRequiresDst(ctx)){
-		ctx->dstStepsGD    = gpudata_alloc(ctx->gpuCtx, ctx->ndd * sizeof(size_t),
-		                                   ctx->dst->strides,    flags, 0);
+	const int flags      = GA_BUFFER_READ_ONLY|GA_BUFFER_INIT;
+	ctx->srcStepsGD      = gpudata_alloc(ctx->gpuCtx, ctx->nds     * sizeof(size_t),
+	                                     ctx->src->strides,     flags, 0);
+	ctx->srcSizeGD       = gpudata_alloc(ctx->gpuCtx, ctx->nds     * sizeof(size_t),
+	                                     ctx->src->dimensions,  flags, 0);
+	ctx->pri.chunkSizeGD = gpudata_alloc(ctx->gpuCtx, ctx->pri.ndh * sizeof(size_t),
+	                                     ctx->pri.cs,           flags, 0);
+	
+	priArgs[i++] = (void*) ctx->src->data;
+	priArgs[i++] = (void*)&ctx->src->offset;
+	priArgs[i++] = (void*) ctx->srcStepsGD;
+	priArgs[i++] = (void*) ctx->srcSizeGD;
+	priArgs[i++] = (void*) ctx->pri.chunkSizeGD;
+	if (reduxKernelRequiresDst   (ctx)){
+		ctx->dstStepsGD      = gpudata_alloc(ctx->gpuCtx, ctx->ndd * sizeof(size_t),
+		                                     ctx->dst->strides,    flags, 0);
+		priArgs[i++]         = (void*) ctx->dst->data;
+		priArgs[i++]         = (void*)&ctx->dst->offset;
+		priArgs[i++]         = (void*) ctx->dstStepsGD;
+		failedDstSteps       =        !ctx->dstStepsGD;
 	}
 	if (reduxKernelRequiresDstArg(ctx)){
-		ctx->dstArgStepsGD = gpudata_alloc(ctx->gpuCtx, ctx->ndd * sizeof(size_t),
-		                                   ctx->dstArg->strides, flags, 0);
+		ctx->dstArgStepsGD   = gpudata_alloc(ctx->gpuCtx, ctx->ndd * sizeof(size_t),
+		                                     ctx->dstArg->strides, flags, 0);
+		priArgs[i++]         = (void*) ctx->dstArg->data;
+		priArgs[i++]         = (void*)&ctx->dstArg->offset;
+		priArgs[i++]         = (void*) ctx->dstArgStepsGD;
+		failedDstArgSteps    =        !ctx->dstArgStepsGD;
 	}
-	args[ 0] = (void*) ctx->src->data;
-	args[ 1] = (void*)&ctx->src->offset;
-	args[ 2] = (void*) ctx->srcStepsGD;
-	args[ 3] = (void*) ctx->srcSizeGD;
-	args[ 4] = (void*) ctx->chunkSizeGD;
-	if       ( reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
-		args[ 5] = (void*) ctx->dst->data;
-		args[ 6] = (void*)&ctx->dst->offset;
-		args[ 7] = (void*) ctx->dstStepsGD;
-		args[ 8] = (void*) ctx->dstArg->data;
-		args[ 9] = (void*)&ctx->dstArg->offset;
-		args[10] = (void*) ctx->dstArgStepsGD;
-	}else if ( reduxKernelRequiresDst   (ctx) && !reduxKernelRequiresDstArg(ctx)){
-		args[ 5] = (void*) ctx->dst->data;
-		args[ 6] = (void*)&ctx->dst->offset;
-		args[ 7] = (void*) ctx->dstStepsGD;
-	}else if (!reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
-		args[ 5] = (void*) ctx->dstArg->data;
-		args[ 6] = (void*)&ctx->dstArg->offset;
-		args[ 7] = (void*) ctx->dstArgStepsGD;
+	if (reduxIsSmallCodeModel(ctx)){
+		/**
+		 * The auxiliary kernel's args are identical to the primary kernel's,
+		 * except that the first three arguments are deleted and the fifth
+		 * argument (now second), called chunkSize, is different.
+		 */
+
+		memcpy(auxArgs, &priArgs[3], sizeof(auxArgs));
+		ctx->aux.chunkSizeGD = gpudata_alloc(ctx->gpuCtx, ctx->aux.ndh * sizeof(size_t),
+		                                     ctx->aux.cs,           flags, 0);
+		auxArgs[ 1 ]         = (void*) ctx->aux.chunkSizeGD;
+		failedAuxChunkSize   =        !ctx->aux.chunkSizeGD;
 	}
 
-	if (ctx->srcStepsGD   &&
-	    ctx->srcSizeGD    &&
-	    ctx->chunkSizeGD  &&
-	    ctx->dstStepsGD   &&
-	    ctx->dstArgStepsGD){
+
+	/**
+	 * One or three kernels is now invoked, depending on the code model.
+	 */
+
+	if (ctx->srcStepsGD      &&
+	    ctx->srcSizeGD       &&
+	    ctx->pri.chunkSizeGD &&
+	    !failedDstSteps      &&
+	    !failedDstArgSteps   &&
+	    !failedAuxChunkSize){
+		/* Pre-kernel invocation, if necessary */
+		if(reduxIsSmallCodeModel(ctx)){
+			ret = GpuKernel_call(&ctx->preKernel,
+			                     ctx->aux.ndh>0 ? ctx->aux.ndh : 1,
+			                     ctx->aux.gs,
+			                     ctx->aux.bs,
+			                     0,
+			                     auxArgs);
+			if (ret != GA_NO_ERROR){
+				return reduxCleanup(ctx, ret);
+			}
+		}
+
+		/* Reduction kernel invocation */
 		ret = GpuKernel_call(&ctx->kernel,
-		                     ctx->ndh>0 ? ctx->ndh : 1,
-		                     ctx->gridSize,
-		                     ctx->blockSize,
+		                     ctx->pri.ndh>0 ? ctx->pri.ndh : 1,
+		                     ctx->pri.gs,
+		                     ctx->pri.bs,
 		                     0,
-		                     args);
+		                     priArgs);
+		if (ret != GA_NO_ERROR){
+			return reduxCleanup(ctx, ret);
+		}
+
+		/* Post-kernel invocation, if necessary */
+		if(reduxIsSmallCodeModel(ctx)){
+			ret = GpuKernel_call(&ctx->postKernel,
+			                     ctx->aux.ndh>0 ? ctx->aux.ndh : 1,
+			                     ctx->aux.gs,
+			                     ctx->aux.bs,
+			                     0,
+			                     auxArgs);
+			if (ret != GA_NO_ERROR){
+				return reduxCleanup(ctx, ret);
+			}
+		}
+
 		return reduxCleanup(ctx, ret);
 	}else{
 		return reduxCleanup(ctx, GA_MEMORY_ERROR);
@@ -1852,18 +2112,28 @@ static int   reduxInvokeLarge              (redux_ctx*  ctx){
  */
 
 static int   reduxCleanup                  (redux_ctx*  ctx, int ret){
-	free(ctx->axisList);
+	free(ctx->srcAxisList);
+	free(ctx->dstAxisList);
 	free(ctx->sourceCode);
-	ctx->axisList   = NULL;
-	ctx->sourceCode = NULL;
+	free(ctx->errorString0);
+	free(ctx->errorString1);
+	free(ctx->errorString2);
+	ctx->srcAxisList  = NULL;
+	ctx->dstAxisList  = NULL;
+	ctx->sourceCode   = NULL;
+	ctx->errorString0 = NULL;
+	ctx->errorString1 = NULL;
+	ctx->errorString2 = NULL;
 
 	gpudata_release(ctx->srcStepsGD);
 	gpudata_release(ctx->srcSizeGD);
-	gpudata_release(ctx->chunkSizeGD);
 	gpudata_release(ctx->dstStepsGD);
 	gpudata_release(ctx->dstArgStepsGD);
-	ctx->srcStepsGD = ctx->srcSizeGD     = ctx->chunkSizeGD   =
-	ctx->dstStepsGD = ctx->dstArgStepsGD = NULL;
+	gpudata_release(ctx->pri.chunkSizeGD);
+	gpudata_release(ctx->aux.chunkSizeGD);
+	ctx->srcStepsGD      = ctx->srcSizeGD       =
+	ctx->dstStepsGD      = ctx->dstArgStepsGD   =
+	ctx->pri.chunkSizeGD = ctx->aux.chunkSizeGD = NULL;
 
 	return ret;
 }
