@@ -1,17 +1,17 @@
 ﻿"""Ufuncs and reductions for GPU arrays."""
 
-from itertools import chain
 import numpy
 import re
-from ._array import ndgpuarray
-from .dtypes import dtype_to_ctype
-from ._elemwise import arg
-from .elemwise import as_argument, GpuElemwise
-from .reduction import reduce1
-from .gpuarray import GpuArray, array, empty, get_default_context
+from pygpu._array import ndgpuarray
+from pygpu.dtypes import dtype_to_ctype, NAME_TO_DTYPE
+from pygpu._elemwise import arg
+from pygpu.elemwise import as_argument, GpuElemwise
+from pygpu.reduction import reduce1
+from pygpu.gpuarray import GpuArray, array, empty, get_default_context
 
 
 # --- Helper functions --- #
+
 
 def restore_reduced_dims(shape, red_axes):
     """Return tuple from ``shape`` with size-1 axes at indices ``red_axes``."""
@@ -40,19 +40,23 @@ def reduce_dims(shape, red_axes):
 
 def _prepare_array_for_reduction(a, out):
     """Return input array ready for usage in a reduction kernel."""
-    # Get a context and an array class to work with
+    # Get a context and an array class to work with. Use the "highest"
+    # class present in the inputs.
     need_context = True
+    ctx = None
+    cls = None
     for ary in (a, out):
         if isinstance(ary, GpuArray):
+            if ctx is not None and ary.context != ctx:
+                raise ValueError('cannot mix contexts')
             ctx = ary.context
-            cls = ary.__class__
+            if cls is None or cls == GpuArray:
+                cls = ary.__class__
             need_context = False
-            break
+
     if need_context:
         ctx = get_default_context()
-        # TODO: sensible choice? Makes sense to choose the more "feature-rich"
-        # variant here perhaps.
-        cls = ndgpuarray
+        cls = ndgpuarray  # TODO: sensible choice as default?
 
     # TODO: can CPU memory handed directly to kernels?
     if not isinstance(a, GpuArray):
@@ -99,18 +103,13 @@ def reduce_with_op(a, op, neutral, axis=None, dtype=None, out=None,
         is a scalar.
     """
     a = _prepare_array_for_reduction(a, out)
-    if a.dtype == numpy.dtype('float16') or dtype == numpy.dtype('float16'):
-        # Gives wrong results currently, see
-        # https://github.com/Theano/libgpuarray/issues/316
-        raise NotImplementedError('float16 currently broken')
 
     if dtype is None:
         if numpy.issubsctype(a.dtype, numpy.unsignedinteger):
-            # Avoid overflow for small integer types by default, as in
-            # Numpy
-            out_type = numpy.dtype('uint64')
+            # Avoid overflow for small integer types by default, as in Numpy
+            out_type = max(a.dtype, numpy.dtype('uint'))
         elif numpy.issubsctype(a.dtype, numpy.integer):
-            out_type = numpy.dtype('int64')
+            out_type = max(a.dtype, numpy.dtype('int'))
         else:
             out_type = a.dtype
     else:
@@ -189,10 +188,6 @@ def reduce_with_cmp(a, cmp, neutral, axis=None, out=None, keepdims=False):
         is a scalar.
     """
     a = _prepare_array_for_reduction(a, out)
-    if a.dtype == numpy.dtype('float16'):
-        # Gives wrong results currently, see
-        # https://github.com/Theano/libgpuarray/issues/316
-        raise NotImplementedError('float16 currently broken')
 
     axes = axis if axis is not None else tuple(range(a.ndim))
     if out is not None:
@@ -223,16 +218,18 @@ def amin(a, axis=None, out=None, keepdims=False):
     numpy.amin
     """
     a = _prepare_array_for_reduction(a, out)
-    if numpy.issubsctype(a.dtype, numpy.integer):
+    if a.dtype == numpy.bool:
+        neutral = 1
+    elif numpy.issubsctype(a.dtype, numpy.integer):
         neutral = numpy.iinfo(a.dtype).max
     elif numpy.issubsctype(a.dtype, numpy.floating):
-        neutral = numpy.finfo(a.dtype).max
+        neutral = numpy.inf
     elif numpy.issubsctype(a.dtype, numpy.complexfloating):
-        raise ValueError("array dtype '{}' not comparable"
-                         "".format(a.dtype.name))
+        raise ValueError('array dtype {!r} not comparable'
+                         ''.format(a.dtype.name))
     else:
-        raise ValueError("array dtype '{}' not supported"
-                         "".format(a.dtype.name))
+        raise ValueError('array dtype {!r} not supported'
+                         ''.format(a.dtype.name))
     return reduce_with_cmp(a, '<', neutral, axis, out, keepdims)
 
 
@@ -244,22 +241,26 @@ def amax(a, axis=None, out=None, keepdims=False):
     numpy.amax
     """
     a = _prepare_array_for_reduction(a, out)
-    if numpy.issubsctype(a.dtype, numpy.integer):
+    if a.dtype == numpy.bool:
+        neutral = 0
+    elif numpy.issubsctype(a.dtype, numpy.integer):
         neutral = numpy.iinfo(a.dtype).min
     elif numpy.issubsctype(a.dtype, numpy.floating):
-        neutral = numpy.finfo(a.dtype).min
+        neutral = -numpy.inf
     elif numpy.issubsctype(a.dtype, numpy.complexfloating):
-        raise ValueError("array dtype '{}' not comparable"
-                         "".format(a.dtype.name))
+        raise ValueError('array dtype {!r} not comparable'
+                         ''.format(a.dtype.name))
     else:
-        raise ValueError("array dtype '{}' not supported"
-                         "".format(a.dtype.name))
+        raise ValueError('array dtype {!r} not supported'
+                         ''.format(a.dtype.name))
     return reduce_with_cmp(a, '>', neutral, axis, out, keepdims)
 
 
 # --- Elementwise ufuncs --- #
 
 
+# This dictionary is derived from Numpy's C99_FUNCS list, see
+# https://github.com/numpy/numpy/search?q=C99_FUNCS
 UNARY_C_FUNC_TO_UFUNC = {
     'abs': 'absolute',
     'acos': 'arccos',
@@ -289,20 +290,16 @@ UNARY_C_FUNC_TO_UFUNC = {
     'tanh': 'tanh',
     'trunc': 'trunc',
     }
-
 UNARY_UFUNC_TO_C_FUNC = {v: k for k, v in UNARY_C_FUNC_TO_UFUNC.items()}
-
 UNARY_UFUNC_TO_C_OP = {
     'bitwise_not': '~',
     'logical_not': '!',
     'negative': '-',
     }
-
 UNARY_UFUNCS = (list(UNARY_UFUNC_TO_C_FUNC.keys()) +
                 list(UNARY_UFUNC_TO_C_OP.keys()))
 UNARY_UFUNCS.extend(['deg2rad', 'rad2deg', 'reciprocal', 'sign', 'signbit',
                      'square'])
-
 BINARY_C_FUNC_TO_UFUNC = {
     'atan2': 'arctan2',
     'copysign': 'copysign',
@@ -312,9 +309,7 @@ BINARY_C_FUNC_TO_UFUNC = {
     'nextafter': 'nextafter',
     'fmod': 'fmod',
 }
-
 BINARY_UFUNC_TO_C_FUNC = {v: k for k, v in BINARY_C_FUNC_TO_UFUNC.items()}
-
 BINARY_UFUNC_TO_C_OP = {
     'add': '+',
     'bitwise_and': '&',
@@ -333,7 +328,6 @@ BINARY_UFUNC_TO_C_OP = {
     'right_shift': '>>',
     'subtract': '-',
     }
-
 BINARY_UFUNCS = (list(BINARY_UFUNC_TO_C_FUNC.keys()) +
                  list(BINARY_UFUNC_TO_C_OP.keys()))
 BINARY_UFUNCS.extend(['floor_divide', 'true_divide', 'logical_xor',
@@ -392,16 +386,9 @@ def ufunc_dtypes(ufunc_name, dtypes_in):
     ((dtype('float32'), dtype('float32')), (dtype('float32'),))
     """
     npy_ufunc = getattr(numpy, ufunc_name)
+    supported_dtypes = set(NAME_TO_DTYPE.values())
 
-    # TODO: get supported dtypes from some place within libgpuarray?
-    dtypes = [numpy.dtype(dt)
-              for dt in chain(numpy.sctypes['int'], numpy.sctypes['uint'],
-                              numpy.sctypes['float'])
-              if numpy.dtype(dt) not in [numpy.dtype('float16'),
-                                         numpy.dtype('float128'),
-                                         numpy.dtype('complex256')]]
-
-    # Filter for dtypes larger than our input types
+    # Filter for dtypes larger than our input dtypes, using only supported ones
     def larger_eq_than_dtypes(sig):
         from_part = sig.split('->')[0]
         if len(from_part) != len(dtypes_in):
@@ -409,20 +396,22 @@ def ufunc_dtypes(ufunc_name, dtypes_in):
         else:
             dts = tuple(numpy.dtype(c) for c in from_part)
             # Currently unsupported, filtering out
-            if any(dt not in dtypes for dt in dts):
+            if any(dt not in supported_dtypes for dt in dts):
                 return False
             else:
                 return all(dt >= dt_in for dt, dt_in in zip(dts, dtypes_in))
 
+    # List of ufunc signatures that are "larger" than our input dtypes
     larger_sig_list = list(filter(larger_eq_than_dtypes, npy_ufunc.types))
     if not larger_sig_list:
-        # TODO: Numpy raises TypeError for bad data types, which is wrong,
+        # Numpy raises TypeError for bad data types, which is not quite right,
         # but we mirror that behavior
         raise TypeError('data types {} not supported for ufunc {}'
                         ''.format(tuple(dt.name for dt in dtypes_in),
                                   ufunc_name))
 
-    # Key function for signature comparison
+    # Key function for signature comparison. It results in comparison of
+    # *all* typecodes in the signature since they are assembled in a tuple.
     def from_part_key(sig):
         from_part = sig.split('->')[0]
         return tuple(numpy.dtype(c) for c in from_part)
@@ -533,19 +522,23 @@ def unary_ufunc(a, ufunc_name, out=None):
     ufunc_result_dtype : Get dtype of a ufunc result.
     ufunc_c_funcname : Get C name for math ufuncs.
     """
-    # Get a context and an array class to work with
+    # Get a context and an array class to work with. Use the "highest"
+    # class present in the inputs.
     need_context = True
+    ctx = None
+    cls = None
     for ary in (a, out):
         if isinstance(ary, GpuArray):
+            if ctx is not None and ary.context != ctx:
+                raise ValueError('cannot mix contexts')
             ctx = ary.context
-            cls = ary.__class__
+            if cls is None or cls == GpuArray:
+                cls = ary.__class__
             need_context = False
-            break
+
     if need_context:
         ctx = get_default_context()
-        # TODO: sensible choice? Makes sense to choose the more "feature-rich"
-        # variant here perhaps.
-        cls = ndgpuarray
+        cls = ndgpuarray  # TODO: sensible choice as default?
 
     # TODO: can CPU memory handed directly to kernels?
     if not isinstance(a, GpuArray):
@@ -569,8 +562,8 @@ def unary_ufunc(a, ufunc_name, out=None):
     # This is the "fallback signature" case, for us it signals failure.
     # TypeError is what Numpy raises, too, which is kind of wrong
     if prom_dtype_in == numpy.dtype(object):
-        raise TypeError("input dtype '{}' invalid for ufunc '{}'"
-                        "".format(a.dtype.name, ufunc_name))
+        raise TypeError('input dtype {!r} invalid for ufunc {!r}'
+                        ''.format(a.dtype.name, ufunc_name))
 
     # Convert input such that the kernel runs
     # TODO: can this be avoided?
@@ -581,11 +574,10 @@ def unary_ufunc(a, ufunc_name, out=None):
     else:
         # TODO: allow larger dtype
         if out.dtype != result_dtype:
-            raise ValueError("`out.dtype` != result dtype ('{}' != '{}')"
-                             "".format(out.dtype.name, result_dtype.name))
+            raise ValueError('`out.dtype` != result dtype ({!r} != {!r})'
+                             ''.format(out.dtype.name, result_dtype.name))
 
     # C result dtype for casting
-    # TODO: necessary? overly cautious?
     c_res_dtype = dtype_to_ctype(result_dtype)
 
     oper = ''
@@ -623,8 +615,8 @@ def unary_ufunc(a, ufunc_name, out=None):
         oper = 'res = ({}) (a * a)'.format(c_res_dtype)
 
     if not oper:
-        raise ValueError("`ufunc_name` '{}' does not represent a unary ufunc"
-                         "".format(ufunc_name))
+        raise ValueError('`ufunc_name` {!r} does not represent a unary ufunc'
+                         ''.format(ufunc_name))
 
     a_arg = as_argument(a, 'a', read=True)
     args = [arg('res', out.dtype, write=True), a_arg]
@@ -721,8 +713,8 @@ def binary_ufunc(a, b, ufunc_name, out=None):
 
     # This is the "fallback signature" case, for us it signals failure
     if any(dt == numpy.dtype(object) for dt in prom_dtypes_in):
-        raise TypeError("input dtypes {} invalid for ufunc '{}'"
-                        "".format((a.dtype.name, b.dtype.name), ufunc_name))
+        raise TypeError('input dtypes {} invalid for ufunc {!r}'
+                        ''.format((a.dtype.name, b.dtype.name), ufunc_name))
 
     # Convert input such that the kernel runs
     # TODO: can this be avoided?
@@ -744,7 +736,7 @@ def binary_ufunc(a, b, ufunc_name, out=None):
             raise ValueError('`out.shape` != result shape ({} != {})'
                              ''.format(out.shape, result_shape))
         if out.dtype != result_dtype:
-            raise ValueError("`out.dtype` != result dtype ('{}' != '{}')"
+            raise ValueError('`out.dtype` != result dtype ({!r} != {!r})'
                              ''.format(out.dtype.name, result_dtype.name))
 
     a_arg = as_argument(a, 'a', read=True)
@@ -835,8 +827,8 @@ def binary_ufunc(a, b, ufunc_name, out=None):
             oper = 'res = ({rt}) {}'.format(comp_part, rt=c_res_dtype)
 
     if not oper:
-        raise ValueError("`ufunc_name` '{}' does not represent a binary "
-                         "ufunc".format(ufunc_name))
+        raise ValueError('`ufunc_name` {!r} does not represent a binary '
+                         'ufunc'.format(ufunc_name))
 
     kernel = GpuElemwise(a.context, oper, args, convert_f16=True)
     kernel(out, a, b, broadcast=True)
@@ -862,11 +854,14 @@ UFUNC_SYNONYMS = [
     ('deg2rad', 'degrees'),
     ('rad2deg', 'radians'),
     ('true_divide', 'divide'),
-    ('maximum', 'fmax'),  # differ in NaN propagation in numpy, doable?
-    ('minimum', 'fmin'),  # differ in NaN propagation in numpy, doable?
+    ('maximum', 'fmax'),  # TODO: differ in NaN propagation in numpy, doable?
+    ('minimum', 'fmin'),  # TODO: differ in NaN propagation in numpy, doable?
     ('bitwise_not', 'invert'),
     ('remainder', 'mod')
     ]
+
+
+# --- Add ufuncs to global namespace --- #
 
 
 def make_unary_ufunc(name, doc):
@@ -922,7 +917,6 @@ for name, alt_name in UFUNC_SYNONYMS:
 
 
 if __name__ == '__main__':
-    # pylint: disable=wrong-import-position
     from doctest import testmod, NORMALIZE_WHITESPACE
     import numpy
     optionflags = NORMALIZE_WHITESPACE
