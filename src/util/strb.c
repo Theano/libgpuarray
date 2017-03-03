@@ -43,25 +43,29 @@ int strb_grow(strb *sb, size_t n) {
   return 0;
 }
 
-void strb_appendf(strb *sb, const char *f, ...) {
-  va_list ap;
-  int s;
+void strb_appendv(strb *sb, const char *f, va_list ap) {
+  va_list apSave;
+  int     s;
 
-  va_start(ap, f);
 #ifdef _MSC_VER
-  s = _vscprintf(f, ap);
+  /**
+   * va_copy() is a C99 novelty that a particular company should have started
+   * supporting a long time ago, to their undying shame.
+   */
+  
+  apSave = ap;
+  s = _vscprintf(f, apSave);
 #else
-  s = vsnprintf(NULL, 0, f, ap);
+  va_copy(apSave, ap);
+  s = vsnprintf(NULL, 0, f, apSave);
 #endif
-  va_end(ap);
-
+  va_end(apSave);
+  
   if (s < 0) { strb_seterror(sb); return; }
   s += 1;
   
   if (strb_ensure(sb, s)) return;
-  va_start(ap, f);
   s = vsnprintf(sb->s+sb->l, s, f, ap);
-  va_end(ap);
   sb->l += s;
 }
 
@@ -100,3 +104,11 @@ int strb_write(int fd, strb *sb) {
   }
   return 0;
 }
+
+void strb_appendf(strb *sb, const char *f, ...) {
+  va_list ap;
+  va_start(ap, f);
+  strb_appendv(sb, f, ap);
+  va_end(ap);
+}
+

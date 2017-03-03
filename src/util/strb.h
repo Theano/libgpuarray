@@ -2,6 +2,7 @@
 #define STRB_H
 
 #include "private_config.h"
+#include <stdarg.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -186,6 +187,17 @@ void strb_read(strb *sb, int fd, size_t sz);
  * Write errors will be signaled by a nonzero return value.
  */
 int strb_write(int fd, strb *sb);
+
+/*
+ * Appends the result of a sprintf using the format string `f` and
+ * following variadic arguments list, excluding terminating nul.
+ *
+ * Unlike sprintf, this function makes sure not to run off the end of
+ * memory and behaves like asprintf in that respect.
+ *
+ * A format error will place the strb in error mode.
+ */
+void strb_appendv(strb *, const char *f, va_list ap);
 
 /*
  * Returns a C string from the content of the strb.
