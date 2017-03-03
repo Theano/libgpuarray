@@ -2,6 +2,7 @@
 
 import numpy
 import re
+import warnings
 from pygpu._array import ndgpuarray
 from pygpu.dtypes import dtype_to_ctype, NAME_TO_DTYPE
 from pygpu._elemwise import arg
@@ -141,6 +142,9 @@ def sum(a, axis=None, dtype=None, out=None, keepdims=False):
     --------
     numpy.sum
     """
+    # Do what Numpy does with booleans, sensible or not
+    if a.dtype == bool and dtype is None:
+        dtype = int
     return reduce_with_op(a, '+', 0, axis, dtype, out, keepdims)
 
 
@@ -247,7 +251,7 @@ def amin(a, axis=None, out=None, keepdims=False):
     elif numpy.issubsctype(a.dtype, numpy.integer):
         neutral = numpy.iinfo(a.dtype).max
     elif numpy.issubsctype(a.dtype, numpy.floating):
-        neutral = numpy.inf
+        neutral = 'INFINITY'
     elif numpy.issubsctype(a.dtype, numpy.complexfloating):
         raise ValueError('array dtype {!r} not comparable'
                          ''.format(a.dtype.name))
@@ -270,7 +274,7 @@ def amax(a, axis=None, out=None, keepdims=False):
     elif numpy.issubsctype(a.dtype, numpy.integer):
         neutral = numpy.iinfo(a.dtype).min
     elif numpy.issubsctype(a.dtype, numpy.floating):
-        neutral = -numpy.inf
+        neutral = '-INFINITY'
     elif numpy.issubsctype(a.dtype, numpy.complexfloating):
         raise ValueError('array dtype {!r} not comparable'
                          ''.format(a.dtype.name))
@@ -610,11 +614,24 @@ def unary_ufunc(a, ufunc_name, out=None):
     # Case 1: math function
     if ufunc_name in UNARY_UFUNC_TO_C_FUNC:
         c_func = ufunc_c_fname(ufunc_name, (a.dtype,))
-        oper = 'res = ({}) {}(a)'.format(c_res_dtype, c_func)
+        # Shortcut for abs() with unsigned int. This also fixes a CUDA quirk
+        # that makes abs() fail with unsigned ints.
+        if (ufunc_name == 'absolute' and
+                numpy.issubsctype(a.dtype, numpy.unsignedinteger)):
+            out[:] = a.copy()
+            return out
+        else:
+            oper = 'res = ({}) {}(a)'.format(c_res_dtype, c_func)
 
     # Case 2: unary operator
     unop = UNARY_UFUNC_TO_C_OP.get(ufunc_name, None)
     if unop is not None:
+        if a.dtype == numpy.bool and unop == '-':
+            warnings.warn('using negation (`-`) with boolean arrays is '
+                          'deprecated, use logical not (`~`) instead; '
+                          'the current behavior will be changed along with '
+                          "NumPy's", FutureWarning)
+            unop = '!'
         oper = 'res = ({}) {}a'.format(c_res_dtype, unop)
 
     # Other cases: specific functions
@@ -627,7 +644,7 @@ def unary_ufunc(a, ufunc_name, out=None):
                                                       rdt=c_res_dtype)
 
     if ufunc_name == 'reciprocal':
-        oper = 'res = ({}) (1.0) / a'.format(c_res_dtype)
+        oper = 'res = ({dt}) (({dt}) 1.0) / a'.format(dt=c_res_dtype)
 
     if ufunc_name == 'sign':
         oper = 'res = ({}) ((a > 0) ? 1 : (a < 0) ? -1 : 0)'.format(
