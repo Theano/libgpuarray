@@ -18,6 +18,7 @@
 #include "gpuarray/util.h"
 
 #include "util/strb.h"
+#include "util/srcgen.h"
 #include "util/integerfactoring.h"
 
 
@@ -34,7 +35,7 @@
 
 /**
  *                    Reduction Kernel Generator.
- * 
+ *
  * The generator produces a kernel from one of two "code models":
  *   - Large
  *   - Small
@@ -43,132 +44,142 @@
  * with more than SMALL_REDUX_THRESHOLD elements or more elements than
  * reductions for each element will result in use of the large code model;
  * Otherwise the small code model is used.
- * 
- * 
+ *
+ *
  *                         LARGE CODE MODEL:
- * 
+ *
  * In the large code model, each destination element is processed by a
  * single thread.
- * 
+ *
  * Each thread begins with an initial value in a register, reads from all
  * source elements contributing to the reduction, computes the result and
  * writes it to the destination element.
- * 
+ *
  * A single kernel is generated that performs prescalar transformations, the
  * reduction itself, postscalar transformations and the write to global memory.
- * 
- * 
+ *
+ *
  *                         SMALL CODE MODEL:
- * 
+ *
  * In the small code model, each destination element is processed by
  * multiple threads.
- * 
+ *
  * The destination tensor is first initialized with the initial value. Then,
  * one several threads cooperate to perform the reduction atomically on each
  * destination element. Lastly, postscalar transformations are applied
  * in-place.
- * 
+ *
  * Two or three kernels are generated: The initialization kernel, the main
  * kernel that performs prescalar transformations and the reduction itself, and
  * possibly also a postscalar transformation kernel when it is required.
- * 
- * 
+ *
+ *
  *                           Kernel Template:
- * 
+ *
  * The following kernel code template displays the code generated for the
  * small code model. For the large code model, no pre/postRedux() kernels
  * are generated (since their functionality is incorporated within the main
  * redux() kernel), no atomicRedux() function needs to be generated because
  * writes to global memory are unconditional and not contended.
- * 
- * 
- *     //Includes
- *     #include <limits.h>
- *     #include <math.h>
- *     #include <stdint.h>
- *     
- *     
+ *
+ *
+ *     //Macros
+ *     #define FOROVER
+ *     #define ESCAPE
+ *     #define srcVal       //Indexer
+ *     #define dstVal       //Indexer
+ *     #define dstArgVal    //Indexer
+ *     #define rdxIdx       //Special reduction index computer
+ *
+ *
  *     //Typedefs:
- *     typedef  float    T
- *     typedef  int64_t  X
- *     
- *     
- *     //Initializer (in case initial T cannot be expressed as a literal)
- *     static T    getInitVal(void){
+ *     typedef  float    S  //The type of the source array.
+ *     typedef  float    T  //The type of the destination array.
+ *     typedef  ssize_t  A  //The type of the destination argument array.
+ *     typedef  ssize_t  X  //The type of the indices: signed 32/64-bit.
+ *     typedef  float    K  //The type of the accumulator variable.
+ *
+ *
+ *     //Initializer (in case initial value of accumulator cannot be expressed
+ *     //as a literal)
+ *     static K    getInitValTFn(void){
  *         return ...
  *     }
- *     
- *     
+ *     static K    getInitValKFn(void){
+ *         return ...
+ *     }
+ *
+ *
  *     //Reduce into global memory destination a value.
- *     static void atomicRedux(GLOBAL_MEM T* dst, T val){
- *         ...
+ *     static void writeBackFn(GLOBAL_MEM T* d_, T d,
+ *                             GLOBAL_MEM A* a_, A a){
+ *         //Large code model:
+ *         *dPtr = d;
+ *         *aPtr = a;
+ *
+ *         //Small code model:
+ *         // Something complex possibly involving CAS loops
  *     }
- *     
- *     
- *     //Load data from source and apply pre-operations.
- *     static T loadVal(X i0, X i1, ..., X iN,
- *                      const GLOBAL_MEM T* src,
- *                      const GLOBAL_MEM X* srcSteps,
- *                      ...?){
+ *
+ *
+ *     //Load data from source and apply pre-operations, coercing the type to
+ *     //the accumulator type K.
+ *     static K loadValFn(X i0, X i1, ..., X iN,
+ *                        const GLOBAL_MEM S* srcPtr,
+ *                        const X             srcOff,
+ *                        const GLOBAL_MEM X* srcSteps,
+ *                        ...?){
  *         return ...
  *     }
- *     
- *     
- *     //Initialization kernel,
- *     KERNEL void preRedux(const GLOBAL_MEM X*        srcSize,
- *                          const GLOBAL_MEM X*        chunkSize,
- *                          GLOBAL_MEM T*              dst,
- *                          const X                    dstOff,
- *                          const GLOBAL_MEM X*        dstSteps){
- *         //OFFSETS
- *         dst += dstOff;
- *         
- *         //Initialize
- *         dst[...] = getInitVal();
+ *
+ *
+ *     //Initialization kernel
+ *     KERNEL void initKer(const GLOBAL_MEM X*        srcSize,
+ *                         const GLOBAL_MEM X*        chunkSize,
+ *                         GLOBAL_MEM T*              dstPtr,
+ *                         const X                    dstOff,
+ *                         const GLOBAL_MEM X*        dstSteps){
+ *         dstVal = getInitValTFn();
  *     }
- *     
- *     
+ *
+ *
  *     //Reduction Kernel.
- *     KERNEL void redux(const GLOBAL_MEM T*        src,
- *                       const X                    srcOff,
- *                       const GLOBAL_MEM X*        srcSteps,
- *                       const GLOBAL_MEM X*        srcSize,
- *                       const GLOBAL_MEM X*        chunkSize,
- *                       GLOBAL_MEM T*              dst,
- *                       const X                    dstOff,
- *                       const GLOBAL_MEM X*        dstSteps,
- *                       GLOBAL_MEM X*              dstArg,
- *                       const X                    dstArgOff,
- *                       const GLOBAL_MEM X*        dstArgSteps){
- *         //OFFSETS
- *         src    += srcOff
- *         dst    += dstOff
- *         dstArg += dstArgOff
- *         
+ *     KERNEL void reduxKer(GLOBAL_MEM S*              srcPtr,
+ *                          const X                    srcOff,
+ *                          const GLOBAL_MEM X*        srcSteps,
+ *                          const GLOBAL_MEM X*        srcSize,
+ *                          const GLOBAL_MEM X*        chunkSize,
+ *                          GLOBAL_MEM T*              dstPtr,
+ *                          const X                    dstOff,
+ *                          const GLOBAL_MEM X*        dstSteps,
+ *                          GLOBAL_MEM A*              dstArgPtr,
+ *                          const X                    dstArgOff,
+ *                          const GLOBAL_MEM X*        dstArgSteps){
  *         //Declare Indices
  *         //Compute Ranges
- *         
- *         //Define macros
+ *
  *         //Outer Loops
+ *            K rdxK = getInitValKFn();
+ *            A rdxA = 0;
  *            //Inner Loops
- *         //Undefine macros
+ *                K k  = loadValFn(indices..., srcPtr, srcOff, srcSteps)
+ *                rdxK = k
+ *                rdxA = rdxIdx
+ *            writeBackFn(&dstVal, d, &dstArgVal, a);
  *     }
- *     
- *     
+ *
+ *
  *     //Post-scalar kernel,
- *     KERNEL void postRedux(const GLOBAL_MEM X*        srcSize,
- *                           const GLOBAL_MEM X*        chunkSize,
- *                           GLOBAL_MEM T*              dst,
- *                           const X                    dstOff,
- *                           const GLOBAL_MEM X*        dstSteps){
- *         //OFFSETS
- *         dst += dstOff;
- *         
- *         //Initialize
- *         dst[...] = getInitVal();
+ *     KERNEL void postKer(const GLOBAL_MEM X*        srcSize,
+ *                         const GLOBAL_MEM X*        chunkSize,
+ *                         GLOBAL_MEM T*              dst,
+ *                         const X                    dstOff,
+ *                         const GLOBAL_MEM X*        dstSteps){
+ *         //Default: Nothing.
+ *         dstVal = dstVal
  *     }
- * 
- * 
+ *
+ *
  *                           Initial Reduction Values
  * +--------------+-----+-----+---------+---------+-----+-----+-----+-----+-----+
  * | Type\Op      |  +  |  *  |   max   |   min   |  &  |  |  |  ^  | &&  | ||  |
@@ -189,8 +200,10 @@ struct redux_ctx{
 	const int*      reduxList;
 
 	/* General. */
+	GpuArray*       wsDst;
+	GpuArray*       wsDstArg;
 	int*            srcAxisList;
-	int*            dstAxisList;
+	size_t*         dstDims;
 	gpucontext*     gpuCtx;
 
 	/* Source code Generator. */
@@ -204,12 +217,14 @@ struct redux_ctx{
 	const char*     dstArgTypeStr;
 	const char*     idxTypeStr;
 	const char*     accTypeStr;
-	const char*     initVal;
+	const char*     initValT;
+	const char*     initValK;
 	int             ndd;
 	int             ndr;
 	int             nds;
 	int             largeCodeModel;
 	strb            s;
+	srcb            srcGen;
 	char*           sourceCode;
 	size_t          sourceCodeLen;
 	char*           errorString0;
@@ -274,11 +289,10 @@ static void  appendIdxes                   (strb*              s,
                                             const char*        epilogue);
 static int   reduxCheckargs                (redux_ctx*  ctx);
 static void  reduxSelectTypes              (redux_ctx*  ctx);
-static int   reduxSelectModel              (redux_ctx*  ctx);
 static int   reduxIsSmallCodeModel         (redux_ctx*  ctx);
 static int   reduxIsLargeCodeModel         (redux_ctx*  ctx);
-static int   reduxHasDst                   (redux_ctx*  ctx);
-static int   reduxHasDstArg                (redux_ctx*  ctx);
+static int   reduxRequiresDst              (redux_ctx*  ctx);
+static int   reduxRequiresDstArg           (redux_ctx*  ctx);
 static int   reduxKernelRequiresDst        (redux_ctx*  ctx);
 static int   reduxKernelRequiresDstArg     (redux_ctx*  ctx);
 static int   reduxCanAppendHwAxis          (redux_ctx* ctx,
@@ -292,22 +306,22 @@ static int   reduxComputeAxisList          (redux_ctx*  ctx);
 static int   reduxGenSource                (redux_ctx*  ctx);
 static void  reduxAppendSource             (redux_ctx*  ctx);
 static void  reduxAppendIncludes           (redux_ctx*  ctx);
+static void  reduxAppendTensorDeclArgs     (redux_ctx*  ctx,
+                                            const char* type,
+                                            const char* baseName);
+static void  reduxAppendTensorCallArgs     (redux_ctx*  ctx,
+                                            const char* baseName);
+static void  reduxAppendMacroDefs          (redux_ctx*  ctx);
 static void  reduxAppendTypedefs           (redux_ctx*  ctx);
-static void  reduxAppendFuncGetInitVal     (redux_ctx*  ctx);
-static void  reduxAppendFuncLoadVal        (redux_ctx*  ctx);
-static void  reduxAppendFuncReduxVal       (redux_ctx*  ctx);
-static void  reduxAppendFuncPreKernel      (redux_ctx*  ctx);
-static void  reduxAppendFuncKernel         (redux_ctx*  ctx);
-static void  reduxAppendFuncPostKernel     (redux_ctx*  ctx);
+static void  reduxAppendGetInitValFns      (redux_ctx*  ctx);
+static void  reduxAppendWriteBackFn        (redux_ctx*  ctx);
+static void  reduxAppendReduxKernel        (redux_ctx*  ctx);
 static void  reduxAppendPrototype          (redux_ctx*  ctx);
-static void  reduxAppendOffsets            (redux_ctx*  ctx);
 static void  reduxAppendIndexDeclarations  (redux_ctx*  ctx);
 static void  reduxAppendRangeCalculations  (redux_ctx*  ctx);
 static void  reduxAppendLoops              (redux_ctx*  ctx);
-static void  reduxAppendLoopMacroDefs      (redux_ctx*  ctx);
-static void  reduxAppendLoopOuter          (redux_ctx*  ctx);
-static void  reduxAppendLoopInner          (redux_ctx*  ctx);
-static void  reduxAppendLoopMacroUndefs    (redux_ctx*  ctx);
+static void  reduxAppendInitKernel         (redux_ctx*  ctx);
+static void  reduxAppendPostKernel         (redux_ctx*  ctx);
 static int   reduxCompile                  (redux_ctx*  ctx);
 static int   reduxSchedule                 (redux_ctx*  ctx);
 static void  reduxScheduleKernel           (int         ndims,
@@ -771,28 +785,36 @@ static void  appendIdxes                   (strb*              s,
 }
 
 /**
- * @brief Check the sanity of the arguments, in agreement with the
+ * @brief Check the sanity of the arguments in agreement with the
  *        documentation for GpuArray_reduction().
  *
- *        Also initialize certain parts of the context.
+ *        Also initialize certain parts of the context, allocate memory
+ *        buffers and fail out if at any point the environment gives us
+ *        a problem.
  *
- * @return GA_INVALID_ERROR if arguments invalid; GA_NO_ERROR otherwise.
+ * @return GA_INVALID_ERROR if arguments invalid; GA_NO_MEMORY if out of
+ *         memory, GA_NO_ERROR otherwise.
  */
 
 static int   reduxCheckargs                (redux_ctx*  ctx){
-	int i, ret;
+	int      i, j, ret, retT, retK;
+	unsigned numProcs;
+	size_t   localSize;
+	size_t   dstNumElem = 1, reduxPerElem = 1;
 
 	/**
 	 * We initialize certain parts of the context.
 	 */
 
+	ctx->wsDst         = NULL;
+	ctx->wsDstArg      = NULL;
 	ctx->srcAxisList   = NULL;
-	ctx->dstAxisList   = NULL;
+	ctx->dstDims       = NULL;
 	ctx->gpuCtx        = NULL;
 
 	ctx->srcTypeStr    = ctx->dstTypeStr    = ctx->dstArgTypeStr =
 	ctx->accTypeStr    = ctx->idxTypeStr    = NULL;
-	ctx->initVal       = NULL;
+	ctx->initValK       = NULL;
 	ctx->pri.ndh       = ctx->aux.ndh  = 0;
 	ctx->pri.ndhd      = ctx->aux.ndhd = 0;
 	ctx->pri.ndhr      = ctx->aux.ndhr = 0;
@@ -802,6 +824,7 @@ static int   reduxCheckargs                (redux_ctx*  ctx){
 	ctx->errorString1  = NULL;
 	ctx->errorString2  = NULL;
 	strb_init(&ctx->s);
+	srcbInit (&ctx->srcGen, &ctx->s);
 
 	for (i=0;i<MAX_HW_DIMS;i++){
 		ctx->aux.axisList[i] = ctx->pri.axisList[i] = 0;
@@ -817,12 +840,14 @@ static int   reduxCheckargs                (redux_ctx*  ctx){
 
 
 	/* Insane src, reduxLen, dst or dstArg? */
-	if (!ctx->src || ctx->src->nd <= 0 || ctx->reduxLen == 0 ||
-	    ctx->reduxLen > (int)ctx->src->nd){
-		return reduxCleanup(ctx, GA_INVALID_ERROR);
-	}
-	if ((reduxHasDst   (ctx) && !ctx->dst)   ||
-	    (reduxHasDstArg(ctx) && !ctx->dstArg)){
+	if (!ctx->src                                                      ||
+	    (reduxRequiresDst   (ctx) && !ctx->dst)                        ||
+	    (reduxRequiresDstArg(ctx) && !ctx->dstArg)                     ||
+	    (ctx->src->nd  <= 0)                                           ||
+	    (ctx->reduxLen <= 0)                                           ||
+	    (ctx->src->nd  <  (unsigned)ctx->reduxLen)                     ||
+	    (ctx->dst    && ctx->dst->nd   +ctx->reduxLen != ctx->src->nd) ||
+	    (ctx->dstArg && ctx->dstArg->nd+ctx->reduxLen != ctx->src->nd) ){
 		return reduxCleanup(ctx, GA_INVALID_ERROR);
 	}
 
@@ -855,36 +880,46 @@ static int   reduxCheckargs                (redux_ctx*  ctx){
 	/* Determine initializer, and error out if reduction unsupported. */
 	switch (ctx->op){
 		case GA_REDUCE_SUM:
-		  ret = reduxGetSumInit (ctx->accTypeCode, &ctx->initVal);
+		  retT = reduxGetSumInit (ctx->dstTypeCode, &ctx->initValT);
+		  retK = reduxGetSumInit (ctx->accTypeCode, &ctx->initValK);
 		break;
 		case GA_REDUCE_PRODNZ:
 		case GA_REDUCE_PROD:
-		  ret = reduxGetProdInit(ctx->accTypeCode, &ctx->initVal);
+		  retT = reduxGetProdInit(ctx->dstTypeCode, &ctx->initValT);
+		  retK = reduxGetProdInit(ctx->accTypeCode, &ctx->initValK);
 		break;
 		case GA_REDUCE_MINANDARGMIN:
 		case GA_REDUCE_ARGMIN:
 		case GA_REDUCE_MIN:
-		  ret = reduxGetMinInit (ctx->accTypeCode, &ctx->initVal);
+		  retT = reduxGetMinInit (ctx->dstTypeCode, &ctx->initValT);
+		  retK = reduxGetMinInit (ctx->accTypeCode, &ctx->initValK);
 		break;
 		case GA_REDUCE_MAXANDARGMAX:
 		case GA_REDUCE_ARGMAX:
 		case GA_REDUCE_MAX:
-		  ret = reduxGetMaxInit (ctx->accTypeCode, &ctx->initVal);
+		  retT = reduxGetMaxInit (ctx->dstTypeCode, &ctx->initValT);
+		  retK = reduxGetMaxInit (ctx->accTypeCode, &ctx->initValK);
 		break;
 		case GA_REDUCE_ALL:
 		case GA_REDUCE_AND:
-		  ret = reduxGetAndInit (ctx->accTypeCode, &ctx->initVal);
+		  retT = reduxGetAndInit (ctx->dstTypeCode, &ctx->initValT);
+		  retK = reduxGetAndInit (ctx->accTypeCode, &ctx->initValK);
 		break;
 		case GA_REDUCE_ANY:
 		case GA_REDUCE_XOR:
 		case GA_REDUCE_OR:
-		  ret = reduxGetOrInit  (ctx->accTypeCode, &ctx->initVal);
+		  retT = reduxGetOrInit  (ctx->dstTypeCode, &ctx->initValT);
+		  retK = reduxGetOrInit  (ctx->accTypeCode, &ctx->initValK);
 		break;
 		default:
-		  ret = GA_UNSUPPORTED_ERROR;
+		  retT = GA_UNSUPPORTED_ERROR;
+		  retK = GA_UNSUPPORTED_ERROR;
 	}
-	if (ret != GA_NO_ERROR){
-		return reduxCleanup(ctx, ret);
+	if (retT != GA_NO_ERROR){
+		return reduxCleanup(ctx, retT);
+	}
+	if (retK != GA_NO_ERROR){
+		return reduxCleanup(ctx, retK);
 	}
 
 
@@ -896,11 +931,109 @@ static int   reduxCheckargs                (redux_ctx*  ctx){
 	ctx->nds = ctx->src->nd;
 	ctx->ndr = ctx->reduxLen;
 	ctx->ndd = ctx->nds - ctx->ndr;
-	strb_ensure(&ctx->s, 5*1024);
+	strb_ensure(&ctx->s, 3*1024);
+
+
+	/**
+	 * And make a few small dynamic memory allocations for the benefit of the
+	 * rest of the code, allowing error checking to happen early and fail fast.
+	 */
+
+	ctx->srcAxisList = malloc(ctx->nds * sizeof(unsigned));
+	ctx->dstDims     = malloc(ctx->ndd * sizeof(size_t));
+	if (!ctx->srcAxisList ||
+	    !ctx->dstDims     ){
+		return reduxCleanup(ctx, GA_MEMORY_ERROR);
+	}
+
+
+	/**
+	 * Query device for approximate total level of parallelism. If destination
+	 * tensor is so big it can keep all threads busy on individual elements,
+	 * use large code model; Otherwise use small code model, where threads will
+	 * have to cooperate.
+	 *
+	 *    - Large (Destination tensor >= SMALL_REDUX_THRESHOLD elements, or
+	 *             destination tensor size >= # of reductions per destination
+	 *             tensor element):
+	 *        All destination elements have their own thread.
+	 *    - Small (otherwise):
+	 *        Multiple threads cooperate on a single destination element.
+	 */
+
+	ret = gpucontext_property(ctx->gpuCtx, GA_CTX_PROP_NUMPROCS, &numProcs);
+	if (ret != GA_NO_ERROR){
+		return reduxCleanup(ctx, ret);
+	}
+	ret = gpucontext_property(ctx->gpuCtx, GA_CTX_PROP_MAXLSIZE, &localSize);
+	if (ret != GA_NO_ERROR){
+		return reduxCleanup(ctx, ret);
+	}
+
+	for (i=j=0;i<ctx->nds;i++){
+		if (axisInSet(i, ctx->reduxList, ctx->nds, NULL)){
+			reduxPerElem *= ctx->src->dimensions[i];
+		}else{
+			dstNumElem   *= ctx->src->dimensions[i];
+			ctx->dstDims[j++] = ctx->src->dimensions[i];;
+		}
+	}
+
+	ctx->largeCodeModel = dstNumElem >= numProcs*localSize ||
+	                      dstNumElem >= reduxPerElem
+	                      || 1;/* BUG: Erase when small code model implemented. */
+	/**
+	 * *** IT IS NOW SAFE TO CALL: ***
+	 *       - reduxIsLargeModel()
+	 *       - reduxIsSmallModel()
+	 *       - reduxKernelRequiresDst()
+	 *       - reduxKernelRequiresDstArg()
+	 */
+
+
+	/**
+	 * Allocate workspaces.
+	 *
+	 * Certain reductions may require a workspace that isn't provided by the user.
+	 * For instance, **when using the small code model**, argmin/argmax require
+	 * a dst buffer, but the user didn't supply one (as he would have for
+	 * maxandargmax/minandargmin). We must allocate and deallocate it ourselves.
+	 *
+	 * Otherwise we use the user-supplied buffers.
+	 */
+
+	if (!reduxRequiresDst   (ctx) && reduxKernelRequiresDst(ctx)){
+		ctx->wsDst    = malloc(sizeof(*ctx->wsDst));
+		if (!ctx->wsDst){
+			return reduxCleanup(ctx, GA_MEMORY_ERROR);
+		}
+
+		ret = GpuArray_empty(ctx->wsDst, ctx->gpuCtx,  ctx->dstTypeCode,
+		                     ctx->ndd,   ctx->dstDims, GA_C_ORDER);
+		if(ret != GA_NO_ERROR){
+			return reduxCleanup(ctx, ret);
+		}
+	}else{
+		ctx->wsDst    = ctx->dst;
+	}
+	if (!reduxRequiresDstArg(ctx) && reduxKernelRequiresDstArg(ctx)){
+		ctx->wsDstArg = malloc(sizeof(*ctx->wsDstArg));
+		if (!ctx->wsDstArg){
+			return reduxCleanup(ctx, GA_MEMORY_ERROR);
+		}
+
+		ret = GpuArray_empty(ctx->wsDstArg, ctx->gpuCtx,  ctx->dstArgTypeCode,
+		                     ctx->ndd,      ctx->dstDims, GA_C_ORDER);
+		if(ret != GA_NO_ERROR){
+			return reduxCleanup(ctx, ret);
+		}
+	}else{
+		ctx->wsDstArg = ctx->dstArg;
+	}
 
 
 
-	return reduxSelectModel(ctx);
+	return reduxSelectHwAxes(ctx);
 }
 
 /**
@@ -949,67 +1082,6 @@ static void  reduxSelectTypes              (redux_ctx*  ctx){
 }
 
 /**
- * @brief Select which code model will be used:
- *
- *        - Large (Destination tensor >= SMALL_REDUX_THRESHOLD elements, or
- *                 destination tensor size >= # of reductions per destination
- *                 tensor element):
- *            All destination elements have their own thread.
- *        - Small (otherwise):
- *            Multiple threads cooperate on a single destination element.
- */
-
-static int   reduxSelectModel              (redux_ctx*  ctx){
-	int      i, ret;
-	unsigned numProcs;
-	size_t   localSize;
-	size_t   dstNumElem = 1, reduxPerElem = 1;
-
-
-	/**
-	 * Query device for approximate total level of parallelism. If destination
-	 * tensor is so big it can keep all threads busy on individual elements,
-	 * use large code model; Otherwise use small code model, where threads will
-	 * have to cooperate.
-	 */
-
-	ret = gpucontext_property(ctx->gpuCtx, GA_CTX_PROP_NUMPROCS, &numProcs);
-	if (ret != GA_NO_ERROR){
-		return reduxCleanup(ctx, ret);
-	}
-	ret = gpucontext_property(ctx->gpuCtx, GA_CTX_PROP_MAXLSIZE, &localSize);
-	if (ret != GA_NO_ERROR){
-		return reduxCleanup(ctx, ret);
-	}
-
-
-	/**
-	 * Compute #elems in dst and # reductions per dst element.
-	 */
-
-	for (i=0;i<ctx->nds;i++){
-		if (axisInSet(i, ctx->reduxList, ctx->nds, NULL)){
-			reduxPerElem *= ctx->src->dimensions[i];
-		}else{
-			dstNumElem   *= ctx->src->dimensions[i];
-		}
-	}
-	ctx->largeCodeModel = dstNumElem >= numProcs*localSize ||
-	                      dstNumElem >= reduxPerElem
-	                      || 1;/* BUG: Erase when small code model implemented. */
-	/**
-	 * *** IT IS NOW SAFE TO CALL: ***
-	 *       - reduxIsLargeModel()
-	 *       - reduxIsSmallModel()
-	 *       - reduxKernelRequiresDst()
-	 *       - reduxKernelRequiresDstArg()
-	 */
-
-
-	return reduxSelectHwAxes(ctx);
-}
-
-/**
  * @brief Returns whether we are using the small code model or not.
  */
 
@@ -1029,7 +1101,7 @@ static int   reduxIsLargeCodeModel         (redux_ctx*  ctx){
  * @brief Returns whether the reduction interface requires a dst argument.
  */
 
-static int   reduxHasDst                   (redux_ctx*  ctx){
+static int   reduxRequiresDst              (redux_ctx*  ctx){
 	switch (ctx->op){
 		case GA_REDUCE_ARGMIN:
 		case GA_REDUCE_ARGMAX:
@@ -1043,7 +1115,7 @@ static int   reduxHasDst                   (redux_ctx*  ctx){
  * @brief Returns whether the reduction interface requires a dstArg argument.
  */
 
-static int   reduxHasDstArg                (redux_ctx*  ctx){
+static int   reduxRequiresDstArg           (redux_ctx*  ctx){
 	switch (ctx->op){
 		case GA_REDUCE_MINANDARGMIN:
 		case GA_REDUCE_MAXANDARGMAX:
@@ -1093,7 +1165,7 @@ static int   reduxKernelRequiresDstArg     (redux_ctx*  ctx){
 	 *      buffer for indexes, and will not in the foreseeable future.
 	 */
 
-	return reduxHasDstArg(ctx);
+	return reduxRequiresDstArg(ctx);
 }
 
 /**
@@ -1107,8 +1179,8 @@ static int   reduxCanAppendHwAxis          (redux_ctx* ctx,
 	int kernelNdh  = kernelType == KERNEL_PRIMARY ? ctx->pri.ndh  : ctx->aux.ndh;
 	int kernelNdhr = kernelType == KERNEL_PRIMARY ? ctx->pri.ndhr : ctx->aux.ndhr;
 	int kernelNdhd = kernelType == KERNEL_PRIMARY ? ctx->pri.ndhd : ctx->aux.ndhd;
-	
-	if(kernelNdh >= MAX_HW_DIMS){
+
+	if (kernelNdh >= MAX_HW_DIMS){
 		return 0;
 	}else{
 		return axisType == AXIS_REDUX ? kernelNdhr < ctx->ndr:
@@ -1215,18 +1287,10 @@ static int   reduxSelectHwAxes             (redux_ctx*  ctx){
  * The first ctx->ndd axes correspond to the outer loops that iterate over
  * each destination element. The last ctx->ndr axes correspond to the inner
  * loops that iterate over the dimensions of elements that are to be reduced.
- *
- * @return GA_MEMORY_ERROR if allocating the list failed; Otherwise, returns
- *         GA_NO_ERROR.
  */
 
 static int   reduxComputeAxisList          (redux_ctx*  ctx){
 	int i, f=0;
-
-	ctx->srcAxisList = malloc(ctx->nds * sizeof(unsigned));
-	if (!ctx->srcAxisList){
-		return reduxCleanup(ctx, GA_MEMORY_ERROR);
-	}
 
 	for (i=0;i<ctx->nds;i++){
 		if (!axisInSet(i, ctx->reduxList, ctx->ndr, 0)){
@@ -1257,15 +1321,81 @@ static int   reduxGenSource                (redux_ctx*  ctx){
 }
 static void  reduxAppendSource             (redux_ctx*  ctx){
 	reduxAppendIncludes         (ctx);
+	reduxAppendMacroDefs        (ctx);
 	reduxAppendTypedefs         (ctx);
-	reduxAppendFuncGetInitVal   (ctx);
-	reduxAppendFuncLoadVal      (ctx);
-	reduxAppendFuncReduxVal     (ctx);
-	if(reduxIsSmallCodeModel(ctx)){
-		reduxAppendFuncPreKernel    (ctx);
-		reduxAppendFuncPostKernel   (ctx);
+	reduxAppendGetInitValFns    (ctx);
+	reduxAppendWriteBackFn      (ctx);
+	reduxAppendReduxKernel       (ctx);
+	if (reduxIsSmallCodeModel(ctx)){
+		reduxAppendInitKernel    (ctx);
+		reduxAppendPostKernel   (ctx);
 	}
-	reduxAppendFuncKernel       (ctx);
+}
+static void  reduxAppendTensorDeclArgs     (redux_ctx*  ctx,
+                                            const char* type,
+                                            const char* baseName){
+	srcbAppendElemf(&ctx->srcGen, "%s* %sPtr",             type, baseName);
+	srcbAppendElemf(&ctx->srcGen, "const X %sOff",               baseName);
+	srcbAppendElemf(&ctx->srcGen, "const GLOBAL_MEM X* %sSteps", baseName);
+	(void)reduxAppendTensorCallArgs;/* Silence unused warning */
+}
+static void  reduxAppendTensorCallArgs     (redux_ctx*  ctx,
+                                            const char* baseName){
+	srcbAppendElemf(&ctx->srcGen, "%sPtr",   baseName);
+	srcbAppendElemf(&ctx->srcGen, "%sOff",   baseName);
+	srcbAppendElemf(&ctx->srcGen, "%sSteps", baseName);
+}
+static void  reduxAppendMacroDefs          (redux_ctx*  ctx){
+	int i;
+
+	srcbAppends    (&ctx->srcGen, "#define FOROVER(idx)    for(i##idx = i##idx##Start; i##idx < i##idx##End; i##idx++)\n");
+	srcbAppends    (&ctx->srcGen, "#define ESCAPE(idx)     if(i##idx >= i##idx##Dim){continue;}\n");
+
+	/* srcVal indexer */
+	srcbAppends    (&ctx->srcGen, "#define srcVal          (*(const GLOBAL_MEM S*)(");
+	srcbBeginList  (&ctx->srcGen, "+", "0");
+	srcbAppendElemf(&ctx->srcGen, "(const GLOBAL_MEM char*)srcPtr");
+	srcbAppendElemf(&ctx->srcGen, "srcOff");
+	for (i=0;i<ctx->nds;i++){
+		srcbAppendElemf(&ctx->srcGen, "i%d*i%dSStep", i, i);
+	}
+	srcbEndList    (&ctx->srcGen);
+	srcbAppends    (&ctx->srcGen, "))\n");
+
+	/* dstVal indexer */
+	if (reduxKernelRequiresDst(ctx)){
+		srcbAppends    (&ctx->srcGen, "#define dstVal          (*(GLOBAL_MEM T*)(");
+		srcbBeginList  (&ctx->srcGen, "+", "0");
+		srcbAppendElemf(&ctx->srcGen, "(GLOBAL_MEM char*)dstPtr");
+		srcbAppendElemf(&ctx->srcGen, "dstOff");
+		for (i=0;i<ctx->ndd;i++){
+			srcbAppendElemf(&ctx->srcGen, "i%d*i%dDStep", i, i);
+		}
+		srcbEndList    (&ctx->srcGen);
+		srcbAppends    (&ctx->srcGen, "))\n");
+	}
+
+	/* dstArgVal indexer */
+	if (reduxKernelRequiresDstArg(ctx)){
+		srcbAppends    (&ctx->srcGen, "#define dstArgVal       (*(GLOBAL_MEM A*)(");
+		srcbBeginList  (&ctx->srcGen, "+", "0");
+		srcbAppendElemf(&ctx->srcGen, "(GLOBAL_MEM char*)dstArgPtr");
+		srcbAppendElemf(&ctx->srcGen, "dstArgOff");
+		for (i=0;i<ctx->ndd;i++){
+			srcbAppendElemf(&ctx->srcGen, "i%d*i%dAStep", i, i);
+		}
+		srcbEndList    (&ctx->srcGen);
+		srcbAppends    (&ctx->srcGen, "))\n");
+	}
+
+	/* rdxIdx indexer */
+	srcbAppends    (&ctx->srcGen, "#define rdxIdx          (");
+	srcbBeginList  (&ctx->srcGen, "+", "0");
+	for (i=ctx->ndd;i<ctx->nds;i++){
+		srcbAppendElemf(&ctx->srcGen, "i%d*i%dPDim", i, i);
+	}
+	srcbEndList    (&ctx->srcGen);
+	srcbAppends    (&ctx->srcGen, ")\n");
 }
 static void  reduxAppendIncludes           (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "/* Includes */\n");
@@ -1281,47 +1411,20 @@ static void  reduxAppendTypedefs           (redux_ctx*  ctx){
 	strb_appendf(&ctx->s, "typedef %s X;\n", ctx->idxTypeStr);   /* The type of the indices: signed 32/64-bit. */
 	strb_appendf(&ctx->s, "typedef %s K;\n", ctx->accTypeStr);   /* The type of the accumulator variable. */
 }
-static void  reduxAppendFuncGetInitVal     (redux_ctx*  ctx){
+static void  reduxAppendGetInitValFns      (redux_ctx*  ctx){
 	/**
-	 * Initial value function.
+	 * Initial value functions.
 	 */
 
-	strb_appendf(&ctx->s, "WITHIN_KERNEL K    getInitVal(void){\n"
+	strb_appendf(&ctx->s, "WITHIN_KERNEL T    getInitValTFn(void){\n"
 	                      "\treturn (%s);\n"
-	                      "}\n\n\n\n", ctx->initVal);
+	                      "}\n\n\n\n"
+	                      "WITHIN_KERNEL K    getInitValKFn(void){\n"
+	                      "\treturn (%s);\n"
+	                      "}\n\n\n\n", ctx->initValT, ctx->initValK);
 }
-static void  reduxAppendFuncLoadVal        (redux_ctx*  ctx){
-	int i;
-
+static void  reduxAppendWriteBackFn        (redux_ctx*  ctx){
 	/**
-	 * Multidimensional source element loader.
-	 *
-	 * Also implements prescalar transformations if any.
-	 */
-
-	appendIdxes (&ctx->s, "WITHIN_KERNEL K    loadVal(", "X i", 0, ctx->nds, "", "");
-	if (ctx->nds > 0){
-		strb_appends(&ctx->s, ", ");
-	}
-	strb_appends(&ctx->s, "const GLOBAL_MEM S* src, const GLOBAL_MEM X* srcSteps){\n");
-	strb_appends(&ctx->s, "\tS v = (*(const GLOBAL_MEM S*)((const GLOBAL_MEM char*)src + ");
-	for (i=0;i<ctx->nds;i++){
-		strb_appendf(&ctx->s, "i%d*srcSteps[%d] + \\\n\t                                                            ", i, ctx->srcAxisList[i]);
-	}
-	strb_appends(&ctx->s, "0));\n");
-
-	/* Prescalar transformations go here... */
-
-	/* Return the value. */
-	strb_appends(&ctx->s, "\treturn v;\n");
-	strb_appends(&ctx->s, "}\n\n\n\n");
-}
-static void  reduxAppendFuncReduxVal       (redux_ctx*  ctx){
-	int i, anyArgsEmitted = 0;
-
-	/**
-	 * Function Signature.
-	 *
 	 * Global memory value reduction function.
 	 *
 	 * Responsible for either:
@@ -1329,44 +1432,25 @@ static void  reduxAppendFuncReduxVal       (redux_ctx*  ctx){
 	 *   2) Safe atomic reduction of partial value into memory.
 	 */
 
-	appendIdxes (&ctx->s, "WITHIN_KERNEL void reduxVal(", "X i", 0, ctx->ndd, "", "");
-	anyArgsEmitted = ctx->ndd>0;
-	if (reduxKernelRequiresDst   (ctx)){
-		if (anyArgsEmitted){
-			strb_appends(&ctx->s, ", ");
-		}
-		anyArgsEmitted = 1;
-		strb_appends(&ctx->s, "GLOBAL_MEM T* dst,    const GLOBAL_MEM X* dstSteps,    K v");
+	srcbAppends    (&ctx->srcGen, "WITHIN_KERNEL void writeBackFn(");
+	srcbBeginList  (&ctx->srcGen, ", ", "void");
+	if (reduxKernelRequiresDst(ctx)){
+		srcbAppendElemf(&ctx->srcGen, "GLOBAL_MEM T* d_");
+		srcbAppendElemf(&ctx->srcGen, "T d");
 	}
 	if (reduxKernelRequiresDstArg(ctx)){
-		if (anyArgsEmitted){
-			strb_appends(&ctx->s, ", ");
-		}
-		anyArgsEmitted = 1;
-		strb_appends(&ctx->s, "GLOBAL_MEM A* dstArg, const GLOBAL_MEM X* dstArgSteps, X i");
+		srcbAppendElemf(&ctx->srcGen, "GLOBAL_MEM A* a_");
+		srcbAppendElemf(&ctx->srcGen, "A a");
 	}
-	strb_appends(&ctx->s, "){\n");
+	srcbEndList    (&ctx->srcGen);
+	srcbAppends    (&ctx->srcGen, "){\n");
 
-
-	/* Post-scalar transformations go here. */
-
-
-	/* Write to memory. */
 	if (reduxIsLargeCodeModel(ctx)){
-		/* Large code model. Easy: just write out the data, since it's safe. */
 		if (reduxKernelRequiresDst   (ctx)){
-			strb_appends(&ctx->s, "\t(*(GLOBAL_MEM T*)((GLOBAL_MEM char*)dst + ");
-			for (i=0;i<ctx->ndd;i++){
-				strb_appendf(&ctx->s, "i%d*dstSteps[%d] +\n\t                                          ", i, i);
-			}
-			strb_appends(&ctx->s, "0)) = v;\n");
+			srcbAppends    (&ctx->srcGen, "\t*d_ = d;\n");
 		}
 		if (reduxKernelRequiresDstArg(ctx)){
-			strb_appends(&ctx->s, "\t(*(GLOBAL_MEM A*)((GLOBAL_MEM char*)dstArg + ");
-			for (i=0;i<ctx->ndd;i++){
-				strb_appendf(&ctx->s, "i%d*dstArgSteps[%d] +\n\t                                             ", i, i);
-			}
-			strb_appends(&ctx->s, "0)) = i;\n");
+			srcbAppends    (&ctx->srcGen, "\t*a_ = a;\n");
 		}
 	}else{
 		/* BUG: Implement the atomic reduction, one or two CAS loops. */
@@ -1382,49 +1466,28 @@ static void  reduxAppendFuncReduxVal       (redux_ctx*  ctx){
 	/* Close off function. */
 	strb_appends(&ctx->s, "}\n\n\n\n");
 }
-static void  reduxAppendFuncPreKernel      (redux_ctx*  ctx){
-
-}
-static void  reduxAppendFuncKernel         (redux_ctx*  ctx){
+static void  reduxAppendReduxKernel        (redux_ctx*  ctx){
 	reduxAppendPrototype        (ctx);
 	strb_appends                (&ctx->s, "{\n");
-	reduxAppendOffsets          (ctx);
 	reduxAppendIndexDeclarations(ctx);
 	reduxAppendRangeCalculations(ctx);
 	reduxAppendLoops            (ctx);
 	strb_appends                (&ctx->s, "}\n");
 }
-static void  reduxAppendFuncPostKernel     (redux_ctx*  ctx){
-
-}
 static void  reduxAppendPrototype          (redux_ctx*  ctx){
-	strb_appends(&ctx->s, "/**\n");
-	strb_appends(&ctx->s, " * Reduction Kernel.\n");
-	strb_appends(&ctx->s, " *\n");
-	strb_appends(&ctx->s, " * Implements actual reduction operation.\n");
-	strb_appends(&ctx->s, " */\n\n");
-	strb_appends(&ctx->s, "KERNEL void redux(const GLOBAL_MEM S*        src,\n");
-	strb_appends(&ctx->s, "                  const X                    srcOff,\n");
-	strb_appends(&ctx->s, "                  const GLOBAL_MEM X*        srcSteps,\n");
-	strb_appends(&ctx->s, "                  const GLOBAL_MEM X*        srcSize,\n");
-	strb_appends(&ctx->s, "                  const GLOBAL_MEM X*        chunkSize,\n");
-	strb_appends(&ctx->s, "                  GLOBAL_MEM T*              dst,\n");
-	strb_appends(&ctx->s, "                  const X                    dstOff,\n");
-	strb_appends(&ctx->s, "                  const GLOBAL_MEM X*        dstSteps,\n");
-	strb_appends(&ctx->s, "                  GLOBAL_MEM A*              dstArg,\n");
-	strb_appends(&ctx->s, "                  const X                    dstArgOff,\n");
-	strb_appends(&ctx->s, "                  const GLOBAL_MEM X*        dstArgSteps)");
-}
-static void  reduxAppendOffsets            (redux_ctx*  ctx){
-	strb_appends(&ctx->s, "\t/* Add offsets */\n");
-	strb_appends(&ctx->s, "\tsrc    = (const GLOBAL_MEM T*)((const GLOBAL_MEM char*)src    + srcOff);\n");
-	if (reduxKernelRequiresDst(ctx)){
-		strb_appends(&ctx->s, "\tdst    = (GLOBAL_MEM T*)      ((GLOBAL_MEM char*)      dst    + dstOff);\n");
+	srcbAppends    (&ctx->srcGen, "KERNEL void reduxKer(");
+	srcbBeginList  (&ctx->srcGen, ", ", "void");
+	reduxAppendTensorDeclArgs(ctx, "S", "src");
+	srcbAppendElemf(&ctx->srcGen, "const GLOBAL_MEM X*        srcSize");
+	srcbAppendElemf(&ctx->srcGen, "const GLOBAL_MEM X*        chunkSize");
+	if(reduxKernelRequiresDst(ctx)){
+		reduxAppendTensorDeclArgs(ctx, "T", "dst");
 	}
-	if (reduxKernelRequiresDstArg(ctx)){
-		strb_appends(&ctx->s, "\tdstArg = (GLOBAL_MEM X*)      ((GLOBAL_MEM char*)      dstArg + dstArgOff);\n");
+	if(reduxKernelRequiresDstArg(ctx)){
+		reduxAppendTensorDeclArgs(ctx, "A", "dstArg");
 	}
-	strb_appends(&ctx->s, "\t\n\t\n");
+	srcbEndList    (&ctx->srcGen);
+	srcbAppends    (&ctx->srcGen, ")");
 }
 static void  reduxAppendIndexDeclarations  (redux_ctx*  ctx){
 	int i;
@@ -1441,39 +1504,39 @@ static void  reduxAppendIndexDeclarations  (redux_ctx*  ctx){
 			             i, i, (i==ctx->pri.ndh-1) ? ";\n" : ", ");
 		}
 	}
-
 	strb_appends(&ctx->s, "\t\n\t\n");
 	strb_appends(&ctx->s, "\t/* Free indices & Reduction indices */\n");
-
 	if (ctx->nds >        0){appendIdxes (&ctx->s, "\tX ", "i", 0,        ctx->nds, "",        ";\n");}
 	if (ctx->nds >        0){appendIdxes (&ctx->s, "\tX ", "i", 0,        ctx->nds, "Dim",     ";\n");}
 	if (ctx->nds >        0){appendIdxes (&ctx->s, "\tX ", "i", 0,        ctx->nds, "Start",   ";\n");}
 	if (ctx->nds >        0){appendIdxes (&ctx->s, "\tX ", "i", 0,        ctx->nds, "End",     ";\n");}
 	if (ctx->nds >        0){appendIdxes (&ctx->s, "\tX ", "i", 0,        ctx->nds, "SStep",   ";\n");}
-	if (ctx->ndd >        0){appendIdxes (&ctx->s, "\tX ", "i", 0,        ctx->ndd, "MStep",   ";\n");}
+	if (ctx->ndd >        0){appendIdxes (&ctx->s, "\tX ", "i", 0,        ctx->ndd, "DStep",   ";\n");}
 	if (ctx->ndd >        0){appendIdxes (&ctx->s, "\tX ", "i", 0,        ctx->ndd, "AStep",   ";\n");}
 	if (ctx->nds > ctx->ndd){appendIdxes (&ctx->s, "\tX ", "i", ctx->ndd, ctx->nds, "PDim",    ";\n");}
-
 	strb_appends(&ctx->s, "\t\n\t\n");
 }
 static void  reduxAppendRangeCalculations  (redux_ctx*  ctx){
 	size_t hwDim;
 	int    i;
 
-	/* Use internal remapping when computing the ranges for this thread. */
 	strb_appends(&ctx->s, "\t/* Compute ranges for this thread. */\n");
 
 	for (i=0;i<ctx->nds;i++){
-		strb_appendf(&ctx->s, "\ti%dDim     = srcSize[%d];\n", i, ctx->srcAxisList[i]);
+		strb_appendf(&ctx->s, "\ti%dDim     = srcSize[%d];\n",  i, ctx->srcAxisList[i]);
 	}
 	for (i=0;i<ctx->nds;i++){
 		strb_appendf(&ctx->s, "\ti%dSStep   = srcSteps[%d];\n", i, ctx->srcAxisList[i]);
 	}
-	for (i=0;i<ctx->ndd;i++){
-		strb_appendf(&ctx->s, "\ti%dMStep   = dstSteps[%d];\n", i, i);
+	if(reduxKernelRequiresDst(ctx)){
+		for (i=0;i<ctx->ndd;i++){
+			strb_appendf(&ctx->s, "\ti%dDStep   = dstSteps[%d];\n", i, i);
+		}
 	}
-	for (i=0;i<ctx->ndd;i++){
-		strb_appendf(&ctx->s, "\ti%dAStep   = dstArgSteps[%d];\n", i, i);
+	if(reduxKernelRequiresDstArg(ctx)){
+		for (i=0;i<ctx->ndd;i++){
+			strb_appendf(&ctx->s, "\ti%dAStep   = dstArgSteps[%d];\n", i, i);
+		}
 	}
 	for (i=ctx->nds-1;i>=ctx->ndd;i--){
 		/**
@@ -1515,192 +1578,114 @@ static void  reduxAppendRangeCalculations  (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "\t\n\t\n");
 }
 static void  reduxAppendLoops              (redux_ctx*  ctx){
-	strb_appends(&ctx->s, "\t/**\n");
-	strb_appends(&ctx->s, "\t * FREE LOOPS.\n");
-	strb_appends(&ctx->s, "\t */\n");
-	strb_appends(&ctx->s, "\t\n");
-
-	reduxAppendLoopMacroDefs  (ctx);
-	reduxAppendLoopOuter      (ctx);
-	reduxAppendLoopMacroUndefs(ctx);
-}
-static void  reduxAppendLoopMacroDefs      (redux_ctx*  ctx){
 	int i;
-
-	/**
-	 * FOROVER Macro
-	 */
-
-	strb_appends(&ctx->s, "#define FOROVER(idx)    for(i##idx = i##idx##Start; i##idx < i##idx##End; i##idx++)\n");
-
-	/**
-	 * ESCAPE Macro
-	 */
-
-	strb_appends(&ctx->s, "#define ESCAPE(idx)     if(i##idx >= i##idx##Dim){continue;}\n");
-
-	/**
-	 * RDXINDEXER Macro
-	 */
-
-	appendIdxes (&ctx->s, "#define RDXINDEXER(", "i", ctx->ndd, ctx->nds, "", ")              (");
-	for (i=ctx->ndd;i<ctx->nds;i++){
-		strb_appendf(&ctx->s, "i%d*i%dPDim + \\\n                                        ", i, i);
-	}
-	strb_appends(&ctx->s, "0)\n");
-}
-static void  reduxAppendLoopOuter          (redux_ctx*  ctx){
-	int i;
-
-	/**
-	 * Outer Loop Header Generation
-	 */
 
 	for (i=0;i<ctx->ndd;i++){
-		strb_appendf(&ctx->s, "\tFOROVER(%d){ESCAPE(%d)\n", i, i);
+		srcbAppendf(&ctx->srcGen, "\tFOROVER(%d){ESCAPE(%d)\n", i, i);
 	}
 
-	/**
-	 * Inner Loop Generation
-	 */
-
-	reduxAppendLoopInner(ctx);
-
-	/**
-	 * Outer Loop Trailer Generation
-	 */
-
-	for (i=0;i<ctx->ndd;i++){
-		strb_appends(&ctx->s, "\t}\n");
-	}
-}
-static void  reduxAppendLoopInner          (redux_ctx*  ctx){
-	int i;
-
-	/**
-	 * Inner Loop Prologue
-	 */
-
-	strb_appends(&ctx->s, "\t\t/**\n");
-	strb_appends(&ctx->s, "\t\t * Reduction initialization.\n");
-	strb_appends(&ctx->s, "\t\t */\n");
-	strb_appends(&ctx->s, "\t\t\n");
-	strb_appends(&ctx->s, "\t\tK rdxV = getInitVal();\n");
+	srcbAppends    (&ctx->srcGen, "\t\tT rdxT;\n");
+	srcbAppends    (&ctx->srcGen, "\t\tK rdxK = getInitValKFn();\n");
 	if (reduxKernelRequiresDstArg(ctx)){
-		strb_appends(&ctx->s, "\t\tX argI = 0;\n");
+		srcbAppends(&ctx->srcGen, "\t\tX rdxA = 0;\n");
 	}
-	strb_appends(&ctx->s, "\t\t\n");
-	strb_appends(&ctx->s, "\t\t/**\n");
-	strb_appends(&ctx->s, "\t\t * REDUCTION LOOPS.\n");
-	strb_appends(&ctx->s, "\t\t */\n");
-	strb_appends(&ctx->s, "\t\t\n");
-
-	/**
-	 * Inner Loop Header Generation
-	 */
+	srcbAppends    (&ctx->srcGen, "\t\t\n");
 
 	for (i=ctx->ndd;i<ctx->nds;i++){
-		strb_appendf(&ctx->s, "\t\tFOROVER(%d){ESCAPE(%d)\n", i, i);
+		srcbAppendf    (&ctx->srcGen, "\t\tFOROVER(%d){ESCAPE(%d)\n", i, i);
 	}
+
+	srcbAppends    (&ctx->srcGen, "\t\t\tS s = srcVal;\n");
 
 	/**
-	 * Inner Loop Body Generation
+	 * Prescalar transformations go here. They transform and coerce the S-typed
+	 * value s into the K-typed value k.
 	 */
 
-	appendIdxes (&ctx->s, "\t\t\tK v = loadVal(", "i", 0, ctx->nds, "", "");
-	if (ctx->nds > 0){
-		strb_appends(&ctx->s, ", ");
-	}
-	strb_appends(&ctx->s, "src, srcSteps);\n");
-	strb_appends(&ctx->s, "\t\t\t\n");
+	srcbAppends    (&ctx->srcGen, "\t\t\tK k = s;\n");
+
 	switch (ctx->op){
 		case GA_REDUCE_SUM:
-		  strb_appends(&ctx->s, "\t\t\trdxV += v;\n");
+		  srcbAppends(&ctx->srcGen, "\t\t\trdxK += k;\n");
 		break;
 		case GA_REDUCE_PROD:
-		  strb_appends(&ctx->s, "\t\t\trdxV *= v;\n");
+		  srcbAppends(&ctx->srcGen, "\t\t\trdxK *= k;\n");
 		break;
 		case GA_REDUCE_PRODNZ:
-		  strb_appends(&ctx->s, "\t\t\trdxV *= v==0 ? getInitVal() : v;\n");
+		  srcbAppends(&ctx->srcGen, "\t\t\trdxK *= k==0 ? getInitValKFn() : k;\n");
 		break;
 		case GA_REDUCE_MIN:
-		  strb_appends(&ctx->s, "\t\t\trdxV  = min(rdxV, v);\n");
+		  srcbAppends(&ctx->srcGen, "\t\t\trdxK  = min(rdxK, k);\n");
 		break;
 		case GA_REDUCE_MAX:
-		  strb_appends(&ctx->s, "\t\t\trdxV  = max(rdxV, v);\n");
+		  srcbAppends(&ctx->srcGen, "\t\t\trdxK  = max(rdxK, k);\n");
 		break;
 		case GA_REDUCE_ARGMIN:
 		case GA_REDUCE_MINANDARGMIN:
-		  strb_appends(&ctx->s, "\t\t\trdxV  = min(rdxV, v);\n");
-		  strb_appends(&ctx->s, "\t\t\tif(v == rdxV){\n");
-		  appendIdxes (&ctx->s, "\t\t\t\targI = RDXINDEXER(", "i", ctx->ndd, ctx->nds, "", ");\n");
-		  strb_appends(&ctx->s, "\t\t\t}\n");
+		  srcbAppends(&ctx->srcGen, "\t\t\trdxK  = min(rdxK, k);\n"
+		                            "\t\t\tif(rdxK == k){\n"
+		                            "\t\t\t\trdxA = rdxIdx;\n"
+		                            "\t\t\t}\n");
 		break;
 		case GA_REDUCE_ARGMAX:
 		case GA_REDUCE_MAXANDARGMAX:
-		  strb_appends(&ctx->s, "\t\t\trdxV  = max(rdxV, v);\n");
-		  strb_appends(&ctx->s, "\t\t\tif(v == rdxV){\n");
-		  appendIdxes (&ctx->s, "\t\t\t\targI = RDXINDEXER(", "i", ctx->ndd, ctx->nds, "", ");\n");
-		  strb_appends(&ctx->s, "\t\t\t}\n");
+		  srcbAppends(&ctx->srcGen, "\t\t\trdxK  = max(rdxK, k);\n"
+		                            "\t\t\tif(rdxK == k){\n"
+		                            "\t\t\t\trdxA = rdxIdx;\n"
+		                            "\t\t\t}\n");
 		break;
 		case GA_REDUCE_AND:
-		  strb_appends(&ctx->s, "\t\t\trdxV &= v;\n");
+		  srcbAppends(&ctx->srcGen, "\t\t\trdxK &= k;\n");
 		break;
 		case GA_REDUCE_OR:
-		  strb_appends(&ctx->s, "\t\t\trdxV |= v;\n");
+		  srcbAppends(&ctx->srcGen, "\t\t\trdxK |= k;\n");
 		break;
 		case GA_REDUCE_XOR:
-		  strb_appends(&ctx->s, "\t\t\trdxV ^= v;\n");
+		  srcbAppends(&ctx->srcGen, "\t\t\trdxK ^= k;\n");
 		break;
 		case GA_REDUCE_ALL:
-		  strb_appends(&ctx->s, "\t\t\trdxV  = rdxV && v;\n");
+		  srcbAppends(&ctx->srcGen, "\t\t\trdxK  = rdxK && k;\n");
 		break;
 		case GA_REDUCE_ANY:
-		  strb_appends(&ctx->s, "\t\t\trdxV  = rdxV || v;\n");
+		  srcbAppends(&ctx->srcGen, "\t\t\trdxK  = rdxK || k;\n");
 		break;
 	}
 
-	/**
-	 * Inner Loop Trailer Generation
-	 */
-
 	for (i=ctx->ndd;i<ctx->nds;i++){
-		strb_appends(&ctx->s, "\t\t}\n");
+		srcbAppends(&ctx->srcGen, "\t\t}\n");
 	}
-	strb_appends(&ctx->s, "\t\t\n");
+	srcbAppends(&ctx->srcGen, "\t\t\n");
 
 	/**
-	 * Inner Loop Epilogue Generation
+	 * Large code model: Postscalar transformations go here, coercing the
+	 * K-typed value rdxK to the T-typed value rdxT
 	 */
 
-	strb_appends(&ctx->s, "\t\t/**\n");
-	strb_appends(&ctx->s, "\t\t * Destination writeback.\n");
-	strb_appends(&ctx->s, "\t\t */\n");
-	strb_appends(&ctx->s, "\t\t\n");
-	if       ( reduxKernelRequiresDst   (ctx) && !reduxKernelRequiresDstArg(ctx)){
-		appendIdxes (&ctx->s, "\t\treduxVal(", "i", 0, ctx->ndd, "", "");
-		if (ctx->ndd > 0){
-			strb_appends(&ctx->s, ", ");
-		}
-		strb_appends(&ctx->s, "dst, dstSteps, rdxV);\n");
-	}else if (!reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
-		appendIdxes (&ctx->s, "\t\treduxVal(", "i", 0, ctx->ndd, "", "");
-		if (ctx->ndd > 0){
-			strb_appends(&ctx->s, ", ");
-		}
-		strb_appends(&ctx->s, "dstArg, dstArgSteps, argI);\n");
-	}else if ( reduxKernelRequiresDst   (ctx) &&  reduxKernelRequiresDstArg(ctx)){
-		appendIdxes (&ctx->s, "\t\treduxVal(", "i", 0, ctx->ndd, "", "");
-		if (ctx->ndd > 0){
-			strb_appends(&ctx->s, ", ");
-		}
-		strb_appends(&ctx->s, "dst, dstSteps, rdxV, dstArg, dstArgSteps, argI);\n");
+	srcbAppends    (&ctx->srcGen, "\t\trdxT = rdxK;\n");
+
+	/* Final writeback. */
+	srcbAppends    (&ctx->srcGen, "\t\twriteBackFn(");
+	srcbBeginList  (&ctx->srcGen, ", ", "");
+	if (reduxKernelRequiresDst(ctx)){
+		srcbAppendElemf(&ctx->srcGen, "&dstVal");
+		srcbAppendElemf(&ctx->srcGen, "rdxT");
+	}
+	if (reduxKernelRequiresDstArg(ctx)){
+		srcbAppendElemf(&ctx->srcGen, "&dstArgVal");
+		srcbAppendElemf(&ctx->srcGen, "rdxA");
+	}
+	srcbEndList    (&ctx->srcGen);
+	srcbAppends    (&ctx->srcGen, ");\n");
+
+	for (i=0;i<ctx->ndd;i++){
+		srcbAppends(&ctx->srcGen, "\t}\n");
 	}
 }
-static void  reduxAppendLoopMacroUndefs    (redux_ctx*  ctx){
-	strb_appends(&ctx->s, "#undef FOROVER\n");
-	strb_appends(&ctx->s, "#undef ESCAPE\n");
-	strb_appends(&ctx->s, "#undef RDXINDEXER\n");
+static void  reduxAppendInitKernel         (redux_ctx*  ctx){
+	/* BUG: Implement this for small code model. */
+}
+static void  reduxAppendPostKernel         (redux_ctx*  ctx){
+	/* BUG: Implement this for small code model. */
 }
 
 /**
@@ -1713,43 +1698,43 @@ static int   reduxCompile                  (redux_ctx*  ctx){
 	size_t PRI_TYPECODES_LEN;
 	int*   AUX_TYPECODES;
 	size_t AUX_TYPECODES_LEN;
-	
-	
+
+
 	/**
 	 * Construct Argument Typecode Lists.
 	 */
-	
-	PRI_TYPECODES[i++] = GA_BUFFER; /* src */
+
+	PRI_TYPECODES[i++] = GA_BUFFER; /* srcPtr */
 	PRI_TYPECODES[i++] = GA_SIZE;   /* srcOff */
 	PRI_TYPECODES[i++] = GA_BUFFER; /* srcSteps */
 	PRI_TYPECODES[i++] = GA_BUFFER; /* srcSize */
 	PRI_TYPECODES[i++] = GA_BUFFER; /* chnkSize */
-	if(reduxKernelRequiresDst(ctx)){
-		PRI_TYPECODES[i++] = GA_BUFFER; /* dst */
+	if (reduxKernelRequiresDst(ctx)){
+		PRI_TYPECODES[i++] = GA_BUFFER; /* dstPtr */
 		PRI_TYPECODES[i++] = GA_SIZE;   /* dstOff */
 		PRI_TYPECODES[i++] = GA_BUFFER; /* dstSteps */
 	}
-	if(reduxKernelRequiresDstArg(ctx)){
-		PRI_TYPECODES[i++] = GA_BUFFER; /* dstArg */
+	if (reduxKernelRequiresDstArg(ctx)){
+		PRI_TYPECODES[i++] = GA_BUFFER; /* dstArgPtr */
 		PRI_TYPECODES[i++] = GA_SIZE;   /* dstArgOff */
 		PRI_TYPECODES[i++] = GA_BUFFER; /* dstArgSteps */
 	}
 	PRI_TYPECODES_LEN  = i;
 	AUX_TYPECODES      = &PRI_TYPECODES[3];
 	AUX_TYPECODES_LEN  = PRI_TYPECODES_LEN-3;
-	
-	
+
+
 	/**
 	 * Compile the kernels.
 	 */
-	
+
 	{
 		ret  = GpuKernel_init(&ctx->kernel,
 		                      ctx->gpuCtx,
 		                      1,
 		                      (const char**)&ctx->sourceCode,
 		                      &ctx->sourceCodeLen,
-		                      "redux",
+		                      "reduxKer",
 		                      PRI_TYPECODES_LEN,
 		                      PRI_TYPECODES,
 		                      GA_USE_CLUDA,
@@ -1758,13 +1743,13 @@ static int   reduxCompile                  (redux_ctx*  ctx){
 			return reduxCleanup(ctx, ret);
 		}
 	}
-	if(reduxIsSmallCodeModel(ctx)){
+	if (reduxIsSmallCodeModel(ctx)){
 		ret  = GpuKernel_init(&ctx->kernel,
 		                      ctx->gpuCtx,
 		                      1,
 		                      (const char**)&ctx->sourceCode,
 		                      &ctx->sourceCodeLen,
-		                      "preRedux",
+		                      "initKer",
 		                      AUX_TYPECODES_LEN,
 		                      AUX_TYPECODES,
 		                      GA_USE_CLUDA,
@@ -1777,7 +1762,7 @@ static int   reduxCompile                  (redux_ctx*  ctx){
 		                      1,
 		                      (const char**)&ctx->sourceCode,
 		                      &ctx->sourceCodeLen,
-		                      "postRedux",
+		                      "postKer",
 		                      AUX_TYPECODES_LEN,
 		                      AUX_TYPECODES,
 		                      GA_USE_CLUDA,
@@ -1810,8 +1795,8 @@ static int   reduxSchedule                 (redux_ctx*  ctx){
 	size_t   warpSize,
 	         maxL, maxL0, maxL1, maxL2,
 	         maxG, maxG0, maxG1, maxG2;
-	
-	
+
+
 	/**
 	 * Obtain the constraints of our problem.
 	 */
@@ -1827,14 +1812,14 @@ static int   reduxSchedule                 (redux_ctx*  ctx){
 	gpukernel_property(ctx->kernel.k,     GA_KERNEL_PROP_MAXLSIZE,  &maxL);
 	maxLgRdx  = maxL;
 	maxLgPri  = maxLgRdx;
-	if(reduxIsSmallCodeModel(ctx)){
+	if (reduxIsSmallCodeModel(ctx)){
 		gpukernel_property(ctx->preKernel.k,  GA_KERNEL_PROP_MAXLSIZE,  &maxL);
 		maxLgPre  = maxL;
 		gpukernel_property(ctx->postKernel.k, GA_KERNEL_PROP_MAXLSIZE,  &maxL);
 		maxLgPost = maxL;
 		maxLgAux  = maxLgPre<maxLgPost ? maxLgPre : maxLgPost;
 	}
-	
+
 	priNdims  = ctx->pri.ndh;
 	maxGs[0]  = maxG0;
 	maxGs[1]  = maxG1;
@@ -1846,18 +1831,18 @@ static int   reduxSchedule                 (redux_ctx*  ctx){
 	for (i=0;i<priNdims;i++){
 		priDims[i] = ctx->src->dimensions[ctx->pri.axisList[i]];
 	}
-	if(reduxIsSmallCodeModel(ctx)){
+	if (reduxIsSmallCodeModel(ctx)){
 		auxNdims  = ctx->aux.ndh;
 		for (i=0;i<auxNdims;i++){
 			auxDims[i] = ctx->src->dimensions[ctx->aux.axisList[i]];
 		}
 	}
-	
-	
+
+
 	/**
 	 * Apply the solver.
 	 */
-	
+
 	{
 		reduxScheduleKernel(priNdims,
 		                    priDims,
@@ -1890,14 +1875,14 @@ static int   reduxSchedule                 (redux_ctx*  ctx){
 			ctx->aux.bs[i] = ctx->aux.gs[i] = ctx->aux.cs[i] = 1;
 		}
 	}
-	
+
 	return reduxInvoke(ctx);
 }
 
 /**
  * @brief Given the parameters of a kernel scheduling problem, solve it as
  *        optimally as possible.
- * 
+ *
  * NB: This is the only function in this entire file that should have
  *     anything to do with the integer factorization APIs.
  */
@@ -1919,20 +1904,20 @@ static void  reduxScheduleKernel           (int         ndims,
 	ga_factor_list factBS     [MAX_HW_DIMS];
 	ga_factor_list factGS     [MAX_HW_DIMS];
 	ga_factor_list factCS     [MAX_HW_DIMS];
-	
-	
+
+
 	/**
 	 * Quick check for scalar case.
 	 */
-	
+
 	if (ndims <= 0){
 		return;
 	}
-	
-	
+
+
 	/**
 	 * Identify the dimension to which the warp factor will be given.
-	 * 
+	 *
 	 * The current heuristic is to find the dimension that is either
 	 *   1) Evenly divided by the warp size, or
 	 *   2) As close to filling the last warp as possible.
@@ -2017,7 +2002,7 @@ static int   reduxInvoke                   (redux_ctx*  ctx){
 	                                     ctx->src->dimensions,  flags, 0);
 	ctx->pri.chunkSizeGD = gpudata_alloc(ctx->gpuCtx, ctx->pri.ndh * sizeof(size_t),
 	                                     ctx->pri.cs,           flags, 0);
-	
+
 	priArgs[i++] = (void*) ctx->src->data;
 	priArgs[i++] = (void*)&ctx->src->offset;
 	priArgs[i++] = (void*) ctx->srcStepsGD;
@@ -2025,21 +2010,21 @@ static int   reduxInvoke                   (redux_ctx*  ctx){
 	priArgs[i++] = (void*) ctx->pri.chunkSizeGD;
 	if (reduxKernelRequiresDst   (ctx)){
 		ctx->dstStepsGD      = gpudata_alloc(ctx->gpuCtx, ctx->ndd * sizeof(size_t),
-		                                     ctx->dst->strides,    flags, 0);
-		priArgs[i++]         = (void*) ctx->dst->data;
-		priArgs[i++]         = (void*)&ctx->dst->offset;
+		                                     ctx->wsDst->strides,    flags, 0);
+		priArgs[i++]         = (void*) ctx->wsDst->data;
+		priArgs[i++]         = (void*)&ctx->wsDst->offset;
 		priArgs[i++]         = (void*) ctx->dstStepsGD;
 		failedDstSteps       =        !ctx->dstStepsGD;
 	}
 	if (reduxKernelRequiresDstArg(ctx)){
 		ctx->dstArgStepsGD   = gpudata_alloc(ctx->gpuCtx, ctx->ndd * sizeof(size_t),
-		                                     ctx->dstArg->strides, flags, 0);
-		priArgs[i++]         = (void*) ctx->dstArg->data;
-		priArgs[i++]         = (void*)&ctx->dstArg->offset;
+		                                     ctx->wsDstArg->strides, flags, 0);
+		priArgs[i++]         = (void*) ctx->wsDstArg->data;
+		priArgs[i++]         = (void*)&ctx->wsDstArg->offset;
 		priArgs[i++]         = (void*) ctx->dstArgStepsGD;
 		failedDstArgSteps    =        !ctx->dstArgStepsGD;
 	}
-	if (reduxIsSmallCodeModel(ctx)){
+	if (reduxIsSmallCodeModel    (ctx)){
 		/**
 		 * The auxiliary kernel's args are identical to the primary kernel's,
 		 * except that the first three arguments are deleted and the fifth
@@ -2065,7 +2050,7 @@ static int   reduxInvoke                   (redux_ctx*  ctx){
 	    !failedDstArgSteps   &&
 	    !failedAuxChunkSize){
 		/* Pre-kernel invocation, if necessary */
-		if(reduxIsSmallCodeModel(ctx)){
+		if (reduxIsSmallCodeModel(ctx)){
 			ret = GpuKernel_call(&ctx->preKernel,
 			                     ctx->aux.ndh>0 ? ctx->aux.ndh : 1,
 			                     ctx->aux.gs,
@@ -2089,7 +2074,7 @@ static int   reduxInvoke                   (redux_ctx*  ctx){
 		}
 
 		/* Post-kernel invocation, if necessary */
-		if(reduxIsSmallCodeModel(ctx)){
+		if (reduxIsSmallCodeModel(ctx)){
 			ret = GpuKernel_call(&ctx->postKernel,
 			                     ctx->aux.ndh>0 ? ctx->aux.ndh : 1,
 			                     ctx->aux.gs,
@@ -2112,14 +2097,25 @@ static int   reduxInvoke                   (redux_ctx*  ctx){
  */
 
 static int   reduxCleanup                  (redux_ctx*  ctx, int ret){
+	if (ctx->dst    != ctx->wsDst){
+		GpuArray_clear(ctx->wsDst);
+		free(ctx->wsDst);
+		ctx->wsDst    = NULL;
+	}
+	if (ctx->dstArg != ctx->wsDstArg){
+		GpuArray_clear(ctx->wsDstArg);
+		free(ctx->wsDstArg);
+		ctx->wsDstArg = NULL;
+	}
+
 	free(ctx->srcAxisList);
-	free(ctx->dstAxisList);
+	free(ctx->dstDims);
 	free(ctx->sourceCode);
 	free(ctx->errorString0);
 	free(ctx->errorString1);
 	free(ctx->errorString2);
 	ctx->srcAxisList  = NULL;
-	ctx->dstAxisList  = NULL;
+	ctx->dstDims      = NULL;
 	ctx->sourceCode   = NULL;
 	ctx->errorString0 = NULL;
 	ctx->errorString1 = NULL;
