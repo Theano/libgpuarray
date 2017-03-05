@@ -1781,9 +1781,9 @@ static int   reduxCompile                  (redux_ctx*  ctx){
  */
 
 static int   reduxSchedule                 (redux_ctx*  ctx){
-	int      i, priNdims, auxNdims;
-	uint64_t maxLgRdx, maxLgPre, maxLgPost;
-	uint64_t maxLgPri, maxLgAux;
+	int      i, priNdims = 0, auxNdims = 0;
+	uint64_t maxLgRdx = 0, maxLgPre = 0, maxLgPost = 0;
+	uint64_t maxLgPri = 0, maxLgAux = 0;
 	uint64_t maxLs  [MAX_HW_DIMS];
 	uint64_t maxGg;
 	uint64_t maxGs  [MAX_HW_DIMS];
