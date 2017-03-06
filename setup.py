@@ -5,7 +5,7 @@ have_cython = False
 
 MAJOR = 0
 MINOR = 6
-PATCH = 1
+PATCH = 2
 SUFFIX = ''
 FULLVERSION = '%d.%d.%d%s' % (MAJOR, MINOR, PATCH, SUFFIX)
 
