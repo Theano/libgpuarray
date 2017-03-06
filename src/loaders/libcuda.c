@@ -56,9 +56,9 @@ int load_libcuda(void) {
   #include "libcuda.fn"
 
 /*
- * The blacklisted versions of cuda are not available on mac as far as I know.
+ * We keep this in case we need again blacklist in the futur.
  */
-#ifndef __APPLE__
+#if 0
   v = ga_lib_version(lib, cuInit);
   if (v == -1)
     fprintf(stderr, "WARNING: could not determine cuda driver version.  Some versions return bad results, make sure your version is fine\n");
