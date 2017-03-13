@@ -26,45 +26,6 @@ void *ga_func_ptr(void *h, const char *name) {
   return res;
 }
 
-float ga_lib_version(void *h, void *sym) {
-  Dl_info dli;
-  char *real_path;
-  char *dot1;
-  char *dot2;
-  char *end;
-  float res;
-
-  if (!dladdr(sym, &dli))
-    return -1;
-
-  real_path = realpath(dli.dli_fname, NULL);
-  if (real_path == NULL)
-    return -1;
-
-  dot1 = strrchr(real_path, '.');
-  if (dot1 == NULL) {
-    free(real_path);
-    return -1;
-  }
-  dot1[0] = '\0';
-
-  dot2 = strrchr(real_path, '.');
-  if (dot2 == NULL) {
-    free(real_path);
-    return -1;
-  }
-  dot1[0] = '.';
-
-  res = strtof(dot2+1, &end);
-  if (*end != '\0') {
-    free(real_path);
-    return -1;
-  }
-
-  free(real_path);
-  return res;
-}
-
 #else
 
 /* Should be windows */
@@ -77,41 +38,6 @@ void *ga_load_library(const char *name) {
 
 void *ga_func_ptr(void *h, const char *name) {
   return (void *)GetProcAddress(h, name);
-}
-
-float ga_lib_version(void *h, void *sym) {
-  char fname[1024];
-  char *vinfo;
-  size_t vsize;
-  VS_FIXEDFILEINFO *vp;
-  unsigned int ui;
-  float res;
-
-  if (GetModuleFileName(h, fname, sizeof(fname)) == sizeof(fname))
-    return -1;
-
-  vsize = GetFileVersionInfoSize(fname, NULL);
-  if (vsize == 0)
-    return -1;
-
-  vinfo = malloc(vsize);
-  if (vinfo == NULL)
-    return -1;
-
-  if (!GetFileVersionInfo(fname, 0, vsize, vinfo)) {
-    free(vinfo);
-    return -1;
-  }
-
-  if (!VerQueryValue(vinfo, "\\", &vp, &ui)) {
-    free(vinfo);
-    return -1;
-  }
-
-  res = ( ((HIWORD(vp->dwFileVersionLS) - 10) * 10000) + LOWORD(vp->dwFileVersionLS) ) / 100.0;
-
-  free(vinfo);
-  return res;
 }
 
 #endif
