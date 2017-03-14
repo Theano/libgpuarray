@@ -387,19 +387,44 @@ cache *cache_disk(const char *dirpath, cache *mem,
                   kread_fn kread, vread_fn vread) {
   struct stat st;
   disk_cache *res;
-  char *dirp = strdup(dirpath);
+  char *dirp;
+  size_t dirl = strlen(dirpath);
+  char sep = '/';
+
+  /* This trickery is to make sure the path ends with a separator */
+#ifdef _WIN32
+  if (dirpath[dirl - 1] == '\\')
+    sep = '\\';
+#endif
+
+  if (dirpath[dirl - 1] != sep) dirl++;
+
+  dirp = malloc(dirl + 1);  /* With the NUL */
 
   if (dirp == NULL) return NULL;
+
+  strlcpy(dirp, dirpath, dirl + 1);
+
+  if (dirp[dirl - 1] != sep) {
+    dirp[dirl - 1] = sep;
+    dirp[dirl] = '\0';
+  }
 
   if (ensurep(NULL, dirp) != 0) {
     free(dirp);
     return NULL;
   }
 
-  mkdir(dirpath, 0777); /* This may fail, but it's ok */
+  /* For Windows mkdir and lstat which can't handle trailing separator */
+  dirp[dirl -  1] = '\0';
 
-  if (lstat(dirpath, &st) != 0)
+  mkdir(dirp, 0777); /* This may fail, but it's ok */
+
+  if (lstat(dirp, &st) != 0)
     return NULL;
+
+  /* Restore the good path at the end */
+  dirp[dirl - 1] = sep;
 
   if (!(st.st_mode & S_IFDIR))
     return NULL;
