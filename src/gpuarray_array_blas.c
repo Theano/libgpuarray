@@ -5,8 +5,8 @@
 #include "gpuarray/util.h"
 #include "gpuarray/error.h"
 
-int GpuArray_rdot( GpuArray *X, GpuArray *Y,
-        GpuArray *Z, int nocopy) {
+int GpuArray_rdot(GpuArray *X, GpuArray *Y,
+                  GpuArray *Z, int nocopy) {
     GpuArray *Xp = X;
     GpuArray copyX;
     GpuArray *Yp = Y;
