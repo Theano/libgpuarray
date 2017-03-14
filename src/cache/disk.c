@@ -61,6 +61,9 @@ static int gettimeofday(struct timeval *tp, struct timezone *tzp) {
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+
+#define O_BINARY 0
+
 #endif
 
 
@@ -281,7 +284,7 @@ static int find_entry(disk_cache *c, const cache_key_t key,
 
   if (key_path(c, key, hexp)) return 0;
 
-  fd = openp(c->dirp, hexp, O_RDONLY, 0);
+  fd = openp(c->dirp, hexp, O_RDONLY|O_BINARY, 0);
 
   if (fd == -1) return 0;
 
