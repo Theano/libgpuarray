@@ -129,7 +129,7 @@ static int mkstempp(const char *dirp, char *template) {
   res = mkstemp(path);
 
   /* We need to copy the result path back */
-  if (res == 0)
+  if (res != -1)
     memcpy(template, &path[strlen(dirp)], strlen(template));
 
   return res;
