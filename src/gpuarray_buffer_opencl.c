@@ -212,7 +212,7 @@ cl_command_queue cl_get_stream(gpucontext *ctx) {
 }
 
 static void cl_free_ctx(cl_ctx *ctx) {
-  gpuarray_blas_ops *blas_ops;
+  gpuarray_blas_ops *blas_ops = NULL;
 
   ASSERT_CTX(ctx);
   assert(ctx->refcnt != 0);
