@@ -379,8 +379,8 @@ static int gen_take1_kernel(GpuKernel *k, gpucontext *ctx, char **err_str,
                "  const %s numThreads1 = LDIM_1 * GDIM_1;\n"
                "  %s i0, i1;\n", sz, sz, sz, sz, sz);
   strb_appends(&sb, "  if (idx0 >= n0 || idx1 >= n1) return;\n");
-  strb_appendf(&sb, "  r = (GLOBAL_MEM %s *)(((char *)r) + r_off);\n"
-               "  ind = (GLOBAL_MEM %s *)(((char *)ind) + i_off);\n",
+  strb_appendf(&sb, "  r = (GLOBAL_MEM %s *)(((GLOBAL_MEM char *)r) + r_off);\n"
+               "  ind = (GLOBAL_MEM %s *)(((GLOBAL_MEM char *)ind) + i_off);\n",
                gpuarray_get_type(a->typecode)->cluda_name,
                gpuarray_get_type(ind->typecode)->cluda_name);
   strb_appendf(&sb, "  for (i0 = idx0; i0 < n0; i0 += numThreads0) {\n"
