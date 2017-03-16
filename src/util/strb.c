@@ -74,7 +74,7 @@ void strb_read(strb *sb, int fd, size_t sz) {
   while (sz) {
     res = read(fd, b, sz);
     if (res == -1 || res == 0) {
-      if (res == -1 && errno == EAGAIN || errno == EINTR)
+      if (res == -1 && (errno == EAGAIN || errno == EINTR))
         continue;
       strb_seterror(sb);
       return;

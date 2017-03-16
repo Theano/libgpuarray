@@ -63,6 +63,7 @@ static int gettimeofday(struct timeval *tp, struct timezone *tzp) {
 #include <sys/stat.h>
 
 #define O_BINARY 0
+#define setmode(a, b)
 
 #endif
 
@@ -131,9 +132,11 @@ static int mkstempp(const char *dirp, char *template) {
 
   res = mkstemp(path);
 
-  /* We need to copy the result path back */
-  if (res != -1)
+  /* We need to copy the result path back and set binary mode (for windows) */
+  if (res != -1) {
+    setmode(res, O_BINARY);
     memcpy(template, &path[strlen(dirp)], strlen(template));
+  }
 
   return res;
 }
