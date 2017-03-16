@@ -337,7 +337,8 @@ static int find_entry(disk_cache *c, const cache_key_t key,
     return 1;
   }
  error:
-  c->c.kfree(k);
+  if (k)
+    c->c.kfree(k);
   b.s = ts;
   strb_clear(&b);
   return 0;
