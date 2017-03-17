@@ -63,7 +63,7 @@ static int gettimeofday(struct timeval *tp, struct timezone *tzp) {
 #include <sys/stat.h>
 
 #define O_BINARY 0
-#define setmode(a, b)
+#define _setmode(a, b)
 
 #endif
 
@@ -84,7 +84,8 @@ typedef struct _disk_cache {
 } disk_cache;
 
 
-static unsigned long long ntohull(const char *in) {
+static unsigned long long ntohull(const char *_in) {
+  const unsigned char *in = (const unsigned char *)_in;
   return ((unsigned long long)in[0] << 56 | (unsigned long long)in[1] << 48 |
           (unsigned long long)in[2] << 40 | (unsigned long long)in[3] << 32 |
           (unsigned long long)in[4] << 24 | (unsigned long long)in[5] << 16 |
@@ -92,14 +93,14 @@ static unsigned long long ntohull(const char *in) {
 }
 
 static void htonull(unsigned long long in, char *out) {
-  out[0] = (char)(in >> 56);
-  out[1] = (char)(in >> 48);
-  out[2] = (char)(in >> 40);
-  out[3] = (char)(in >> 32);
-  out[4] = (char)(in >> 24);
-  out[5] = (char)(in >> 16);
-  out[6] = (char)(in >> 8);
-  out[7] = (char)(in);
+  out[0] = (unsigned char)(in >> 56);
+  out[1] = (unsigned char)(in >> 48);
+  out[2] = (unsigned char)(in >> 40);
+  out[3] = (unsigned char)(in >> 32);
+  out[4] = (unsigned char)(in >> 24);
+  out[5] = (unsigned char)(in >> 16);
+  out[6] = (unsigned char)(in >> 8);
+  out[7] = (unsigned char)(in);
 }
 
 static int catp(char *path, const char *dirp, const char *rpath) {
@@ -134,7 +135,7 @@ static int mkstempp(const char *dirp, char *template) {
 
   /* We need to copy the result path back and set binary mode (for windows) */
   if (res != -1) {
-    setmode(res, O_BINARY);
+    _setmode(res, O_BINARY);
     memcpy(template, &path[strlen(dirp)], strlen(template));
   }
 
