@@ -1151,6 +1151,7 @@ static void _cuda_freekernel(gpukernel *k) {
     }
     CLEAR(k);
     free(k->args);
+    free(k->bin);
     free(k->types);
     free(k);
   }
@@ -1264,13 +1265,15 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
       FAIL(NULL, GA_SYS_ERROR);
     }
 
+    /* Don't clear bin after this */
+    res->bin_sz = bin.l;
+    res->bin = bin.s;
     res->refcnt = 1;
     res->argcount = argcount;
     res->types = calloc(argcount, sizeof(int));
     if (res->types == NULL) {
       _cuda_freekernel(res);
       strb_clear(&src);
-      strb_clear(&bin);
       cuda_exit(ctx);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
@@ -1279,7 +1282,6 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
     if (res->args == NULL) {
       _cuda_freekernel(res);
       strb_clear(&src);
-      strb_clear(&bin);
       cuda_exit(ctx);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
@@ -1288,11 +1290,9 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
     if (ctx->err != CUDA_SUCCESS) {
       _cuda_freekernel(res);
       strb_clear(&src);
-      strb_clear(&bin);
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
-    strb_clear(&bin);
 
     ctx->err = cuModuleGetFunction(&res->k, res->m, fname);
     if (ctx->err != CUDA_SUCCESS) {
@@ -1388,6 +1388,16 @@ static int cuda_callkernel(gpukernel *k, unsigned int n,
 
     cuda_exit(ctx);
     return GA_NO_ERROR;
+}
+
+static int cuda_kernelbin(gpukernel *k, size_t *sz, void **obj) {
+  void *res = malloc(k->bin_sz);
+  if (res == NULL)
+    return GA_MEMORY_ERROR;
+  memcpy(res, k->bin, k->bin_sz);
+  *sz = k->bin_sz;
+  *obj = res;
+  return GA_NO_ERROR;
 }
 
 static int cuda_sync(gpudata *b) {
@@ -1792,6 +1802,7 @@ const gpuarray_buffer_ops cuda_ops = {cuda_get_platform_count,
                                       cuda_freekernel,
                                       cuda_kernelsetarg,
                                       cuda_callkernel,
+                                      cuda_kernelbin,
                                       cuda_sync,
                                       cuda_transfer,
                                       cuda_property,

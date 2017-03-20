@@ -494,9 +494,22 @@ GPUARRAY_PUBLIC int gpukernel_call(gpukernel *k, unsigned int n,
                                    size_t shared, void **args);
 
 /**
- * Get the kernel binary (REMOVED).
+ * (Deprecated) Get the kernel binary.
  *
- * Always returns GA_DEPRECATED_ERROR.
+ * This function is deprecated and will be removed in the next release.
+ *
+ * This can be use to cache kernel binaries after compilation of a
+ * specific device.  The kernel can be recreated by calling
+ * kernel_alloc with the binary and size and passing `GA_USE_BINARY`
+ * as the use flags.
+ *
+ * The returned pointer is allocated and must be freed by the caller.
+ *
+ * \param k kernel
+ * \param sz size of the returned binary
+ * \param obj pointer to the binary for the kernel.
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
  */
 GPUARRAY_PUBLIC int gpukernel_binary(gpukernel *k, size_t *sz, void **obj);
 
