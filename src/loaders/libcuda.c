@@ -42,9 +42,6 @@ static int loaded = 0;
 
 int load_libcuda(void) {
   void *lib;
-#ifndef __APPLE__
-  float v;
-#endif
 
   if (loaded)
     return GA_NO_ERROR;
@@ -54,31 +51,6 @@ int load_libcuda(void) {
     return GA_LOAD_ERROR;
 
   #include "libcuda.fn"
-
-/*
- * We keep this in case we need again blacklist in the futur.
- */
-#if 0
-  v = ga_lib_version(lib, cuInit);
-  if (v == -1)
-    fprintf(stderr, "WARNING: could not determine cuda driver version.  Some versions return bad results, make sure your version is fine\n");
-  #ifdef DEBUG
-  fprintf(stderr, "CUDA driver version detected: %.2f\n", v);
-  #endif
-
-  if (v > 373.06) {
-    if (getenv("GPUARRAY_FORCE_CUDA_DRIVER_LOAD") != NULL) {
-      fprintf(stderr, "WARNING: loading blacklisted driver because the load was forced.\n");
-    } else {
-      fprintf(stderr, "ERROR: refusing to load cuda driver library "
-              "because the version is blacklisted.  "
-              "Versions 373.06 and below are known to be ok.\n"
-              "If you want to bypass this check and force the driver load "
-              "define GPUARRAY_FORCE_CUDA_DRIVER_LOAD in your environement.\n");
-      return GA_LOAD_ERROR;
-    }
-  }
-#endif
 
   loaded = 1;
   return GA_NO_ERROR;
