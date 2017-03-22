@@ -27,6 +27,10 @@ extern "C" {
 }
 #endif
 
+static inline int error_sys(error *e, const char *msg) {
+  return error_fmt(e, GA_SYS_ERROR, "%s: %s", msg, strerror(errno));
+}
+
 #define ADDR32_MAX   4294967295L
 #define SADDR32_MIN -2147483648L
 #define SADDR32_MAX  2147483647L
@@ -45,7 +49,7 @@ typedef struct _gpuarray_comm_ops gpuarray_comm_ops;
   const gpuarray_blas_ops *blas_ops;            \
   const gpuarray_comm_ops *comm_ops;            \
   void *blas_handle;                            \
-  error *msg;                                   \
+  error *err;                                   \
   unsigned int refcnt;                          \
   int flags;                                    \
   struct _gpudata *errbuf;                      \
@@ -77,7 +81,7 @@ typedef struct _partial_gpucomm {
 struct _gpuarray_buffer_ops {
   int (*get_platform_count)(unsigned int* platcount);
   int (*get_device_count)(unsigned int platform, unsigned int* devcount);
-  gpucontext *(*buffer_init)(int dev, int flags, int *ret);
+  gpucontext *(*buffer_init)(int dev, int flags);
   void (*buffer_deinit)(gpucontext *ctx);
   gpudata *(*buffer_alloc)(gpucontext *ctx, size_t sz, void *data, int flags,
                            int *ret);

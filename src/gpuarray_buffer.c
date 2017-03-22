@@ -17,7 +17,7 @@ const gpuarray_buffer_ops *gpuarray_get_ops(const char *name) {
   return NULL;
 }
 
-#define FAIL(v, e) { if (ret) *ret = e; return v; }
+#define FAIL(v, e) { if (ret) *ret = (e)->code; return v; }
 
 int gpu_get_platform_count(const char* name, unsigned int* platcount) {
   const gpuarray_buffer_ops* ops = gpuarray_get_ops(name);
@@ -39,11 +39,9 @@ int gpu_get_device_count(const char* name, unsigned int platform,
 gpucontext *gpucontext_init(const char *name, int dev, int flags, int *ret) {
   gpucontext *res;
   const gpuarray_buffer_ops *ops = gpuarray_get_ops(name);
-  if (ops == NULL)
-    FAIL(NULL, GA_INVALID_ERROR);
-  res = ops->buffer_init(dev, flags, ret);
-  if (res == NULL)
-    return NULL;
+  if (ops == NULL) FAIL(NULL, global_err);
+  res = ops->buffer_init(dev, flags);
+  if (res == NULL) FAIL(NULL, global_err);
   res->ops = ops;
   if (gpucontext_property(res, GA_CTX_PROP_BLAS_OPS, (void *)&res->blas_ops) != GA_NO_ERROR)
     res->blas_ops = NULL;
@@ -84,7 +82,9 @@ const char *gpucontext_error(gpucontext *ctx, int err) {
 
 gpudata *gpudata_alloc(gpucontext *ctx, size_t sz, void *data, int flags,
                        int *ret) {
-  return ctx->ops->buffer_alloc(ctx, sz, data, flags, ret);
+  gpudata *res = ctx->ops->buffer_alloc(ctx, sz, data, flags);
+  if (res == NULL && ret) *ret = ctx->err->code;
+  return res;
 }
 
 void gpudata_retain(gpudata *b) {
@@ -92,9 +92,8 @@ void gpudata_retain(gpudata *b) {
 }
 
 void gpudata_release(gpudata *b) {
-  if(b){
+  if (b)
     ((partial_gpudata *)b)->ctx->ops->buffer_release(b);
-  }
 }
 
 int gpudata_share(gpudata *a, gpudata *b, int *ret) {
