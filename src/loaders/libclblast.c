@@ -20,23 +20,23 @@ static const char libname[] = "libclblast.so";
 
 #undef DEF_PROC
 
-#define DEF_PROC(ret, name, args)            \
-  name = (t##name *)ga_func_ptr(lib, #name); \
-  if (name == NULL) {                        \
-    return GA_LOAD_ERROR;                    \
+#define DEF_PROC(ret, name, args)                 \
+  name = (t##name *)ga_func_ptr(lib, #name, e);   \
+  if (name == NULL) {                             \
+    return e->code;                               \
   }
 
 static int loaded = 0;
 
-int load_libclblast(void) {
+int load_libclblast(error *e) {
   void *lib;
 
   if (loaded)
     return GA_NO_ERROR;
 
-  lib = ga_load_library(libname);
+  lib = ga_load_library(libname, e);
   if (lib == NULL)
-    return GA_LOAD_ERROR;
+    return e->code;
 
   #include "libclblast.fn"
 

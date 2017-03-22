@@ -1,6 +1,8 @@
 #ifndef LOADER_LIBNCCL_H
 #define LOADER_LIBNCCL_H
 
+#include "util/error.h"
+
 typedef struct CUstream_st *cudaStream_t;
 typedef struct ncclComm* ncclComm_t;
 
@@ -25,7 +27,7 @@ typedef enum { ncclChar       = 0,
                ncclUint64     = 6,
                nccl_NUM_TYPES = 7 } ncclDataType_t;
 
-int load_libnccl(void);
+int load_libnccl(error *e);
 
 #define DEF_PROC(ret, name, args) typedef ret t##name args
 

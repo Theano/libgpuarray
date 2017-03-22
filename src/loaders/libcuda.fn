@@ -1,5 +1,6 @@
 DEF_PROC(cuInit, (int flags));
 DEF_PROC(cuDriverGetVersion, (int *driverVersion));
+DEF_PROC(cuGetErrorName, (CUresult error, const char **pStr));
 DEF_PROC(cuGetErrorString, (CUresult error, const char **pStr));
 
 DEF_PROC(cuDeviceGet, (CUdevice *device, int ordinal));

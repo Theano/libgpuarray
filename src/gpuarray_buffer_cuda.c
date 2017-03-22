@@ -158,7 +158,7 @@ static int setup_lib(void) {
     }
     if (major > 9 || major < 0 || minor > 9 || minor < 0)
       return error_fmt(global_err, GA_VALUE_ERROR, "Invalid cuda version: %d.%d", major, minor);
-    res = load_libnvrtc(major, minor);
+    res = load_libnvrtc(major, minor, global_err);
     if (res != GA_NO_ERROR)
       return res;
     setup_done = 1;
@@ -1833,9 +1833,9 @@ static const char *cuda_error(gpucontext *c) {
   cuda_context *ctx = (cuda_context *)c;
   const char *errstr = NULL;
   if (ctx == NULL)
-    cuGetErrorString(err, &errstr);
+    return global_err->msg;
   else
-    cuGetErrorString(ctx->err, &errstr);
+    return ctx->msg->msg;
   return errstr;
 }
 

@@ -1,13 +1,15 @@
 #ifndef LOADER_LIBNVRTC_H
 #define LOADER_LIBNVRTC_H
 
+#include "util/error.h"
+
 typedef enum {
   NVRTC_SUCCESS = 0,
 } nvrtcResult;
 
 typedef struct _nvrtcProgram *nvrtcProgram;
 
-int load_libnvrtc(int major, int minor);
+int load_libnvrtc(int major, int minor, error *e);
 
 #define DEF_PROC(name, args) typedef nvrtcResult t##name args
 

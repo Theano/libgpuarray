@@ -1,6 +1,7 @@
 #ifndef LOADER_LIBCLBLAST_H
 #define LOADER_LIBCLBLAST_H
 
+#include "util/error.h"
 #include "libopencl.h"
 
 typedef enum Layout_ {
@@ -19,7 +20,7 @@ typedef enum StatusCode_ {
   /* Rest is not exposed from here */
 } StatusCode;
 
-int load_libclblast(void);
+int load_libclblast(error *);
 
 #define DEF_PROC(ret, name, args) typedef ret t##name args
 

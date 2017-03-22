@@ -1,6 +1,7 @@
 #ifndef LOADER_LIBCLBLAS_H
 #define LOADER_LIBCLBLAS_H
 
+#include "util/error.h"
 #include "libopencl.h"
 
 typedef enum clblasOrder_ {
@@ -19,7 +20,7 @@ typedef enum clblasStatus_ {
   /* Rest is not exposed from here */
 } clblasStatus;
 
-int load_libclblas(void);
+int load_libclblas(error *);
 
 #define DEF_PROC(ret, name, args) typedef ret t##name args
 

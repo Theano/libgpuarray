@@ -1,6 +1,8 @@
 #ifndef LOADER_LIBOPENCL_H
 #define LOADER_LIBOPENCL_H
 
+#include "util/error.h"
+
 #if defined(_WIN32)
     #define CL_API_CALL     __stdcall
     #define CL_CALLBACK     __stdcall
@@ -54,7 +56,7 @@ typedef cl_uint cl_program_build_info;
 typedef cl_uint cl_kernel_info;
 typedef cl_uint cl_kernel_work_group_info;
 
-int load_libopencl(void);
+int load_libopencl(error *);
 
 #define DEF_PROC(ret, name, args) typedef ret CL_API_CALL t##name args
 
