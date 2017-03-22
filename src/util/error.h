@@ -9,11 +9,11 @@ typedef struct _error {
   int code;
 } error;
 
-int error_alloc(error **ctx);
-void error_free(error *ctx);
-int error_set(error *ctx, int code, const char *msg);
-int error_fmt(error *ctx, int code, const char *fmt, ...);
+int error_alloc(error **e);
+void error_free(error *e);
+int error_set(error *e, int code, const char *msg);
+int error_fmt(error *e, int code, const char *fmt, ...);
 
-extern error *global_ctx;
+extern error *global_err;
 
 #endif

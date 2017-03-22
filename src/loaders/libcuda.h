@@ -1,6 +1,8 @@
 #ifndef LOADER_LIBCUDA_H
 #define LOADER_LIBCUDA_H
 
+#include "util/error.h"
+
 #ifdef _WIN32
 #define CUDAAPI __stdcall
 #else
@@ -39,7 +41,7 @@ typedef struct CUipcMemHandle_st {
   char reserved[CU_IPC_HANDLE_SIZE];
 } CUipcMemHandle;
 
-int load_libcuda(void);
+int load_libcuda(error *);
 
 #define DEF_PROC(name, args) typedef CUresult CUDAAPI t##name args
 #define DEF_PROC_V2(name, args) DEF_PROC(name, args)

@@ -132,19 +132,24 @@ static int major = -1;
 static int minor = -1;
 static int setup_lib(void) {
   int res, tmp;
+  const char *name, *msg;
   const char *ver;
+
   if (!setup_done) {
-    res = load_libcuda();
+    res = load_libcuda(global_err);
     if (res != GA_NO_ERROR)
       return res;
     err = cuInit(0);
-    if (err != CUDA_SUCCESS)
-      return GA_IMPL_ERROR;
+    if (err != CUDA_SUCCESS) {
+      cuGetErrorName(err, *name);
+      cuGetErrorString(err, *msg);
+      return error_fmt(global_err, GA_IMPL_ERROR, "cuInit: %s: %s", name, msg);
+    }
     ver = getenv("GPUARRAY_CUDA_VERSION");
     if (ver == NULL || strlen(ver) != 2) {
       err = cuDriverGetVersion(&tmp);
       if (err != CUDA_SUCCESS)
-        return GA_IMPL_ERROR;
+        return error_set(global_err, GA_IMPL_ERROR, "cuDriverGetVersion failed");
       major = tmp / 1000;
       minor = (tmp / 10) % 10;
     } else {
@@ -152,7 +157,7 @@ static int setup_lib(void) {
       minor = ver[1] - '0';
     }
     if (major > 9 || major < 0 || minor > 9 || minor < 0)
-      return GA_VALUE_ERROR;
+      return error_fmt(global_err, GA_VALUE_ERROR, "Invalid cuda version: %d.%d", major, minor);
     res = load_libnvrtc(major, minor);
     if (res != GA_NO_ERROR)
       return res;
@@ -202,7 +207,7 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   res->minor = minor;
   res->freeblocks = NULL;
   if (error_alloc(&res->msg)) {
-    error_sets(global_ctx, GA_SYS_ERROR, "Could not create error context");
+    error_sets(global_err, GA_SYS_ERROR, "Could not create error context");
     goto fail_errmsg;
   }
   if (detect_arch(ARCH_PREFIX, res->bin_id, &err)) {
