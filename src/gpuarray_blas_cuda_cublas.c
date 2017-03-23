@@ -24,6 +24,46 @@ static inline cublasOperation_t convT(cb_transpose trans) {
   }
 }
 
+static const char *error(cublasStatus_t err) {
+  switch (err) {
+  case CUBLAS_STATUS_SUCCESS:
+    return "(cublas) Operation completed successfully.";
+  case CUBLAS_STATUS_NOT_INITIALIZED:
+    return "(cublas) Library not initialized.";
+  case CUBLAS_STATUS_ALLOC_FAILED:
+    return "(cublas) GPU ressource allocation failed.";
+  case CUBLAS_STATUS_INVALID_VALUE:
+    return "(cublas) Invalid value.";
+  case CUBLAS_STATUS_ARCH_MISMATCH:
+    return "(cublas) Operation not supported by device.";
+  case CUBLAS_STATUS_MAPPING_ERROR:
+    return "(cublas) Mapping error.";
+  case CUBLAS_STATUS_EXECUTION_FAILED:
+    return "(cublas) Execution failed.";
+  case CUBLAS_STATUS_INTERNAL_ERROR:
+    return "(cublas) Internal error.";
+  case CUBLAS_STATUS_NOT_SUPPORTED:
+    return "(cublas) Unsupported functionality.";
+  case CUBLAS_STATUS_LICENSE_ERROR:
+    return "(cublas) License error.";
+  default:
+    return "(cublas) Unknown error.";
+  }
+}
+
+static inline int error_cublas(error *e, const char *msg, cublasStatus_t err) {
+  return error_fmt(e, (err == CUBLAS_STATUS_ARCH_MISMATCH) ? GA_DEVSUP_ERROR : GA_BLAS_ERROR,
+                   "%s: %s", msg, error(err));
+}
+
+#define CUBLAS_EXIT_ON_ERROR(ctx, cmd) do {       \
+    cublasStatus_t err = (cmd);                   \
+    if (err != CUBLAS_SUCCESS) {                  \
+      cuda_exit(ctx);                             \
+      return error_cublas((ctx)->err, #cmd, err); \
+    }                                             \
+  } while(0)
+
 typedef struct _blas_handle {
   cublasHandle_t h;
   GpuKernel sgemvBH_N_a1_b1_small;
@@ -32,7 +72,6 @@ typedef struct _blas_handle {
   GpuKernel dgemvBH_T_a1_b1_small;
   GpuKernel sgerBH_gen_small;
   GpuKernel dgerBH_gen_small;
-  cublasStatus_t err;
 } blas_handle;
 
 #define LARGE_VAL(v) (v >= INT_MAX)
@@ -180,25 +219,27 @@ static int setup(gpucontext *c) {
 
   handle = calloc(1, sizeof(*handle));
   if (handle == NULL)
-    return GA_MEMORY_ERROR;
-
-  handle->err = CUBLAS_STATUS_SUCCESS;
+    return error_sys(ctx->err, "calloc");
 
   cuda_enter(ctx);
   err = cublasCreate(&handle->h);
   if (err != CUBLAS_STATUS_SUCCESS) {
     cuda_exit(ctx);
     free(handle);
-    return GA_BLAS_ERROR;
+    return error_cublas(ctx->err, "cublasCreate", err);
   }
 
   err = cublasSetStream(handle->h, ctx->s);
   if (err != CUBLAS_STATUS_SUCCESS) {
-    e = GA_BLAS_ERROR;
+    e = error_cublas(ctx->err, "cublasSetStream", err);
     goto e1;
   }
 
-  cublasSetPointerMode(handle->h, CUBLAS_POINTER_MODE_HOST);
+  err = cublasSetPointerMode(handle->h, CUBLAS_POINTER_MODE_HOST);
+  if (err != CUBLAS_STATUS_SUCCESS) {
+    e = error_cublas(ctx->err, "cublasSetPointerMode", err);
+    goto e1;
+  }
 
   types[0] = GA_BUFFER;
   types[1] = GA_SIZE;
@@ -283,39 +324,6 @@ static void teardown(gpucontext *c) {
   ctx->blas_handle = NULL;
 }
 
-static const char *error(gpucontext *c) {
-  cuda_context *ctx = (cuda_context *)c;
-  blas_handle *handle = (blas_handle *)ctx->blas_handle;
-
-  if (handle != NULL) {
-    switch (handle->err) {
-    case CUBLAS_STATUS_SUCCESS:
-      return "(cublas) Operation completed successfully.";
-    case CUBLAS_STATUS_NOT_INITIALIZED:
-      return "(cublas) Library not initialized.";
-    case CUBLAS_STATUS_ALLOC_FAILED:
-      return "(cublas) GPU ressource allocation failed.";
-    case CUBLAS_STATUS_INVALID_VALUE:
-      return "(cublas) Invalid value.";
-    case CUBLAS_STATUS_ARCH_MISMATCH:
-      return "(cublas) Operation not supported by device.";
-    case CUBLAS_STATUS_MAPPING_ERROR:
-      return "(cublas) Mapping error.";
-    case CUBLAS_STATUS_EXECUTION_FAILED:
-      return "(cublas) Execution failed.";
-    case CUBLAS_STATUS_INTERNAL_ERROR:
-      return "(cublas) Internal error.";
-    case CUBLAS_STATUS_NOT_SUPPORTED:
-      return "(cublas) Unsupported functionality.";
-    case CUBLAS_STATUS_LICENSE_ERROR:
-      return "(cublas) License error.";
-    default:
-      return "(cublas) Unknown error.";
-    }
-  }
-  return "Blas handle not initialized, API error.";
-}
-
 static int sgemm(cb_order order, cb_transpose transA, cb_transpose transB,
                  size_t M, size_t N, size_t K, float alpha,
                  gpudata *A, size_t offA, size_t lda,
@@ -334,7 +342,7 @@ static int sgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
       LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
       LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
-    return GA_XLARGE_ERROR;
+    return error_set(ctx->err, GA_XLARGE_ERROR, "Passed-in sizes would overflow the ints in the cublas interface");
 
   if (order == cb_c) {
     /* swap A and B */
@@ -361,17 +369,11 @@ static int sgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(B, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C, CUDA_WAIT_ALL));
 
-  h->err = cublasSgemm(h->h,
-                       convT(transA), convT(transB), M, N, K,
-                       &alpha, ((float *)A->ptr) + offA, lda,
-                       ((float *)B->ptr) + offB, ldb, &beta,
-                       ((float *)C->ptr) + offC, ldc);
-  if (h->err != CUBLAS_STATUS_SUCCESS) {
-    cuda_exit(ctx);
-    if (h->err == CUBLAS_STATUS_ARCH_MISMATCH)
-      return GA_DEVSUP_ERROR;
-    return GA_BLAS_ERROR;
-  }
+  CUBLAS_EXIT_ON_ERROR(ctx, cublasSgemm(h->h,
+                                        convT(transA), convT(transB), M, N, K,
+                                        &alpha, ((float *)A->ptr) + offA, lda,
+                                        ((float *)B->ptr) + offB, ldb, &beta,
+                                        ((float *)C->ptr) + offC, ldc));
 
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B, CUDA_WAIT_READ));
@@ -399,7 +401,7 @@ static int dgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
       LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
       LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
-    return GA_XLARGE_ERROR;
+    return error_set(ctx->err, GA_XLARGE_ERROR, "Passed-in sizes would overflow the ints in the cublas interface");
 
   if (order == cb_c) {
     /* swap A and B */
@@ -426,17 +428,11 @@ static int dgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(B, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C, CUDA_WAIT_ALL));
 
-  h->err = cublasDgemm(h->h,
-                       convT(transA), convT(transB), M, N, K,
-                       &alpha, ((double *)A->ptr) + offA, lda,
-                       ((double *)B->ptr) + offB, ldb, &beta,
-                       ((double *)C->ptr) + offC, ldc);
-  if (h->err != CUBLAS_STATUS_SUCCESS) {
-    cuda_exit(ctx);
-    if (h->err == CUBLAS_STATUS_ARCH_MISMATCH)
-      return GA_DEVSUP_ERROR;
-    return GA_BLAS_ERROR;
-  }
+  CUBLAS_EXIT_ON_ERROR(ctx, cublasDgemm(h->h,
+                                        convT(transA), convT(transB), M, N, K,
+                                        &alpha, ((double *)A->ptr) + offA, lda,
+                                        ((double *)B->ptr) + offB, ldb, &beta,
+                                        ((double *)C->ptr) + offC, ldc));
 
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B, CUDA_WAIT_READ));
@@ -470,7 +466,7 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
       LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
       LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
-    return GA_XLARGE_ERROR;
+    return error_set(ctx->err, GA_XLARGE_ERROR, "Passed-in sizes would overflow the ints in the cublas interface");
 
   if (order == cb_c) {
     /* swap A and B */
@@ -497,21 +493,15 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(B, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C, CUDA_WAIT_ALL));
 
-  h->err = cublasSgemmEx(h->h,
-                         convT(transA), convT(transB), M, N, K,
-                         &alpha, ((uint16_t *)A->ptr) + offA,
-                         CUDA_R_16F,
-                         lda, ((uint16_t *)B->ptr) + offB,
-                         CUDA_R_16F,
-                         ldb, &beta, ((uint16_t *)C->ptr) + offC,
-                         CUDA_R_16F,
-                         ldc);
-  if (h->err != CUBLAS_STATUS_SUCCESS) {
-    cuda_exit(ctx);
-    if (h->err == CUBLAS_STATUS_ARCH_MISMATCH)
-      return GA_DEVSUP_ERROR;
-    return GA_BLAS_ERROR;
-  }
+  CUBLAS_EXIT_ON_ERROR(ctx, cublasSgemmEx(h->h, convT(transA), convT(transB),
+                                          M, N, K,
+                                          &alpha, ((uint16_t *)A->ptr) + offA,
+                                          CUDA_R_16F,
+                                          lda, ((uint16_t *)B->ptr) + offB,
+                                          CUDA_R_16F,
+                                          ldb, &beta, ((uint16_t *)C->ptr) + offC,
+                                          CUDA_R_16F,
+                                          ldc));
 
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B, CUDA_WAIT_READ));
@@ -519,15 +509,6 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
 
   cuda_exit(ctx);
   return GA_NO_ERROR;
-}
-
-static int hgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
-                      size_t M, size_t N, size_t K, float alpha,
-                      gpudata **A, size_t *offA, size_t lda,
-                      gpudata **B, size_t *offB, size_t ldb,
-                      float beta, gpudata **C, size_t *offC, size_t ldc,
-                      size_t batchCount) {
-  return GA_DEVSUP_ERROR;
 }
 
 static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
@@ -544,12 +525,10 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   const size_t threshold = 650;
   cb_transpose transT;
 
-  if (batchCount == 0) return GA_NO_ERROR;
-
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
       LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
       LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
-    return GA_XLARGE_ERROR;
+    return error_set(ctx->err, GA_XLARGE_ERROR, "Passed-in sizes would overflow the ints in the cublas interface");
 
   ASSERT_BUF(A[0]);
   ctx = A[0]->ctx;
@@ -586,19 +565,13 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
       GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(B[i], CUDA_WAIT_READ));
       GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C[i], CUDA_WAIT_ALL));
 
-      h->err = cublasSgemm(h->h,
-                           convT(transA), convT(transB),
-                           M, N, K, &alpha,
-                           ((float*)A[i]->ptr) + offA[i], lda,
-                           ((float*)B[i]->ptr) + offB[i], ldb,
-                           &beta,
-                           ((float*)C[i]->ptr) + offC[i], ldc);
-      if (h->err != CUBLAS_STATUS_SUCCESS) {
-        cuda_exit(ctx);
-        if (h->err == CUBLAS_STATUS_ARCH_MISMATCH)
-          return GA_DEVSUP_ERROR;
-        return GA_BLAS_ERROR;
-      }
+      CUBLAS_EXIT_ON_ERROR(ctx, cublasSgemm(h->h,
+                                            convT(transA), convT(transB),
+                                            M, N, K, &alpha,
+                                            ((float*)A[i]->ptr) + offA[i], lda,
+                                            ((float*)B[i]->ptr) + offB[i], ldb,
+                                            &beta,
+                                            ((float*)C[i]->ptr) + offC[i], ldc));
 
       GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A[i], CUDA_WAIT_READ));
       GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B[i], CUDA_WAIT_READ));
@@ -611,6 +584,7 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     float **C_l = T_l + (batchCount * 2);
     gpudata *Ta;
     CUdeviceptr Aa, Ba, Ca;
+    cublasStatus_t err;
 
     for (i = 0; i < batchCount; i++) {
       ASSERT_BUF(A[i]);
@@ -626,24 +600,30 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
 
     Ta = gpudata_alloc((gpucontext *)ctx, sizeof(float *) * batchCount * 3,
                        NULL, 0, NULL);
+    if (Ta == NULL) {
+      cuda_exit(ctx);
+      return ctx->err->code;
+    }
     Aa = *(CUdeviceptr *)Ta;
     Ba = Aa + (batchCount * sizeof(float *));
     Ca = Aa + (batchCount * sizeof(float *) * 2);
 
-    gpudata_write(Ta, 0, T_l, sizeof(float *) * batchCount * 3);
-
-    h->err = cublasSgemmBatched(h->h,
-                                convT(transA), convT(transB),
-                                M, N, K, &alpha,
-                                (const float **)Aa, lda,
-                                (const float **)Ba, ldb, &beta,
-                                (float **)Ca, ldc, batchCount);
-    gpudata_release(Ta);
-    if (h->err != CUBLAS_STATUS_SUCCESS) {
+    if (gpudata_write(Ta, 0, T_l, sizeof(float *) * batchCount * 3) != GA_NO_ERROR) {
+      gpudata_release(Ta);
       cuda_exit(ctx);
-      if (h->err == CUBLAS_STATUS_ARCH_MISMATCH)
-        return GA_DEVSUP_ERROR;
-      return GA_BLAS_ERROR;
+      return ctx->err->code;
+    }
+
+    err = cublasSgemmBatched(h->h,
+                             convT(transA), convT(transB),
+                             M, N, K, &alpha,
+                             (const float **)Aa, lda,
+                             (const float **)Ba, ldb, &beta,
+                             (float **)Ca, ldc, batchCount);
+    gpudata_release(Ta);
+    if (err != CUBLAS_STATUS_SUCCESS) {
+      cuda_exit(ctx);
+      return error_cublas(ctx, "cublasSgemmBatched", err);
     }
 
     for (i = 0; i < batchCount; i++) {
@@ -671,12 +651,10 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   const size_t threshold = 650;
   cb_transpose transT;
 
-  if (batchCount == 0) return GA_NO_ERROR;
-
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
       LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
       LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
-    return GA_XLARGE_ERROR;
+    return error_set(ctx->err, GA_XLARGE_ERROR, "Passed-in sizes would overflow the ints in the cublas interface");
 
   ASSERT_BUF(A[0]);
   ctx = A[0]->ctx;
@@ -713,19 +691,13 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
       GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(B[i], CUDA_WAIT_READ));
       GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C[i], CUDA_WAIT_ALL));
 
-      h->err = cublasDgemm(h->h,
-                           convT(transA), convT(transB),
-                           M, N, K, &alpha,
-                           (double*)A[i]->ptr + offA[i], lda,
-                           (double*)B[i]->ptr + offB[i], ldb,
-                           &beta,
-                           (double*)C[i]->ptr + offC[i], ldc);
-      if (h->err != CUBLAS_STATUS_SUCCESS) {
-        cuda_exit(ctx);
-        if (h->err == CUBLAS_STATUS_ARCH_MISMATCH)
-          return GA_DEVSUP_ERROR;
-        return GA_BLAS_ERROR;
-      }
+      CUBLAS_EXIT_ON_ERROR(ctx, cublasDgemm(h->h,
+                                            convT(transA), convT(transB),
+                                            M, N, K, &alpha,
+                                            (double*)A[i]->ptr + offA[i], lda,
+                                            (double*)B[i]->ptr + offB[i], ldb,
+                                            &beta,
+                                            (double*)C[i]->ptr + offC[i], ldc);
 
       GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A[i], CUDA_WAIT_READ));
       GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B[i], CUDA_WAIT_READ));
@@ -738,6 +710,7 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     double **C_l = T_l + (batchCount * 2);
     gpudata *Ta;
     CUdeviceptr Aa, Ba, Ca;
+    cublasStatus_t err;
 
     for (i = 0; i < batchCount; i++) {
       ASSERT_BUF(A[i]);
@@ -753,24 +726,30 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
 
     Ta = gpudata_alloc((gpucontext *)ctx, sizeof(double *) * batchCount * 3,
                        NULL, 0, NULL);
+    if (Ta == NULL) {
+      cuda_exit(ctx);
+      return ctx->err->code;
+    }
     Aa = *(CUdeviceptr *)Ta;
     Ba = Aa + (batchCount * sizeof(double *));
     Ca = Aa + (batchCount * sizeof(double *) * 2);
 
-    gpudata_write(Ta, 0, T_l, sizeof(double *) * batchCount * 3);
-
-    h->err = cublasDgemmBatched(h->h,
-                                convT(transA), convT(transB),
-                                M, N, K, &alpha,
-                                (const double **)Aa, lda,
-                                (const double **)Ba, ldb, &beta,
-                                (double **)Ca, ldc, batchCount);
-    gpudata_release(Ta);
-    if (h->err != CUBLAS_STATUS_SUCCESS) {
+    if (gpudata_write(Ta, 0, T_l, sizeof(double *) * batchCount * 3) != GA_NO_ERROR) {
+      gpudata_release(Ta);
       cuda_exit(ctx);
-      if (h->err == CUBLAS_STATUS_ARCH_MISMATCH)
-        return GA_DEVSUP_ERROR;
-      return GA_BLAS_ERROR;
+      return ctx->err->code;
+    }
+
+    err = cublasDgemmBatched(h->h,
+                             convT(transA), convT(transB),
+                             M, N, K, &alpha,
+                             (const double **)Aa, lda,
+                             (const double **)Ba, ldb, &beta,
+                             (double **)Ca, ldc, batchCount);
+    gpudata_release(Ta);
+    if (err != CUBLAS_STATUS_SUCCESS) {
+      cuda_exit(ctx);
+      return error_cublas(ctx->err, "cublasDgemmBatched", err);
     }
 
     for (i = 0; i < batchCount; i++) {
@@ -782,14 +761,6 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
 
   cuda_exit(ctx);
   return GA_NO_ERROR;
-}
-
-static int hdot(
-        size_t N,
-        gpudata *X, size_t offX, size_t incX,
-        gpudata *Y, size_t offY, size_t incY,
-        gpudata *Z, size_t offZ) {
-    return GA_DEVSUP_ERROR;
 }
 
 static int sdot(
@@ -805,7 +776,8 @@ static int sdot(
   ASSERT_BUF(Y);
   ASSERT_BUF(Z);
 
-  if (LARGE_VAL(N)) return GA_XLARGE_ERROR;
+  if (LARGE_VAL(N))
+    return error_set(ctx->err, GA_XLARGE_ERROR, "Passed-in sizes would overflow the ints in the cublas interface");
 
   cuda_enter(ctx);
 
@@ -814,14 +786,13 @@ static int sdot(
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Z, CUDA_WAIT_WRITE));
 
   // we should store dot result on device
-  cublasGetPointerMode(h->h, &pmode);
-  cublasSetPointerMode(h->h, CUBLAS_POINTER_MODE_DEVICE);
-  h->err = cublasSdot(
-          h->h, N,
-          ((float*)X->ptr) + offX, incX,
-          ((float*)Y->ptr) + offY, incY,
-          ((float*)Z->ptr) + offZ);
-  cublasSetPointerMode(h->h, pmode);
+  CUBLAS_EXIT_ON_ERROR(ctx, cublasGetPointerMode(h->h, &pmode));
+  CUBLAS_EXIT_ON_ERROR(ctx, cublasSetPointerMode(h->h, CUBLAS_POINTER_MODE_DEVICE));
+  CUBLAS_EXIT_ON_ERROR(ctx, cublasSdot(h->h, N,
+                                       ((float*)X->ptr) + offX, incX,
+                                       ((float*)Y->ptr) + offY, incY,
+                                       ((float*)Z->ptr) + offZ));
+  CUBLAS_EXIT_ON_ERROR(ctx, cublasSetPointerMode(h->h, pmode));
 
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(X, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Y, CUDA_WAIT_READ));
@@ -845,7 +816,9 @@ static int ddot(
   ASSERT_BUF(Y);
   ASSERT_BUF(Z);
 
-  if (LARGE_VAL(N)) return GA_XLARGE_ERROR;
+  if (LARGE_VAL(N))
+    return error_set(ctx->err, GA_XLARGE_ERROR, "Passed-in sizes would overflow the ints in the cublas interface");
+
 
   cuda_enter(ctx);
 
@@ -854,14 +827,13 @@ static int ddot(
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Z, CUDA_WAIT_WRITE));
 
   // we should store dot result on device
-  cublasGetPointerMode(h->h, &pmode);
-  cublasSetPointerMode(h->h, CUBLAS_POINTER_MODE_DEVICE);
-  h->err = cublasDdot(
-      h->h, N,
-      ((double*)X->ptr) + offX, incX,
-      ((double*)Y->ptr) + offY, incY,
-      ((double*)Z->ptr) + offZ);
-  cublasSetPointerMode(h->h, pmode);
+  CUBLAS_EXIT_ON_ERROR(ctx, cublasGetPointerMode(h->h, &pmode));
+  CUBLAS_EXIT_ON_ERROR(ctx, cublasSetPointerMode(h->h, CUBLAS_POINTER_MODE_DEVICE));
+  CUBLAS_EXIT_ON_ERROR(ctx, cublasDdot(h->h, N,
+                                       ((double*)X->ptr) + offX, incX,
+                                       ((double*)Y->ptr) + offY, incY,
+                                       ((double*)Z->ptr) + offZ));
+  CUBLAS_EXIT_ON_ERROR(ctx, cublasSetPointerMode(h->h, pmode));
 
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(X, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Y, CUDA_WAIT_READ));
@@ -870,13 +842,6 @@ static int ddot(
   cuda_exit(ctx);
 
   return GA_NO_ERROR;
-}
-
-static int hgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
-                 float alpha, gpudata *A, size_t offA, size_t lda,
-                 gpudata *X, size_t offX, int incX,
-                 float beta, gpudata *Y, size_t offY, int incY) {
-  return GA_DEVSUP_ERROR;
 }
 
 static int sgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
@@ -893,7 +858,7 @@ static int sgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(M * N) ||
       LARGE_VAL(lda) || LARGE_VAL(incX) || LARGE_VAL(incY))
-    return GA_XLARGE_ERROR;
+    return error_set(ctx->err, GA_XLARGE_ERROR, "Passed-in sizes would overflow the ints in the cublas interface");
 
   if (order == cb_c) {
     t = N;
@@ -913,17 +878,11 @@ static int sgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(X, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Y, CUDA_WAIT_ALL));
 
-  h->err = cublasSgemv(h->h,
-                       convT(transA), M, N, &alpha,
-                       ((float *)A->ptr) + offA, lda,
-                       ((float *)X->ptr) + offX, incX,
-                       &beta, ((float *)Y->ptr) + offY, incY);
-  if (h->err != CUBLAS_STATUS_SUCCESS) {
-    cuda_exit(ctx);
-    if (h->err == CUBLAS_STATUS_ARCH_MISMATCH)
-      return GA_DEVSUP_ERROR;
-    return GA_BLAS_ERROR;
-  }
+  CUBLAS_EXIT_ON_ERROR(ctx, cublasSgemv(h->h,
+                                        convT(transA), M, N, &alpha,
+                                        ((float *)A->ptr) + offA, lda,
+                                        ((float *)X->ptr) + offX, incX,
+                                        &beta, ((float *)Y->ptr) + offY, incY));
 
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(X, CUDA_WAIT_READ));
@@ -948,7 +907,7 @@ static int dgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(M * N) ||
       LARGE_VAL(lda) || LARGE_VAL(incX) || LARGE_VAL(incY))
-    return GA_XLARGE_ERROR;
+    return error_set(ctx->err, GA_XLARGE_ERROR, "Passed-in sizes would overflow the ints in the cublas interface");
 
   if (order == cb_c) {
     t = N;
@@ -968,17 +927,11 @@ static int dgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(X, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Y, CUDA_WAIT_ALL));
 
-  h->err = cublasDgemv(h->h,
-                       convT(transA), M, N, &alpha,
-                       ((double *)A->ptr) + offA, lda,
-                       ((double *)X->ptr) + offX, incX,
-                       &beta, ((double *)Y->ptr) + offY, incY);
-  if (h->err != CUBLAS_STATUS_SUCCESS) {
-    cuda_exit(ctx);
-    if (h->err == CUBLAS_STATUS_ARCH_MISMATCH)
-      return GA_DEVSUP_ERROR;
-    return GA_BLAS_ERROR;
-  }
+  CUBLAS_EXIT_ON_ERROR(ctx, cublasDgemv(h->h,
+                                        convT(transA), M, N, &alpha,
+                                        ((double *)A->ptr) + offA, lda,
+                                        ((double *)X->ptr) + offX, incX,
+                                        &beta, ((double *)Y->ptr) + offY, incY));
 
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(X, CUDA_WAIT_READ));
@@ -987,15 +940,6 @@ static int dgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
   cuda_exit(ctx);
 
   return GA_NO_ERROR;
-}
-
-static int hgemvBatch(cb_order order, cb_transpose transA,
-                      size_t M, size_t N, float alpha,
-                      gpudata **A, size_t *offA, size_t lda,
-                      gpudata **x, size_t *offX, size_t incX,
-                      float beta, gpudata **y, size_t *offY, size_t incY,
-                      size_t batchCount, int flags) {
-  return GA_DEVSUP_ERROR;
 }
 
 static int sgemvBatch(cb_order order, cb_transpose transA,
@@ -1013,10 +957,13 @@ static int sgemvBatch(cb_order order, cb_transpose transA,
   gpudata *Aa, *xa, *ya;
   int err;
 
-  if (flags != 0) return GA_INVALID_ERROR;
-  if (batchCount == 0) return GA_NO_ERROR;
+  ASSERT_BUF(A[0]);
 
-  if (alpha != 1.0 || beta != 1.0) return GA_UNSUPPORTED_ERROR;
+  ctx = A[0]->ctx;
+
+  if (flags != 0) return error_set(ctx->err, GA_INVALID_ERROR, "flags not set to 0");
+
+  if (alpha != 1.0 || beta != 1.0) return error_set(ctx->err, GA_UNSUPPORTED_ERROR, "Only alpha = 1 and beta = 1 are supported for now");
 
   if (M < 512) {
     ls[0] = 32;
@@ -1045,10 +992,6 @@ static int sgemvBatch(cb_order order, cb_transpose transA,
     }
   }
 
-  ASSERT_BUF(A[0]);
-
-  ctx = A[0]->ctx;
-
   cuda_enter(ctx);
 
   {
@@ -1070,21 +1013,21 @@ static int sgemvBatch(cb_order order, cb_transpose transA,
     }
 
     Aa = cuda_ops.buffer_alloc((gpucontext *)ctx, sizeof(float *) * batchCount, A_l,
-                               GA_BUFFER_INIT, &err);
+                               GA_BUFFER_INIT);
     if (Aa == NULL)
-      return err;
+      return ctx->err->code;
     xa = cuda_ops.buffer_alloc((gpucontext *)ctx, sizeof(float *) * batchCount, x_l,
-                               GA_BUFFER_INIT, &err);
+                               GA_BUFFER_INIT);
     if (xa == NULL) {
       cuda_ops.buffer_release(Aa);
-      return err;
+      return ctx->err->code;
     }
     ya = cuda_ops.buffer_alloc((gpucontext *)ctx, sizeof(float *) * batchCount, y_l,
-                               GA_BUFFER_INIT, &err);
+                               GA_BUFFER_INIT);
     if (ya == NULL) {
       cuda_ops.buffer_release(Aa);
       cuda_ops.buffer_release(xa);
-      return err;
+      return ctx->err->code;
     }
   }
 
@@ -1137,10 +1080,13 @@ static int dgemvBatch(cb_order order, cb_transpose transA,
   gpudata *Aa, *xa, *ya;
   int err;
 
-  if (flags != 0) return GA_INVALID_ERROR;
-  if (batchCount == 0) return GA_NO_ERROR;
+  ASSERT_BUF(A[0]);
 
-  if (alpha != 1.0 || beta != 1.0) return GA_UNSUPPORTED_ERROR;
+  ctx = A[0]->ctx;
+
+  if (flags != 0) return error_set(ctx->err, GA_INVALID_ERROR, "flags not set to 0");
+
+  if (alpha != 1.0 || beta != 1.0) return error_set(ctx->err, GA_UNSUPPORTED_ERROR, "Only alpha = 1 and beta = 1 are supported for now");
 
   if (M < 512) {
     ls[0] = 32;
@@ -1169,10 +1115,6 @@ static int dgemvBatch(cb_order order, cb_transpose transA,
     }
   }
 
-  ASSERT_BUF(A[0]);
-
-  ctx = A[0]->ctx;
-
   cuda_enter(ctx);
 
   {
@@ -1194,21 +1136,21 @@ static int dgemvBatch(cb_order order, cb_transpose transA,
     }
 
     Aa = cuda_ops.buffer_alloc((gpucontext *)ctx, sizeof(double *) * batchCount, A_l,
-                               GA_BUFFER_INIT, &err);
+                               GA_BUFFER_INIT);
     if (Aa == NULL)
-      return err;
+      return ctx->err->code;
     xa = cuda_ops.buffer_alloc((gpucontext *)ctx, sizeof(double *) * batchCount, x_l,
-                               GA_BUFFER_INIT, &err);
+                               GA_BUFFER_INIT);
     if (xa == NULL) {
       cuda_ops.buffer_release(Aa);
-      return err;
+      return ctx->err->code;
     }
     ya = cuda_ops.buffer_alloc((gpucontext *)ctx, sizeof(double *) * batchCount, y_l,
-                               GA_BUFFER_INIT, &err);
+                               GA_BUFFER_INIT);
     if (ya == NULL) {
       cuda_ops.buffer_release(Aa);
       cuda_ops.buffer_release(xa);
-      return err;
+      return ctx->err->code;
     }
   }
 
@@ -1248,12 +1190,6 @@ static int dgemvBatch(cb_order order, cb_transpose transA,
 }
 
 
-static int hger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
-                size_t offX, int incX, gpudata *Y, size_t offY, int incY,
-                gpudata *A, size_t offA, size_t lda) {
-  return GA_DEVSUP_ERROR;
-}
-
 static int sger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
                 size_t offX, int incX, gpudata *Y, size_t offY, int incY,
                 gpudata *A, size_t offA, size_t lda) {
@@ -1268,7 +1204,7 @@ static int sger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(M * N) ||
       LARGE_VAL(lda) || LARGE_VAL(incX) || LARGE_VAL(incY))
-    return GA_XLARGE_ERROR;
+    return error_set(ctx->err, GA_XLARGE_ERROR, "Passed-in sizes would overflow the ints in the cublas interface");
 
   if (order == cb_c) {
     t = M;
@@ -1291,16 +1227,10 @@ static int sger(cb_order order, size_t M, size_t N, float alpha, gpudata *X,
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Y, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A, CUDA_WAIT_ALL));
 
-  h->err = cublasSger(h->h, M, N, &alpha,
-                      ((float *)X->ptr) + offX, incX,
-                      ((float *)Y->ptr) + offY, incY,
-                      ((float *)A->ptr) + offA, lda);
-  if (h->err != CUBLAS_STATUS_SUCCESS) {
-    cuda_exit(ctx);
-    if (h->err == CUBLAS_STATUS_ARCH_MISMATCH)
-      return GA_DEVSUP_ERROR;
-    return GA_BLAS_ERROR;
-  }
+  CUBLAS_EXIT_ON_ERROR(ctx, cublasSger(h->h, M, N, &alpha,
+                                       ((float *)X->ptr) + offX, incX,
+                                       ((float *)Y->ptr) + offY, incY,
+                                       ((float *)A->ptr) + offA, lda));
 
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(X, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Y, CUDA_WAIT_READ));
@@ -1325,7 +1255,7 @@ static int dger(cb_order order, size_t M, size_t N, double alpha, gpudata *X,
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(M * N) ||
       LARGE_VAL(lda) || LARGE_VAL(incX) || LARGE_VAL(incY))
-    return GA_XLARGE_ERROR;
+    return error_set(ctx->err, GA_XLARGE_ERROR, "Passed-in sizes would overflow the ints in the cublas interface");
 
   if (order == cb_c) {
     t = M;
@@ -1348,16 +1278,10 @@ static int dger(cb_order order, size_t M, size_t N, double alpha, gpudata *X,
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Y, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A, CUDA_WAIT_ALL));
 
-  h->err = cublasDger(h->h, M, N, &alpha,
-                      ((double *)X->ptr) + offX, incX,
-                      ((double *)Y->ptr) + offY, incY,
-                      ((double *)A->ptr) + offA, lda);
-  if (h->err != CUBLAS_STATUS_SUCCESS) {
-    cuda_exit(ctx);
-    if (h->err == CUBLAS_STATUS_ARCH_MISMATCH)
-      return GA_DEVSUP_ERROR;
-    return GA_BLAS_ERROR;
-  }
+  CUBLAS_EXIT_ON_ERROR(ctx, cublasDger(h->h, M, N, &alpha,
+                                       ((double *)X->ptr) + offX, incX,
+                                       ((double *)Y->ptr) + offY, incY,
+                                       ((double *)A->ptr) + offA, lda));
 
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(X, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(Y, CUDA_WAIT_READ));
@@ -1366,14 +1290,6 @@ static int dger(cb_order order, size_t M, size_t N, double alpha, gpudata *X,
   cuda_exit(ctx);
 
   return GA_NO_ERROR;
-}
-
-static int hgerBatch(cb_order order, size_t M, size_t N, float alpha,
-                     gpudata **x, size_t *offX, size_t incX,
-                     gpudata **y, size_t *offY, size_t incY,
-                     gpudata **A, size_t *offA, size_t lda,
-                     size_t batchCount, int flags) {
-  return GA_DEVSUP_ERROR;
 }
 
 static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
@@ -1389,8 +1305,11 @@ static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
   gpudata *Aa, *xa, *ya;
   int err;
 
-  if (flags != 0) return GA_INVALID_ERROR;
-  if (batchCount == 0) return GA_NO_ERROR;
+  ASSERT_BUF(x[0]);
+
+  ctx = x[0]->ctx;
+
+  if (flags != 0) return error_set(ctx->err, GA_INVALID_ERROR, "flags is not 0");
 
   if (incX == 1) {
     if (ls[0] > 32) {
@@ -1432,10 +1351,6 @@ static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
     y = T;
   }
 
-  ASSERT_BUF(x[0]);
-
-  ctx = x[0]->ctx;
-
   cuda_enter(ctx);
 
   {
@@ -1457,21 +1372,21 @@ static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
     }
 
     Aa = cuda_ops.buffer_alloc((gpucontext *)ctx, sizeof(float *) * batchCount, A_l,
-                               GA_BUFFER_INIT, &err);
+                               GA_BUFFER_INIT);
     if (Aa == NULL)
-      return err;
+      return ctx->err->code;
     xa = cuda_ops.buffer_alloc((gpucontext *)ctx, sizeof(float *) * batchCount, x_l,
-                               GA_BUFFER_INIT, &err);
+                               GA_BUFFER_INIT);
     if (xa == NULL) {
       cuda_ops.buffer_release(Aa);
-      return err;
+      return ctx->err->code;
     }
     ya = cuda_ops.buffer_alloc((gpucontext *)ctx, sizeof(float *) * batchCount, y_l,
-                               GA_BUFFER_INIT, &err);
+                               GA_BUFFER_INIT);
     if (ya == NULL) {
       cuda_ops.buffer_release(Aa);
       cuda_ops.buffer_release(xa);
-      return err;
+      return ctx->err->code;
     }
   }
 
@@ -1521,8 +1436,11 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
   gpudata *Aa, *xa, *ya;
   int err;
 
-  if (flags != 0) return GA_INVALID_ERROR;
-  if (batchCount == 0) return GA_NO_ERROR;
+  ASSERT_BUF(x[0]);
+
+  ctx = x[0]->ctx;
+
+  if (flags != 0) return error_set(ctx->err, GA_INVALID_ERROR, "flags is not 0");
 
   if (incX == 1) {
     if (ls[0] > 32) {
@@ -1564,10 +1482,6 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
     y = T;
   }
 
-  ASSERT_BUF(x[0]);
-
-  ctx = x[0]->ctx;
-
   cuda_enter(ctx);
 
   {
@@ -1589,21 +1503,21 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
     }
 
     Aa = cuda_ops.buffer_alloc((gpucontext *)ctx, sizeof(double *) * batchCount, A_l,
-                               GA_BUFFER_INIT, &err);
+                               GA_BUFFER_INIT);
     if (Aa == NULL)
-      return err;
+      return ctx->err->code;
     xa = cuda_ops.buffer_alloc((gpucontext *)ctx, sizeof(double *) * batchCount, x_l,
-                               GA_BUFFER_INIT, &err);
+                               GA_BUFFER_INIT);
     if (xa == NULL) {
       cuda_ops.buffer_release(Aa);
-      return err;
+      return ctx->err->code;
     }
     ya = cuda_ops.buffer_alloc((gpucontext *)ctx, sizeof(double *) * batchCount, y_l,
-                               GA_BUFFER_INIT, &err);
+                               GA_BUFFER_INIT);
     if (ya == NULL) {
       cuda_ops.buffer_release(Aa);
       cuda_ops.buffer_release(xa);
-      return err;
+      return ctx->err->code;
     }
   }
 
@@ -1629,7 +1543,6 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
     return err;
   }
 
-
   for (i = 0; i < batchCount; i++) {
     GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A[i], CUDA_WAIT_READ));
     GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(x[i], CUDA_WAIT_READ));
@@ -1643,26 +1556,25 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
 gpuarray_blas_ops cublas_ops = {
   setup,
   teardown,
-  error,
-  hdot, /* TODO */
+  NULL, /* hdot */
   sdot,
   ddot,
-  hgemv, /* TODO */
+  NULL, /* hgemv */
   sgemv,
   dgemv,
   hgemm,
   sgemm,
   dgemm,
-  hger, /* TODO */
+  NULL, /* hger */
   sger,
   dger,
-  hgemmBatch, /* TODO */
+  NULL, /* hgemmBatch */
   sgemmBatch,
   dgemmBatch,
-  hgemvBatch, /* TODO */
+  NULL, /* hgemvBatch */
   sgemvBatch,
   dgemvBatch,
-  hgerBatch, /* TODO */
+  NULL, /* hgerBatch */
   sgerBatch,
   dgerBatch
 };

@@ -83,8 +83,7 @@ struct _gpuarray_buffer_ops {
   int (*get_device_count)(unsigned int platform, unsigned int* devcount);
   gpucontext *(*buffer_init)(int dev, int flags);
   void (*buffer_deinit)(gpucontext *ctx);
-  gpudata *(*buffer_alloc)(gpucontext *ctx, size_t sz, void *data, int flags,
-                           int *ret);
+  gpudata *(*buffer_alloc)(gpucontext *ctx, size_t sz, void *data, int flags);
   void (*buffer_retain)(gpudata *b);
   void (*buffer_release)(gpudata *b);
   int (*buffer_share)(gpudata *a, gpudata *b, int *ret);
@@ -117,7 +116,6 @@ struct _gpuarray_buffer_ops {
 struct _gpuarray_blas_ops {
   int (*setup)(gpucontext *ctx);
   void (*teardown)(gpucontext *ctx);
-  const char *(*error)(gpucontext *ctx);
 
   int (*hdot)( size_t N,
     gpudata *X, size_t offX, size_t incX,

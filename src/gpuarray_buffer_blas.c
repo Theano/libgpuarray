@@ -14,18 +14,23 @@ void gpublas_teardown(gpucontext *ctx) {
 }
 
 const char *gpublas_error(gpucontext *ctx) {
-  if (ctx->blas_ops != NULL)
-    return ctx->blas_ops->error(ctx);
-  return "No blas ops available, API error.";
+  return ctx->err->msg;
 }
+
+#define BLAS_OP(buf,name, args)                                         \
+  gpucontext *ctx = gpudata_context(buf);                               \
+  if (ctx->blas_ops->name)                                              \
+    return ctx->blas_ops->name args;                                    \
+  else                                                                  \
+    return error_fmt(ctx->err, GA_DEVSUP_ERROR, "Blas operation not supported by device or missing library: %s", #name)
+
 
 int gpublas_hdot(
         size_t N,
         gpudata *X, size_t offX, size_t incX,
         gpudata *Y, size_t offY, size_t incY,
         gpudata *Z, size_t offZ) {
-    return gpudata_context(X)->blas_ops->hdot(
-            N, X, offX, incX, Y, offY, incY, Z, offZ);
+  BLAS_OP(X, hdot, (N, X, offX, incX, Y, offY, incY, Z, offZ));
 }
 
 int gpublas_sdot(
@@ -33,8 +38,7 @@ int gpublas_sdot(
         gpudata *X, size_t offX, size_t incX,
         gpudata *Y, size_t offY, size_t incY,
         gpudata *Z, size_t offZ) {
-    return gpudata_context(X)->blas_ops->sdot(
-            N, X, offX, incX, Y, offY, incY, Z, offZ);
+  BLAS_OP(X, sdot, (N, X, offX, incX, Y, offY, incY, Z, offZ));
 }
 
 int gpublas_ddot(
@@ -42,8 +46,7 @@ int gpublas_ddot(
         gpudata *X, size_t offX, size_t incX,
         gpudata *Y, size_t offY, size_t incY,
         gpudata *Z, size_t offZ) {
-    return gpudata_context(X)->blas_ops->ddot(
-            N, X, offX, incX, Y, offY, incY, Z, offZ);
+  BLAS_OP(X, ddot, (N, X, offX, incX, Y, offY, incY, Z, offZ));
 }
 
 int gpublas_hgemv(cb_order order, cb_transpose transA,
@@ -52,9 +55,8 @@ int gpublas_hgemv(cb_order order, cb_transpose transA,
                   gpudata *X, size_t offX, int incX,
                   float beta,
                   gpudata *Y, size_t offY, int incY) {
-  return gpudata_context(A)->blas_ops->hgemv(
-    order, transA, M, N, alpha, A, offA, lda,
-    X, offX, incX, beta, Y, offY, incY);
+  BLAS_OP(A, hgemv, (order, transA, M, N, alpha, A, offA, lda,
+                     X, offX, incX, beta, Y, offY, incY));
 }
 
 int gpublas_sgemv(cb_order order, cb_transpose transA,
@@ -63,9 +65,8 @@ int gpublas_sgemv(cb_order order, cb_transpose transA,
                   gpudata *X, size_t offX, int incX,
                   float beta,
                   gpudata *Y, size_t offY, int incY) {
-  return gpudata_context(A)->blas_ops->sgemv(
-    order, transA, M, N, alpha, A, offA, lda,
-    X, offX, incX, beta, Y, offY, incY);
+  BLAS_OP(A, sgemv, (order, transA, M, N, alpha, A, offA, lda,
+                     X, offX, incX, beta, Y, offY, incY));
 }
 
 int gpublas_dgemv(cb_order order, cb_transpose transA,
@@ -74,9 +75,8 @@ int gpublas_dgemv(cb_order order, cb_transpose transA,
                   gpudata *X, size_t offX, int incX,
                   double beta,
                   gpudata *Y, size_t offY, int incY) {
-  return gpudata_context(A)->blas_ops->dgemv(
-    order, transA, M, N, alpha, A, offA, lda,
-    X, offX, incX, beta, Y, offY, incY);
+  BLAS_OP(A, dgemv, (order, transA, M, N, alpha, A, offA, lda,
+                     X, offX, incX, beta, Y, offY, incY));
 }
 
 int gpublas_hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
@@ -84,9 +84,8 @@ int gpublas_hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
                   gpudata *A, size_t offA, size_t lda,
                   gpudata *B, size_t offB, size_t ldb,
                   float beta, gpudata *C, size_t offC, size_t ldc) {
-  return gpudata_context(A)->blas_ops->hgemm(
-    order, transA, transB, M, N, K, alpha, A, offA, lda,
-    B, offB, ldb, beta, C, offC, ldc);
+  BLAS_OP(A, hgemm, (order, transA, transB, M, N, K, alpha, A, offA, lda,
+                     B, offB, ldb, beta, C, offC, ldc));
 }
 
 int gpublas_sgemm(cb_order order, cb_transpose transA, cb_transpose transB,
@@ -94,9 +93,8 @@ int gpublas_sgemm(cb_order order, cb_transpose transA, cb_transpose transB,
                   gpudata *A, size_t offA, size_t lda,
                   gpudata *B, size_t offB, size_t ldb,
                   float beta, gpudata *C, size_t offC, size_t ldc) {
-  return gpudata_context(A)->blas_ops->sgemm(
-    order, transA, transB, M, N, K, alpha, A, offA, lda,
-    B, offB, ldb, beta, C, offC, ldc);
+  BLAS_OP(A, sgemm, (order, transA, transB, M, N, K, alpha, A, offA, lda,
+                     B, offB, ldb, beta, C, offC, ldc));
 }
 
 int gpublas_dgemm(cb_order order, cb_transpose transA, cb_transpose transB,
@@ -104,47 +102,63 @@ int gpublas_dgemm(cb_order order, cb_transpose transA, cb_transpose transB,
                   gpudata *A, size_t offA, size_t lda,
                   gpudata *B, size_t offB, size_t ldb,
                   double beta, gpudata *C, size_t offC, size_t ldc) {
-  return gpudata_context(A)->blas_ops->dgemm(
-    order, transA, transB, M, N, K, alpha, A, offA, lda,
-    B, offB, ldb, beta, C, offC, ldc);
+  BLAS_OP(A, dgemm, (order, transA, transB, M, N, K, alpha, A, offA, lda,
+                     B, offB, ldb, beta, C, offC, ldc));
 }
 
 int gpublas_hger(cb_order order, size_t M, size_t N, float alpha,
                  gpudata *X, size_t offX, int incX,
                  gpudata *Y, size_t offY, int incY,
                  gpudata *A, size_t offA, size_t lda) {
-  return gpudata_context(X)->blas_ops->hger(
-    order, M, N, alpha, X, offX, incX, Y, offY, incY, A, offA, lda);
+  BLAS_OP(X, hger,
+          (order, M, N, alpha, X, offX, incX, Y, offY, incY, A, offA, lda));
 }
 
 int gpublas_sger(cb_order order, size_t M, size_t N, float alpha,
                  gpudata *X, size_t offX, int incX,
                  gpudata *Y, size_t offY, int incY,
                  gpudata *A, size_t offA, size_t lda) {
-  return gpudata_context(X)->blas_ops->sger(
-    order, M, N, alpha, X, offX, incX, Y, offY, incY, A, offA, lda);
+  BLAS_OP(X, sger,
+          (order, M, N, alpha, X, offX, incX, Y, offY, incY, A, offA, lda));
 }
 
 int gpublas_dger(cb_order order, size_t M, size_t N, double alpha,
                  gpudata *X, size_t offX, int incX,
                  gpudata *Y, size_t offY, int incY,
                  gpudata *A, size_t offA, size_t lda) {
-  return gpudata_context(X)->blas_ops->dger(
-    order, M, N, alpha, X, offX, incX, Y, offY, incY, A, offA, lda);
+  BLAS_OP(X, dger,
+          (order, M, N, alpha, X, offX, incX, Y, offY, incY, A, offA, lda));
 }
 
+#define BLAS_OPB(l, name, args)                                         \
+  gpucontext *ctx;                                                      \
+  if (batchCount == 0) return GA_NO_ERROR;                              \
+  ctx = gpudata_context(l[0]);                                          \
+  if (ctx->blas_ops->name)                                              \
+    return ctx->blas_ops->name args;                                    \
+  else                                                                  \
+    return error_fmt(ctx->err, GA_DEVSUP_ERROR, "Blas operation not supported by library in use: %s", #name)
+
+#define BLAS_OPBF(l, name, args)                                        \
+  gpucontext *ctx;                                                      \
+  if (batchCount == 0) return GA_NO_ERROR;                              \
+  ctx = gpudata_context(l[0]);                                          \
+  if (flags != 0) return error_set(ctx->err, GA_INVALID_ERROR, "flags is not 0"); \
+  if (ctx->blas_ops->name)                                              \
+    return ctx->blas_ops->name args;                                    \
+  else                                                                  \
+    return error_fmt(ctx->err, GA_DEVSUP_ERROR, "Blas operation not supported by library in use: %s", #name)
+
 int gpublas_hgemmBatch(
-  cb_order order, cb_transpose transA, cb_transpose transB,
-  size_t M, size_t N, size_t K, float alpha,
-  gpudata **A, size_t *offA, size_t lda,
-  gpudata **B, size_t *offB, size_t ldb,
-  float beta, gpudata **C, size_t *offC, size_t ldc,
-  size_t batchCount, int flags) {
-  if (flags != 0) return GA_INVALID_ERROR;
-  if (batchCount == 0) return GA_NO_ERROR;
-  return gpudata_context(A[0])->blas_ops->hgemmBatch(
-    order, transA, transB, M, N, K, alpha, A, offA, lda,
-    B, offB, ldb, beta, C, offC, ldc, batchCount);
+    cb_order order, cb_transpose transA, cb_transpose transB,
+    size_t M, size_t N, size_t K, float alpha,
+    gpudata **A, size_t *offA, size_t lda,
+    gpudata **B, size_t *offB, size_t ldb,
+    float beta, gpudata **C, size_t *offC, size_t ldc,
+    size_t batchCount, int flags) {
+  BLAS_OPBF(A, hgemmBatch,
+            (order, transA, transB, M, N, K, alpha, A, offA, lda,
+             B, offB, ldb, beta, C, offC, ldc, batchCount));
 }
 
 int gpublas_sgemmBatch(
@@ -154,11 +168,9 @@ int gpublas_sgemmBatch(
   gpudata **B, size_t *offB, size_t ldb,
   float beta, gpudata **C, size_t *offC, size_t ldc,
   size_t batchCount, int flags) {
-  if (flags != 0) return GA_INVALID_ERROR;
-  if (batchCount == 0) return GA_NO_ERROR;
-  return gpudata_context(A[0])->blas_ops->sgemmBatch(
-    order, transA, transB, M, N, K, alpha, A, offA, lda,
-    B, offB, ldb, beta, C, offC, ldc, batchCount);
+  BLAS_OPBF(A, sgemmBatch,
+            (order, transA, transB, M, N, K, alpha, A, offA, lda,
+             B, offB, ldb, beta, C, offC, ldc, batchCount));
 }
 
 int gpublas_dgemmBatch(
@@ -168,11 +180,9 @@ int gpublas_dgemmBatch(
   gpudata **B, size_t *offB, size_t ldb,
   double beta, gpudata **C, size_t *offC, size_t ldc,
   size_t batchCount, int flags) {
-  if (flags != 0) return GA_INVALID_ERROR;
-  if (batchCount == 0) return GA_NO_ERROR;
-  return gpudata_context(A[0])->blas_ops->dgemmBatch(
-    order, transA, transB, M, N, K, alpha, A, offA, lda,
-    B, offB, ldb, beta, C, offC, ldc, batchCount);
+  BLAS_OPBF(A, dgemmBatch,
+            (order, transA, transB, M, N, K, alpha, A, offA, lda,
+             B, offB, ldb, beta, C, offC, ldc, batchCount));
 }
 
 int gpublas_hgemvBatch(
@@ -182,10 +192,9 @@ int gpublas_hgemvBatch(
   gpudata **x, size_t *offX, size_t incX,
   float beta, gpudata **y, size_t *offY, size_t incY,
   size_t batchCount, int flags) {
-  if (batchCount == 0) return GA_NO_ERROR;
-  return gpudata_context(A[0])->blas_ops->hgemvBatch(
-    order, transA, M, N, alpha, A, offA, lda, x, offX, incX,
-    beta, y, offY, incY, batchCount, flags);
+  BLAS_OPB(A, hgemvBatch,
+           (order, transA, M, N, alpha, A, offA, lda, x, offX, incX,
+            beta, y, offY, incY, batchCount, flags));
 }
 
 int gpublas_sgemvBatch(
@@ -195,10 +204,9 @@ int gpublas_sgemvBatch(
   gpudata **x, size_t *offX, size_t incX,
   float beta, gpudata **y, size_t *offY, size_t incY,
   size_t batchCount, int flags) {
-  if (batchCount == 0) return GA_NO_ERROR;
-  return gpudata_context(A[0])->blas_ops->sgemvBatch(
-    order, transA, M, N, alpha, A, offA, lda, x, offX, incX,
-    beta, y, offY, incY, batchCount, flags);
+  BLAS_OPB(A, sgemvBatch,
+           (order, transA, M, N, alpha, A, offA, lda, x, offX, incX,
+            beta, y, offY, incY, batchCount, flags));
 }
 
 int gpublas_dgemvBatch(
@@ -208,10 +216,9 @@ int gpublas_dgemvBatch(
   gpudata **x, size_t *offX, size_t incX,
   double beta, gpudata **y, size_t *offY, size_t incY,
   size_t batchCount, int flags) {
-  if (batchCount == 0) return GA_NO_ERROR;
-  return gpudata_context(A[0])->blas_ops->dgemvBatch(
-    order, transA, M, N, alpha, A, offA, lda, x, offX, incX,
-    beta, y, offY, incY, batchCount, flags);
+  BLAS_OPB(A, dgemvBatch,
+           (order, transA, M, N, alpha, A, offA, lda, x, offX, incX,
+            beta, y, offY, incY, batchCount, flags));
 }
 
 int gpublas_hgerBatch(cb_order order, size_t M, size_t N, float alpha,
@@ -219,10 +226,9 @@ int gpublas_hgerBatch(cb_order order, size_t M, size_t N, float alpha,
                       gpudata **y, size_t *offY, size_t incY,
                       gpudata **A, size_t *offA, size_t lda,
                       size_t batchCount, int flags) {
-  if (batchCount == 0) return GA_NO_ERROR;
-  return gpudata_context(x[0])->blas_ops->hgerBatch(
-    order, M, N, alpha, x, offX, incX, y, offY, incY,
-    A, offA, lda, batchCount, flags);
+  BLAS_OPB(x, hgerBatch,
+           (order, M, N, alpha, x, offX, incX, y, offY, incY,
+            A, offA, lda, batchCount, flags));
 }
 
 int gpublas_sgerBatch(cb_order order, size_t M, size_t N, float alpha,
@@ -230,10 +236,9 @@ int gpublas_sgerBatch(cb_order order, size_t M, size_t N, float alpha,
                       gpudata **y, size_t *offY, size_t incY,
                       gpudata **A, size_t *offA, size_t lda,
                       size_t batchCount, int flags) {
-  if (batchCount == 0) return GA_NO_ERROR;
-  return gpudata_context(x[0])->blas_ops->sgerBatch(
-    order, M, N, alpha, x, offX, incX, y, offY, incY,
-    A, offA, lda, batchCount, flags);
+  BLAS_OPB(x, sgerBatch,
+           (order, M, N, alpha, x, offX, incX, y, offY, incY,
+            A, offA, lda, batchCount, flags));
 }
 
 int gpublas_dgerBatch(cb_order order, size_t M, size_t N, double alpha,
@@ -241,8 +246,7 @@ int gpublas_dgerBatch(cb_order order, size_t M, size_t N, double alpha,
                       gpudata **y, size_t *offY, size_t incY,
                       gpudata **A, size_t *offA, size_t lda,
                       size_t batchCount, int flags) {
-  if (batchCount == 0) return GA_NO_ERROR;
-  return gpudata_context(x[0])->blas_ops->dgerBatch(
-    order, M, N, alpha, x, offX, incX, y, offY, incY,
-    A, offA, lda, batchCount, flags);
+  BLAS_OPB(x, dgerBatch,
+           (order, M, N, alpha, x, offX, incX, y, offY, incY,
+            A, offA, lda, batchCount, flags));
 }
