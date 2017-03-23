@@ -71,7 +71,8 @@ static int ga_extcopy(GpuArray *dst, const GpuArray *src) {
     if (ctx->extcopy_cache == NULL)
       ctx->extcopy_cache = cache_twoq(4, 8, 8, 2, extcopy_eq, extcopy_hash,
                                       extcopy_free,
-                                      (cache_freev_fn)GpuElemwise_free);
+                                      (cache_freev_fn)GpuElemwise_free,
+                                      ctx->err);
     if (ctx->extcopy_cache == NULL)
       return GA_MISC_ERROR;
     if (cache_add(ctx->extcopy_cache, aa, k) != 0)

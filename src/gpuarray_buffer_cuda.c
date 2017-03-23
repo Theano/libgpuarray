@@ -129,8 +129,9 @@ static int setup_done = 0;
 static int major = -1;
 static int minor = -1;
 static int setup_lib(void) {
-  int res, tmp;
   const char *ver;
+  CUresult err;
+  int res, tmp;
 
   if (!setup_done) {
     res = load_libcuda(global_err);
@@ -167,6 +168,7 @@ static int cuda_get_platform_count(unsigned int* platcount) {
 
 static int cuda_get_device_count(unsigned int platform,
                                  unsigned int* devcount) {
+  CUresult err;
   int dv;
   // platform number gets ignored in CUDA implementation
   GA_CHECK(setup_lib());
@@ -203,7 +205,7 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   res->minor = minor;
   res->freeblocks = NULL;
   if (error_alloc(&res->err)) {
-    error_sets(global_err, GA_SYS_ERROR, "Could not create error context");
+    error_set(global_err, GA_SYS_ERROR, "Could not create error context");
     goto fail_errmsg;
   }
   if (detect_arch(ARCH_PREFIX, res->bin_id, global_err)) {
@@ -213,7 +215,7 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
      libraries that may do stuff on the NULL stream */
   err = cuStreamCreate(&res->s, 0);
   if (err != CUDA_SUCCESS) {
-    error_cuda(global_err, "cuStreamCreate", err)
+    error_cuda(global_err, "cuStreamCreate", err);
     goto fail_stream;
   }
   if (ISSET(res->flags, GA_CTX_SINGLE_STREAM)) {
@@ -223,7 +225,7 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
        libraries that may do stuff on the NULL stream */
     err = cuStreamCreate(&res->mem_s, 0);
     if (err != CUDA_SUCCESS) {
-      error_cuda(global_err, "cuStreamCreate", err)
+      error_cuda(global_err, "cuStreamCreate", err);
       goto fail_mem_stream;
     }
   }
@@ -234,7 +236,7 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
                                  (cache_freek_fn)strb_free,
                                  (cache_freev_fn)cuda_freekernel, global_err);
   if (res->kernel_cache == NULL)
-    error_cuda(global_err, "cuStreamCreate", err)
+    error_cuda(global_err, "cuStreamCreate", err);
     goto fail_cache;
 
   cache_path = getenv("GPUARRAY_CACHE_PATH");
@@ -243,17 +245,19 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
                           (cache_eq_fn)key_eq,
                           (cache_hash_fn)key_hash,
                           (cache_freek_fn)key_free,
-                          (cache_freev_fn)strb_free);
+                          (cache_freev_fn)strb_free,
+                          res->err);
     if (mem_cache == NULL) {
-      // TODO use better error messages when they are available.
-      fprintf(stderr, "Error initializing disk cache, disabling\n");
+      fprintf(stderr, "Error initializing mem cache for disk: %s\n",
+              res->err->msg);
       goto fail_disk_cache;
     }
     res->disk_cache = cache_disk(cache_path, mem_cache,
                                  (kwrite_fn)key_write,
                                  (vwrite_fn)kernel_write,
                                  (kread_fn)key_read,
-                                 (vread_fn)kernel_read);
+                                 (vread_fn)kernel_read,
+                                 res->err);
     if (res->disk_cache == NULL) {
       // TODO use better error messages when they are available.
       fprintf(stderr, "Error initializing disk cache, disabling\n");
@@ -267,13 +271,13 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
 
   err = cuMemAllocHost(&p, 16);
   if (err != CUDA_SUCCESS) {
-    error_cuda(e, "cuMemAllocHost", err);
+    error_cuda(global_err, "cuMemAllocHost", err);
     goto fail_errbuf;
   }
   memset(p, 0, 16);
   /* Need to tag for new_gpudata */
   TAG_CTX(res);
-  res->errbuf = new_gpudata(res, (CUdeviceptr)p, 16, e);
+  res->errbuf = new_gpudata(res, (CUdeviceptr)p, 16);
   if (res->errbuf == NULL) {
     /* Copy the error from the context since we are getting rid of it */
     error_set(global_err, res->err->code, res->err->msg);
@@ -426,7 +430,7 @@ gpudata *cuda_make_buf(cuda_context *ctx, CUdeviceptr p, size_t sz) {
 
 size_t cuda_get_sz(gpudata *g) { ASSERT_BUF(g); return g->sz; }
 
-#define CHKFAIL(n, v)        \
+#define CHKFAIL(e, n, v)      \
   if (err != CUDA_SUCCESS) { \
     error_cuda(e, n, err);   \
     return v;                \
@@ -498,13 +502,13 @@ static cuda_context *do_init(CUdevice dev, int flags, error *e) {
     if (flags & GA_CTX_MULTI_THREAD)
       fl = CU_CTX_SCHED_YIELD;
     err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_UNIFIED_ADDRESSING, dev);
-    CHKFAIL("cuDeviceGetAttribute", NULL);
+    CHKFAIL(e, "cuDeviceGetAttribute", NULL);
     if (i != 1) {
       error_set(e, GA_UNSUPPORTED_ERROR, "device does not support unified addressing");
       return NULL;
     }
     err = cuDevicePrimaryCtxGetState(dev, &cur_fl, &act);
-    CHKFAIL("cuDevicePrimaryCtxGetState", NULL);
+    CHKFAIL(e, "cuDevicePrimaryCtxGetState", NULL);
     if (act == 1) {
       if ((cur_fl & fl) != fl) {
         error_set(e, GA_INVALID_ERROR, "device is already active and has unsupported flags");
@@ -512,12 +516,12 @@ static cuda_context *do_init(CUdevice dev, int flags, error *e) {
       }
     } else {
       err = cuDevicePrimaryCtxSetFlags(dev, fl);
-      CHKFAIL("cuDevicePrimaryCtxSetFlags", NULL);
+      CHKFAIL(e, "cuDevicePrimaryCtxSetFlags", NULL);
     }
     err = cuDevicePrimaryCtxRetain(&ctx, dev);
-    CHKFAIL("cuDevicePrimaryCtxRetain", NULL);
+    CHKFAIL(e, "cuDevicePrimaryCtxRetain", NULL);
     err = cuCtxPushCurrent(ctx);
-    CHKFAIL("cuCtxPushCurrent", NULL);
+    CHKFAIL(e, "cuCtxPushCurrent", NULL);
     res = cuda_make_ctx(ctx, flags);
     if (res == NULL) {
       cuDevicePrimaryCtxRelease(dev);
@@ -545,11 +549,11 @@ static gpucontext *cuda_init(int ord, int flags) {
     if (ord == -1) {
       int i, c;
       err = cuDeviceGetCount(&c);
-      CHKFAIL("cuDeviceGetCount", NULL);
+      CHKFAIL(global_err, "cuDeviceGetCount", NULL);
       for (i = 0; i < c; i++) {
         err = cuDeviceGet(&dev, i);
-        CHKFAIL("cuDeviceGet", NULL);
-        res = do_init(dev, flags, NULL);
+        CHKFAIL(global_err, "cuDeviceGet", NULL);
+        res = do_init(dev, flags, global_err);
         if (res != NULL)
           return (gpucontext *)res;
       }
@@ -557,8 +561,8 @@ static gpucontext *cuda_init(int ord, int flags) {
       return NULL;
     } else {
       err = cuDeviceGet(&dev, ord);
-      CHKFAIL("cuDeviceGet", NULL);
-      return (gpucontext *)do_init(dev, flags, ret);
+      CHKFAIL(global_err, "cuDeviceGet", NULL);
+      return (gpucontext *)do_init(dev, flags, global_err);
     }
 }
 static void cuda_deinit(gpucontext *c) {
@@ -763,7 +767,8 @@ gpudata *cuda_open_ipc_handle(gpucontext *c, GpuArrayIpcMemHandle *h, size_t sz)
                            CU_IPC_MEM_LAZY_ENABLE_PEER_ACCESS);
   if (err != CUDA_SUCCESS) {
     cuda_exit(ctx);
-    return error_cuda(ctx->err, "cuIpcOpenMemHandle", err);
+    error_cuda(ctx->err, "cuIpcOpenMemHandle", err);
+    return NULL;
   }
   d = cuda_make_buf(ctx, p, sz);
   if (d != NULL)
@@ -1149,14 +1154,14 @@ static int make_bin(cuda_context *ctx, const strb *ptx, strb *bin, strb *log) {
                           cujit_opts, cujit_opt_vals, &st);
   if (ctx->err != CUDA_SUCCESS)
     return error_cuda(ctx->err, "cuLinkCreate", err);
-  ctx->err = cuLinkAddData(st, CU_JIT_INPUT_PTX, ptx->s, ptx->l,
+  err = cuLinkAddData(st, CU_JIT_INPUT_PTX, ptx->s, ptx->l,
                            "kernel code", 0, NULL, NULL);
-  if (ctx->err != CUDA_SUCCESS) {
+  if (err != CUDA_SUCCESS) {
     res = error_cuda(ctx->err, "cuLinkAddData", err);
     goto out;
   }
-  ctx->err = cuLinkComplete(st, &out, &out_size);
-  if (ctx->err != CUDA_SUCCESS) {
+  err = cuLinkComplete(st, &out, &out_size);
+  if (err != CUDA_SUCCESS) {
     res = error_cuda(ctx->err, "cuLinkComplete", err);
     goto out;
   }
@@ -1176,7 +1181,6 @@ static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
   strb *cbin;
   kernel_key k;
   kernel_key *pk;
-  int err;
 
   memset(&k, 0, sizeof(k));
   k.version = 0;
@@ -1204,29 +1208,33 @@ static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
   if (ctx->disk_cache) {
     pk = calloc(sizeof(kernel_key), 1);
     if (pk == NULL) {
-      // TODO use better error messages
-      fprintf(stderr, "Error adding kernel to disk cache\n");
+      error_sys(ctx->err, "calloc");
+      fprintf(stderr, "Error adding kernel to disk cache: %s\n",
+              ctx->err->msg);
       return GA_NO_ERROR;
     }
     memcpy(pk, &k, KERNEL_KEY_MM);
     strb_appendb(&pk->src, src);
     if (strb_error(&pk->src)) {
-      // TODO use better error messages
-      fprintf(stderr, "Error adding kernel to disk cache\n");
+      error_sys(ctx->err, "strb_appendb"); 
+      fprintf(stderr, "Error adding kernel to disk cache %s\n",
+              ctx->err->msg);
       key_free((cache_key_t)pk);
       return GA_NO_ERROR;
     }
     cbin = strb_alloc(bin->l);
     if (cbin == NULL) {
-      // TODO use better error messages
-      fprintf(stderr, "Error adding kernel to disk cache\n");
+      error_sys(ctx->err, "strb_alloc"); 
+      fprintf(stderr, "Error adding kernel to disk cache: %s\n",
+              ctx->err->msg);
       key_free((cache_key_t)pk);
       return GA_NO_ERROR;
     }
     strb_appendb(cbin, bin);
     if (strb_error(cbin)) {
-      // TODO use better error messages
-      fprintf(stderr, "Error adding kernel to disk cache\n");
+      error_sys(ctx->err, "strb_appendb"); 
+      fprintf(stderr, "Error adding kernel to disk cache %s\n",
+              ctx->err->msg);
       key_free((cache_key_t)pk);
       strb_free(cbin);
       return GA_NO_ERROR;
@@ -1292,7 +1300,7 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
     }
 
     if (get_cc(dev, &major, &minor, ctx->err) != GA_NO_ERROR)
-      return ctx->err->code;
+      return NULL;
 
     // GA_USE_CLUDA is done later
     // GA_USE_SMALL will always work
@@ -1371,7 +1379,7 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
 
     res = calloc(1, sizeof(*res));
     if (res == NULL) {
-      error_sys(ctx->err, "calloc")
+      error_sys(ctx->err, "calloc");
       strb_clear(&src);
       strb_clear(&bin);
       cuda_exit(ctx);
@@ -1491,7 +1499,7 @@ static int cuda_callkernel(gpukernel *k, unsigned int n,
       break;
     default:
       cuda_exit(ctx);
-      return error_set(ctx->err, GA_VALUE_ERROR, "Call with more than 3 dimensions")
+      return error_set(ctx->err, GA_VALUE_ERROR, "Call with more than 3 dimensions");
     }
 
     for (i = 0; i < k->argcount; i++) {
@@ -1643,7 +1651,7 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_NUMPROCS:
-    GETPROP(CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT, unsigned int)
+    GETPROP(CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT, unsigned int);
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_MAXGSIZE:
@@ -1675,7 +1683,7 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
 
   case GA_CTX_PROP_FREE_GMEM:
     cuda_enter(ctx);
-    CUDA_EXIT_ON_ERROR(cuMemGetInfo((size_t *)res, &sz));
+    CUDA_EXIT_ON_ERROR(ctx, cuMemGetInfo((size_t *)res, &sz));
     cuda_exit(ctx);
     return GA_NO_ERROR;
 
@@ -1723,15 +1731,15 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
 
   case GA_KERNEL_PROP_MAXLSIZE:
     cuda_enter(ctx);
-    CUDA_EXIT_ON_ERROR(cuFuncGetAttribute(&i, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK, k->k));
+    CUDA_EXIT_ON_ERROR(ctx, cuFuncGetAttribute(&i, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK, k->k));
     cuda_exit(ctx);
     *((size_t *)res) = i;
     return GA_NO_ERROR;
 
   case GA_KERNEL_PROP_PREFLSIZE:
     cuda_enter(ctx);
-    CUDA_EXIT_ON_ERROR(cuCtxGetDevice(&id));
-    CUDA_EXIT_ON_ERROR(cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_WARP_SIZE, id));
+    CUDA_EXIT_ON_ERROR(ctx, cuCtxGetDevice(&id));
+    CUDA_EXIT_ON_ERROR(ctx, cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_WARP_SIZE, id));
     cuda_exit(ctx);
     *((size_t *)res) = i;
     return GA_NO_ERROR;

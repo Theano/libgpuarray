@@ -5,13 +5,13 @@
 #include "dyn_load.h"
 #include "gpuarray/error.h"
 
-#define DEF_PROC(name, args) t##name *name
+#define DEF_PROC(rt, name, args) t##name *name
 
 #include "libnvrtc.fn"
 
 #undef DEF_PROC
 
-#define DEF_PROC(name, args)                      \
+#define DEF_PROC(rt, name, args)                  \
   name = (t##name *)ga_func_ptr(lib, #name, e);   \
   if (name == NULL) {                             \
     return e->code;                               \

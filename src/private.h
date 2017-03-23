@@ -27,10 +27,6 @@ extern "C" {
 }
 #endif
 
-static inline int error_sys(error *e, const char *msg) {
-  return error_fmt(e, GA_SYS_ERROR, "%s: %s", msg, strerror(errno));
-}
-
 #define ADDR32_MAX   4294967295L
 #define SADDR32_MIN -2147483648L
 #define SADDR32_MAX  2147483647L
@@ -95,8 +91,7 @@ struct _gpuarray_buffer_ops {
   gpukernel *(*kernel_alloc)(gpucontext *ctx, unsigned int count,
                              const char **strings, const size_t *lengths,
                              const char *fname, unsigned int numargs,
-                             const int *typecodes, int flags, int *ret,
-                             char **err_str);
+                             const int *typecodes, int flags, char **err_str);
   void (*kernel_retain)(gpukernel *k);
   void (*kernel_release)(gpukernel *k);
   int (*kernel_setarg)(gpukernel *k, unsigned int i, void *a);

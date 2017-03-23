@@ -89,7 +89,8 @@ cache *cache_twoq(size_t hot_size, size_t warm_size,
 
 cache *cache_disk(const char *dirpath, cache *mem,
                   kwrite_fn kwrite, vwrite_fn vwrite,
-                  kread_fn kread, vread_fn vread);
+                  kread_fn kread, vread_fn vread,
+                  error *e);
 
 /* API functions */
 static inline int cache_add(cache *c, cache_key_t k, cache_value_t v) {

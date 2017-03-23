@@ -20,7 +20,7 @@ void error_free(error *e) {
 
 int error_setall(error *e, int code, const char *msg) {
   e->code = code;
-  strlcpy(e->msg, msg, MSGBUF_LEN);
+  strlcpy(e->msg, msg, ERROR_MSGBUF_LEN);
   return code;
 }
 
@@ -29,7 +29,7 @@ int error_fmt(error *e, int code, const char *fmt, ...) {
 
   e->code = code;
   va_start(ap, fmt);
-  vsnprintf(e->msg, MSGBUF_LEN, fmt, ap);
+  vsnprintf(e->msg, ERROR_MSGBUF_LEN, fmt, ap);
   va_end(ap);
   return code;
 }

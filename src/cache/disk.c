@@ -397,7 +397,7 @@ static void disk_destroy(cache *_c) {
 
 cache *cache_disk(const char *dirpath, cache *mem,
                   kwrite_fn kwrite, vwrite_fn vwrite,
-                  kread_fn kread, vread_fn vread) {
+                  kread_fn kread, vread_fn vread, error *e) {
   struct stat st;
   disk_cache *res;
   char *dirp;
@@ -414,7 +414,10 @@ cache *cache_disk(const char *dirpath, cache *mem,
 
   dirp = malloc(dirl + 1);  /* With the NUL */
 
-  if (dirp == NULL) return NULL;
+  if (dirp == NULL) {
+    error_sys(e, "malloc");
+    return NULL;
+  }
 
   strlcpy(dirp, dirpath, dirl + 1);
 
@@ -425,6 +428,7 @@ cache *cache_disk(const char *dirpath, cache *mem,
 
   if (ensurep(NULL, dirp) != 0) {
     free(dirp);
+    error_sys(e, "ensurep");
     return NULL;
   }
 
@@ -433,18 +437,24 @@ cache *cache_disk(const char *dirpath, cache *mem,
 
   mkdir(dirp, 0777); /* This may fail, but it's ok */
 
-  if (lstat(dirp, &st) != 0)
+  if (lstat(dirp, &st) != 0) {
+    error_sys(e, "lstat");
     return NULL;
+  }
 
   /* Restore the good path at the end */
   dirp[dirl - 1] = sep;
 
-  if (!(st.st_mode & S_IFDIR))
+  if (!(st.st_mode & S_IFDIR)) {
+    error_set(e, GA_SYS_ERROR, "Cache path exists but is not a directory");
     return NULL;
+  }
 
   res = calloc(sizeof(*res), 1);
-  if (res == NULL)
+  if (res == NULL) {
+    error_sys(e, "calloc");
     return NULL;
+  }
 
   res->dirp = dirp;
   res->mem = mem;

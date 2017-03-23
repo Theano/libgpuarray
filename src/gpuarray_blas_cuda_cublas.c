@@ -24,7 +24,7 @@ static inline cublasOperation_t convT(cb_transpose trans) {
   }
 }
 
-static const char *error(cublasStatus_t err) {
+static const char *estr(cublasStatus_t err) {
   switch (err) {
   case CUBLAS_STATUS_SUCCESS:
     return "(cublas) Operation completed successfully.";
@@ -53,12 +53,12 @@ static const char *error(cublasStatus_t err) {
 
 static inline int error_cublas(error *e, const char *msg, cublasStatus_t err) {
   return error_fmt(e, (err == CUBLAS_STATUS_ARCH_MISMATCH) ? GA_DEVSUP_ERROR : GA_BLAS_ERROR,
-                   "%s: %s", msg, error(err));
+                   "%s: %s", msg, estr(err));
 }
 
 #define CUBLAS_EXIT_ON_ERROR(ctx, cmd) do {       \
     cublasStatus_t err = (cmd);                   \
-    if (err != CUBLAS_SUCCESS) {                  \
+    if (err != CUBLAS_STATUS_SUCCESS) {           \
       cuda_exit(ctx);                             \
       return error_cublas((ctx)->err, #cmd, err); \
     }                                             \
@@ -525,13 +525,14 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   const size_t threshold = 650;
   cb_transpose transT;
 
+  ASSERT_BUF(A[0]);
+  ctx = A[0]->ctx;
+
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
       LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
       LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
     return error_set(ctx->err, GA_XLARGE_ERROR, "Passed-in sizes would overflow the ints in the cublas interface");
 
-  ASSERT_BUF(A[0]);
-  ctx = A[0]->ctx;
   h = (blas_handle *)ctx->blas_handle;
   cuda_enter(ctx);
 
@@ -623,7 +624,7 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     gpudata_release(Ta);
     if (err != CUBLAS_STATUS_SUCCESS) {
       cuda_exit(ctx);
-      return error_cublas(ctx, "cublasSgemmBatched", err);
+      return error_cublas(ctx->err, "cublasSgemmBatched", err);
     }
 
     for (i = 0; i < batchCount; i++) {
@@ -651,13 +652,14 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   const size_t threshold = 650;
   cb_transpose transT;
 
+  ASSERT_BUF(A[0]);
+  ctx = A[0]->ctx;
+
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
       LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
       LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
     return error_set(ctx->err, GA_XLARGE_ERROR, "Passed-in sizes would overflow the ints in the cublas interface");
 
-  ASSERT_BUF(A[0]);
-  ctx = A[0]->ctx;
   h = (blas_handle *)ctx->blas_handle;
   cuda_enter(ctx);
 
@@ -697,7 +699,7 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
                                             (double*)A[i]->ptr + offA[i], lda,
                                             (double*)B[i]->ptr + offB[i], ldb,
                                             &beta,
-                                            (double*)C[i]->ptr + offC[i], ldc);
+                                            (double*)C[i]->ptr + offC[i], ldc));
 
       GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A[i], CUDA_WAIT_READ));
       GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B[i], CUDA_WAIT_READ));

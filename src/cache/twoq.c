@@ -1,6 +1,8 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include <gpuarray/error.h>
+
 #include "cache.h"
 #include "private_config.h"
 

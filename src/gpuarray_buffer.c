@@ -163,8 +163,12 @@ gpukernel *gpukernel_init(gpucontext *ctx, unsigned int count,
                           const char *fname, unsigned int numargs,
                           const int *typecodes, int flags, int *ret,
                           char **err_str) {
-  return ctx->ops->kernel_alloc(ctx, count, strings, lengths, fname, numargs,
-                                typecodes, flags, ret, err_str);
+  gpukernel *res;
+  res = ctx->ops->kernel_alloc(ctx, count, strings, lengths, fname, numargs,
+                               typecodes, flags, err_str);
+  if (res == NULL && ret)
+    *ret = ctx->err->code;
+  return res;
 }
 
 void gpukernel_retain(gpukernel *k) {
