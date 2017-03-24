@@ -1152,7 +1152,7 @@ static int make_bin(cuda_context *ctx, const strb *ptx, strb *bin, strb *log) {
 
   err = cuLinkCreate(sizeof(cujit_opts)/sizeof(cujit_opts[0]),
                           cujit_opts, cujit_opt_vals, &st);
-  if (ctx->err != CUDA_SUCCESS)
+  if (err != CUDA_SUCCESS)
     return error_cuda(ctx->err, "cuLinkCreate", err);
   err = cuLinkAddData(st, CU_JIT_INPUT_PTX, ptx->s, ptx->l,
                            "kernel code", 0, NULL, NULL);

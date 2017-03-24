@@ -896,7 +896,7 @@ static gpukernel *cl_newkernel(gpucontext *c, unsigned int count,
     }
 
     p = clCreateProgramWithSource(ctx->ctx, count+n, news, newl, &err);
-    if (ctx->err != CL_SUCCESS) {
+    if (err != CL_SUCCESS) {
       if (n != 0) {
         free(news);
         free(newl);
@@ -1135,7 +1135,7 @@ static int cl_kernelbin(gpukernel *k, size_t *sz, void **obj) {
   if (res == NULL)
     return error_sys(ctx->err, "malloc");
   err = clGetProgramInfo(p, CL_PROGRAM_BINARIES, sizeof(res), &res, NULL);
-  if (ctx->err != CL_SUCCESS) {
+  if (err != CL_SUCCESS) {
     free(res);
     return error_cl(ctx->err, "clProgramGetInfo", err);
   }
