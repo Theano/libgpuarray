@@ -148,7 +148,12 @@ cl_ctx *cl_make_ctx(cl_context ctx, int flags) {
 
   res->ctx = ctx;
   res->ops = &opencl_ops;
-  res->err = CL_SUCCESS;
+  if (error_alloc(&res->err)) {
+    error_set(global_err, GA_SYS_ERROR, "Could not create error context");
+    free(res);
+    return NULL;
+  }
+
   res->refcnt = 1;
   res->exts = NULL;
   res->blas_handle = NULL;
@@ -158,8 +163,9 @@ cl_ctx *cl_make_ctx(cl_context ctx, int flags) {
     ISSET(flags, GA_CTX_SINGLE_STREAM) ? 0 : qprop&CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE,
     &err);
   if (res->q == NULL) {
-    free(res);
     error_cl(global_err, "clCreateCommandQueue", err);
+    error_free(res->err);
+    free(res);
     return NULL;
   }
 
@@ -221,6 +227,7 @@ static void cl_free_ctx(cl_ctx *ctx) {
     clReleaseContext(ctx->ctx);
     if (ctx->preamble != NULL)
       free(ctx->preamble);
+    error_free(ctx->err);
     CLEAR(ctx);
     free(ctx);
   }
