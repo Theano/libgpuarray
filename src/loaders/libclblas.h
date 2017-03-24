@@ -18,6 +18,24 @@ typedef enum clblasTranspose_ {
 typedef enum clblasStatus_ {
   clblasSuccess = CL_SUCCESS,
   /* Rest is not exposed from here */
+  clblasNotImplemented = -1024,
+  clblasNotInitialized,
+  clblasInvalidMatA,
+  clblasInvalidMatB,
+  clblasInvalidMatC,
+  clblasInvalidVecX,
+  clblasInvalidVecY,
+  clblasInvalidDim,
+  clblasInvalidLeadDimA,
+  clblasInvalidLeadDimB,
+  clblasInvalidLeadDimC,
+  clblasInvalidIncX,
+  clblasInvalidIncY,
+  clblasInsufficientMemMatA,
+  clblasInsufficientMemMatB,
+  clblasInsufficientMemMatC,
+  clblasInsufficientMemVecX,
+  clblasInsufficientMemVecY,
 } clblasStatus;
 
 int load_libclblas(error *);
