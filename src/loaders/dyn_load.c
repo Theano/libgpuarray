@@ -16,7 +16,7 @@ void *ga_load_library(const char *name, error *e) {
   return res;
 }
 
-void *ga_func_ptr(void *h, const char *name) {
+void *ga_func_ptr(void *h, const char *name, error *e) {
   void *res = dlsym(h, name);
   if (res == NULL)
     error_fmt(e, GA_LOAD_ERROR, "Could not find synbol \"%s\": %s", name, dlerror());

@@ -23,7 +23,7 @@
   }
 
 #define DEF_PROC_OPT(name, args)                \
-  name = (t##name *)ga_func_ptr(lib, #name);
+  name = (t##name *)ga_func_ptr(lib, #name, e);
 
 #define DEF_PROC_V2(name, args)                                   \
   name = (t##name *)ga_func_ptr(lib, STRINGIFY(name##_v2), e);    \

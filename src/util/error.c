@@ -1,4 +1,5 @@
 #include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "error.h"
@@ -18,14 +19,14 @@ void error_free(error *e) {
   free(e);
 }
 
-int error_setall(error *e, int code, const char *msg) {
+int error_set(error *e, int code, const char *msg) {
   e->code = code;
   strlcpy(e->msg, msg, ERROR_MSGBUF_LEN);
   return code;
 }
 
 int error_fmt(error *e, int code, const char *fmt, ...) {
-  va_arg ap;
+  va_list ap;
 
   e->code = code;
   va_start(ap, fmt);

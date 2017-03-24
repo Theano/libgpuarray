@@ -47,9 +47,9 @@ int load_libcuda(error *e) {
   if (loaded)
     return GA_NO_ERROR;
 
-  lib = ga_load_library(libname);
+  lib = ga_load_library(libname, e);
   if (lib == NULL)
-    return error_fmt(e, GA_LOAD_ERROR, "Could not load \"%s\"", libname);
+    return e->code;
 
   #include "libcuda.fn"
 
