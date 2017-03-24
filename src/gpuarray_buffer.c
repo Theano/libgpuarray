@@ -67,17 +67,10 @@ int gpucontext_property(gpucontext *ctx, int prop_id, void *res) {
 }
 
 const char *gpucontext_error(gpucontext *ctx, int err) {
-  if (ctx != NULL) {
-    switch (err) {
-    case GA_IMPL_ERROR:
-      return ctx->ops->ctx_error(ctx);
-    case GA_BLAS_ERROR:
-      return gpublas_error(ctx);
-    case GA_COMM_ERROR:
-      return gpucomm_error(ctx);
-    }
-  }
-  return gpuarray_error_str(err);
+  if (ctx == NULL)
+    return global_err->msg;
+  else
+    return ctx->ops->ctx_error(ctx);
 }
 
 gpudata *gpudata_alloc(gpucontext *ctx, size_t sz, void *data, int flags,
