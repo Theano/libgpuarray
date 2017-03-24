@@ -82,7 +82,7 @@ struct _gpuarray_buffer_ops {
   gpudata *(*buffer_alloc)(gpucontext *ctx, size_t sz, void *data, int flags);
   void (*buffer_retain)(gpudata *b);
   void (*buffer_release)(gpudata *b);
-  int (*buffer_share)(gpudata *a, gpudata *b, int *ret);
+  int (*buffer_share)(gpudata *a, gpudata *b);
   int (*buffer_move)(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff,
                      size_t sz);
   int (*buffer_read)(void *dst, gpudata *src, size_t srcoff, size_t sz);

@@ -851,7 +851,7 @@ static void cuda_free(gpudata *d) {
   }
 }
 
-static int cuda_share(gpudata *a, gpudata *b, int *ret) {
+static int cuda_share(gpudata *a, gpudata *b) {
   ASSERT_BUF(a);
   ASSERT_BUF(b);
   return (a->ctx == b->ctx && a->sz != 0 && b->sz != 0 &&
@@ -1753,7 +1753,7 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     return GA_NO_ERROR;
 
   default:
-    return GA_INVALID_ERROR;
+    return error_fmt(ctx->err, GA_INVALID_ERROR, "Invalid property: %d", prop_id);
   }
 }
 

@@ -97,7 +97,10 @@ void gpudata_release(gpudata *b) {
 }
 
 int gpudata_share(gpudata *a, gpudata *b, int *ret) {
-  return ((partial_gpudata *)a)->ctx->ops->buffer_share(a, b, ret);
+  int res = ((partial_gpudata *)a)->ctx->ops->buffer_share(a, b);
+  if (res == -1 && ret)
+    *ret = ((partial_gpudata *)a)->ctx->err->code;
+  return res;
 }
 
 int gpudata_move(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff,
