@@ -25,23 +25,29 @@ def _generate_kernel(ctx, cols, upper=True):
     return k
 
 
-def triu(A, ctx, inplace=True):
+def triu(A, inplace=True):
     if not inplace:
         A = A.copy()
-    upper = True
     if A.flags['F_CONTIGUOUS']:
         upper = False
-    k = _generate_kernel(ctx, A.shape[0], upper)
+        cols = A.shape[0]
+    else:
+        upper = True
+        cols = A.shape[1]
+    k = _generate_kernel(A.context, cols, upper)
     k(A, A.shape[0] * A.shape[1], n=A.shape[0] * A.shape[1])
     return A
 
 
-def tril(A, ctx, inplace=True):
+def tril(A, inplace=True):
     if not inplace:
         A = A.copy()
-    upper = False
     if A.flags['F_CONTIGUOUS']:
         upper = True
-    k = _generate_kernel(ctx, A.shape[0], upper)
+        cols = A.shape[0]
+    else:
+        upper = False
+        cols = A.shape[1]
+    k = _generate_kernel(A.context, cols, upper)
     k(A, A.shape[0] * A.shape[1], n=A.shape[0] * A.shape[1])
     return A
