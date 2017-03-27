@@ -1,4 +1,5 @@
 from pygpu.basic import (tril, triu)
+from unittest import TestCase
 from .support import (gen_gpuarray, context)
 import numpy
 
@@ -29,3 +30,29 @@ def test_triu():
                     assert numpy.all(numpy.triu(ac) == ag)
                 else:
                     assert numpy.all(ac == ag)
+
+
+class test_shape(TestCase):
+
+    def runTest(self):
+        self.assertRaises(ValueError, self.run_1d_triu)
+        self.assertRaises(ValueError, self.run_3d_triu)
+        self.assertRaises(ValueError, self.run_1d_tril)
+        self.assertRaises(ValueError, self.run_3d_tril)
+
+    def run_1d_triu(self):
+        ac, ag = gen_gpuarray((10, ), 'float32', ctx=context)
+        triu(ag)
+
+    def run_3d_triu(self):
+        ac, ag = gen_gpuarray((10, 10, 10), 'float32', ctx=context)
+        triu(ag)
+
+    def run_1d_tril(self):
+        ac, ag = gen_gpuarray((10, ), 'float32', ctx=context)
+        tril(ag)
+
+    def run_3d_tril(self):
+        ac, ag = gen_gpuarray((10, 10, 10), 'float32', ctx=context)
+        tril(ag)
+

@@ -4,9 +4,9 @@ from .gpuarray import GpuArray, GpuKernel
 
 def _generate_kernel(ctx, cols, upper=True):
     tmpl = Template("""
-    KERNEL void extract_tri(ga_float *a, ga_uint N) {
-        unsigned int idx = blockIdx.y*blockDim.x*gridDim.x+
-                           blockIdx.x*blockDim.x+threadIdx.x;
+    KERNEL void extract_tri(GLOBAL_MEM ga_float *a, ga_uint N) {
+        unsigned int idx = GID_1 * LDIM_0 * GDIM_0 +
+                           GID_0 * LDIM_0 + LID_0;
         unsigned int ix = idx/${cols};
         unsigned int iy = idx%${cols};
         if (idx < N) {
@@ -26,6 +26,8 @@ def _generate_kernel(ctx, cols, upper=True):
 
 
 def triu(A, inplace=True):
+    if len(A.shape) != 2:
+        raise ValueError("triu only works for 2d arrays")
     if not inplace:
         A = A.copy()
     if A.flags['F_CONTIGUOUS']:
@@ -40,6 +42,8 @@ def triu(A, inplace=True):
 
 
 def tril(A, inplace=True):
+    if len(A.shape) != 2:
+        raise ValueError("tril only works for 2d arrays")
     if not inplace:
         A = A.copy()
     if A.flags['F_CONTIGUOUS']:
