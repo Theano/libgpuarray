@@ -25,12 +25,7 @@ before_install:
 # Build with Debug and Release to flush out build problems
 script:
   - mkdir Debug
-  - cd Debug
-  - cmake .. -DCMAKE_BUILD_TYPE=Debug
-  - make
-  - cd ..
+  - cd Debug && cmake .. -DCMAKE_BUILD_TYPE=Debug && make
   - mkdir Release
-  - cd Release
-  - cmake .. -DCMAKE_BUILD_TYPE=Release
-  - make
+  - cd Release &&  cmake .. -DCMAKE_BUILD_TYPE=Release && make
   - cd doc && make html
