@@ -14,10 +14,8 @@ from ._array import ndgpuarray
 
 from .version import fullversion as __version__
 
-from .tests import main
-if hasattr(main, "NoseTester"):
-    test = main.NoseTester().test
-else:
-    def test():
-        raise ImportError("The nose module is not installed."
-                          " It is needed for pygpu tests.")
+
+def test():
+    from .tests import main
+    if hasattr(main, "NoseTester"):
+        main.NoseTester().test()
