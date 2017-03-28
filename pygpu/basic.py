@@ -26,7 +26,7 @@ def _generate_kernel(ctx, cols, upper=True):
 
 
 def triu(A, inplace=True):
-    if len(A.shape) != 2:
+    if A.ndim != 2:
         raise ValueError("triu only works for 2d arrays")
     if A.flags.c_contiguous is A.flags.f_contiguous is False:
         raise ValueError("triu only works for contiguous arrays")
@@ -45,7 +45,7 @@ def triu(A, inplace=True):
 
 
 def tril(A, inplace=True):
-    if len(A.shape) != 2:
+    if A.ndim != 2:
         raise ValueError("tril only works for 2d arrays")
     if A.flags.c_contiguous is A.flags.f_contiguous is False:
         raise ValueError("tril only works for contiguous arrays")
