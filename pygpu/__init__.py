@@ -16,6 +16,7 @@ from .version import fullversion as __version__
 
 
 def test():
+    from . import tests
     from .tests import main
     if hasattr(main, "NoseTester"):
-        main.NoseTester().test()
+        main.NoseTester(package=tests).test()
