@@ -5,8 +5,8 @@ have_cython = False
 
 MAJOR = 0
 MINOR = 6
-PATCH = 2
-SUFFIX = ''
+PATCH = 3
+SUFFIX = '.dev0' # include the '.'
 FULLVERSION = '%d.%d.%d%s' % (MAJOR, MINOR, PATCH, SUFFIX)
 
 try:

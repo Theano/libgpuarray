@@ -89,7 +89,7 @@ set_target_properties(gpuarray PROPERTIES
   INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/lib
   MACOSX_RPATH OFF
   # This is the shared library version
-  VERSION 2.0
+  VERSION 2.1
   )
 
 add_library(gpuarray-static STATIC ${GPUARRAY_SRC})
