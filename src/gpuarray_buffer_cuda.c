@@ -1120,17 +1120,23 @@ static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
   err = make_bin(ctx, &ptx, bin, log);
   if (err != GA_NO_ERROR) return err;
   if (ctx->disk_cache) {
-    pk = memdup(&k, sizeof(k));
+    pk = calloc(sizeof(kernel_key), 1);
     if (pk == NULL)
       return GA_NO_ERROR;
+    memcpy(pk->bin_id, k.bin_id, 64);
+    strb_appendb(&pk->src, src);
+    if (strb_error(&pk->src)) {
+      key_free((cache_key_t)pk);
+      return GA_NO_ERROR;
+    }
     cbin = strb_alloc(bin->l);
     if (cbin == NULL) {
-      free(pk);
+      key_free((cache_key_t)pk);
       return GA_NO_ERROR;
     }
     strb_appendb(cbin, bin);
     if (strb_error(cbin)) {
-      free(pk);
+      key_free((cache_key_t)pk);
       strb_free(cbin);
       return GA_NO_ERROR;
     }
