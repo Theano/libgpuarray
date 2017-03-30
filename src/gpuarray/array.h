@@ -6,6 +6,7 @@
  */
 
 #include <gpuarray/buffer.h>
+#include <gpuarray/util.h>
 
 #ifdef _MSC_VER
 #ifndef inline
