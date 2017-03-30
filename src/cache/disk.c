@@ -84,6 +84,7 @@ typedef struct _disk_cache {
 } disk_cache;
 
 
+/* Convert unsigned long long from network to host order */
 static unsigned long long ntohull(const char *_in) {
   const unsigned char *in = (const unsigned char *)_in;
   return ((unsigned long long)in[0] << 56 | (unsigned long long)in[1] << 48 |
@@ -92,6 +93,7 @@ static unsigned long long ntohull(const char *_in) {
           (unsigned long long)in[6] << 8 | (unsigned long long)in[7]);
 }
 
+/* Convert unsigned long long from host to network order */
 static void htonull(unsigned long long in, char *out) {
   out[0] = (unsigned char)(in >> 56);
   out[1] = (unsigned char)(in >> 48);
@@ -103,6 +105,8 @@ static void htonull(unsigned long long in, char *out) {
   out[7] = (unsigned char)(in);
 }
 
+/* Concatenate prefix and suffix into a single path string while
+   checking for overflow */
 static int catp(char *path, const char *dirp, const char *rpath) {
   if (strlcpy(path, dirp, PATH_MAX) >= PATH_MAX) {
     errno = ENAMETOOLONG;
@@ -115,6 +119,7 @@ static int catp(char *path, const char *dirp, const char *rpath) {
   return 0;
 }
 
+/* open() for a path specifed by the concatenation of dirp and rpath */
 static int openp(const char *dirp, const char *rpath, int flags, int mode) {
   char path[PATH_MAX];
 

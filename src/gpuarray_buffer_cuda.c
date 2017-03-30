@@ -1025,7 +1025,7 @@ static int call_compiler(cuda_context *ctx, strb *src, strb *ptx, strb *log) {
     strb_appends(log, "NVRTC compile log::\n");
     if (strb_ensure(log, buflen) == 0)
       if (nvrtcGetProgramLog(prog, log->s+log->l) == NVRTC_SUCCESS)
-        log->l += buflen - 1;
+        log->l += buflen - 1; // Remove the final NUL
     strb_appendc(log, '\n');
   }
 
