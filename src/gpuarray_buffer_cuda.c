@@ -1034,7 +1034,7 @@ static int call_compiler(cuda_context *ctx, strb *src, strb *ptx, strb *log) {
 
   if (strb_ensure(ptx, buflen) == 0) {
     err = nvrtcGetPTX(prog, ptx->s+ptx->l);
-    if (err == NVRTC_SUCCESS) ptx->l = buflen;
+    if (err == NVRTC_SUCCESS) ptx->l += buflen;
   }
 
 end:

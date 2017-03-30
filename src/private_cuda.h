@@ -68,7 +68,7 @@ typedef struct _cuda_context {
   CUstream mem_s;
   gpudata *freeblocks;
   cache *kernel_cache;
-  cache *disk_cache;
+  cache *disk_cache; // This is per-context to avoid lock contention
   unsigned int enter;
   unsigned char major;
   unsigned char minor;

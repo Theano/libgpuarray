@@ -46,7 +46,7 @@ strb *strb_alloc(size_t s);
  *
  * Don't call this for stack of global declarations, see strb_clear() instead.
  */
-void strb_free(strb *);
+void strb_free(strb *sb);
 
 /*
  * Return a pointer to a dynamically allocated strb with a default
@@ -96,7 +96,7 @@ static inline void strb_clear(strb *sb) {
  * This should almost never be called directly.  Use strb_ensure()
  * instead.
  */
-int strb_grow(strb *, size_t s);
+int strb_grow(strb *sb, size_t s);
 
 /*
  * Make sure there is space to store at least `s` bytes of data after
@@ -159,14 +159,17 @@ static inline void strb_appendb(strb *sb, const strb *sb2) {
  *
  * A format error will place the strb in error mode.
  */
-void strb_appendf(strb *, const char *f, ...);
+void strb_appendf(strb *sb, const char *f, ...);
 
 /*
  * Reads from the file specified by the given file descriptor.
  *
+ * This will read `sz` bytes from the file descriptor.  Insufficient
+ * data is handled as a read error.
+ *
  * A read error will place the strb in error mode.
  */
-void strb_read(strb *, int fd, size_t sz);
+void strb_read(strb *sb, int fd, size_t sz);
 
 /*
  * Write the content of an strb to the specified file descriptor.
