@@ -496,21 +496,23 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   elsize = gpuarray_get_elsize(A->typecode);
 
   // FIXME: these conditions are overly restrictive; the first axis need not be contiguous
-  if (!GpuArray_ISONESEGMENT(A)) {
+  // The F CONTIGUOUS path isn't working well, so don't support it for now.
+  if (!GpuArray_IS_C_CONTIGUOUS(A)) {
     if (nocopy)
       return GA_COPY_ERROR;
     else {
-      err = GpuArray_copy(&copyA, A, GA_F_ORDER);
+      err = GpuArray_copy(&copyA, A, GA_C_ORDER);
       if (err != GA_NO_ERROR)
 	goto cleanup;
       Ap = &copyA;
     }
   }
-  if (!GpuArray_ISONESEGMENT(B)) {
+  // The F CONTIGUOUS path isn't working well, so don't support it for now.
+  if (!GpuArray_IS_C_CONTIGUOUS(B)) {
     if (nocopy)
       return GA_COPY_ERROR;
     else {
-      err = GpuArray_copy(&copyB, B, GA_F_ORDER);
+      err = GpuArray_copy(&copyB, B, GA_C_ORDER);
       if (err != GA_NO_ERROR)
 	goto cleanup;
       Bp = &copyB;
@@ -528,7 +530,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
     o = cb_c;
     ldc = Cp->dimensions[2];
   } else {
-    err = GA_VALUE_ERROR;
+    err = GA_MISC_ERROR;  // should not happen
     goto cleanup;
   }
   if (Ap->flags & GA_F_CONTIGUOUS) {
@@ -568,7 +570,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
         transB = cb_no_trans;
     }
   } else {
-    err = GA_VALUE_ERROR;
+    err = GA_MISC_ERROR;  // should not happen
     goto cleanup;
   }
 
