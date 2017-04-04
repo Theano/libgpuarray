@@ -50,9 +50,16 @@ static int detect_arch(const char *prefix, char *ret, CUresult *err);
 static gpudata *new_gpudata(cuda_context *ctx, CUdeviceptr ptr, size_t size);
 
 typedef struct _kernel_key {
+  uint8_t version;
+  uint8_t debug;
+  uint8_t major;
+  uint8_t minor;
+  uint32_t reserved;
   char bin_id[64];
   strb src;
 } kernel_key;
+
+#define KERNEL_KEY_MM (sizeof(kernel_key) - sizeof(strb))
 
 static void key_free(cache_key_t _k) {
   kernel_key *k = (kernel_key *)_k;
@@ -70,36 +77,36 @@ static uint32_t strb_hash(strb *k) {
 }
 
 static int key_eq(kernel_key *k1, kernel_key *k2) {
-  return (memcmp(k1->bin_id, k2->bin_id, 64) == 0 &&
+  return (memcmp(k1, k2, KERNEL_KEY_MM) == 0 &&
           strb_eq(&k1->src, &k2->src));
 }
 
 static int key_hash(kernel_key *k) {
   XXH32_state_t state;
   XXH32_reset(&state, 42);
-  XXH32_update(&state, k->bin_id, 64);
+  XXH32_update(&state, k, KERNEL_KEY_MM);
   XXH32_update(&state, k->src.s, k->src.l);
   return XXH32_digest(&state);
 }
 
 static int key_write(strb *res, kernel_key *k) {
-  strb_appendn(res, k->bin_id, 64);
+  strb_appendn(res, (const char *)k, KERNEL_KEY_MM);
   strb_appendb(res, &k->src);
   return strb_error(res);
 }
 
 static kernel_key *key_read(const strb *b) {
   kernel_key *k;
-  if (b->l < 64) return NULL;
+  if (b->l < KERNEL_KEY_MM) return NULL;
   k = calloc(1, sizeof(*k));
   if (k == NULL) return NULL;
-  if (strb_ensure(&k->src, b->l - 64) != 0) {
+  if (strb_ensure(&k->src, b->l - KERNEL_KEY_MM) != 0) {
     strb_clear(&k->src);
     free(k);
     return NULL;
   }
-  memcpy(k->bin_id, b->s, 64);
-  strb_appendn(&k->src, b->s+64, b->l-64);
+  memcpy(k->bin_id, b->s, KERNEL_KEY_MM);
+  strb_appendn(&k->src, b->s + KERNEL_KEY_MM, b->l - KERNEL_KEY_MM);
   return k;
 }
 
@@ -1108,6 +1115,13 @@ static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
   kernel_key *pk;
   int err;
 
+  memset(&k, 0, sizeof(k));
+  k.version = 0;
+#ifdef DEBUG
+  k.debug = 1;
+#endif
+  k.major = ctx->major;
+  k.minor = ctx->minor;
   memcpy(k.bin_id, ctx->bin_id, 64);
   memcpy(&k.src, src, sizeof(strb));
 
@@ -1131,7 +1145,7 @@ static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
       fprintf(stderr, "Error adding kernel to disk cache\n");
       return GA_NO_ERROR;
     }
-    memcpy(pk->bin_id, k.bin_id, 64);
+    memcpy(pk, &k, KERNEL_KEY_MM);
     strb_appendb(&pk->src, src);
     if (strb_error(&pk->src)) {
       // TODO use better error messages
