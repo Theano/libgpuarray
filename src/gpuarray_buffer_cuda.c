@@ -224,14 +224,19 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
                           (cache_hash_fn)key_hash,
                           (cache_freek_fn)key_free,
                           (cache_freev_fn)strb_free);
-    if (mem_cache == NULL)
+    if (mem_cache == NULL) {
+      // TODO use better error messages when they are available.
+      fprintf(stderr, "Error initializing disk cache, disabling\n");
       goto fail_disk_cache;
+    }
     res->disk_cache = cache_disk(cache_path, mem_cache,
                                  (kwrite_fn)key_write,
                                  (vwrite_fn)kernel_write,
                                  (kread_fn)key_read,
                                  (vread_fn)kernel_read);
     if (res->disk_cache == NULL) {
+      // TODO use better error messages when they are available.
+      fprintf(stderr, "Error initializing disk cache, disabling\n");
       cache_destroy(mem_cache);
       goto fail_disk_cache;
     }
@@ -1121,26 +1126,38 @@ static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
   if (err != GA_NO_ERROR) return err;
   if (ctx->disk_cache) {
     pk = calloc(sizeof(kernel_key), 1);
-    if (pk == NULL)
+    if (pk == NULL) {
+      // TODO use better error messages
+      fprintf(stderr, "Error adding kernel to disk cache\n");
       return GA_NO_ERROR;
+    }
     memcpy(pk->bin_id, k.bin_id, 64);
     strb_appendb(&pk->src, src);
     if (strb_error(&pk->src)) {
+      // TODO use better error messages
+      fprintf(stderr, "Error adding kernel to disk cache\n");
       key_free((cache_key_t)pk);
       return GA_NO_ERROR;
     }
     cbin = strb_alloc(bin->l);
     if (cbin == NULL) {
+      // TODO use better error messages
+      fprintf(stderr, "Error adding kernel to disk cache\n");
       key_free((cache_key_t)pk);
       return GA_NO_ERROR;
     }
     strb_appendb(cbin, bin);
     if (strb_error(cbin)) {
+      // TODO use better error messages
+      fprintf(stderr, "Error adding kernel to disk cache\n");
       key_free((cache_key_t)pk);
       strb_free(cbin);
       return GA_NO_ERROR;
     }
-    cache_add(ctx->disk_cache, pk, cbin);
+    if (cache_add(ctx->disk_cache, pk, cbin)) {
+      // TODO use better error messages
+      fprintf(stderr, "Error adding kernel to disk cache\n");
+    }
   }
 
   return GA_NO_ERROR;
