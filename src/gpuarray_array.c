@@ -1096,6 +1096,9 @@ int GpuArray_fdump(FILE *fd, const GpuArray *a) {
     case GA_LONG:
       fprintf(fd, "%lld", (long long)*(int64_t *)p);
       break;
+    case GA_FLOAT:
+      fprintf(fd, "%f", *(float *)p);
+      break;
     case GA_SSIZE:
       fprintf(fd, "%" SPREFIX "d", *(ssize_t *)p);
       break;
