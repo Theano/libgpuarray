@@ -439,6 +439,23 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
   return err;
 }
 
+static inline int is_last_2d_contiguous(const GpuArray *a) {
+  size_t size = GpuArray_ITEMSIZE(a);
+
+  if (GpuArray_IS_C_CONTIGUOUS(a))
+    return 1; // C contiguous
+
+  if (a->strides[a->nd - 2] <= 0 || a->strides[a->nd - 1] <= 0)
+    return 0;
+
+  if (a->strides[a->nd - 2] == size)
+    return 2; // F contiguous
+  if (a->strides[a->nd - 1] == size)
+    return 1; // C contiguous
+
+  return 0;
+}
+
 int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alpha,
                            GpuArray *A, GpuArray *B, double beta, GpuArray *C,
                            int nocopy) {
@@ -451,6 +468,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   size_t elsize;
   size_t batchCount, m, n, k, lda, ldb, ldc;
   cb_order o;
+  int cA, cB, cC;
   int err;
   gpudata **A_datas = NULL, **B_datas = NULL, **C_datas = NULL;
   size_t *A_offsets = NULL, *B_offsets = NULL, *C_offsets = NULL;
@@ -495,52 +513,56 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
 
   elsize = gpuarray_get_elsize(A->typecode);
 
-  // FIXME: these conditions are overly restrictive; the first axis need not be contiguous
-  if (!GpuArray_ISONESEGMENT(A)) {
+  cA = is_last_2d_contiguous(A);
+  if (!cA) {
     if (nocopy)
       return GA_COPY_ERROR;
     else {
-      err = GpuArray_copy(&copyA, A, GA_F_ORDER);
+      err = GpuArray_copy(&copyA, A, GA_C_ORDER);
+      cA = 1;
       if (err != GA_NO_ERROR)
 	goto cleanup;
       Ap = &copyA;
     }
   }
-  if (!GpuArray_ISONESEGMENT(B)) {
+  cB = is_last_2d_contiguous(B);
+  if (!cB) {
     if (nocopy)
       return GA_COPY_ERROR;
     else {
-      err = GpuArray_copy(&copyB, B, GA_F_ORDER);
+      err = GpuArray_copy(&copyB, B, GA_C_ORDER);
+      cB = 1;
       if (err != GA_NO_ERROR)
 	goto cleanup;
       Bp = &copyB;
     }
   }
-  if (!GpuArray_ISONESEGMENT(C)) {
+  cC = is_last_2d_contiguous(C);
+  if (!cC) {
     err = GA_VALUE_ERROR;
     goto cleanup;
   }
 
-  if (Cp->flags & GA_F_CONTIGUOUS) {
+  if (cC == 2) {
     o = cb_fortran;
-    ldc = Cp->dimensions[1];
-  } else if (Cp->flags & GA_C_CONTIGUOUS) {
+    ldc = Cp->strides[2] / elsize;
+  } else if (cC == 1) {
     o = cb_c;
-    ldc = Cp->dimensions[2];
+    ldc = Cp->strides[1] / elsize;
   } else {
     err = GA_VALUE_ERROR;
     goto cleanup;
   }
-  if (Ap->flags & GA_F_CONTIGUOUS) {
-    lda = Ap->dimensions[1];
+  if (cA == 2) {
+    lda = Ap->strides[2] / elsize;
     if (o == cb_c) {
       if (transA == cb_no_trans)
         transA = cb_trans;
       else
         transA = cb_no_trans;
     }
-  } else if (Ap->flags & GA_C_CONTIGUOUS) {
-    lda = Ap->dimensions[2];
+  } else if (cA == 1) {
+    lda = Ap->strides[1] / elsize;
     if (o == cb_fortran) {
       if (transA == cb_no_trans)
         transA = cb_trans;
@@ -551,16 +573,16 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
     err = GA_VALUE_ERROR;
     goto cleanup;
   }
-  if (Bp->flags & GA_F_CONTIGUOUS) {
-    ldb = Bp->dimensions[1];
+  if (cB == 2) {
+    ldb = Bp->strides[2] / elsize;
     if (o == cb_c) {
       if (transB == cb_no_trans)
         transB = cb_trans;
       else
         transB = cb_no_trans;
     }
-  } else if (Bp->flags & GA_C_CONTIGUOUS) {
-    ldb = Bp->dimensions[2];
+  } else if (cB == 1) {
+    ldb = Bp->strides[1] / elsize;
     if (o == cb_fortran) {
       if (transB == cb_no_trans)
         transB = cb_trans;
