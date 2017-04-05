@@ -59,6 +59,7 @@ typedef struct _kernel_key {
   strb src;
 } kernel_key;
 
+/* Size of the kernel_key that we can memcopy to duplicate */
 #define KERNEL_KEY_MM (sizeof(kernel_key) - sizeof(strb))
 
 static void key_free(cache_key_t _k) {
@@ -100,12 +101,16 @@ static kernel_key *key_read(const strb *b) {
   if (b->l < KERNEL_KEY_MM) return NULL;
   k = calloc(1, sizeof(*k));
   if (k == NULL) return NULL;
+  memcpy(k, b->s, KERNEL_KEY_MM);
+  if (k->version != 0) {
+    free(k);
+    return NULL;
+  }
   if (strb_ensure(&k->src, b->l - KERNEL_KEY_MM) != 0) {
     strb_clear(&k->src);
     free(k);
     return NULL;
   }
-  memcpy(k->bin_id, b->s, KERNEL_KEY_MM);
   strb_appendn(&k->src, b->s + KERNEL_KEY_MM, b->l - KERNEL_KEY_MM);
   return k;
 }
