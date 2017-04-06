@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <gpuarray/config.h>
 #include "private_config.h"
+#include "util/strb.h"
 
 typedef void *cache_key_t;
 typedef void *cache_value_t;
@@ -12,6 +13,11 @@ typedef int (*cache_eq_fn)(cache_key_t, cache_key_t);
 typedef uint32_t (*cache_hash_fn)(cache_key_t);
 typedef void (*cache_freek_fn)(cache_key_t);
 typedef void (*cache_freev_fn)(cache_value_t);
+
+typedef int (*kwrite_fn)(strb *res, cache_key_t key);
+typedef int (*vwrite_fn)(strb *res, cache_value_t val);
+typedef cache_key_t (*kread_fn)(const strb *b);
+typedef cache_value_t (*vread_fn)(const strb *b);
 
 typedef struct _cache cache;
 
@@ -77,6 +83,10 @@ cache *cache_twoq(size_t hot_size, size_t warm_size,
                   size_t cold_size, size_t elasticity,
                   cache_eq_fn keq, cache_hash_fn khash,
                   cache_freek_fn kfree, cache_freev_fn vfree);
+
+cache *cache_disk(const char *dirpath, cache *mem,
+                  kwrite_fn kwrite, vwrite_fn vwrite,
+                  kread_fn kread, vread_fn vread);
 
 /* API functions */
 static inline int cache_add(cache *c, cache_key_t k, cache_value_t v) {

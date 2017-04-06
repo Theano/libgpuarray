@@ -8,6 +8,8 @@
 #include <io.h>
 #define open _open
 #define mktemp _mktemp
+#else
+#define O_BINARY 0
 #endif
 
 int mkstemp(char *path) {
@@ -18,7 +20,7 @@ int mkstemp(char *path) {
     do {
         tmp = mktemp(path);
         if (tmp == NULL) return -1;
-        res = open(path, O_CREAT|O_EXCL|O_RDWR, S_IREAD|S_IWRITE);
+        res = open(path, O_CREAT|O_EXCL|O_RDWR|O_BINARY, S_IREAD|S_IWRITE);
         if (res != -1 || errno != EEXIST)
             return res;
     } while (--tries);

@@ -75,38 +75,10 @@ typedef enum { XXH_OK=0, XXH_ERROR } XXH_errorcode;
 
 
 /*****************************
-*  Namespace Emulation
-*****************************/
-/* Motivations :
-
-If you need to include xxHash into your library,
-but wish to avoid xxHash symbols to be present on your library interface
-in an effort to avoid potential name collision if another library also includes xxHash,
-
-you can use XXH_NAMESPACE, which will automatically prefix any symbol from xxHash
-with the value of XXH_NAMESPACE (so avoid to keep it NULL, and avoid numeric values).
-
-Note that no change is required within the calling program :
-it can still call xxHash functions using their regular name.
-They will be automatically translated by this header.
-*/
-#ifdef XXH_NAMESPACE
-#  define XXH_CAT(A,B) A##B
-#  define XXH_NAME2(A,B) XXH_CAT(A,B)
-#  define XXH32 XXH_NAME2(XXH_NAMESPACE, XXH32)
-#  define XXH32_createState XXH_NAME2(XXH_NAMESPACE, XXH32_createState)
-#  define XXH32_freeState XXH_NAME2(XXH_NAMESPACE, XXH32_freeState)
-#  define XXH32_reset XXH_NAME2(XXH_NAMESPACE, XXH32_reset)
-#  define XXH32_update XXH_NAME2(XXH_NAMESPACE, XXH32_update)
-#  define XXH32_digest XXH_NAME2(XXH_NAMESPACE, XXH32_digest)
-#endif
-
-
-/*****************************
 *  Simple Hash Functions
 *****************************/
 
-GPUARRAY_LOCAL unsigned int XXH32 (const void* input, size_t length, unsigned seed);
+unsigned int XXH32 (const void* input, size_t length, unsigned seed);
 
 /*
 XXH32() :
@@ -129,9 +101,9 @@ These structures allow static allocation of XXH states.
 States must then be initialized using XXH32_reset() before first use.
 */
 
-GPUARRAY_LOCAL XXH_errorcode XXH32_reset  (XXH32_state_t* statePtr, unsigned seed);
-GPUARRAY_LOCAL XXH_errorcode XXH32_update (XXH32_state_t* statePtr, const void* input, size_t length);
-GPUARRAY_LOCAL unsigned int  XXH32_digest (const XXH32_state_t* statePtr);
+XXH_errorcode XXH32_reset  (XXH32_state_t* statePtr, unsigned seed);
+XXH_errorcode XXH32_update (XXH32_state_t* statePtr, const void* input, size_t length);
+unsigned int  XXH32_digest (const XXH32_state_t* statePtr);
 
 /*
 These functions calculate the xxHash of an input provided in multiple smaller packets,

@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+
+import os
+import sys
+
+def clean(max_size, path):
+    content = []
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            fpath = os.path.join(root, file)
+            st = os.stat(fpath)
+            content.append((st.st_atime, st.st_size, fpath))
+
+    content.sort()
+    cur_size = 0
+    for _, size, path in content:
+        cur_size += size
+        if cur_size > max_size:
+            os.remove(path)
+
+
+SUFFIXES = {'B': 1, 'K': 1 << 10, 'M': 1 << 20, 'G': 1 << 30, 'T': 1 << 40,
+            'P': 1 << 50, 'E': 1 << 60, 'Z': 1 << 70, 'Y': 1 << 80}
+
+
+def get_size(s):
+    i = 0
+    s = s.strip()
+    if s[-1].upper() in SUFFIXES:
+        num = s[:-1]
+        suf = s[-1].upper()
+    else:
+        num = s
+        suf = ""
+    num = float(num)
+    if suf != "":
+        mult = SUFFIXES[suf]
+    else:
+        mult = 1
+    return int(num * mult)
+
+
+if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description='libgpuarray cache maintenance utility')
+    parser.add_argument('-s', '--max_size', help='Set the maximum size for pruning (in bytes with suffixes: K, M, G, ...)')
+    args = parser.parse_args()
+    path = os.environ.get('GPUARRAY_CACHE_PATH', None)
+    if path is None:
+        print("You need to set GPUARRAY_CACHE_PATH so that this programs knows which path to clean.")
+        sys.exit(1)
+
+    clean(get_size(args.max_size), path)
+

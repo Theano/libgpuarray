@@ -644,7 +644,7 @@ static int   maxandargmaxCompile                (maxandargmax_ctx*  ctx){
 		GA_SIZE,   /* dstArgmaxOff */
 		GA_BUFFER  /* dstArgmaxSteps */
 	};
-	const size_t ARG_TYPECODES_LEN = sizeof(ARG_TYPECODES)/sizeof(*ARG_TYPECODES);
+	const unsigned int ARG_TYPECODES_LEN = sizeof(ARG_TYPECODES)/sizeof(*ARG_TYPECODES);
 	const char*  SRCS[1];
 
 	SRCS[0] = ctx->sourceCode;

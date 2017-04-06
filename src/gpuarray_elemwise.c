@@ -131,8 +131,8 @@ static int gen_elemwise_basic_kernel(GpuKernel *k, gpucontext *ctx,
   strb sb = STRB_STATIC_INIT;
   unsigned int i, _i, j;
   int *ktypes;
-  size_t p;
   char *size = "ga_size", *ssize = "ga_ssize";
+  unsigned int p;
   int flags = GA_USE_CLUDA;
   int res;
 

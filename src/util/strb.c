@@ -1,5 +1,14 @@
-
+#define _CRT_SECURE_NO_WARNINGS
+#include <errno.h>
 #include <stdarg.h>
+#ifdef _MSC_VER
+#include <io.h>
+#define read _read
+#define write _write
+#else
+#include <unistd.h>
+#endif
+
 #include "util/strb.h"
 
 strb *strb_alloc(size_t i) {
@@ -54,4 +63,40 @@ void strb_appendf(strb *sb, const char *f, ...) {
   s = vsnprintf(sb->s+sb->l, s, f, ap);
   va_end(ap);
   sb->l += s;
+}
+
+void strb_read(strb *sb, int fd, size_t sz) {
+  ssize_t res;
+  char *b;
+  if (strb_ensure(sb, sz)) return;
+  b = sb->s + sb->l;
+  sb->l += sz;
+  while (sz) {
+    res = read(fd, b, sz);
+    if (res == -1 || res == 0) {
+      if (res == -1 && (errno == EAGAIN || errno == EINTR))
+        continue;
+      strb_seterror(sb);
+      return;
+    }
+    sz -= (size_t)res;
+    b += (size_t)res;
+  }
+}
+
+int strb_write(int fd, strb *sb) {
+  ssize_t res;
+  size_t l = sb->l;
+  char *b = sb->s;
+  while (l) {
+    res = write(fd, b, l);
+    if (res == -1) {
+      if (errno == EAGAIN || errno == EINTR)
+        continue;
+      return -1;
+    }
+    l -= (size_t)res;
+    b += (size_t)res;
+  }
+  return 0;
 }

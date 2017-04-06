@@ -39,7 +39,7 @@ STATIC_ASSERT(sizeof(GpuArrayIpcMemHandle) == sizeof(CUipcMemHandle), cuda_ipcme
 
 static CUresult err;
 
-GPUARRAY_LOCAL const gpuarray_buffer_ops cuda_ops;
+const gpuarray_buffer_ops cuda_ops;
 
 static void cuda_freekernel(gpukernel *);
 static int cuda_property(gpucontext *, gpudata *, gpukernel *, int, void *);
@@ -49,16 +49,82 @@ static int cuda_records(gpudata *, int, CUstream);
 static int detect_arch(const char *prefix, char *ret, CUresult *err);
 static gpudata *new_gpudata(cuda_context *ctx, CUdeviceptr ptr, size_t size);
 
-static int strb_eq(void *_k1, void *_k2) {
-  strb *k1 = (strb *)_k1;
-  strb *k2 = (strb *)_k2;
+typedef struct _kernel_key {
+  uint8_t version;
+  uint8_t debug;
+  uint8_t major;
+  uint8_t minor;
+  uint32_t reserved;
+  char bin_id[64];
+  strb src;
+} kernel_key;
+
+/* Size of the kernel_key that we can memcopy to duplicate */
+#define KERNEL_KEY_MM (sizeof(kernel_key) - sizeof(strb))
+
+static void key_free(cache_key_t _k) {
+  kernel_key *k = (kernel_key *)_k;
+  strb_clear(&k->src);
+  free(k);
+}
+
+static int strb_eq(strb *k1, strb *k2) {
   return (k1->l == k2->l &&
           memcmp(k1->s, k2->s, k1->l) == 0);
 }
 
-static uint32_t strb_hash(void *_k) {
-  strb *k = (strb *)_k;
+static uint32_t strb_hash(strb *k) {
   return XXH32(k->s, k->l, 42);
+}
+
+static int key_eq(kernel_key *k1, kernel_key *k2) {
+  return (memcmp(k1, k2, KERNEL_KEY_MM) == 0 &&
+          strb_eq(&k1->src, &k2->src));
+}
+
+static int key_hash(kernel_key *k) {
+  XXH32_state_t state;
+  XXH32_reset(&state, 42);
+  XXH32_update(&state, k, KERNEL_KEY_MM);
+  XXH32_update(&state, k->src.s, k->src.l);
+  return XXH32_digest(&state);
+}
+
+static int key_write(strb *res, kernel_key *k) {
+  strb_appendn(res, (const char *)k, KERNEL_KEY_MM);
+  strb_appendb(res, &k->src);
+  return strb_error(res);
+}
+
+static kernel_key *key_read(const strb *b) {
+  kernel_key *k;
+  if (b->l < KERNEL_KEY_MM) return NULL;
+  k = calloc(1, sizeof(*k));
+  if (k == NULL) return NULL;
+  memcpy(k, b->s, KERNEL_KEY_MM);
+  if (k->version != 0) {
+    free(k);
+    return NULL;
+  }
+  if (strb_ensure(&k->src, b->l - KERNEL_KEY_MM) != 0) {
+    strb_clear(&k->src);
+    free(k);
+    return NULL;
+  }
+  strb_appendn(&k->src, b->s + KERNEL_KEY_MM, b->l - KERNEL_KEY_MM);
+  return k;
+}
+
+static int kernel_write(strb *res, strb *bin) {
+  strb_appendb(res, bin);
+  return strb_error(res);
+}
+
+static strb *kernel_read(const strb *b) {
+  strb *res = strb_alloc(b->l);
+  if (res != NULL)
+    strb_appendb(res, b);
+  return res;
 }
 
 static int setup_done = 0;
@@ -114,6 +180,8 @@ static int cuda_get_device_count(unsigned int platform,
 
 cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   cuda_context *res;
+  cache *mem_cache;
+  char *cache_path;
   void *p;
   int e;
 
@@ -152,11 +220,43 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
       goto fail_mem_stream;
     }
   }
-  res->kernel_cache = cache_twoq(64, 128, 64, 8, strb_eq, strb_hash,
+
+  res->kernel_cache = cache_twoq(64, 128, 64, 8,
+                                 (cache_eq_fn)strb_eq,
+                                 (cache_hash_fn)strb_hash,
                                  (cache_freek_fn)strb_free,
                                  (cache_freev_fn)cuda_freekernel);
   if (res->kernel_cache == NULL)
     goto fail_cache;
+
+  cache_path = getenv("GPUARRAY_CACHE_PATH");
+  if (cache_path != NULL) {
+    mem_cache = cache_lru(64, 8,
+                          (cache_eq_fn)key_eq,
+                          (cache_hash_fn)key_hash,
+                          (cache_freek_fn)key_free,
+                          (cache_freev_fn)strb_free);
+    if (mem_cache == NULL) {
+      // TODO use better error messages when they are available.
+      fprintf(stderr, "Error initializing disk cache, disabling\n");
+      goto fail_disk_cache;
+    }
+    res->disk_cache = cache_disk(cache_path, mem_cache,
+                                 (kwrite_fn)key_write,
+                                 (vwrite_fn)kernel_write,
+                                 (kread_fn)key_read,
+                                 (vread_fn)kernel_read);
+    if (res->disk_cache == NULL) {
+      // TODO use better error messages when they are available.
+      fprintf(stderr, "Error initializing disk cache, disabling\n");
+      cache_destroy(mem_cache);
+      goto fail_disk_cache;
+    }
+  } else {
+  fail_disk_cache:
+    res->disk_cache = NULL;
+  }
+
   err = cuMemAllocHost(&p, 16);
   if (err != CUDA_SUCCESS) {
     goto fail_errbuf;
@@ -174,6 +274,8 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
  fail_end:
   cuMemFreeHost(p);
  fail_errbuf:
+  if (res->disk_cache)
+    cache_destroy(res->disk_cache);
   cache_destroy(res->kernel_cache);
  fail_cache:
   if (ISCLR(res->flags, GA_CTX_SINGLE_STREAM))
@@ -215,6 +317,8 @@ static void cuda_free_ctx(cuda_context *ctx) {
       deallocate(curr);
     }
     cache_destroy(ctx->kernel_cache);
+    if (ctx->disk_cache)
+      cache_destroy(ctx->disk_cache);
 
     if (!(ctx->flags & DONTFREE)) {
       cuCtxPushCurrent(ctx->ctx);
@@ -913,22 +1017,19 @@ static int detect_arch(const char *prefix, char *ret, CUresult *err) {
   return GA_NO_ERROR;
 }
 
-static void *call_compiler(const char *src, size_t len, const char *arch_arg,
-                           size_t *bin_len, char **log, size_t *log_len,
-                           int *ret) {
+static int call_compiler(cuda_context *ctx, strb *src, strb *ptx, strb *log) {
   nvrtcProgram prog;
-  void *buf = NULL;
   size_t buflen;
   const char *opts[4] = {
     "-arch", ""
     , "-G", "-lineinfo"
   };
-  nvrtcResult err, err2;
+  nvrtcResult err;
 
-  opts[1] = arch_arg;
+  opts[1] = ctx->bin_id;
 
-  err = nvrtcCreateProgram(&prog, src, NULL, 0, NULL, NULL);
-  if (err != NVRTC_SUCCESS) FAIL(NULL, GA_SYS_ERROR);
+  err = nvrtcCreateProgram(&prog, src->s, NULL, 0, NULL, NULL);
+  if (err != NVRTC_SUCCESS) return GA_SYS_ERROR;
 
   err = nvrtcCompileProgram(prog,
 #ifdef DEBUG
@@ -937,41 +1038,148 @@ static void *call_compiler(const char *src, size_t len, const char *arch_arg,
                             2,
 #endif
                             opts);
-  if (log != NULL) {
-    err2 = nvrtcGetProgramLogSize(prog, &buflen);
-    if (err2 != NVRTC_SUCCESS) goto end2;
-    buf = malloc(buflen);
-    if (buf == NULL) goto end2;
-    err2 = nvrtcGetProgramLog(prog, (char *)buf);
-    if (err2 != NVRTC_SUCCESS) goto end2;
-    if (log_len != NULL) *log_len = buflen;
-    *log = (char *)buf;
-    buf = NULL;
+  if (nvrtcGetProgramLogSize(prog, &buflen) == NVRTC_SUCCESS) {
+    strb_appends(log, "NVRTC compile log::\n");
+    if (strb_ensure(log, buflen) == 0)
+      if (nvrtcGetProgramLog(prog, log->s+log->l) == NVRTC_SUCCESS)
+        log->l += buflen - 1; // Remove the final NUL
+    strb_appendc(log, '\n');
   }
-end2:
-  if (err != NVRTC_SUCCESS) goto end;
 
   err = nvrtcGetPTXSize(prog, &buflen);
   if (err != NVRTC_SUCCESS) goto end;
 
-  buf = malloc(buflen);
-  if (buf == NULL) {
-    nvrtcDestroyProgram(&prog);
-    FAIL(NULL, GA_MEMORY_ERROR);
+  if (strb_ensure(ptx, buflen) == 0) {
+    err = nvrtcGetPTX(prog, ptx->s+ptx->l);
+    if (err == NVRTC_SUCCESS) ptx->l += buflen;
   }
-
-  err = nvrtcGetPTX(prog, (char *)buf);
-  if (err != NVRTC_SUCCESS) goto end;
-
-  *bin_len = buflen;
 
 end:
   nvrtcDestroyProgram(&prog);
-  if (err != NVRTC_SUCCESS) {
-    free(buf);
-    FAIL(NULL, GA_SYS_ERROR);
+  if (err != NVRTC_SUCCESS)
+    return GA_SYS_ERROR;
+  return GA_NO_ERROR;
+}
+
+static int make_bin(cuda_context *ctx, const strb *ptx, strb *bin, strb *log) {
+  char info_log[2048];
+  char error_log[2048];
+  void *out;
+  size_t out_size;
+  CUlinkState st;
+  CUjit_option cujit_opts[] = {
+    CU_JIT_INFO_LOG_BUFFER_SIZE_BYTES,
+    CU_JIT_INFO_LOG_BUFFER,
+    CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES,
+    CU_JIT_ERROR_LOG_BUFFER,
+    CU_JIT_LOG_VERBOSE,
+    CU_JIT_GENERATE_DEBUG_INFO,
+    CU_JIT_GENERATE_LINE_INFO,
+  };
+  void *cujit_opt_vals[] = {
+    (void *)sizeof(info_log), info_log,
+    (void *)sizeof(error_log), error_log,
+#ifdef DEBUG
+    (void *)1, (void *)1, (void *)1
+#else
+    (void *)0, (void *)0, (void *)0
+#endif
+  };
+  int err = GA_NO_ERROR;
+
+  ctx->err = cuLinkCreate(sizeof(cujit_opts)/sizeof(cujit_opts[0]),
+                          cujit_opts, cujit_opt_vals, &st);
+  if (ctx->err != CUDA_SUCCESS)
+    return GA_IMPL_ERROR;
+  ctx->err = cuLinkAddData(st, CU_JIT_INPUT_PTX, ptx->s, ptx->l,
+                           "kernel code", 0, NULL, NULL);
+  if (ctx->err != CUDA_SUCCESS) {
+    err = GA_IMPL_ERROR;
+    goto out;
   }
-  return buf;
+  ctx->err = cuLinkComplete(st, &out, &out_size);
+  if (ctx->err != CUDA_SUCCESS) {
+    err = GA_IMPL_ERROR;
+    goto out;
+  }
+  strb_appendn(bin, out, out_size);
+out:
+  cuLinkDestroy(st);
+  strb_appends(log, "Link info log::\n");
+  strb_appends(log, info_log);
+  strb_appends(log, "\nLink error log::\n");
+  strb_appends(log, error_log);
+  strb_appendc(log, '\n');
+  return err;
+}
+
+static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
+  strb ptx = STRB_STATIC_INIT;
+  strb *cbin;
+  kernel_key k;
+  kernel_key *pk;
+  int err;
+
+  memset(&k, 0, sizeof(k));
+  k.version = 0;
+#ifdef DEBUG
+  k.debug = 1;
+#endif
+  k.major = ctx->major;
+  k.minor = ctx->minor;
+  memcpy(k.bin_id, ctx->bin_id, 64);
+  memcpy(&k.src, src, sizeof(strb));
+
+  // Look up the binary in the disk cache
+  if (ctx->disk_cache) {
+    cbin = cache_get(ctx->disk_cache, &k);
+    if (cbin != NULL) {
+      strb_appendb(bin, cbin);
+      return GA_NO_ERROR;
+    }
+  }
+
+  err = call_compiler(ctx, src, &ptx, log);
+  if (err != GA_NO_ERROR) return err;
+  err = make_bin(ctx, &ptx, bin, log);
+  if (err != GA_NO_ERROR) return err;
+  if (ctx->disk_cache) {
+    pk = calloc(sizeof(kernel_key), 1);
+    if (pk == NULL) {
+      // TODO use better error messages
+      fprintf(stderr, "Error adding kernel to disk cache\n");
+      return GA_NO_ERROR;
+    }
+    memcpy(pk, &k, KERNEL_KEY_MM);
+    strb_appendb(&pk->src, src);
+    if (strb_error(&pk->src)) {
+      // TODO use better error messages
+      fprintf(stderr, "Error adding kernel to disk cache\n");
+      key_free((cache_key_t)pk);
+      return GA_NO_ERROR;
+    }
+    cbin = strb_alloc(bin->l);
+    if (cbin == NULL) {
+      // TODO use better error messages
+      fprintf(stderr, "Error adding kernel to disk cache\n");
+      key_free((cache_key_t)pk);
+      return GA_NO_ERROR;
+    }
+    strb_appendb(cbin, bin);
+    if (strb_error(cbin)) {
+      // TODO use better error messages
+      fprintf(stderr, "Error adding kernel to disk cache\n");
+      key_free((cache_key_t)pk);
+      strb_free(cbin);
+      return GA_NO_ERROR;
+    }
+    if (cache_add(ctx->disk_cache, pk, cbin)) {
+      // TODO use better error messages
+      fprintf(stderr, "Error adding kernel to disk cache\n");
+    }
+  }
+
+  return GA_NO_ERROR;
 }
 
 static void _cuda_freekernel(gpukernel *k) {
@@ -997,44 +1205,20 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
                                  const int *types, int flags, int *ret,
                                  char **err_str) {
     cuda_context *ctx = (cuda_context *)c;
-    strb sb = STRB_STATIC_INIT;
-    strb *psb;
-    char *bin, *log = NULL;
+    strb src = STRB_STATIC_INIT;
+    strb bin = STRB_STATIC_INIT;
+    strb log = STRB_STATIC_INIT;
+    strb *psrc;
     gpukernel *res;
-    size_t bin_len = 0, log_len = 0;
     CUdevice dev;
     unsigned int i;
     int major, minor;
-    strb debug_msg = STRB_STATIC_INIT;
-
-    // options for cuModuleLoadDataEx
-    const size_t cujit_log_size = 4096;
-    char *cujit_info_log = NULL;
-    unsigned int num_cujit_opts = 4;
-    CUjit_option cujit_opts[] = {
-        CU_JIT_INFO_LOG_BUFFER_SIZE_BYTES,
-        CU_JIT_INFO_LOG_BUFFER,
-        CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES,
-        CU_JIT_ERROR_LOG_BUFFER
-    };
-    void *cujit_opt_vals[] = {
-        (void*)(size_t)cujit_log_size, NULL,
-        (void*)(size_t)cujit_log_size, NULL,
-    };
+    int err;
 
     if (count == 0) FAIL(NULL, GA_VALUE_ERROR);
 
     if (flags & GA_USE_OPENCL)
       FAIL(NULL, GA_DEVSUP_ERROR);
-
-    if (flags & GA_USE_BINARY) {
-      // GA_USE_BINARY is exclusive
-      if (flags & ~GA_USE_BINARY)
-        FAIL(NULL, GA_INVALID_ERROR);
-      // We need the length for binary data and there is only one blob.
-      if (count != 1 || lengths == NULL || lengths[0] == 0)
-        FAIL(NULL, GA_VALUE_ERROR);
-    }
 
     cuda_enter(ctx);
 
@@ -1051,6 +1235,7 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
 
     // GA_USE_CLUDA is done later
     // GA_USE_SMALL will always work
+    // GA_USE_HALF should always work
     if (flags & GA_USE_DOUBLE) {
       if (major < 1 || (major == 1 && minor < 3)) {
         cuda_exit(ctx);
@@ -1062,90 +1247,75 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
       cuda_exit(ctx);
       FAIL(NULL, GA_DEVSUP_ERROR);
     }
-    // GA_USE_HALF should always work
 
-    if (flags & GA_USE_BINARY) {
-      bin = memdup(strings[0], lengths[0]);
-      bin_len = lengths[0];
-      if (bin == NULL) {
-        cuda_exit(ctx);
-        FAIL(NULL, GA_MEMORY_ERROR);
-      }
+    if (flags & GA_USE_CLUDA) {
+      strb_appends(&src, CUDA_PREAMBLE);
+    }
+
+    if (lengths == NULL) {
+      for (i = 0; i < count; i++)
+        strb_appends(&src, strings[i]);
     } else {
-      if (flags & GA_USE_CLUDA) {
-        strb_appends(&sb, CUDA_PREAMBLE);
-      }
-
-      if (lengths == NULL) {
-        for (i = 0; i < count; i++)
-        strb_appends(&sb, strings[i]);
-      } else {
-        for (i = 0; i < count; i++) {
-          if (lengths[i] == 0)
-            strb_appends(&sb, strings[i]);
-          else
-            strb_appendn(&sb, strings[i], lengths[i]);
-        }
-      }
-
-      strb_append0(&sb);
-
-      if (strb_error(&sb)) {
-        strb_clear(&sb);
-        cuda_exit(ctx);
-        FAIL(NULL, GA_MEMORY_ERROR);
-      }
-
-      res = (gpukernel *)cache_get(ctx->kernel_cache, &sb);
-      if (res != NULL) {
-        res->refcnt++;
-        strb_clear(&sb);
-        return res;
-      }
-      bin = call_compiler(sb.s, sb.l, ctx->bin_id, &bin_len,
-                          &log, &log_len, ret);
-      if (bin == NULL) {
-        if (err_str != NULL) {
-
-          // We're substituting debug_msg for a string with this first line:
-          strb_appends(&debug_msg, "CUDA kernel compile failure ::\n");
-
-          /* Delete the final NUL */
-          sb.l--;
-          gpukernel_source_with_line_numbers(1, (const char **)&sb.s,
-                                             &sb.l, &debug_msg);
-
-          if (log != NULL) {
-            strb_appends(&debug_msg, "\nCompiler log:\n");
-            strb_appendn(&debug_msg, log, log_len);
-            free(log);
-          }
-          *err_str = strb_cstr(&debug_msg);
-          // *err_str will be free()d by the caller (see docs in kernel.h)
-        }
-        strb_clear(&sb);
-        cuda_exit(ctx);
-        FAIL(NULL, GA_IMPL_ERROR);
+      for (i = 0; i < count; i++) {
+        if (lengths[i] == 0)
+          strb_appends(&src, strings[i]);
+        else
+          strb_appendn(&src, strings[i], lengths[i]);
       }
     }
 
+    strb_append0(&src);
+
+    if (strb_error(&src)) {
+      strb_clear(&src);
+      cuda_exit(ctx);
+      FAIL(NULL, GA_MEMORY_ERROR);
+    }
+
+    res = (gpukernel *)cache_get(ctx->kernel_cache, &src);
+    if (res != NULL) {
+      res->refcnt++;
+      strb_clear(&src);
+      return res;
+    }
+
+    err = compile(ctx, &src, &bin, &log);
+    if (err != GA_NO_ERROR || strb_error(&bin)) {
+      if (err_str != NULL) {
+        strb debug_msg = STRB_STATIC_INIT;
+        strb_appends(&debug_msg, "CUDA kernel compile failure ::\n");
+        src.l--;
+        gpukernel_source_with_line_numbers(1, (const char **)&src.s,
+                                           &src.l, &debug_msg);
+        strb_appends(&debug_msg, "\nCompile log:\n");
+        strb_appendb(&debug_msg, &log);
+        *err_str = strb_cstr(&debug_msg);
+      }
+      strb_clear(&src);
+      strb_clear(&bin);
+      strb_clear(&log);
+      cuda_exit(ctx);
+      FAIL(NULL, err);
+    }
+    strb_clear(&log);
+
     res = calloc(1, sizeof(*res));
     if (res == NULL) {
-      free(bin);
-      strb_clear(&sb);
+      strb_clear(&src);
+      strb_clear(&bin);
       cuda_exit(ctx);
       FAIL(NULL, GA_SYS_ERROR);
     }
 
-    res->bin_sz = bin_len;
-    res->bin = bin;
-
+    /* Don't clear bin after this */
+    res->bin_sz = bin.l;
+    res->bin = bin.s;
     res->refcnt = 1;
     res->argcount = argcount;
     res->types = calloc(argcount, sizeof(int));
     if (res->types == NULL) {
       _cuda_freekernel(res);
-      strb_clear(&sb);
+      strb_clear(&src);
       cuda_exit(ctx);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
@@ -1153,55 +1323,23 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
     res->args = calloc(argcount, sizeof(void *));
     if (res->args == NULL) {
       _cuda_freekernel(res);
-      strb_clear(&sb);
+      strb_clear(&src);
       cuda_exit(ctx);
       FAIL(NULL, GA_MEMORY_ERROR);
     }
 
-    // for both info/err log
-    cujit_info_log = (char*)malloc(2*cujit_log_size*sizeof(char));
-    if(cujit_info_log == NULL) {
-      _cuda_freekernel(res);
-      strb_clear(&sb);
-      cuda_exit(ctx);
-      FAIL(NULL, GA_MEMORY_ERROR);
-    }
-    cujit_info_log[0] = 0;
-    cujit_info_log[cujit_log_size] = 0;
-    cujit_opt_vals[1] = (void*)cujit_info_log;
-    cujit_opt_vals[3] = (void*)(cujit_info_log+cujit_log_size);
-
-    ctx->err = cuModuleLoadDataEx(
-            &res->m, bin,
-            num_cujit_opts, cujit_opts, (void**)cujit_opt_vals);
-
+    ctx->err = cuModuleLoadData(&res->m, bin.s);
     if (ctx->err != CUDA_SUCCESS) {
-      if (err_str != NULL) {
-        strb_appends(&debug_msg, "CUDA kernel link failure::\n");
-        if (cujit_info_log[0]) {
-          strb_appends(&debug_msg, "\nLinker msg:\n");
-          strb_appends(&debug_msg, cujit_info_log);
-        }
-        if (cujit_info_log[cujit_log_size]) {
-          strb_appends(&debug_msg, "\nLinker error log:\n");
-          strb_appends(&debug_msg, cujit_info_log+cujit_log_size);
-        }
-        strb_append0(&debug_msg);
-        *err_str = strb_cstr(&debug_msg);
-      }
-      free(cujit_info_log);
       _cuda_freekernel(res);
-      strb_clear(&sb);
+      strb_clear(&src);
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
 
-    free(cujit_info_log);
-
     ctx->err = cuModuleGetFunction(&res->k, res->m, fname);
     if (ctx->err != CUDA_SUCCESS) {
       _cuda_freekernel(res);
-      strb_clear(&sb);
+      strb_clear(&src);
       cuda_exit(ctx);
       FAIL(NULL, GA_IMPL_ERROR);
     }
@@ -1210,16 +1348,16 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
     ctx->refcnt++;
     cuda_exit(ctx);
     TAG_KER(res);
-    psb = memdup(&sb, sizeof(strb));
-    if (psb == NULL) {
-      cuda_freekernel(res);
-      strb_clear(&sb);
-      FAIL(NULL, GA_MEMORY_ERROR);
+    psrc = memdup(&src, sizeof(strb));
+    if (psrc != NULL) {
+      /* One of the refs is for the cache */
+      res->refcnt++;
+      /* If this fails, it will free the key and remove a ref from the
+         kernel. */
+      cache_add(ctx->kernel_cache, psrc, res);
+    } else {
+      strb_clear(&src);
     }
-    /* One of the refs is for the cache */
-    res->refcnt++;
-    /* If this fails, it will free the key and remove a ref from the kernel. */
-    cache_add(ctx->kernel_cache, psb, res);
     return res;
 }
 
@@ -1689,7 +1827,6 @@ static const char *cuda_error(gpucontext *c) {
   return errstr;
 }
 
-GPUARRAY_LOCAL
 const gpuarray_buffer_ops cuda_ops = {cuda_get_platform_count,
                                       cuda_get_device_count,
                                       cuda_init,

@@ -328,9 +328,9 @@ GPUARRAY_PUBLIC int gpudata_move(gpudata *dst, size_t dstoff,
  * \returns the new buffer in dst_ctx or NULL if no efficient way to
  *          transfer could be found.
  */
-GPUARRAY_LOCAL int gpudata_transfer(gpudata *dst, size_t dstoff,
-                                    gpudata *src, size_t srcoff,
-                                    size_t sz);
+GPUARRAY_PUBLIC int gpudata_transfer(gpudata *dst, size_t dstoff,
+                                     gpudata *src, size_t srcoff,
+                                     size_t sz);
 
 /**
  * Transfer data from a buffer to memory.

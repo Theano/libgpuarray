@@ -455,6 +455,6 @@ static int all_gather(gpudata* src, size_t offsrc, gpudata* dest,
  * linked in \ref gpuarray_buffer_cuda.c, in order to fill a /ref gpucontext's
  * comm_ops.
  */
-GPUARRAY_LOCAL gpuarray_comm_ops nccl_ops = {
+gpuarray_comm_ops nccl_ops = {
     comm_new, comm_free,  generate_clique_id, get_count, get_rank,
     reduce,   all_reduce, reduce_scatter,     broadcast, all_gather};

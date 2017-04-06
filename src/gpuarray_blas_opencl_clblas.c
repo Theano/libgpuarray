@@ -100,7 +100,7 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     ARRAY_INIT(C[i]);
     err = clblasSgemm(convO(order), convT(transA), convT(transB), M, N, K,
                       alpha, A[i]->buf, offA[i], lda, B[i]->buf, offB[i], ldb,
-                      beta, C[i]->buf, offB[i], ldc, 1, &ctx->q,
+                      beta, C[i]->buf, offC[i], ldc, 1, &ctx->q,
                       num_ev, num_ev == 0 ? NULL : evl, &ev);
     if (err != clblasSuccess)
       return GA_BLAS_ERROR;
@@ -132,7 +132,7 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     ARRAY_INIT(C[i]);
     err = clblasDgemm(convO(order), convT(transA), convT(transB), M, N, K,
                       alpha, A[i]->buf, offA[i], lda, B[i]->buf, offB[i], ldb,
-                      beta, C[i]->buf, offB[i], ldc, 1, &ctx->q,
+                      beta, C[i]->buf, offC[i], ldc, 1, &ctx->q,
                       num_ev, num_ev == 0 ? NULL : evl, &ev);
     if (err != clblasSuccess)
       return GA_BLAS_ERROR;
@@ -491,7 +491,7 @@ static int dger(cb_order order, size_t M, size_t N, double alpha,
   return GA_NO_ERROR;
 }
 
-GPUARRAY_LOCAL gpuarray_blas_ops clblas_ops = {
+gpuarray_blas_ops clblas_ops = {
   setup,
   teardown,
   error,

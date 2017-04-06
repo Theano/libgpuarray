@@ -23,6 +23,7 @@ typedef struct CUmod_st *CUmodule;
 typedef struct CUfunc_st *CUfunction;
 typedef struct CUevent_st *CUevent;
 typedef struct CUstream_st *CUstream;
+typedef struct CUlinkState_st *CUlinkState;
 
 typedef enum CUdevice_attribute_enum CUdevice_attribute;
 typedef enum CUfunction_attribute_enum CUfunction_attribute;
@@ -30,6 +31,7 @@ typedef enum CUevent_flags_enum CUevent_flags;
 typedef enum CUctx_flags_enum CUctx_flags;
 typedef enum CUipcMem_flags_enum CUipcMem_flags;
 typedef enum CUjit_option_enum CUjit_option;
+typedef enum CUjitInputType_enum CUjitInputType;
 
 #define CU_IPC_HANDLE_SIZE 64
 
@@ -204,6 +206,15 @@ enum CUjit_option_enum {
     CU_JIT_NEW_SM3X_OPT,
     CU_JIT_FAST_COMPILE,
     CU_JIT_NUM_OPTIONS
+};
+
+enum CUjitInputType_enum {
+    CU_JIT_INPUT_CUBIN = 0,
+    CU_JIT_INPUT_PTX,
+    CU_JIT_INPUT_FATBINARY,
+    CU_JIT_INPUT_OBJECT,
+    CU_JIT_INPUT_LIBRARY,
+    CU_JIT_NUM_INPUT_TYPES
 };
 
 #endif

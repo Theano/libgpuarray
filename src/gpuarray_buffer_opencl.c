@@ -28,7 +28,7 @@ static cl_int err;
 #define CHKFAIL(v) if (err != CL_SUCCESS) FAIL(v, GA_IMPL_ERROR)
 
 
-GPUARRAY_LOCAL const gpuarray_buffer_ops opencl_ops;
+const gpuarray_buffer_ops opencl_ops;
 
 static int cl_property(gpucontext *c, gpudata *b, gpukernel *k, int p, void *r);
 static gpudata *cl_alloc(gpucontext *c, size_t size, void *data, int flags,
@@ -212,7 +212,7 @@ cl_command_queue cl_get_stream(gpucontext *ctx) {
 }
 
 static void cl_free_ctx(cl_ctx *ctx) {
-  gpuarray_blas_ops *blas_ops;
+  gpuarray_blas_ops *blas_ops = NULL;
 
   ASSERT_CTX(ctx);
   assert(ctx->refcnt != 0);
@@ -1448,7 +1448,6 @@ static const char *cl_error(gpucontext *c) {
   }
 }
 
-GPUARRAY_LOCAL
 const gpuarray_buffer_ops opencl_ops = {cl_get_platform_count,
                                         cl_get_device_count,
                                         cl_init,

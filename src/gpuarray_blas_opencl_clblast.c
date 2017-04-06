@@ -68,7 +68,7 @@ static int hgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     ARRAY_INIT(C[i]);
     err = CLBlastHgemm(convO(order), convT(transA), convT(transB), M, N, K,
                        float_to_half(alpha), A[i]->buf, offA[i], lda, B[i]->buf, offB[i], ldb,
-                       float_to_half(beta), C[i]->buf, offB[i], ldc, &ctx->q, &ev);
+                       float_to_half(beta), C[i]->buf, offC[i], ldc, &ctx->q, &ev);
     if (err != kSuccess)
       return GA_BLAS_ERROR;
     ARRAY_FINI(A[i]);
@@ -97,7 +97,7 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     ARRAY_INIT(C[i]);
     err = CLBlastSgemm(convO(order), convT(transA), convT(transB), M, N, K,
                       alpha, A[i]->buf, offA[i], lda, B[i]->buf, offB[i], ldb,
-                      beta, C[i]->buf, offB[i], ldc, &ctx->q, &ev);
+                      beta, C[i]->buf, offC[i], ldc, &ctx->q, &ev);
     if (err != kSuccess)
       return GA_BLAS_ERROR;
     ARRAY_FINI(A[i]);
@@ -126,7 +126,7 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
     ARRAY_INIT(C[i]);
     err = CLBlastDgemm(convO(order), convT(transA), convT(transB), M, N, K,
                       alpha, A[i]->buf, offA[i], lda, B[i]->buf, offB[i], ldb,
-                      beta, C[i]->buf, offB[i], ldc, &ctx->q, &ev);
+                      beta, C[i]->buf, offC[i], ldc, &ctx->q, &ev);
     if (err != kSuccess)
       return GA_BLAS_ERROR;
     ARRAY_FINI(A[i]);
@@ -525,7 +525,7 @@ static int dger(cb_order order, size_t M, size_t N, double alpha,
   return GA_NO_ERROR;
 }
 
-GPUARRAY_LOCAL gpuarray_blas_ops clblast_ops = {
+gpuarray_blas_ops clblast_ops = {
   setup,
   teardown,
   error,

@@ -5,8 +5,8 @@ have_cython = False
 
 MAJOR = 0
 MINOR = 6
-PATCH = 2
-SUFFIX = ''
+PATCH = 3
+SUFFIX = '.dev0' # include the '.'
 FULLVERSION = '%d.%d.%d%s' % (MAJOR, MINOR, PATCH, SUFFIX)
 
 try:
@@ -82,7 +82,7 @@ if sys.platform == 'win32' and not os.getenv('CONDA_BUILD'):
     current_dir = os.path.abspath(os.path.dirname(__file__))
     include_dirs += [os.path.join(current_dir, 'src')]
 
-    default_bin_dir = os.path.join(current_dir, 'lib', 'Release')
+    default_bin_dir = os.path.join(current_dir, 'lib')
     if not os.path.isdir(default_bin_dir):
         raise RuntimeError('default binary dir {} does not exist, you may need to build the C library in release mode'.format(default_bin_dir))
     library_dirs += [default_bin_dir]
