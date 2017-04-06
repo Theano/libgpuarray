@@ -1,0 +1,8 @@
+Release process:
+- Make sure you are on the proper release branch
+- Update the version in setup.py
+- Update the version in doc/conf.py
+- Commit the changes with message "Changes for release X.Y.Z"
+- Push to master
+- Add a release on github with a tag in the form of 'vX.Y.X'
+ - Make note of the major changes since the last release
