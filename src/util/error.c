@@ -2,7 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "error.h"
+#include "private_config.h"
+#include "util/error.h"
 
 static error _global_err = {};
 error *global_err = &_global_err;
