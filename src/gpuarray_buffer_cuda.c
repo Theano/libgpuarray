@@ -235,9 +235,10 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
                                  (cache_hash_fn)strb_hash,
                                  (cache_freek_fn)strb_free,
                                  (cache_freev_fn)cuda_freekernel, global_err);
-  if (res->kernel_cache == NULL)
+  if (res->kernel_cache == NULL) {
     error_cuda(global_err, "cuStreamCreate", err);
     goto fail_cache;
+  }
 
   cache_path = getenv("GPUARRAY_CACHE_PATH");
   if (cache_path != NULL) {
@@ -246,10 +247,10 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
                           (cache_hash_fn)key_hash,
                           (cache_freek_fn)key_free,
                           (cache_freev_fn)strb_free,
-                          res->err);
+                          global_err);
     if (mem_cache == NULL) {
       fprintf(stderr, "Error initializing mem cache for disk: %s\n",
-              res->err->msg);
+              global_err->msg);
       goto fail_disk_cache;
     }
     res->disk_cache = cache_disk(cache_path, mem_cache,
@@ -489,50 +490,51 @@ static const char CUDA_PREAMBLE[] =
 /* XXX: add vector types */
 
 static cuda_context *do_init(CUdevice dev, int flags, error *e) {
-    cuda_context *res;
-    CUcontext ctx;
-    CUresult err;
-    unsigned int fl = CU_CTX_SCHED_AUTO;
-    unsigned int cur_fl;
-    int act;
-    int i;
+  cuda_context *res;
+  CUcontext ctx;
+  CUresult err;
+  unsigned int fl = CU_CTX_SCHED_AUTO;
+  unsigned int cur_fl;
+  int act;
+  int i;
 
-    if (flags & GA_CTX_SINGLE_THREAD)
-      fl = CU_CTX_SCHED_SPIN;
-    if (flags & GA_CTX_MULTI_THREAD)
-      fl = CU_CTX_SCHED_YIELD;
-    err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_UNIFIED_ADDRESSING, dev);
-    CHKFAIL(e, "cuDeviceGetAttribute", NULL);
-    if (i != 1) {
-      error_set(e, GA_UNSUPPORTED_ERROR, "device does not support unified addressing");
+  if (flags & GA_CTX_SINGLE_THREAD)
+    fl = CU_CTX_SCHED_SPIN;
+  if (flags & GA_CTX_MULTI_THREAD)
+    fl = CU_CTX_SCHED_YIELD;
+  err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_UNIFIED_ADDRESSING, dev);
+  CHKFAIL(e, "cuDeviceGetAttribute", NULL);
+  if (i != 1) {
+    error_set(e, GA_UNSUPPORTED_ERROR, "device does not support unified addressing");
+    return NULL;
+  }
+  err = cuDevicePrimaryCtxGetState(dev, &cur_fl, &act);
+  CHKFAIL(e, "cuDevicePrimaryCtxGetState", NULL);
+  if (act == 1) {
+    if ((cur_fl & fl) != fl) {
+      error_set(e, GA_INVALID_ERROR, "device is already active and has unsupported flags");
       return NULL;
     }
-    err = cuDevicePrimaryCtxGetState(dev, &cur_fl, &act);
-    CHKFAIL(e, "cuDevicePrimaryCtxGetState", NULL);
-    if (act == 1) {
-      if ((cur_fl & fl) != fl) {
-        error_set(e, GA_INVALID_ERROR, "device is already active and has unsupported flags");
-        return NULL;
-      }
-    } else {
-      err = cuDevicePrimaryCtxSetFlags(dev, fl);
-      CHKFAIL(e, "cuDevicePrimaryCtxSetFlags", NULL);
-    }
-    err = cuDevicePrimaryCtxRetain(&ctx, dev);
-    CHKFAIL(e, "cuDevicePrimaryCtxRetain", NULL);
-    err = cuCtxPushCurrent(ctx);
-    CHKFAIL(e, "cuCtxPushCurrent", NULL);
-    res = cuda_make_ctx(ctx, flags);
-    if (res == NULL) {
-      cuDevicePrimaryCtxRelease(dev);
-      if (e != global_err)
-        error_set(e, global_err->code, global_err->msg);
-      return NULL;
-    }
-    /* Don't leave the context on the thread stack */
-    cuCtxPopCurrent(NULL);
+  } else {
+    err = cuDevicePrimaryCtxSetFlags(dev, fl);
+    CHKFAIL(e, "cuDevicePrimaryCtxSetFlags", NULL);
+  }
+  err = cuDevicePrimaryCtxRetain(&ctx, dev);
+  CHKFAIL(e, "cuDevicePrimaryCtxRetain", NULL);
+  err = cuCtxPushCurrent(ctx);
+  CHKFAIL(e, "cuCtxPushCurrent", NULL);
+  res = cuda_make_ctx(ctx, flags);
+  if (res == NULL) {
+    fprintf(stderr, "res failed\n");
+    cuDevicePrimaryCtxRelease(dev);
+    if (e != global_err)
+      error_set(e, global_err->code, global_err->msg);
+    return NULL;
+  }
+  /* Don't leave the context on the thread stack */
+  cuCtxPopCurrent(NULL);
 
-     return res;
+  return res;
 }
 
 static gpucontext *cuda_init(int ord, int flags) {
