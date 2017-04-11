@@ -55,7 +55,7 @@ typedef struct _gpuarray_comm_ops gpuarray_comm_ops;
 struct _gpucontext {
   GPUCONTEXT_HEAD;
   void *ctx_ptr;
-  void *private[7];
+  void *private[11];
 };
 
 /* The real gpudata struct is likely bigger but we only care about the
