@@ -32,6 +32,7 @@ typedef enum CUctx_flags_enum CUctx_flags;
 typedef enum CUipcMem_flags_enum CUipcMem_flags;
 typedef enum CUjit_option_enum CUjit_option;
 typedef enum CUjitInputType_enum CUjitInputType;
+typedef enum CUmemAttach_flags_enum CUmemAttach_flags;
 
 #define CU_IPC_HANDLE_SIZE 64
 
@@ -185,6 +186,12 @@ enum CUctx_flags_enum {
 
 enum CUipcMem_flags_enum {
   CU_IPC_MEM_LAZY_ENABLE_PEER_ACCESS = 0x1
+};
+
+enum CUmemAttach_flags_enum {
+  CU_MEM_ATTACH_GLOBAL = 0x1,
+  CU_MEM_ATTACH_HOST = 0x2,
+  CU_MEM_ATTACH_SINGLE = 0x4
 };
 
 enum CUjit_option_enum {
