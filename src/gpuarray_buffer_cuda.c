@@ -583,7 +583,10 @@ static int allocate(cuda_context *ctx, gpudata **res, gpudata **prev,
 
   cuda_enter(ctx);
 
-  ctx->err = cuMemAlloc(&ptr, size);
+  if (1)
+    ctx->err = cuMemAllocManaged(&ptr, size, CU_MEM_ATTACH_GLOBAL);
+  else
+    ctx->err = cuMemAlloc(&ptr, size);
   if (ctx->err != CUDA_SUCCESS) {
     cuda_exit(ctx);
     return GA_IMPL_ERROR;

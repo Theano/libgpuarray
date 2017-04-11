@@ -30,6 +30,7 @@ DEF_PROC_V2(cuMemGetInfo, (size_t *free, size_t *total));
 DEF_PROC_V2(cuMemAlloc, (CUdeviceptr *dptr, size_t bytesize));
 DEF_PROC_V2(cuMemFree, (CUdeviceptr dptr));
 DEF_PROC_V2(cuMemAllocHost, (void **pp, size_t bytesize));
+DEF_PROC(cuMemAllocManaged, (CUdeviceptr* dptr, size_t bytesize, unsigned int flags));
 DEF_PROC(cuMemFreeHost, (void *p));
 
 DEF_PROC_V2(cuMemcpyHtoDAsync, (CUdeviceptr dstDevice, const void *srcHost, size_t ByteCount, CUstream hStream));
