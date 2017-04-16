@@ -797,9 +797,8 @@ def binary_ufunc(a, b, ufunc_name, out=None):
         if ufunc_name == 'power':
             # Arguments to `pow` cannot be integer, need to cast
             if numpy.issubsctype(result_dtype, numpy.integer):
-                eps = 0.001
-                tpl = 'res = ({rt}) (long) (pow((double) a, (double) b) + {})'
-                oper = tpl.format(eps, rt=c_res_dtype)
+                tpl = 'res = ({rt}) (long) round(pow((double) a, (double) b))'
+                oper = tpl.format(rt=c_res_dtype)
             else:
                 oper = 'res = ({rt}) pow(({rt}) a, ({rt}) b)'.format(
                     rt=c_res_dtype)
@@ -873,7 +872,8 @@ def binary_ufunc(a, b, ufunc_name, out=None):
         raise ValueError('`ufunc_name` {!r} does not represent a binary '
                          'ufunc'.format(ufunc_name))
 
-    kernel = GpuElemwise(a.context, oper, args, convert_f16=True)
+    kernel = GpuElemwise(a.context, oper, args, convert_f16=True,
+                         preamble='')
     kernel(out, a, b, broadcast=True)
     return out
 
