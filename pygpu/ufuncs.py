@@ -1,5 +1,6 @@
 ﻿"""Ufuncs and reductions for GPU arrays."""
 
+import mako
 import numpy
 import re
 import warnings
@@ -789,8 +790,9 @@ def binary_ufunc(a, b, ufunc_name, out=None):
     # C result dtype for casting
     c_res_dtype = dtype_to_ctype(result_dtype)
 
-    # Set string for mapping operation
+    # Set string for mapping operation and preamble for additional functions
     oper = ''
+    preamble = ''
 
     # Case 1: math function
     if ufunc_name in BINARY_UFUNC_TO_C_FUNC:
@@ -825,16 +827,19 @@ def binary_ufunc(a, b, ufunc_name, out=None):
         if ufunc_name == 'floor_divide':
             # implement as sign(a/b) * int(abs(a/b) + shift(a,b))
             # where shift(a,b) = 0 if sign(a) == sign(b) else 1 - epsilon
-            sign_part = '(((a < 0) != (b < 0)) ? -1 : 1)'
-            # TODO: this computes twice - better solution?
-            abs_div_part = ('(((double)a / b < 0) ? ' +
-                            '-(double)a / b : ' +
-                            '(double)a / b)')
-            shift_part = '(((a < 0) != (b < 0)) ? 0.999 : 0)'
-            oper = 'res = ({}) ({} * (long)({} + {}))'.format(c_res_dtype,
-                                                              sign_part,
-                                                              abs_div_part,
-                                                              shift_part)
+            preamble = '''
+            WITHIN_KERNEL long
+            floor_div_dbl(double a, double b) {
+                double quot = a / b;
+                if ((a < 0) != (b < 0)) {
+                    return - (long) (quot + 0.999);
+                } else {
+                    return (long) quot;
+                }
+            }
+            '''
+            oper = 'res = ({}) floor_div_dbl((double) a, (double) b)'.format(
+                c_res_dtype)
 
         if ufunc_name == 'true_divide':
             if result_dtype == numpy.dtype('float64'):
@@ -855,25 +860,33 @@ def binary_ufunc(a, b, ufunc_name, out=None):
 
         elif ufunc_name == 'remainder':
             # The same as `fmod` except for b < 0, where we have
-            # remainder(a,b) = fmod(a, b)
+            # remainder(a, b) = fmod(a, b) + b
             if numpy.issubsctype(result_dtype, numpy.integer):
                 cast_type = 'double'
             else:
                 cast_type = c_res_dtype
 
-            # TODO: this computes fmod(a,b) twice for b < 0, better solution?
-            mod_expr = 'fmod(({ct}) a, ({ct}) b)'.format(ct=cast_type)
-            comp_part = ('(((b < 0) && ({expr} != 0)) ? ' +
-                         '({ct})b + {expr} : ' +
-                         '{expr})').format(ct=cast_type, expr=mod_expr)
-            oper = 'res = ({rt}) {}'.format(comp_part, rt=c_res_dtype)
+            preamble = mako.template.Template('''
+            WITHIN_KERNEL ${ct}
+            rem(${ct} a, ${ct} b) {
+                ${ct} modval = fmod(a, b);
+                if (b < 0 && modval != 0) {
+                    return b + modval;
+                } else {
+                    return modval;
+                }
+            }
+            ''').render(ct=cast_type)
+            oper = 'res = ({rt}) rem(({ct}) a, ({ct}) b)'.format(
+                rt=c_res_dtype, ct=cast_type)
+            print(oper)
 
     if not oper:
         raise ValueError('`ufunc_name` {!r} does not represent a binary '
                          'ufunc'.format(ufunc_name))
 
     kernel = GpuElemwise(a.context, oper, args, convert_f16=True,
-                         preamble='')
+                         preamble=preamble)
     kernel(out, a, b, broadcast=True)
     return out
 
