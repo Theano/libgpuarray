@@ -328,7 +328,7 @@ UNARY_UFUNC_TO_C_OP = {
 UNARY_UFUNCS = (list(UNARY_UFUNC_TO_C_FUNC.keys()) +
                 list(UNARY_UFUNC_TO_C_OP.keys()))
 UNARY_UFUNCS.extend(['deg2rad', 'rad2deg', 'reciprocal', 'sign', 'signbit',
-                     'square'])
+                     'square', 'isinf', 'isfinite', 'spacing'])
 BINARY_C_FUNC_TO_UFUNC = {
     'atan2': 'arctan2',
     'copysign': 'copysign',
@@ -360,7 +360,8 @@ BINARY_UFUNC_TO_C_OP = {
 BINARY_UFUNCS = (list(BINARY_UFUNC_TO_C_FUNC.keys()) +
                  list(BINARY_UFUNC_TO_C_OP.keys()))
 BINARY_UFUNCS.extend(['floor_divide', 'true_divide', 'logical_xor',
-                      'maximum', 'minimum', 'remainder'])
+                      'maximum', 'minimum', 'remainder', 'logaddexp',
+                      'logaddexp2'])
 
 
 def ufunc_dtypes(ufunc_name, dtypes_in):
@@ -657,6 +658,27 @@ def unary_ufunc(a, ufunc_name, out=None):
     if ufunc_name == 'square':
         oper = 'res = ({}) (a * a)'.format(c_res_dtype)
 
+    if ufunc_name == 'isfinite':
+        # TODO: NaN part yields wrong value
+        oper = '''
+        res = ({}) (a != INFINITY && a != -INFINITY && a != NAN)
+        '''.format(c_res_dtype)
+
+    if ufunc_name == 'isinf':
+        oper = 'res = ({}) (a == INFINITY || a == -INFINITY)'.format(
+            c_res_dtype)
+
+    if ufunc_name == 'isnan':
+        # TODO: always returns False, fix NaN comparison in C
+        oper = 'res = ({}) (a == NAN)'.format(c_res_dtype)
+
+    if ufunc_name == 'spacing':
+        oper = '''
+        res = ({}) ((a < 0) ?
+                    nextafter(a, -INFINITY) - a :
+                    nextafter(a, INFINITY) - a)
+        '''.format(c_res_dtype)
+
     if not oper:
         raise ValueError('`ufunc_name` {!r} does not represent a unary ufunc'
                          ''.format(ufunc_name))
@@ -879,7 +901,14 @@ def binary_ufunc(a, b, ufunc_name, out=None):
             ''').render(ct=cast_type)
             oper = 'res = ({rt}) rem(({ct}) a, ({ct}) b)'.format(
                 rt=c_res_dtype, ct=cast_type)
-            print(oper)
+
+        elif ufunc_name == 'logaddexp':
+            oper = 'res = ({}) log(exp(a) + exp(b))'.format(c_res_dtype)
+
+        elif ufunc_name == 'logaddexp2':
+            oper = '''
+            res = ({}) log(exp(a * log(2.0)) + exp(b * log(2.0))) / log(2.0)
+            '''.format(c_res_dtype)
 
     if not oper:
         raise ValueError('`ufunc_name` {!r} does not represent a binary '
@@ -894,13 +923,9 @@ def binary_ufunc(a, b, ufunc_name, out=None):
 MISSING_UFUNCS = [
     'conjugate',  # no complex dtype yet
     'frexp',  # multiple output values, how to handle that?
-    'isfinite',  # how to test in C?
-    'isinf',  # how to test in C?
-    'isnan',  # how to test in C?
-    'logaddexp',  # not a one-liner (at least not in numpy)
-    'logaddexp2',  # not a one-liner (at least not in numpy)
+    'isfinite',  # check in C against NaN doesn't work properly
+    'isnan',  # check in C against NaN doesn't work properly
     'modf',  # multiple output values, how to handle that?
-    'spacing',  # implementation?
     ]
 
 
