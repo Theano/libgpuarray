@@ -181,55 +181,92 @@ float_dtypes = [dt for dt in NAME_TO_DTYPE.values()
 # Reasons for failure:
 # - fmod: division by zero handled differently
 # - nextafter: for bool, numpy upcasts to float16 only, we cast to float32
-# - power: negative numbers to the `True`-th power are too large by 1
+# - ldexp: numpy upcasts to float32, we to float64
 # - left_shift: numpy wraps around (True << -3 is huge), our code doesn't
 # - floor_divide: division by zero handled differently
 # - logical_xor: our code yields True for True ^ 0.1 due to rounding
 # - remainder: division by zero handled differently
-fail_binary = [{'ufunc': 'fmod', 'dtype2': [bool]},  # wrong where array2 is 0
-               {'ufunc': 'nextafter', 'dtype1': [bool], 'dtype2': int_dtypes},
-               {'ufunc': 'left_shift', 'dtype1': sint_dtypes},
-               {'ufunc': 'left_shift', 'dtype2': sint_dtypes},
-               {'ufunc': 'floor_divide', 'dtype2': [bool]},
-               {'ufunc': 'logical_xor', 'dtype1': [bool],
-                'dtype2': float_dtypes},
-               {'ufunc': 'remainder', 'dtype2': [bool]},
-               ]
+fail_binary = {'fmod': {'dtype2': [bool]},  # wrong where array2 is 0
+               'nextafter': {'dtype1': [bool], 'dtype2': int_dtypes},
+               'ldexp': {'dtype2': [numpy.uint16]},
+               'left_shift': {'dtype2': sint_dtypes},
+               'floor_divide': {'dtype2': [bool]},
+               'logical_xor': {'dtype1': [bool], 'dtype2': float_dtypes},
+               'remainder': {'dtype2': [bool]},
+               }
+# ufuncs where negative scalars trigger upcasting that differs from Numpy
+upcast_wrong_neg = ('copysign', 'ldexp', 'hypot', 'arctan2', 'nextafter')
 
 
 def test_binary_ufuncs():
     for ufunc in BINARY_UFUNCS:
         for dtype1 in dtypes:
             for dtype2 in dtypes:
-                if any(d['ufunc'] == ufunc and
-                       dtype1 in d.get('dtype1', [dtype1]) and
-                       dtype2 in d.get('dtype2', [dtype2])
-                       for d in fail_binary):
+                if (ufunc in fail_binary and
+                    dtype1 in fail_binary[ufunc].get('dtype1', [dtype1]) and
+                        dtype2 in fail_binary[ufunc].get('dtype2', [dtype2])):
                     pass
                 else:
                     yield check_binary_ufunc, ufunc, dtype1, dtype2
 
-            scalars = [1, 5]
-            if ufunc not in ('fmod', 'remainder', 'floor_divide'):
-                scalars.append(0)
-            if (numpy.issubsctype(dtype1, numpy.unsignedinteger) or
-                    (ufunc == 'power' and
-                     (numpy.issubsctype(dtype1, numpy.integer) or
-                      dtype1 == bool))):
-                # Not appending negative scalars in this case.
-                # power: integers (including bool) to negative integer powers
-                # not valid
-                pass
-            else:
-                scalars += [-1, -2]
+                scalars_left = [-2, -1, -0.5, 0, 1, 2.5, 4]
+                scalars_right = list(scalars_left)
 
-            for scalar in scalars:
-                if any(d['ufunc'] == ufunc and
-                       dtype1 in d.get('dtype2', [dtype2])  # this is correct
-                       for d in fail_binary):
-                    pass
-                else:
-                    yield check_binary_ufunc_scalar, ufunc, scalar, dtype1
+                # For scalars, we need to exclude some cases
+
+                # Obvious things first: no invalid scalars for the given dtype
+                if numpy.issubsctype(dtype1, numpy.integer):
+                    scalars_left = [x for x in scalars_left if int(x) == x]
+                if numpy.issubsctype(dtype2, numpy.integer):
+                    scalars_right = [x for x in scalars_right if int(x) == x]
+                if numpy.issubsctype(dtype1, numpy.unsignedinteger):
+                    scalars_left = [x for x in scalars_left if x >= 0]
+                if numpy.issubsctype(dtype2, numpy.unsignedinteger):
+                    scalars_right = [x for x in scalars_right if x >= 0]
+
+                # Special treatment for some ufuncs
+                if ufunc == 'power':
+                    if (numpy.issubsctype(dtype1, numpy.integer) or
+                            dtype1 == bool):
+                        # Negative integer power of integer is invalid
+                        scalars_right = [x for x in scalars_right if x >= 0]
+                    if numpy.issubsctype(dtype2, numpy.signedinteger):
+                        # Negative integer power of integer is invalid
+                        scalars_left = [x for x in scalars_right if x >= 0]
+                if ufunc in ('fmod', 'remainder', 'floor_divide'):
+                    # These ufuncs divide by the right operand, so we remove 0
+                    scalars_left = [x for x in scalars_left if x >= 0]
+                if ufunc == 'copysign':
+                    if numpy.issubsctype(dtype2, numpy.unsignedinteger):
+                        # Don't try to copy negative sign to unsigned array
+                        scalars_left = [x for x in scalars_left if x >= 0]
+                if ufunc == 'ldexp':
+                    # Only integers as second argument
+                    scalars_right = [x for x in scalars_right if int(x) == x]
+                    if numpy.issubsctype(dtype2, numpy.unsignedinteger):
+                        # This is not allowed due to invalid type coercion
+                        scalars_left = []
+
+                # Remove negative scalars for ufuncs with differing upcasting
+                if ufunc in upcast_wrong_neg:
+                    scalars_left = [x for x in scalars_left if x >= 0]
+                    scalars_right = [x for x in scalars_left if x >= 0]
+
+                for scalar in scalars_left:
+                    if (ufunc in fail_binary and
+                            fail_binary[ufunc].get('dtype2', [dtype2])):
+                        pass
+                    else:
+                        yield (check_binary_ufunc_scalar_left,
+                               ufunc, scalar, dtype2)
+
+                for scalar in scalars_right:
+                    if (ufunc in fail_binary and
+                            fail_binary[ufunc].get('dtype1', [dtype1])):
+                        pass
+                    else:
+                        yield (check_binary_ufunc_scalar_right,
+                               ufunc, scalar, dtype1)
 
 
 def check_binary_ufunc(ufunc, dtype1, dtype2):
@@ -243,7 +280,6 @@ def check_binary_ufunc(ufunc, dtype1, dtype2):
     npy_arr2, gpuary_arr2 = npy_and_gpuary_arrays(shape=(2, 3),
                                                   dtype=dtype2,
                                                   positive=True)
-
     try:
         res = numpy.finfo(numpy.result_type(dtype1, dtype2)).resolution
     except ValueError:
@@ -275,7 +311,40 @@ def check_binary_ufunc(ufunc, dtype1, dtype2):
                               equal_nan=True)
 
 
-def check_binary_ufunc_scalar(ufunc, scalar, dtype):
+def check_binary_ufunc_scalar_left(ufunc, scalar, dtype):
+    """Test GpuArray binary ufunc with scalar first operand."""
+    gpuary_ufunc = getattr(ufuncs, ufunc)
+    npy_ufunc = getattr(numpy, ufunc)
+
+    npy_arr, gpuary_arr = npy_and_gpuary_arrays(shape=(2, 3),
+                                                dtype=dtype,
+                                                positive=True)
+    try:
+        res = numpy.finfo(dtype).resolution
+    except ValueError:
+        res = numpy.finfo(numpy.promote_types(dtype,
+                                              numpy.float16)).resolution
+    rtol = 10 * res
+
+    try:
+        npy_result = npy_ufunc(scalar, npy_arr)
+    except TypeError:
+        # Make sure we raise the same error as Numpy
+        with assert_raises(TypeError):
+            gpuary_ufunc(gpuary_arr, scalar)
+    else:
+        if npy_result.dtype == numpy.dtype('float16'):
+            # We use float32 as minimum for GPU arrays, do the same here
+            npy_result = npy_result.astype('float32')
+
+        gpuary_result = gpuary_ufunc(scalar, gpuary_arr)
+        assert npy_result.shape == gpuary_result.shape
+        assert npy_result.dtype == gpuary_result.dtype
+        assert numpy.allclose(npy_result, gpuary_result, rtol=rtol,
+                              atol=rtol, equal_nan=True)
+
+
+def check_binary_ufunc_scalar_right(ufunc, scalar, dtype):
     """Test GpuArray binary ufunc with scalar second operand."""
     gpuary_ufunc = getattr(ufuncs, ufunc)
     npy_ufunc = getattr(numpy, ufunc)
@@ -283,7 +352,6 @@ def check_binary_ufunc_scalar(ufunc, scalar, dtype):
     npy_arr, gpuary_arr = npy_and_gpuary_arrays(shape=(2, 3),
                                                 dtype=dtype,
                                                 positive=True)
-
     try:
         res = numpy.finfo(dtype).resolution
     except ValueError:
