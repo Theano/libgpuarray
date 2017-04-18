@@ -4,7 +4,7 @@ import numpy
 import pygpu
 from pygpu.dtypes import NAME_TO_DTYPE
 from pygpu import ufuncs
-from pygpu.ufuncs import UNARY_UFUNCS, BINARY_UFUNCS
+from pygpu.ufuncs import UNARY_UFUNCS, UNARY_UFUNCS_TWO_OUT, BINARY_UFUNCS
 from pygpu.tests.support import context
 
 
@@ -86,14 +86,14 @@ def check_reduction(reduction, dtype, axis, keepdims):
     else:
         assert npy_result.shape == gpuary_result.shape
         assert npy_result.dtype == gpuary_result.dtype
-        assert numpy.allclose(npy_result, gpuary_result, rtol=rtol,
+        assert numpy.allclose(gpuary_result, npy_result, rtol=rtol,
                               atol=rtol)
 
     # With out array
     out = pygpu.empty(npy_result.shape, npy_result.dtype)
     gpuary_result = gpuary_reduction(gpuary_arr, axis=axis, out=out,
                                      keepdims=keepdims)
-    assert numpy.allclose(npy_result, out, rtol=rtol, atol=rtol)
+    assert numpy.allclose(out, npy_result, rtol=rtol, atol=rtol)
     assert out is gpuary_result
 
     # Explicit out dtype, supported by some reductions only
@@ -103,7 +103,7 @@ def check_reduction(reduction, dtype, axis, keepdims):
                                          dtype=out_dtype,
                                          keepdims=keepdims)
         assert gpuary_result.dtype == out_dtype
-        assert numpy.allclose(npy_result, out, rtol=rtol, atol=rtol)
+        assert numpy.allclose(out, npy_result, rtol=rtol, atol=rtol)
 
     # Using numpy arrays as input
     gpuary_result = gpuary_reduction(npy_arr, axis=axis, keepdims=keepdims)
@@ -114,20 +114,27 @@ def check_reduction(reduction, dtype, axis, keepdims):
     else:
         assert npy_result.shape == gpuary_result.shape
         assert npy_result.dtype == gpuary_result.dtype
-        assert numpy.allclose(npy_result, gpuary_result, rtol=rtol,
+        assert numpy.allclose(gpuary_result, npy_result, rtol=rtol,
                               atol=rtol)
 
 
-fail_unary = [('reciprocal', bool),  # Numpy maps to logical_not.. why?
-              ('sign', bool),  # no valid signature
-              ('fmod', bool)  # wrong result where second array is 0
-              ]
+# Dictionary of failing combinations.
+# Reasons for failure:
+# - reciprocal: Numpy ufunc is equivalent to logical_not for bool, no idea why
+# - sign: fails for Numpy, too, since there's no valid signature
+# - fmod: division by 0 handled differently
+# - spacing: Numpy upcasts to float16 for small int types, we can't do that yet
+fail_unary = {'reciprocal': [bool],
+              'sign': [bool],
+              'fmod': [bool],
+              'spacing': [bool, numpy.int8, numpy.uint8],
+              }
 
 
 def test_unary_ufuncs():
     for ufunc in UNARY_UFUNCS:
         for dtype in dtypes:
-            if (ufunc, dtype) not in fail_unary:
+            if dtype not in fail_unary.get(ufunc, []):
                 yield check_unary_ufunc, ufunc, dtype
 
 
@@ -159,14 +166,66 @@ def check_unary_ufunc(ufunc, dtype):
         gpuary_result = gpuary_ufunc(gpuary_arr)
         assert npy_result.shape == gpuary_result.shape
         assert npy_result.dtype == gpuary_result.dtype
-        assert numpy.allclose(npy_result, gpuary_result, rtol=rtol,
+        assert numpy.allclose(gpuary_result, npy_result, rtol=rtol,
                               atol=rtol, equal_nan=True)
 
         # In-place
         out = pygpu.empty(npy_result.shape, npy_result.dtype)
         gpuary_ufunc(gpuary_arr, out)
-        assert numpy.allclose(npy_result, gpuary_result, rtol=rtol,
+        assert numpy.allclose(out, npy_result, rtol=rtol,
                               equal_nan=True)
+
+
+def test_unary_ufuncs_two_out():
+    for ufunc in UNARY_UFUNCS_TWO_OUT:
+        for dtype in dtypes:
+            if dtype not in fail_unary.get(ufunc, []):
+                yield check_unary_ufunc_two_out, ufunc, dtype
+
+
+def check_unary_ufunc_two_out(ufunc, dtype):
+    """Test GpuArray unary ufuncs with two outputs against Numpy."""
+    gpuary_ufunc = getattr(ufuncs, ufunc)
+    npy_ufunc = getattr(numpy, ufunc)
+
+    npy_arr, gpuary_arr = npy_and_gpuary_arrays(shape=(2, 3), dtype=dtype,
+                                                positive=True)
+    try:
+        res = numpy.finfo(dtype).resolution
+    except ValueError:
+        res = numpy.finfo(numpy.promote_types(dtype,
+                                              numpy.float16)).resolution
+    rtol = 10 * res
+
+    try:
+        npy_result1, npy_result2 = npy_ufunc(npy_arr)
+    except TypeError:
+        # Make sure we raise the same error as Numpy
+        with assert_raises(TypeError):
+            gpuary_ufunc(gpuary_arr)
+    else:
+        if npy_result1.dtype == numpy.dtype('float16'):
+            # We use float32 as minimum for GPU arrays, do the same here
+            npy_result1 = npy_result1.astype('float32')
+        if npy_result2.dtype == numpy.dtype('float16'):
+            npy_result2 = npy_result2.astype('float32')
+
+        gpuary_result1, gpuary_result2 = gpuary_ufunc(gpuary_arr)
+        assert npy_result1.shape == gpuary_result1.shape
+        assert npy_result2.shape == gpuary_result2.shape
+        assert npy_result1.dtype == gpuary_result1.dtype
+        assert npy_result2.dtype == gpuary_result2.dtype
+        assert numpy.allclose(gpuary_result1, npy_result1, rtol=rtol,
+                              atol=rtol, equal_nan=True)
+        assert numpy.allclose(gpuary_result2, npy_result2, rtol=rtol,
+                              atol=rtol, equal_nan=True)
+
+        # In-place
+        out1 = pygpu.empty(npy_result1.shape, npy_result1.dtype)
+        out2 = pygpu.empty(npy_result2.shape, npy_result2.dtype)
+        gpuary_ufunc(gpuary_arr, out1, out2)
+        assert numpy.allclose(out1, npy_result1, rtol=rtol, equal_nan=True)
+        assert numpy.allclose(out2, npy_result2, rtol=rtol, equal_nan=True)
 
 
 sint_dtypes = [dt for dt in NAME_TO_DTYPE.values()
@@ -176,16 +235,18 @@ uint_dtypes = [dt for dt in NAME_TO_DTYPE.values()
 int_dtypes = sint_dtypes + uint_dtypes
 float_dtypes = [dt for dt in NAME_TO_DTYPE.values()
                 if numpy.issubsctype(dt, numpy.floating)]
-# List of failing combinations.
+# Dictionary of failing combinations.
 # If a dtype key is not present, it is equivalent to "all dtypes".
 # Reasons for failure:
 # - fmod: division by zero handled differently
-# - nextafter: for bool, numpy upcasts to float16 only, we cast to float32
-# - ldexp: numpy upcasts to float32, we to float64
-# - left_shift: numpy wraps around (True << -3 is huge), our code doesn't
+# - nextafter: for bool, Numpy upcasts to float16 only, we cast to float32
+# - ldexp: Numpy upcasts to float32, we to float64
+# - left_shift: Numpy wraps around (True << -3 is huge), our code doesn't
 # - floor_divide: division by zero handled differently
 # - logical_xor: our code yields True for True ^ 0.1 due to rounding
 # - remainder: division by zero handled differently
+# - logaddexp: Numpy upcasts to float32, we to float64
+# - logaddexp2: Numpy upcasts to float32, we to float64
 fail_binary = {'fmod': {'dtype2': [bool]},  # wrong where array2 is 0
                'nextafter': {'dtype1': [bool], 'dtype2': int_dtypes},
                'ldexp': {'dtype2': [numpy.uint16]},
@@ -193,6 +254,8 @@ fail_binary = {'fmod': {'dtype2': [bool]},  # wrong where array2 is 0
                'floor_divide': {'dtype2': [bool]},
                'logical_xor': {'dtype1': [bool], 'dtype2': float_dtypes},
                'remainder': {'dtype2': [bool]},
+               'logaddexp': {'dtype2': [numpy.uint16]},
+               'logaddexp2': {'dtype2': [numpy.uint16]},
                }
 # ufuncs where negative scalars trigger upcasting that differs from Numpy
 upcast_wrong_neg = ('copysign', 'ldexp', 'hypot', 'arctan2', 'nextafter')
@@ -301,13 +364,13 @@ def check_binary_ufunc(ufunc, dtype1, dtype2):
         gpuary_result = gpuary_ufunc(gpuary_arr, gpuary_arr2)
         assert npy_result.shape == gpuary_result.shape
         assert npy_result.dtype == gpuary_result.dtype
-        assert numpy.allclose(npy_result, gpuary_result, rtol=rtol,
+        assert numpy.allclose(gpuary_result, npy_result, rtol=rtol,
                               atol=rtol, equal_nan=True)
 
         # In-place
         out = pygpu.empty(npy_result.shape, npy_result.dtype)
         gpuary_ufunc(gpuary_arr, gpuary_arr2, out)
-        assert numpy.allclose(npy_result, gpuary_result, rtol=rtol,
+        assert numpy.allclose(out, npy_result, rtol=rtol,
                               equal_nan=True)
 
 
@@ -340,7 +403,7 @@ def check_binary_ufunc_scalar_left(ufunc, scalar, dtype):
         gpuary_result = gpuary_ufunc(scalar, gpuary_arr)
         assert npy_result.shape == gpuary_result.shape
         assert npy_result.dtype == gpuary_result.dtype
-        assert numpy.allclose(npy_result, gpuary_result, rtol=rtol,
+        assert numpy.allclose(gpuary_result, npy_result, rtol=rtol,
                               atol=rtol, equal_nan=True)
 
 
@@ -373,5 +436,5 @@ def check_binary_ufunc_scalar_right(ufunc, scalar, dtype):
         gpuary_result = gpuary_ufunc(gpuary_arr, scalar)
         assert npy_result.shape == gpuary_result.shape
         assert npy_result.dtype == gpuary_result.dtype
-        assert numpy.allclose(npy_result, gpuary_result, rtol=rtol,
+        assert numpy.allclose(gpuary_result, npy_result, rtol=rtol,
                               atol=rtol, equal_nan=True)

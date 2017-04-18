@@ -329,6 +329,7 @@ UNARY_UFUNCS = (list(UNARY_UFUNC_TO_C_FUNC.keys()) +
                 list(UNARY_UFUNC_TO_C_OP.keys()))
 UNARY_UFUNCS.extend(['deg2rad', 'rad2deg', 'reciprocal', 'sign', 'signbit',
                      'square', 'isinf', 'isfinite', 'spacing'])
+UNARY_UFUNCS_TWO_OUT = ['frexp', 'modf']
 BINARY_C_FUNC_TO_UFUNC = {
     'atan2': 'arctan2',
     'copysign': 'copysign',
@@ -641,43 +642,49 @@ def unary_ufunc(a, ufunc_name, out=None):
         oper = 'res = ({rdt})({}) * ({rdt}) a'.format(numpy.deg2rad(1),
                                                       rdt=c_res_dtype)
 
-    if ufunc_name == 'rad2deg':
+    elif ufunc_name == 'rad2deg':
         oper = 'res = ({rdt})({}) * ({rdt}) a'.format(numpy.rad2deg(1),
                                                       rdt=c_res_dtype)
 
-    if ufunc_name == 'reciprocal':
+    elif ufunc_name == 'reciprocal':
         oper = 'res = ({dt}) (({dt}) 1.0) / a'.format(dt=c_res_dtype)
 
-    if ufunc_name == 'sign':
+    elif ufunc_name == 'sign':
         oper = 'res = ({}) ((a > 0) ? 1 : (a < 0) ? -1 : 0)'.format(
             c_res_dtype)
 
-    if ufunc_name == 'signbit':
+    elif ufunc_name == 'signbit':
         oper = 'res = ({}) (a < 0)'.format(c_res_dtype)
 
-    if ufunc_name == 'square':
+    elif ufunc_name == 'square':
         oper = 'res = ({}) (a * a)'.format(c_res_dtype)
 
-    if ufunc_name == 'isfinite':
+    elif ufunc_name == 'isfinite':
         # TODO: NaN part yields wrong value
         oper = '''
         res = ({}) (a != INFINITY && a != -INFINITY && a != NAN)
         '''.format(c_res_dtype)
 
-    if ufunc_name == 'isinf':
+    elif ufunc_name == 'isinf':
         oper = 'res = ({}) (a == INFINITY || a == -INFINITY)'.format(
             c_res_dtype)
 
-    if ufunc_name == 'isnan':
+    elif ufunc_name == 'isnan':
         # TODO: always returns False, fix NaN comparison in C
         oper = 'res = ({}) (a == NAN)'.format(c_res_dtype)
 
-    if ufunc_name == 'spacing':
+    elif ufunc_name == 'spacing':
+        if numpy.issubsctype(a.dtype, numpy.integer):
+            # TODO: float16 as soon as it is properly supported
+            cast_dtype = numpy.result_type(a.dtype, numpy.float32)
+            c_cast_dtype = dtype_to_ctype(cast_dtype)
+        else:
+            c_cast_dtype = dtype_to_ctype(a.dtype)
         oper = '''
         res = ({}) ((a < 0) ?
-                    nextafter(a, -INFINITY) - a :
-                    nextafter(a, INFINITY) - a)
-        '''.format(c_res_dtype)
+                    nextafter(({ct}) a, ({ct}) a - 1) - a :
+                    nextafter(({ct}) a, ({ct}) a + 1) - a)
+        '''.format(c_res_dtype, ct=c_cast_dtype)
 
     if not oper:
         raise ValueError('`ufunc_name` {!r} does not represent a unary ufunc'
@@ -920,12 +927,126 @@ def binary_ufunc(a, b, ufunc_name, out=None):
     return out
 
 
+def unary_ufunc_two_out(a, ufunc_name, out1=None, out2=None):
+    """Call a unary ufunc with two outputs on an array ``a``.
+
+    Parameters
+    ----------
+    a : `array-like`
+        Input array.
+    ufunc_name : str
+        Name of the NumPy ufunc to be called on ``a``.
+    out1, out2 : `pygpu.gpuarray.GpuArray`, optional
+        Arrays in which to store the result. Their shape must be equal to
+        ``a.shape`` and their dtype must be the result dtypes of the
+        called function.
+        The arrays ``out1`` and ``out2`` must either both be provided,
+        or none of them. If both are ``None`` and ``a`` is not a
+        GPU array, a default GPU context must have been set.
+
+    Returns
+    -------
+    out1, out2 : `pygpu.gpuarray.GpuArray`
+        Results of the computation. If ``out1``, ``out2`` were given,
+        the returned object is a reference to it.
+        If ``out1`` and ``out2`` are ``None`` and ``a`` is not a GPU array,
+        the result arrays ``out1`` and ``out2`` are instances of
+        `pygpu._array.ndgpuarray`.
+
+    See Also
+    --------
+    ufunc_result_dtype : Get dtype of a ufunc result.
+    ufunc_c_funcname : Get C name for math ufuncs.
+    """
+    # Get a context and an array class to work with. Use the "highest"
+    # class present in the inputs.
+    need_context = True
+    ctx = None
+    cls = None
+    for ary in (a, out1, out2):
+        if isinstance(ary, GpuArray):
+            if ctx is not None and ary.context != ctx:
+                raise ValueError('cannot mix contexts')
+            ctx = ary.context
+            if cls is None or cls == GpuArray:
+                cls = ary.__class__
+            need_context = False
+
+    if need_context:
+        ctx = get_default_context()
+        cls = ndgpuarray  # TODO: sensible choice as default?
+
+    # TODO: can CPU memory handed directly to kernels?
+    if not isinstance(a, GpuArray):
+        a = numpy.asarray(a)
+        if a.flags.f_contiguous and not a.flags.c_contiguous:
+            order = 'F'
+        else:
+            order = 'C'
+        a = array(a, dtype=a.dtype, copy=False, order=order, context=ctx,
+                  cls=cls)
+
+    if a.dtype == numpy.dtype('float16'):
+        # Gives wrong results currently, see
+        # https://github.com/Theano/libgpuarray/issues/316
+        raise NotImplementedError('float16 currently broken')
+
+    prom_dtypes_in, result_dtypes = ufunc_dtypes(ufunc_name, [a.dtype])
+    prom_dtype_in = prom_dtypes_in[0]
+    result_dtype1, result_dtype2 = result_dtypes
+
+    # This is the "fallback signature" case, for us it signals failure.
+    # TypeError is what Numpy raises, too, which is kind of wrong
+    if prom_dtype_in == numpy.dtype(object):
+        raise TypeError('input dtype {!r} invalid for ufunc {!r}'
+                        ''.format(a.dtype.name, ufunc_name))
+
+    # Convert input such that the kernel runs
+    # TODO: can this be avoided?
+    a = a.astype(prom_dtype_in, copy=False)
+
+    if out1 is None:
+        out1 = empty(a.shape, dtype=result_dtype1, context=ctx, cls=cls)
+    else:
+        # TODO: allow larger dtype
+        if out1.dtype != result_dtype1:
+            raise ValueError('`out1.dtype` != result dtype: {!r} != {!r}'
+                             ''.format(out1.dtype.name, result_dtype1.name))
+    if out2 is None:
+        out2 = empty(a.shape, dtype=result_dtype2, context=ctx, cls=cls)
+    else:
+        if out2.dtype != result_dtype2:
+            raise ValueError('`out2.dtype` != result dtype: {!r} != {!r}'
+                             ''.format(out2.dtype.name, result_dtype2.name))
+
+    # C result dtypes for casting
+    c_res_dtype1 = dtype_to_ctype(result_dtype1)
+
+    oper = ''
+
+    if ufunc_name == 'frexp':
+        oper = 'res = ({rdt1}) frexp(a, &out2)'.format(rdt1=c_res_dtype1)
+    elif ufunc_name == 'modf':
+        oper = 'res = ({rdt1}) modf(a, &out2)'.format(rdt1=c_res_dtype1)
+
+    if not oper:
+        raise ValueError('`ufunc_name` {!r} does not represent a unary ufunc'
+                         ''.format(ufunc_name))
+
+    a_arg = as_argument(a, 'a', read=True)
+    args = [arg('res', out1.dtype, write=True),
+            arg('out2', out2.dtype, write=True),
+            a_arg]
+
+    ker = GpuElemwise(ctx, oper, args, convert_f16=True)
+    ker(out1, out2, a)
+    return out1, out2
+
+
 MISSING_UFUNCS = [
     'conjugate',  # no complex dtype yet
-    'frexp',  # multiple output values, how to handle that?
     'isfinite',  # check in C against NaN doesn't work properly
     'isnan',  # check in C against NaN doesn't work properly
-    'modf',  # multiple output values, how to handle that?
     ]
 
 
@@ -967,6 +1088,30 @@ numpy.{}
 """.format(ufunc_name)
 
     globals()[ufunc_name] = make_unary_ufunc(ufunc_name, doc)
+
+
+def make_unary_ufunc_two_out(name, doc):
+    def wrapper(a, out1=None, out2=None):
+        return unary_ufunc_two_out(a, name, out1, out2)
+    wrapper.__qualname__ = wrapper.__name__ = name
+    wrapper.__doc__ = doc
+    return wrapper
+
+
+# Add the ufuncs to the module dictionary
+for ufunc_name in UNARY_UFUNCS_TWO_OUT:
+    npy_ufunc = getattr(numpy, ufunc_name)
+    descr = npy_ufunc.__doc__.splitlines()[2]
+    # Numpy occasionally uses single ticks for doc, we only use them for links
+    descr = re.sub('`+', '``', descr)
+    doc = descr + """
+
+See Also
+--------
+numpy.{}
+""".format(ufunc_name)
+
+    globals()[ufunc_name] = make_unary_ufunc_two_out(ufunc_name, doc)
 
 
 def make_binary_ufunc(name, doc):
