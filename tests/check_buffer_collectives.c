@@ -193,7 +193,7 @@ TEST_REDUCE_FAIL(optype, SIZE / sizeof(int), GA_INT, -1, 0, GA_INVALID_ERROR)
 TEST_REDUCE_FAIL(src_offset, SIZE / sizeof(int), GA_INT, GA_SUM,
                  SIZE - sizeof(int), GA_VALUE_ERROR)
 TEST_REDUCE_FAIL(elemcount, (size_t)INT_MAX + 1, GA_INT, GA_SUM, 0,
-                 GA_UNSUPPORTED_ERROR)
+                 GA_XLARGE_ERROR)
 
 #define TEST_ALL_REDUCE(systype, gatype, mpitype, coloptype, epsilon, print) \
   START_TEST(test_gpucomm_all_reduce_##gatype##_##coloptype) {               \
@@ -289,7 +289,7 @@ TEST_ALL_REDUCE_FAIL(src_offset, SIZE / sizeof(int), GA_INT, GA_SUM,
 TEST_ALL_REDUCE_FAIL(dest_offset, SIZE / sizeof(int), GA_INT, GA_SUM, 0,
                      SIZE - sizeof(int), GA_VALUE_ERROR)
 TEST_ALL_REDUCE_FAIL(elemcount, (size_t)INT_MAX + 1, GA_INT, GA_SUM, 0, 0,
-                     GA_UNSUPPORTED_ERROR)
+                     GA_XLARGE_ERROR)
 
 #define TEST_REDUCE_SCATTER(systype, gatype, mpitype, coloptype, epsilon,    \
                             print)                                           \
@@ -392,7 +392,7 @@ TEST_REDUCE_SCATTER_FAIL(src_offset, outcount, GA_INT, GA_SUM,
 TEST_REDUCE_SCATTER_FAIL(dest_offset, outcount, GA_INT, GA_SUM, 0,
                          SIZE / comm_ndev - sizeof(int), GA_VALUE_ERROR)
 TEST_REDUCE_SCATTER_FAIL(elemcount, (size_t)INT_MAX + 1, GA_INT, GA_SUM, 0, 0,
-                         GA_UNSUPPORTED_ERROR)
+                         GA_XLARGE_ERROR)
 
 #define TEST_BROADCAST(systype, gatype, mpitype, epsilon, print)             \
   START_TEST(test_gpucomm_broadcast_##gatype) {                              \
@@ -459,7 +459,7 @@ TEST_BROADCAST_FAIL(datatype, SIZE / sizeof(int), -1, 0, GA_INVALID_ERROR)
 TEST_BROADCAST_FAIL(src_offset, SIZE / sizeof(int), GA_INT, SIZE - sizeof(int),
                     GA_VALUE_ERROR)
 TEST_BROADCAST_FAIL(elemcount, (size_t)INT_MAX + 1, GA_INT, 0,
-                    GA_UNSUPPORTED_ERROR)
+                    GA_XLARGE_ERROR)
 
 #define TEST_ALL_GATHER(systype, gatype, mpitype, epsilon, print)             \
   START_TEST(test_gpucomm_all_gather_##gatype) {                              \
@@ -533,7 +533,7 @@ TEST_ALL_GATHER_FAIL(src_offset, incount, GA_INT,
 TEST_ALL_GATHER_FAIL(dest_offset, incount, GA_INT, 0, SIZE - sizeof(int),
                      GA_VALUE_ERROR)
 TEST_ALL_GATHER_FAIL(elemcount, (size_t)INT_MAX + 1, GA_INT, 0, 0,
-                     GA_UNSUPPORTED_ERROR)
+                     GA_XLARGE_ERROR)
 
 Suite* get_suite(void) {
   Suite* s = suite_create("buffer_collectives_API");
