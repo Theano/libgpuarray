@@ -42,6 +42,13 @@
 /* Keep in sync with the copy in gpuarray/extension.h */
 #define DONTFREE 0x10000000
 
+static inline int error_cuda(error *e, const char *msg, CUresult err) {
+  const char *name, *descr;
+  cuGetErrorName(err, &name);
+  cuGetErrorString(err, &descr);
+  return error_fmt(e, GA_IMPL_ERROR, "%s: %s: %s", msg, name, descr);
+}
+
 #define GA_CUDA_EXIT_ON_ERROR(ctx, cmd) \
   do {                                  \
     int err = (cmd);                    \
@@ -51,19 +58,18 @@
     }                                   \
   } while (0)
 
-#define CUDA_EXIT_ON_ERROR(ctx, cmd)  \
-  do {                                \
-    (ctx)->err = (cmd);               \
-    if ((ctx)->err != CUDA_SUCCESS) { \
-      cuda_exit((ctx));               \
-      return GA_IMPL_ERROR;           \
-    }                                 \
+#define CUDA_EXIT_ON_ERROR(ctx, cmd)            \
+  do {                                          \
+    CUresult err = (cmd);                       \
+    if (err != CUDA_SUCCESS) {                  \
+      cuda_exit((ctx));                         \
+      return error_cuda((ctx)->err, #cmd, err); \
+    }                                           \
   } while (0)
 
 typedef struct _cuda_context {
   GPUCONTEXT_HEAD;
   CUcontext ctx;
-  CUresult err;
   CUstream s;
   CUstream mem_s;
   gpudata *freeblocks;

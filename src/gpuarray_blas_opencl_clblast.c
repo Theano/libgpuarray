@@ -30,15 +30,81 @@ static inline Transpose convT(cb_transpose trans) {
   }
 }
 
+static const char *estr(CLBlastStatusCode err) {
+  if (err > -1024)
+    return cl_error_string((cl_int)err);
+  switch (err) {
+  case CLBlastNotImplemented:
+    return "Unimplemented feature";
+  case CLBlastInvalidMatrixA:
+    return "matrix A is not a valid memory object";
+  case CLBlastInvalidMatrixB:
+    return "matrix B is not a valid memory object";
+  case CLBlastInvalidMatrixC:
+    return "matrix C is not a valid memory object";
+  case CLBlastInvalidVectorX:
+    return "vector X is not a valid memory object";
+  case CLBlastInvalidVectorY:
+    return "vector Y is not a valid memory object";
+  case CLBlastInvalidDimension:
+    return "An input dimension (M, N, K) is invalid";
+  case CLBlastInvalidLeadDimA:
+    return "leading dimension for A must not be less than the size of the first  dimension";
+  case CLBlastInvalidLeadDimB:
+    return "leading dimension for B must not be less than the size of the second dimension";
+  case CLBlastInvalidLeadDimC:
+    return "leading dimension for C must not be less than the size of the third dimension";
+  case CLBlastInvalidIncrementX:
+    return "increment for X must not be 0";
+  case CLBlastInvalidIncrementY:
+    return "increment for Y must not be 0";
+  case CLBlastInsufficientMemoryA:
+    return "memory object for matrix A is too small";
+  case CLBlastInsufficientMemoryB:
+    return "memory object for matrix B is too small";
+  case CLBlastInsufficientMemoryC:
+    return "memory object for matrix C is too small";
+  case CLBlastInsufficientMemoryX:
+    return "memory object for vector X is too small";
+  case CLBlastInsufficientMemoryY:
+    return "memory object for vector Y is too small";
+  case CLBlastInvalidLocalMemUsage:
+    return "not enough local memory on the device";
+  case CLBlastNoHalfPrecision:
+    return "float16 is not supported on this device";
+  case CLBlastNoDoublePrecision:
+    return "float64 is not supported on this device";
+  case CLBlastInvalidVectorScalar:
+    return "unit-sized vector is not a valid memory object";
+  case CLBlastInsufficientMemoryScalar:
+    return "memory object for unit-sized vector is too small";
+  case CLBlastDatabaseError:
+    return "device entry not in database";
+  case CLBlastUnknownError:
+    return "Unspecified error";
+  case CLBlastUnexpectedError:
+    return "Unexpected error";
+  default:
+    return "Unknow error";
+  }
+}
+
+static inline int error_clblast(error *e, const char *msg,
+                                CLBlastStatusCode err) {
+  return error_fmt(e, GA_BLAS_ERROR, "%s: %s", msg, estr(err));
+}
+
+#define CLBT_CHECK(e, cmd) do {                 \
+    CLBlastStatusCode err = (cmd);              \
+    if (err != kSuccess)                        \
+      return error_clblast(e, #cmd, err);       \
+  } while (0)
+
 static int setup(gpucontext *ctx) {
   return GA_NO_ERROR;
 }
 
 static void teardown(gpucontext *ctx) {
-}
-
-static const char *error(gpucontext *ctx) {
-  return "(clblast) error in blas call, no details for now.";
 }
 
 #define ARRAY_INIT(A)                           \
@@ -60,17 +126,18 @@ static int hgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   cl_ctx *ctx = A[0]->ctx;
   cl_event ev;
   size_t i;
-  StatusCode err;
 
   for (i = 0; i < batchCount; i++) {
     ARRAY_INIT(A[i]);
     ARRAY_INIT(B[i]);
     ARRAY_INIT(C[i]);
-    err = CLBlastHgemm(convO(order), convT(transA), convT(transB), M, N, K,
-                       float_to_half(alpha), A[i]->buf, offA[i], lda, B[i]->buf, offB[i], ldb,
-                       float_to_half(beta), C[i]->buf, offC[i], ldc, &ctx->q, &ev);
-    if (err != kSuccess)
-      return GA_BLAS_ERROR;
+    CLBT_CHECK(ctx->err, CLBlastHgemm(convO(order), convT(transA),
+                                      convT(transB), M, N, K,
+                                      float_to_half(alpha),
+                                      A[i]->buf, offA[i], lda,
+                                      B[i]->buf, offB[i], ldb,
+                                      float_to_half(beta),
+                                      C[i]->buf, offC[i], ldc, &ctx->q, &ev));
     ARRAY_FINI(A[i]);
     ARRAY_FINI(B[i]);
     ARRAY_FINI(C[i]);
@@ -89,17 +156,16 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   cl_ctx *ctx = A[0]->ctx;
   cl_event ev;
   size_t i;
-  StatusCode err;
 
   for (i = 0; i < batchCount; i++) {
     ARRAY_INIT(A[i]);
     ARRAY_INIT(B[i]);
     ARRAY_INIT(C[i]);
-    err = CLBlastSgemm(convO(order), convT(transA), convT(transB), M, N, K,
-                      alpha, A[i]->buf, offA[i], lda, B[i]->buf, offB[i], ldb,
-                      beta, C[i]->buf, offC[i], ldc, &ctx->q, &ev);
-    if (err != kSuccess)
-      return GA_BLAS_ERROR;
+    CLBT_CHECK(ctx->err, CLBlastSgemm(convO(order), convT(transA),
+                                      convT(transB), M, N, K,
+                                      alpha, A[i]->buf, offA[i], lda,
+                                      B[i]->buf, offB[i], ldb, beta,
+                                      C[i]->buf, offC[i], ldc, &ctx->q, &ev));
     ARRAY_FINI(A[i]);
     ARRAY_FINI(B[i]);
     ARRAY_FINI(C[i]);
@@ -118,17 +184,16 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   cl_ctx *ctx = A[0]->ctx;
   cl_event ev;
   size_t i;
-  StatusCode err;
 
   for (i = 0; i < batchCount; i++) {
     ARRAY_INIT(A[i]);
     ARRAY_INIT(B[i]);
     ARRAY_INIT(C[i]);
-    err = CLBlastDgemm(convO(order), convT(transA), convT(transB), M, N, K,
-                      alpha, A[i]->buf, offA[i], lda, B[i]->buf, offB[i], ldb,
-                      beta, C[i]->buf, offC[i], ldc, &ctx->q, &ev);
-    if (err != kSuccess)
-      return GA_BLAS_ERROR;
+    CLBT_CHECK(ctx->err, CLBlastDgemm(convO(order), convT(transA),
+                                      convT(transB), M, N, K,
+                                      alpha, A[i]->buf, offA[i], lda,
+                                      B[i]->buf, offB[i], ldb, beta,
+                                      C[i]->buf, offC[i], ldc, &ctx->q, &ev));
     ARRAY_FINI(A[i]);
     ARRAY_FINI(B[i]);
     ARRAY_FINI(C[i]);
@@ -138,78 +203,20 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   return GA_NO_ERROR;
 }
 
-static int hgemvBatch(cb_order order, cb_transpose transA,
-                      size_t M, size_t N, float alpha,
-                      gpudata **A, size_t *offA, size_t lda,
-                      gpudata **x, size_t *offX, size_t incX,
-                      float beta, gpudata **y, size_t *offY, size_t incY,
-                      size_t batchCount, int flags) {
-  return GA_DEVSUP_ERROR;
-}
-
-static int sgemvBatch(cb_order order, cb_transpose transA,
-                      size_t M, size_t N, float alpha,
-                      gpudata **A, size_t *offA, size_t lda,
-                      gpudata **x, size_t *offX, size_t incX,
-                      float beta, gpudata **y, size_t *offY, size_t incY,
-                      size_t batchCount, int flags) {
-  return GA_DEVSUP_ERROR;
-}
-
-static int dgemvBatch(cb_order order, cb_transpose transA,
-                      size_t M, size_t N, double alpha,
-                      gpudata **A, size_t *offA, size_t lda,
-                      gpudata **x, size_t *offX, size_t incX,
-                      double beta, gpudata **y, size_t *offY, size_t incY,
-                      size_t batchCount, int flags) {
-  return GA_DEVSUP_ERROR;
-}
-
-static int hgerBatch(cb_order order, size_t M, size_t N, float alpha,
-                     gpudata **x, size_t *offX, size_t incX,
-                     gpudata **y, size_t *offY, size_t incY,
-                     gpudata **A, size_t *offA, size_t lda,
-                     size_t batchCount, int flags) {
-  return GA_DEVSUP_ERROR;
-}
-
-static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
-                     gpudata **x, size_t *offX, size_t incX,
-                     gpudata **y, size_t *offY, size_t incY,
-                     gpudata **A, size_t *offA, size_t lda,
-                     size_t batchCount, int flags) {
-  return GA_DEVSUP_ERROR;
-}
-
-static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
-                     gpudata **x, size_t *offX, size_t incX,
-                     gpudata **y, size_t *offY, size_t incY,
-                     gpudata **A, size_t *offA, size_t lda,
-                     size_t batchCount, int flags) {
-  return GA_DEVSUP_ERROR;
-}
-
 static int hdot(
         size_t N,
         gpudata *X, size_t offX, size_t incX,
         gpudata *Y, size_t offY, size_t incY,
         gpudata *Z, size_t offZ) {
   cl_ctx *ctx = X->ctx;
-  StatusCode err;
   cl_event ev;
 
   ARRAY_INIT(X);
   ARRAY_INIT(Y);
   ARRAY_INIT(Z);
 
-  err = CLBlastHdot(
-          N,
-          Z->buf, offZ,
-          X->buf, offX, incX,
-          Y->buf, offY, incY,
-          &ctx->q, &ev);
-  if (err != kSuccess)
-      return GA_BLAS_ERROR;
+  CLBT_CHECK(ctx->err, CLBlastHdot(N, Z->buf, offZ, X->buf, offX, incX,
+                                   Y->buf, offY, incY, &ctx->q, &ev));
 
   ARRAY_FINI(X);
   ARRAY_FINI(Y);
@@ -226,21 +233,14 @@ static int sdot(
         gpudata *Y, size_t offY, size_t incY,
         gpudata *Z, size_t offZ) {
   cl_ctx *ctx = X->ctx;
-  StatusCode err;
   cl_event ev;
 
   ARRAY_INIT(X);
   ARRAY_INIT(Y);
   ARRAY_INIT(Z);
 
-  err = CLBlastSdot(
-          N,
-          Z->buf, offZ,
-          X->buf, offX, incX,
-          Y->buf, offY, incY,
-          &ctx->q, &ev);
-  if (err != kSuccess)
-      return GA_BLAS_ERROR;
+  CLBT_CHECK(ctx->err, CLBlastSdot(N, Z->buf, offZ, X->buf, offX, incX,
+                                   Y->buf, offY, incY, &ctx->q, &ev));
 
   ARRAY_FINI(X);
   ARRAY_FINI(Y);
@@ -257,21 +257,14 @@ static int ddot(
         gpudata *Y, size_t offY, size_t incY,
         gpudata *Z, size_t offZ) {
   cl_ctx *ctx = X->ctx;
-  StatusCode err;
   cl_event ev;
 
   ARRAY_INIT(X);
   ARRAY_INIT(Y);
   ARRAY_INIT(Z);
 
-  err = CLBlastDdot(
-          N,
-          Z->buf, offZ,
-          X->buf, offX, incX,
-          Y->buf, offY, incY,
-          &ctx->q, &ev);
-  if (err != kSuccess)
-      return GA_BLAS_ERROR;
+  CLBT_CHECK(ctx->err, CLBlastDdot(N, Z->buf, offZ, X->buf, offX, incX,
+                                   Y->buf, offY, incY, &ctx->q, &ev));
 
   ARRAY_FINI(X);
   ARRAY_FINI(Y);
@@ -287,18 +280,17 @@ static int hgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
                  gpudata *X, size_t offX, int incX, float beta,
                  gpudata *Y, size_t offY, int incY) {
   cl_ctx *ctx = A->ctx;
-  StatusCode err;
   cl_event ev;
 
   ARRAY_INIT(A);
   ARRAY_INIT(X);
   ARRAY_INIT(Y);
 
-  err = CLBlastHgemv(convO(order), convT(transA), M, N, float_to_half(alpha),
-                     A->buf, offA, lda, X->buf, offX, incX,
-                     float_to_half(beta), Y->buf, offY, incY, &ctx->q, &ev);
-  if (err != kSuccess)
-    return GA_BLAS_ERROR;
+  CLBT_CHECK(ctx->err, CLBlastHgemv(convO(order), convT(transA), M, N,
+                                    float_to_half(alpha),
+                                    A->buf, offA, lda, X->buf, offX, incX,
+                                    float_to_half(beta),
+                                    Y->buf, offY, incY, &ctx->q, &ev));
 
   ARRAY_FINI(A);
   ARRAY_FINI(X);
@@ -314,18 +306,15 @@ static int sgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
                  gpudata *X, size_t offX, int incX, float beta,
                  gpudata *Y, size_t offY, int incY) {
   cl_ctx *ctx = A->ctx;
-  StatusCode err;
   cl_event ev;
 
   ARRAY_INIT(A);
   ARRAY_INIT(X);
   ARRAY_INIT(Y);
 
-  err = CLBlastSgemv(convO(order), convT(transA), M, N, alpha,
-                    A->buf, offA, lda, X->buf, offX, incX,
-                    beta, Y->buf, offY, incY, &ctx->q, &ev);
-  if (err != kSuccess)
-    return GA_BLAS_ERROR;
+  CLBT_CHECK(ctx->err, CLBlastSgemv(convO(order), convT(transA), M, N, alpha,
+                                    A->buf, offA, lda, X->buf, offX, incX,
+                                    beta, Y->buf, offY, incY, &ctx->q, &ev));
 
   ARRAY_FINI(A);
   ARRAY_FINI(X);
@@ -341,18 +330,15 @@ static int dgemv(cb_order order, cb_transpose transA, size_t M, size_t N,
                  gpudata *X, size_t offX, int incX, double beta,
                  gpudata *Y, size_t offY, int incY) {
   cl_ctx *ctx = A->ctx;
-  StatusCode err;
   cl_event ev;
 
   ARRAY_INIT(A);
   ARRAY_INIT(X);
   ARRAY_INIT(Y);
 
-  err = CLBlastDgemv(convO(order), convT(transA), M, N, alpha,
-                    A->buf, offA, lda, X->buf, offX, incX,
-                    beta, Y->buf, offY, incY, &ctx->q, &ev);
-  if (err != kSuccess)
-    return GA_BLAS_ERROR;
+  CLBT_CHECK(ctx->err, CLBlastDgemv(convO(order), convT(transA), M, N, alpha,
+                                    A->buf, offA, lda, X->buf, offX, incX,
+                                    beta, Y->buf, offY, incY, &ctx->q, &ev));
 
   ARRAY_FINI(A);
   ARRAY_FINI(X);
@@ -369,18 +355,17 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
                  gpudata *B, size_t offB, size_t ldb, float beta,
                  gpudata *C, size_t offC, size_t ldc) {
   cl_ctx *ctx = A->ctx;
-  StatusCode err;
   cl_event ev;
 
   ARRAY_INIT(A);
   ARRAY_INIT(B);
   ARRAY_INIT(C);
 
-  err = CLBlastHgemm(convO(order), convT(transA), convT(transB), M, N, K,
-                     float_to_half(alpha), A->buf, offA, lda, B->buf, offB, ldb,
-                     float_to_half(beta), C->buf, offC, ldc, &ctx->q, &ev);
-  if (err != kSuccess)
-    return GA_BLAS_ERROR;
+  CLBT_CHECK(ctx->err, CLBlastHgemm(convO(order), convT(transA), convT(transB),
+                                    M, N, K, float_to_half(alpha),
+                                    A->buf, offA, lda, B->buf, offB, ldb,
+                                    float_to_half(beta), C->buf, offC, ldc,
+                                    &ctx->q, &ev));
 
   ARRAY_FINI(A);
   ARRAY_FINI(B);
@@ -397,18 +382,16 @@ static int sgemm(cb_order order, cb_transpose transA, cb_transpose transB,
                  gpudata *B, size_t offB, size_t ldb, float beta,
                  gpudata *C, size_t offC, size_t ldc) {
   cl_ctx *ctx = A->ctx;
-  StatusCode err;
   cl_event ev;
 
   ARRAY_INIT(A);
   ARRAY_INIT(B);
   ARRAY_INIT(C);
 
-  err = CLBlastSgemm(convO(order), convT(transA), convT(transB), M, N, K,
-                    alpha, A->buf, offA, lda, B->buf, offB, ldb,
-                    beta, C->buf, offC, ldc, &ctx->q, &ev);
-  if (err != kSuccess)
-    return GA_BLAS_ERROR;
+  CLBT_CHECK(ctx->err, CLBlastSgemm(convO(order), convT(transA), convT(transB),
+                                    M, N, K, alpha,
+                                    A->buf, offA, lda, B->buf, offB, ldb,
+                                    beta, C->buf, offC, ldc, &ctx->q, &ev));
 
   ARRAY_FINI(A);
   ARRAY_FINI(B);
@@ -425,18 +408,16 @@ static int dgemm(cb_order order, cb_transpose transA, cb_transpose transB,
                  gpudata *B, size_t offB, size_t ldb, double beta,
                  gpudata *C, size_t offC, size_t ldc) {
   cl_ctx *ctx = A->ctx;
-  StatusCode err;
   cl_event ev;
 
   ARRAY_INIT(A);
   ARRAY_INIT(B);
   ARRAY_INIT(C);
 
-  err = CLBlastDgemm(convO(order), convT(transA), convT(transB), M, N, K,
-                    alpha, A->buf, offA, lda, B->buf, offB, ldb,
-                    beta, C->buf, offC, ldc, &ctx->q, &ev);
-  if (err != kSuccess)
-    return GA_BLAS_ERROR;
+  CLBT_CHECK(ctx->err, CLBlastDgemm(convO(order), convT(transA), convT(transB),
+                                    M, N, K, alpha,
+                                    A->buf, offA, lda, B->buf, offB, ldb,
+                                    beta, C->buf, offC, ldc, &ctx->q, &ev));
 
   ARRAY_FINI(A);
   ARRAY_FINI(B);
@@ -453,16 +434,14 @@ static int hger(cb_order order, size_t M, size_t N, float alpha,
                 gpudata *A, size_t offA, size_t lda) {
   cl_ctx *ctx = X->ctx;
   cl_event ev;
-  StatusCode err;
 
   ARRAY_INIT(X);
   ARRAY_INIT(Y);
   ARRAY_INIT(A);
 
-  err = CLBlastHger(convO(order), M, N, float_to_half(alpha), X->buf, offX, incX,
-                    Y->buf, offY, incY, A->buf, offA, lda, &ctx->q, &ev);
-  if (err != kSuccess)
-    return GA_BLAS_ERROR;
+  CLBT_CHECK(ctx->err, CLBlastHger(convO(order), M, N, float_to_half(alpha),
+                                   X->buf, offX, incX, Y->buf, offY, incY,
+                                   A->buf, offA, lda, &ctx->q, &ev));
 
   ARRAY_FINI(X);
   ARRAY_FINI(Y);
@@ -479,16 +458,14 @@ static int sger(cb_order order, size_t M, size_t N, float alpha,
                 gpudata *A, size_t offA, size_t lda) {
   cl_ctx *ctx = X->ctx;
   cl_event ev;
-  StatusCode err;
 
   ARRAY_INIT(X);
   ARRAY_INIT(Y);
   ARRAY_INIT(A);
 
-  err = CLBlastSger(convO(order), M, N, alpha, X->buf, offX, incX,
-                   Y->buf, offY, incY, A->buf, offA, lda, &ctx->q, &ev);
-  if (err != kSuccess)
-    return GA_BLAS_ERROR;
+  CLBT_CHECK(ctx->err, CLBlastSger(convO(order), M, N, alpha,
+                                   X->buf, offX, incX, Y->buf, offY, incY,
+                                   A->buf, offA, lda, &ctx->q, &ev));
 
   ARRAY_FINI(X);
   ARRAY_FINI(Y);
@@ -505,16 +482,14 @@ static int dger(cb_order order, size_t M, size_t N, double alpha,
                 gpudata *A, size_t offA, size_t lda) {
   cl_ctx *ctx = X->ctx;
   cl_event ev;
-  StatusCode err;
 
   ARRAY_INIT(X);
   ARRAY_INIT(Y);
   ARRAY_INIT(A);
 
-  err = CLBlastDger(convO(order), M, N, alpha, X->buf, offX, incX,
-                    Y->buf, offY, incY, A->buf, offA, lda, &ctx->q, &ev);
-  if (err != kSuccess)
-    return GA_BLAS_ERROR;
+  CLBT_CHECK(ctx->err, CLBlastDger(convO(order), M, N, alpha,
+                                   X->buf, offX, incX, Y->buf, offY, incY,
+                                   A->buf, offA, lda, &ctx->q, &ev));
 
   ARRAY_FINI(X);
   ARRAY_FINI(Y);
@@ -528,7 +503,6 @@ static int dger(cb_order order, size_t M, size_t N, double alpha,
 gpuarray_blas_ops clblast_ops = {
   setup,
   teardown,
-  error,
   hdot,
   sdot,
   ddot,
@@ -544,10 +518,10 @@ gpuarray_blas_ops clblast_ops = {
   hgemmBatch,
   sgemmBatch,
   dgemmBatch,
-  hgemvBatch, /* TODO */
-  sgemvBatch, /* TODO */
-  dgemvBatch, /* TODO */
-  hgerBatch, /* TODO */
-  sgerBatch, /* TODO */
-  dgerBatch, /* TODO */
+  NULL, /* hgemvBatch */
+  NULL, /* sgemvBatch */
+  NULL, /* dgemvBatch */
+  NULL, /* hgerBatch */
+  NULL, /* sgerBatch */
+  NULL, /* dgerBatch */
 };

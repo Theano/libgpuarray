@@ -10,15 +10,6 @@ extern void *ctx;
 void setup(void);
 void teardown(void);
 
-START_TEST(test_gpu_error) {
-  const char *msg;
-  msg = gpucontext_error(NULL, -1);
-  msg = gpucontext_error(NULL, 99);
-  msg = gpucontext_error(NULL, GA_NO_ERROR);
-  ck_assert_str_eq(msg, "No error");
-}
-END_TEST
-
 static unsigned int refcnt(gpudata *b) {
   unsigned int res;
   int err;
@@ -189,7 +180,6 @@ Suite *get_suite(void) {
   Suite *s = suite_create("buffer");
   TCase *tc = tcase_create("API");
   tcase_add_checked_fixture(tc, setup, teardown);
-  tcase_add_test(tc, test_gpu_error);
   tcase_add_test(tc, test_buffer_alloc);
   tcase_add_test(tc, test_buffer_retain_release);
   tcase_add_test(tc, test_buffer_share);

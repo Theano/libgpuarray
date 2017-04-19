@@ -4,6 +4,7 @@
 #include "libcuda.h"
 #include "dyn_load.h"
 #include "gpuarray/error.h"
+#include "util/error.h"
 
 /* This code is inspired from the dynamic loading code in the samples */
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
@@ -26,29 +27,29 @@ static char libname[] = "libcuda.so";
 
 #define STRINGIFY(X) #X
 
-#define DEF_PROC(name, args)                 \
-  name = (t##name *)ga_func_ptr(lib, #name); \
-  if (name == NULL) {                        \
-    return GA_LOAD_ERROR;                    \
+#define DEF_PROC(name, args)                    \
+  name = (t##name *)ga_func_ptr(lib, #name, e); \
+  if (name == NULL) {                           \
+    return e->code;                             \
   }
 
-#define DEF_PROC_V2(name, args)                             \
-  name = (t##name *)ga_func_ptr(lib, STRINGIFY(name##_v2)); \
-  if (name == NULL) {                                       \
-    return GA_LOAD_ERROR;                                   \
+#define DEF_PROC_V2(name, args)                                \
+  name = (t##name *)ga_func_ptr(lib, STRINGIFY(name##_v2), e); \
+  if (name == NULL) {                                          \
+    return e->code;                                            \
   }
 
 static int loaded = 0;
 
-int load_libcuda(void) {
+int load_libcuda(error *e) {
   void *lib;
 
   if (loaded)
     return GA_NO_ERROR;
 
-  lib = ga_load_library(libname);
+  lib = ga_load_library(libname, e);
   if (lib == NULL)
-    return GA_LOAD_ERROR;
+    return e->code;
 
   #include "libcuda.fn"
 

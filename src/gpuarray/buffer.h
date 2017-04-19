@@ -500,7 +500,7 @@ GPUARRAY_PUBLIC int gpukernel_call(gpukernel *k, unsigned int n,
  *
  * This can be use to cache kernel binaries after compilation of a
  * specific device.  The kernel can be recreated by calling
- * kernel_alloc with the binary and size and passing `GA_USE_BINARY`
+ * gpukernel_alloc with the binary and size and passing `GA_USE_BINARY`
  * as the use flags.
  *
  * The returned pointer is allocated and must be freed by the caller.

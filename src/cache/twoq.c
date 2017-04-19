@@ -1,6 +1,8 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include <gpuarray/error.h>
+
 #include "cache.h"
 #include "private_config.h"
 
@@ -135,10 +137,11 @@ static inline size_t roundup2(size_t s) {
   return s;
 }
 
-static inline int hash_init(hash *h, size_t size) {
+static inline int hash_init(hash *h, size_t size, error *e) {
   h->nbuckets = roundup2(size + (size/6));
   h->keyval = calloc(h->nbuckets, sizeof(*h->keyval));
   if (h->keyval == NULL) {
+    error_sys(e, "calloc");
     return -1;
   }
   h->size = 0;
@@ -322,16 +325,21 @@ static void twoq_destroy(cache *_c) {
 }
 
 cache *cache_twoq(size_t hot_size, size_t warm_size, size_t cold_size,
-                 size_t elasticity, cache_eq_fn keq, cache_hash_fn khash,
-                 cache_freek_fn kfree, cache_freev_fn vfree) {
+                  size_t elasticity, cache_eq_fn keq, cache_hash_fn khash,
+                  cache_freek_fn kfree, cache_freev_fn vfree, error *e) {
   twoq_cache *res;
-  if (hot_size == 0 || warm_size == 0 || cold_size == 0)
+  if (hot_size == 0 || warm_size == 0 || cold_size == 0) {
+    error_set(e, GA_VALUE_ERROR, "cache_twoq: section size is 0");
     return NULL;
+  }
 
   res = malloc(sizeof(*res));
-  if (res == NULL) return NULL;
+  if (res == NULL) {
+    error_sys(e, "malloc");
+    return NULL;
+  }
 
-  if (hash_init(&res->data, hot_size+warm_size+cold_size+elasticity)) {
+  if (hash_init(&res->data, hot_size+warm_size+cold_size+elasticity, e)) {
     free(res);
     return NULL;
   }

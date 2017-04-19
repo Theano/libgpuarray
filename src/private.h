@@ -17,6 +17,7 @@
 #include <gpuarray/buffer_collectives.h>
 
 #include "util/strb.h"
+#include "util/error.h"
 #include "cache.h"
 
 #ifdef __cplusplus
@@ -44,7 +45,7 @@ typedef struct _gpuarray_comm_ops gpuarray_comm_ops;
   const gpuarray_blas_ops *blas_ops;            \
   const gpuarray_comm_ops *comm_ops;            \
   void *blas_handle;                            \
-  const char* error_msg;                        \
+  error *err;                                   \
   unsigned int refcnt;                          \
   int flags;                                    \
   struct _gpudata *errbuf;                      \
@@ -76,13 +77,12 @@ typedef struct _partial_gpucomm {
 struct _gpuarray_buffer_ops {
   int (*get_platform_count)(unsigned int* platcount);
   int (*get_device_count)(unsigned int platform, unsigned int* devcount);
-  gpucontext *(*buffer_init)(int dev, int flags, int *ret);
+  gpucontext *(*buffer_init)(int dev, int flags);
   void (*buffer_deinit)(gpucontext *ctx);
-  gpudata *(*buffer_alloc)(gpucontext *ctx, size_t sz, void *data, int flags,
-                           int *ret);
+  gpudata *(*buffer_alloc)(gpucontext *ctx, size_t sz, void *data, int flags);
   void (*buffer_retain)(gpudata *b);
   void (*buffer_release)(gpudata *b);
-  int (*buffer_share)(gpudata *a, gpudata *b, int *ret);
+  int (*buffer_share)(gpudata *a, gpudata *b);
   int (*buffer_move)(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff,
                      size_t sz);
   int (*buffer_read)(void *dst, gpudata *src, size_t srcoff, size_t sz);
@@ -91,8 +91,7 @@ struct _gpuarray_buffer_ops {
   gpukernel *(*kernel_alloc)(gpucontext *ctx, unsigned int count,
                              const char **strings, const size_t *lengths,
                              const char *fname, unsigned int numargs,
-                             const int *typecodes, int flags, int *ret,
-                             char **err_str);
+                             const int *typecodes, int flags, char **err_str);
   void (*kernel_retain)(gpukernel *k);
   void (*kernel_release)(gpukernel *k);
   int (*kernel_setarg)(gpukernel *k, unsigned int i, void *a);
@@ -112,7 +111,6 @@ struct _gpuarray_buffer_ops {
 struct _gpuarray_blas_ops {
   int (*setup)(gpucontext *ctx);
   void (*teardown)(gpucontext *ctx);
-  const char *(*error)(gpucontext *ctx);
 
   int (*hdot)( size_t N,
     gpudata *X, size_t offX, size_t incX,

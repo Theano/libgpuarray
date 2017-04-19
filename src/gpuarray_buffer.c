@@ -17,7 +17,7 @@ const gpuarray_buffer_ops *gpuarray_get_ops(const char *name) {
   return NULL;
 }
 
-#define FAIL(v, e) { if (ret) *ret = e; return v; }
+#define FAIL(v, e) { if (ret) *ret = (e)->code; return v; }
 
 int gpu_get_platform_count(const char* name, unsigned int* platcount) {
   const gpuarray_buffer_ops* ops = gpuarray_get_ops(name);
@@ -39,11 +39,9 @@ int gpu_get_device_count(const char* name, unsigned int platform,
 gpucontext *gpucontext_init(const char *name, int dev, int flags, int *ret) {
   gpucontext *res;
   const gpuarray_buffer_ops *ops = gpuarray_get_ops(name);
-  if (ops == NULL)
-    FAIL(NULL, GA_INVALID_ERROR);
-  res = ops->buffer_init(dev, flags, ret);
-  if (res == NULL)
-    return NULL;
+  if (ops == NULL) FAIL(NULL, global_err);
+  res = ops->buffer_init(dev, flags);
+  if (res == NULL) FAIL(NULL, global_err);
   res->ops = ops;
   if (gpucontext_property(res, GA_CTX_PROP_BLAS_OPS, (void *)&res->blas_ops) != GA_NO_ERROR)
     res->blas_ops = NULL;
@@ -69,22 +67,17 @@ int gpucontext_property(gpucontext *ctx, int prop_id, void *res) {
 }
 
 const char *gpucontext_error(gpucontext *ctx, int err) {
-  if (ctx != NULL) {
-    switch (err) {
-    case GA_IMPL_ERROR:
-      return ctx->ops->ctx_error(ctx);
-    case GA_BLAS_ERROR:
-      return gpublas_error(ctx);
-    case GA_COMM_ERROR:
-      return gpucomm_error(ctx);
-    }
-  }
-  return gpuarray_error_str(err);
+  if (ctx == NULL)
+    return global_err->msg;
+  else
+    return ctx->ops->ctx_error(ctx);
 }
 
 gpudata *gpudata_alloc(gpucontext *ctx, size_t sz, void *data, int flags,
                        int *ret) {
-  return ctx->ops->buffer_alloc(ctx, sz, data, flags, ret);
+  gpudata *res = ctx->ops->buffer_alloc(ctx, sz, data, flags);
+  if (res == NULL && ret) *ret = ctx->err->code;
+  return res;
 }
 
 void gpudata_retain(gpudata *b) {
@@ -92,13 +85,15 @@ void gpudata_retain(gpudata *b) {
 }
 
 void gpudata_release(gpudata *b) {
-  if(b){
+  if (b)
     ((partial_gpudata *)b)->ctx->ops->buffer_release(b);
-  }
 }
 
 int gpudata_share(gpudata *a, gpudata *b, int *ret) {
-  return ((partial_gpudata *)a)->ctx->ops->buffer_share(a, b, ret);
+  int res = ((partial_gpudata *)a)->ctx->ops->buffer_share(a, b);
+  if (res == -1 && ret)
+    *ret = ((partial_gpudata *)a)->ctx->err->code;
+  return res;
 }
 
 int gpudata_move(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff,
@@ -164,8 +159,12 @@ gpukernel *gpukernel_init(gpucontext *ctx, unsigned int count,
                           const char *fname, unsigned int numargs,
                           const int *typecodes, int flags, int *ret,
                           char **err_str) {
-  return ctx->ops->kernel_alloc(ctx, count, strings, lengths, fname, numargs,
-                                typecodes, flags, ret, err_str);
+  gpukernel *res;
+  res = ctx->ops->kernel_alloc(ctx, count, strings, lengths, fname, numargs,
+                               typecodes, flags, err_str);
+  if (res == NULL && ret)
+    *ret = ctx->err->code;
+  return res;
 }
 
 void gpukernel_retain(gpukernel *k) {

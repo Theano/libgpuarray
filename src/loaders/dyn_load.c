@@ -1,4 +1,5 @@
 #include "dyn_load.h"
+#include "util/error.h"
 
 #if defined(__unix__) || defined(__APPLE__)
 
@@ -8,21 +9,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-void *ga_load_library(const char *name) {
+void *ga_load_library(const char *name, error *e) {
   void *res = dlopen(name, RTLD_LAZY|RTLD_LOCAL);
-#ifdef DEBUG
   if (res == NULL)
-    warn("dlopen: %s", name);
-#endif
+    error_fmt(e, GA_LOAD_ERROR, "Could not load \"%s\": %s", name, dlerror());
   return res;
 }
 
-void *ga_func_ptr(void *h, const char *name) {
+void *ga_func_ptr(void *h, const char *name, error *e) {
   void *res = dlsym(h, name);
-#ifdef DEBUG
   if (res == NULL)
-    warn("dlsym: %s", name);
-#endif
+    error_fmt(e, GA_LOAD_ERROR, "Could not find synbol \"%s\": %s", name, dlerror());
   return res;
 }
 
@@ -30,14 +27,31 @@ void *ga_func_ptr(void *h, const char *name) {
 
 /* Should be windows */
 #include <windows.h>
-#pragma comment(lib,"Version.lib")
 
-void *ga_load_library(const char *name) {
-  return LoadLibrary(name);
+static inline void error_win(error *e) {
+  char msgbuf[512];
+  DWORD err = GetLastError();
+  DWORD len = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM|
+                             FORMAT_MESSAGE_IGNORE_INSERTS,
+                             NULL, err, 0, msgbuf, 512, NULL);
+  if (len == 0)
+    error_fmt(e, GA_LOAD_ERROR, "Could not load \"%s\": error code %X", name, err);
+  else
+    error_fmt(e, GA_LOAD_ERROR, "Could not load \"%s\": %s", name, msgbuf);
 }
 
-void *ga_func_ptr(void *h, const char *name) {
-  return (void *)GetProcAddress(h, name);
+void *ga_load_library(const char *name, error *e) {
+  void *res = LoadLibrary(name);
+  if (res == NULL)
+    error_win(e);
+  return res;
+}
+
+void *ga_func_ptr(void *h, const char *name, error *e) {
+  void *res = (void *)GetProcAddress(h, name);
+  if (res == NULL)
+    error_win(e);
+  return res;
 }
 
 #endif

@@ -30,13 +30,46 @@
 #define CLEAR(o)
 #endif
 
+const char *cl_error_string(cl_int);
+
+static inline int error_cl(error *e, const char *msg, cl_int err) {
+  return error_fmt(e, GA_IMPL_ERROR, "%s: %s", msg, cl_error_string(err));
+}
+
+#define CL_CHECK(e, cmd) do {                   \
+    cl_int err = (cmd);                         \
+    if (err != CL_SUCCESS)                      \
+      return error_cl(e, #cmd, err);            \
+  } while(0)
+
+#define CL_CHECKN(e, cmd) do {                  \
+    cl_int err = (cmd);                         \
+    if (err != CL_SUCCESS) {                    \
+      error_cl(e, #cmd, err);                   \
+      return NULL;                              \
+    }                                           \
+  } while(0)
+
+#define CL_GET_PROP(e, fn, obj, prop, val) do {     \
+    size_t sz;                                      \
+    cl_int err;                                     \
+    CL_CHECK(e, fn (obj, prop, 0, NULL, &sz));      \
+    val = malloc(sz);                               \
+    if (val == NULL) return error_sys(e, "malloc"); \
+    err = fn (obj, prop, sz, val, NULL);            \
+    if (err != CL_SUCCESS) {                        \
+      free(val);                                    \
+      val = NULL;                                   \
+      return error_cl(e, #fn, err);                 \
+    }                                               \
+  } while(0)
+
 typedef struct _cl_ctx {
   GPUCONTEXT_HEAD;
   cl_context ctx;
   cl_command_queue q;
   char *exts;
   char *preamble;
-  cl_int err;
 } cl_ctx;
 
 STATIC_ASSERT(sizeof(cl_ctx) <= sizeof(gpucontext), sizeof_struct_gpucontext_cl);

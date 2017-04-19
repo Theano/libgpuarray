@@ -5,6 +5,7 @@
 #include <gpuarray/config.h>
 #include "private_config.h"
 #include "util/strb.h"
+#include "util/error.h"
 
 typedef void *cache_key_t;
 typedef void *cache_value_t;
@@ -77,16 +78,19 @@ struct _cache {
 
 cache *cache_lru(size_t max_size, size_t elasticity,
                  cache_eq_fn keq, cache_hash_fn khash,
-                 cache_freek_fn kfree, cache_freev_fn vfree);
+                 cache_freek_fn kfree, cache_freev_fn vfree,
+                 error *e);
 
 cache *cache_twoq(size_t hot_size, size_t warm_size,
                   size_t cold_size, size_t elasticity,
                   cache_eq_fn keq, cache_hash_fn khash,
-                  cache_freek_fn kfree, cache_freev_fn vfree);
+                  cache_freek_fn kfree, cache_freev_fn vfree,
+                  error *e);
 
 cache *cache_disk(const char *dirpath, cache *mem,
                   kwrite_fn kwrite, vwrite_fn vwrite,
-                  kread_fn kread, vread_fn vread);
+                  kread_fn kread, vread_fn vread,
+                  error *e);
 
 /* API functions */
 static inline int cache_add(cache *c, cache_key_t k, cache_value_t v) {

@@ -127,10 +127,11 @@ static inline size_t roundup2(size_t s) {
   return s;
 }
 
-static inline int hash_init(hash *h, size_t size) {
+static inline int hash_init(hash *h, size_t size, error *e) {
   h->nbuckets = roundup2(size + (size/6));
   h->keyval = calloc(h->nbuckets, sizeof(*h->keyval));
   if (h->keyval == NULL) {
+    error_sys(e, "calloc");
     return -1;
   }
   h->size = 0;
@@ -276,11 +277,15 @@ static void lru_destroy(cache *_c) {
 
 cache *cache_lru(size_t max_size, size_t elasticity,
                  cache_eq_fn keq, cache_hash_fn khash,
-                 cache_freek_fn kfree, cache_freev_fn vfree) {
+                 cache_freek_fn kfree, cache_freev_fn vfree,
+                 error *e) {
   lru_cache *res = malloc(sizeof(*res));
-  if (res == NULL) return NULL;
+  if (res == NULL) {
+    error_sys(e, "malloc");
+    return NULL;
+  }
 
-  if (hash_init(&res->data, max_size+elasticity)) {
+  if (hash_init(&res->data, max_size+elasticity, e)) {
     free(res);
     return NULL;
   }

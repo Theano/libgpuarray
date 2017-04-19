@@ -5,21 +5,21 @@
 #include "dyn_load.h"
 #include "gpuarray/error.h"
 
-#define DEF_PROC(name, args) t##name *name
+#define DEF_PROC(rt, name, args) t##name *name
 
 #include "libnvrtc.fn"
 
 #undef DEF_PROC
 
-#define DEF_PROC(name, args)                 \
-  name = (t##name *)ga_func_ptr(lib, #name); \
-  if (name == NULL) {                        \
-    return GA_LOAD_ERROR;                    \
+#define DEF_PROC(rt, name, args)                  \
+  name = (t##name *)ga_func_ptr(lib, #name, e);   \
+  if (name == NULL) {                             \
+    return e->code;                               \
   }
 
 static int loaded = 0;
 
-int load_libnvrtc(int major, int minor) {
+int load_libnvrtc(int major, int minor, error *e) {
   void *lib;
 
   if (loaded)
@@ -33,7 +33,7 @@ int load_libnvrtc(int major, int minor) {
     libname[8] = DIGITS[major];
     libname[9] = DIGITS[minor];
 
-    lib = ga_load_library(libname);
+    lib = ga_load_library(libname, e);
   }
 #else /* Unix */
 #ifdef __APPLE__
@@ -43,14 +43,14 @@ int load_libnvrtc(int major, int minor) {
     char libname[] = "/Developer/NVIDIA/CUDA-?.?/lib/libnvrtc.dylib";
     libname[23] = DIGITS[major];
     libname[25] = DIGITS[minor];
-    lib = ga_load_library(libname);
+    lib = ga_load_library(libname, e);
   }
 #else
-  lib = ga_load_library("libnvrtc.so");
+  lib = ga_load_library("libnvrtc.so", e);
 #endif
 #endif
   if (lib == NULL)
-    return GA_LOAD_ERROR;
+    return e->code;
 
   #include "libnvrtc.fn"
 
