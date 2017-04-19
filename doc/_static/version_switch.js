@@ -3,7 +3,7 @@
 
   var url = window.location.href;
   var base_dir = 'libgpuarray'; // directory containing doc
-  // Default theano version: release and development.
+  // Default libgpuarray version: release and development.
   var versions_dir = {"release": "libgpuarray", "dev": "libgpuarray_versions/dev"};
 
   // If doc is run localy
@@ -14,7 +14,7 @@
 
   var root_url = url.substring(0, url.search('/' + base_dir)) + '/';
 
-  // Regular expression to find theano version directory in URL.
+  // Regular expression to find libgpuarray version directory in URL.
   var version_regex = new RegExp("\\/" + base_dir + "(_versions\\/)?([_a-zA-Z.0-9]*)\\/");
 
   // Get current version
@@ -31,7 +31,7 @@
   // Build HTML string for version selector, based on ReadTheDocs theme's versions.html
 
     var vlabel = current_version.replace("libgpuarray_versions/", "");
-    if (vlabel == 'theano') {
+    if (vlabel == 'libgpuarray') {
       vlabel = 'release';
     }
     var vswitch = ['<div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions" align=left>'];
