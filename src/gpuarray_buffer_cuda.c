@@ -525,7 +525,6 @@ static cuda_context *do_init(CUdevice dev, int flags, error *e) {
   CHKFAIL(e, "cuCtxPushCurrent", NULL);
   res = cuda_make_ctx(ctx, flags);
   if (res == NULL) {
-    fprintf(stderr, "res failed\n");
     cuDevicePrimaryCtxRelease(dev);
     if (e != global_err)
       error_set(e, global_err->code, global_err->msg);
