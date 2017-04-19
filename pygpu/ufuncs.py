@@ -328,7 +328,7 @@ UNARY_UFUNC_TO_C_OP = {
 UNARY_UFUNCS = (list(UNARY_UFUNC_TO_C_FUNC.keys()) +
                 list(UNARY_UFUNC_TO_C_OP.keys()))
 UNARY_UFUNCS.extend(['deg2rad', 'rad2deg', 'reciprocal', 'sign', 'signbit',
-                     'square', 'isinf', 'isfinite', 'spacing'])
+                     'square', 'isinf', 'isnan', 'isfinite', 'spacing'])
 UNARY_UFUNCS_TWO_OUT = ['frexp', 'modf']
 BINARY_C_FUNC_TO_UFUNC = {
     'atan2': 'arctan2',
@@ -660,9 +660,8 @@ def unary_ufunc(a, ufunc_name, out=None):
         oper = 'res = ({}) (a * a)'.format(c_res_dtype)
 
     elif ufunc_name == 'isfinite':
-        # TODO: NaN part yields wrong value
         oper = '''
-        res = ({}) (a != INFINITY && a != -INFINITY && a != NAN)
+        res = ({}) (a != INFINITY && a != -INFINITY && !isnan(a))
         '''.format(c_res_dtype)
 
     elif ufunc_name == 'isinf':
@@ -670,8 +669,7 @@ def unary_ufunc(a, ufunc_name, out=None):
             c_res_dtype)
 
     elif ufunc_name == 'isnan':
-        # TODO: always returns False, fix NaN comparison in C
-        oper = 'res = ({}) (a == NAN)'.format(c_res_dtype)
+        oper = 'res = ({}) (abs(isnan(a)))'.format(c_res_dtype)
 
     elif ufunc_name == 'spacing':
         if numpy.issubsctype(a.dtype, numpy.integer):
@@ -1045,8 +1043,6 @@ def unary_ufunc_two_out(a, ufunc_name, out1=None, out2=None):
 
 MISSING_UFUNCS = [
     'conjugate',  # no complex dtype yet
-    'isfinite',  # check in C against NaN doesn't work properly
-    'isnan',  # check in C against NaN doesn't work properly
     ]
 
 
