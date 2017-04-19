@@ -4,7 +4,7 @@
 
 int gpublas_setup(gpucontext *ctx) {
   if (ctx->blas_ops == NULL)
-    return GA_UNSUPPORTED_ERROR;
+    return error_set(ctx->err, GA_UNSUPPORTED_ERROR, "Missing Blas library");
   return ctx->blas_ops->setup(ctx);
 }
 
