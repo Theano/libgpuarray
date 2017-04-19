@@ -1292,6 +1292,11 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
       return NULL;
     }
 
+    if (flags & GA_USE_BINARY) {
+      error_set(ctx->err, GA_UNSUPPORTED_ERROR, "Binary mode not supported any more");
+      return NULL;
+    }
+
     cuda_enter(ctx);
 
     err = cuCtxGetDevice(&dev);
