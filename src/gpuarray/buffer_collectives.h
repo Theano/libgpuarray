@@ -23,7 +23,7 @@ struct _gpucomm;
 typedef struct _gpucomm gpucomm;
 
 /*
- * \enum _gpucomm_reduce_ops
+ * \enum gpucomm_reduce_ops
  *
  * \brief Reduction operations
  */
