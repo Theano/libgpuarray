@@ -3,6 +3,11 @@ Release process:
 - Update the version in setup.py
 - Update the version in doc/conf.py
 - Commit the changes with message "Changes for release X.Y.Z"
-- Push to master
-- Add a release on github with a tag in the form of 'vX.Y.X'
+  git commit -m "Changes for release X.Y.Z"
+- Make a git tag
+  git tag vX.Y.Z
+- Push to master the commit and the tag
+  git push --tags central master
+- Add a release on github with a tag in the form of 'vX.Y.Z'
+  https://github.com/Theano/libgpuarray/releases/new
  - Make note of the major changes since the last release
