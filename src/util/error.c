@@ -5,7 +5,7 @@
 #include "private_config.h"
 #include "util/error.h"
 
-static error _global_err = {};
+static error _global_err = {{0}, 0};
 error *global_err = &_global_err;
 
 int error_alloc(error **_e) {

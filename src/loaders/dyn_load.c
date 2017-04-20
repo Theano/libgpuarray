@@ -28,7 +28,7 @@ void *ga_func_ptr(void *h, const char *name, error *e) {
 /* Should be windows */
 #include <windows.h>
 
-static inline void error_win(error *e) {
+static inline void error_win(const char* name, error *e) {
   char msgbuf[512];
   DWORD err = GetLastError();
   DWORD len = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM|
@@ -43,14 +43,14 @@ static inline void error_win(error *e) {
 void *ga_load_library(const char *name, error *e) {
   void *res = LoadLibrary(name);
   if (res == NULL)
-    error_win(e);
+    error_win(name, e);
   return res;
 }
 
 void *ga_func_ptr(void *h, const char *name, error *e) {
   void *res = (void *)GetProcAddress(h, name);
   if (res == NULL)
-    error_win(e);
+    error_win(name, e);
   return res;
 }
 
