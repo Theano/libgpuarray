@@ -335,7 +335,7 @@ static int find_entry(disk_cache *c, const cache_key_t key,
       b.l = vl;
       *_v = c->vread(&b);
       if (*_v == NULL)
-        goto error;
+        goto error_find_entry;
     }
     if (_k)
       *_k = k;
@@ -345,7 +345,7 @@ static int find_entry(disk_cache *c, const cache_key_t key,
     strb_clear(&b);
     return 1;
   }
- error:
+ error_find_entry:
   if (k)
     c->c.kfree(k);
   b.s = ts;

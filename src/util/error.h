@@ -6,6 +6,13 @@
 
 #include <gpuarray/error.h>
 
+/* MSVC 2008 does not support "inline". */
+#ifdef _MSC_VER
+#ifndef inline
+#define inline __inline
+#endif
+#endif
+
 /* 1024 - 4 for the int that goes after */
 #define ERROR_MSGBUF_LEN 1020
 

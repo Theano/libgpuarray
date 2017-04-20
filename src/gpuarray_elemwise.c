@@ -387,11 +387,11 @@ static int call_basic(GpuElemwise *ge, void **args, size_t n, unsigned int nd,
   }
 
   err = GpuKernel_setarg(k, p++, &n);
-  if (err != GA_NO_ERROR) goto error;
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   for (i = 0; i < nd; i++) {
     err = GpuKernel_setarg(k, p++, &dims[i]);
-    if (err != GA_NO_ERROR) goto error;
+    if (err != GA_NO_ERROR) goto error_call_basic;
   }
 
   /* l is the number of arrays to date */
@@ -400,25 +400,25 @@ static int call_basic(GpuElemwise *ge, void **args, size_t n, unsigned int nd,
     if (is_array(ge->args[j])) {
       GpuArray *v = (GpuArray *)args[j];
       err = GpuKernel_setarg(k, p++, v->data);
-      if (err != GA_NO_ERROR) goto error;
+      if (err != GA_NO_ERROR) goto error_call_basic;
       err = GpuKernel_setarg(k, p++, &v->offset);
-      if (err != GA_NO_ERROR) goto error;
+      if (err != GA_NO_ERROR) goto error_call_basic;
       for (i = 0; i < nd; i++) {
         err = GpuKernel_setarg(k, p++, &strs[l][i]);
-        if (err != GA_NO_ERROR) goto error;
+        if (err != GA_NO_ERROR) goto error_call_basic;
       }
       l++;
     } else {
       err = GpuKernel_setarg(k, p++, args[j]);
-      if (err != GA_NO_ERROR) goto error;
+      if (err != GA_NO_ERROR) goto error_call_basic;
     }
   }
 
   err = GpuKernel_sched(k, n, &gs, &ls);
-  if (err != GA_NO_ERROR) goto error;
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_call(k, 1, &gs, &ls, 0, NULL);
- error:
+ error_call_basic:
   return err;
 }
 
