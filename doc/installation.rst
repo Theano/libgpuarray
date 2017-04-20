@@ -13,6 +13,17 @@ It should also work on any decently recent OS not listed here. If you
 get an error during the build on your favorite OS, please report it
 and we will attempt to fix it.
 
+Conda
+-----
+
+The easiest way to install libgpuarray is with conda::
+
+  conda install pygpu
+
+This will also install the libgpuarray package automatically.
+
+This should work on Linux, Mac OS and Windows.
+
 Build Requirements
 ------------------
 
