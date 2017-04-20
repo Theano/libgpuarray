@@ -20,12 +20,23 @@ addons:
       - doxygen
 
 before_install:
+  - export PREFIX=$HOME/.local
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew install doxygen; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export PYTHONUSERBASE=$PREFIX; fi
+  - pip install --user breathe sphinx sphinx_rtd_theme cython numpy 'mako>=0.7' six
+  - export PATH=$PATH:$PREFIX/bin
+  - export CPATH=$CPATH:$PREFIX/include
+  - export LIBRARY_PATH=$LIBRARY_PATH:$PREFIX/lib
+  - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PREFIX/lib
 
 # Build with Debug and Release to flush out build problems
 script:
   - mkdir Debug
-  - cd Debug && cmake .. -DCMAKE_BUILD_TYPE=Debug && make
+  - (cd Debug && cmake .. -DCMAKE_BUILD_TYPE=Debug && make)
   - mkdir Release
-  - cd Release &&  cmake .. -DCMAKE_BUILD_TYPE=Release && make
-  - cd doc && make html
+  - (cd Release &&  cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$PREFIX && make && make install)
+  - python setup.py build_ext --inplace
+  - (cd doc && make html)
+
+# Do not treat "shell_session_update: command not found" on MacOS as a failure
+after_script: set +e
