@@ -44,23 +44,28 @@ struct _gpukernel;
 typedef struct _gpukernel gpukernel;
 
 /**
- * \brief Gets information about the number of available platforms for the
+ * Gets information about the number of available platforms for the
  * backend specified in `name`.
- * \param name [const char*] the backend name
- * \param platcount [unsigned int*] will contain number of compatible platforms in host
- * \return int GA_NO_ERROR, if success
+ *
+ * \param name the backend name
+ * \param platcount will contain number of compatible
+ *                  platforms in host
+ *
+ * \return #GA_NO_ERROR, if success
  */
 GPUARRAY_PUBLIC int gpu_get_platform_count(const char* name,
                                            unsigned int* platcount);
 
 /**
- * \brief Gets information about the number of compatible devices on a specific
- * host's `platform` for the backend specified in `name`.
- * \param name [const char*] the backend name
- * \param platform [unsigned int] number for a platform in host
- * \param devcount [unsigned int*] will contain number of compatible devices in
- * `platform`
- * \return int GA_NO_ERROR, if success
+ * Gets information about the number of compatible devices on a
+ * specific host's `platform` for the backend specified in `name`.
+ *
+ * \param name the backend name
+ * \param platform number for a platform in host
+ * \param devcount will contain number of compatible devices in
+ *                 `platform`
+ *
+ * \return #GA_NO_ERROR, if success
  */
 GPUARRAY_PUBLIC int gpu_get_device_count(const char* name,
                                          unsigned int platform,
@@ -422,6 +427,8 @@ GPUARRAY_PUBLIC gpucontext *gpudata_context(gpudata *b);
  * \param strings table of string pointers
  * \param lengths (optional) length for each string in the table
  * \param fname name of the kernel function (as defined in the code)
+ * \param numargs number of kernel arguments
+ * \param typecodes the type of each argument
  * \param flags flags for compilation (see #ga_usefl)
  * \param ret error return pointer
  * \param err_str returns pointer to debug message from GPU backend

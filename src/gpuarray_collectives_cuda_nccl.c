@@ -149,7 +149,7 @@ static int get_rank(const gpucomm *comm, int *rank) {
 }
 
 /**
- * \brief Helper function to try to convert \ref enum _gpucomm_reduce_ops to
+ * \brief Helper function to try to convert \ref enum gpucomm_reduce_ops to
  * \ref
  * ncclRedOp_t.
  *

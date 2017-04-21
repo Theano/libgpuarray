@@ -28,17 +28,19 @@ Run Requirements
 ----------------
 
 No matter what was available at build time, this library comes with
-dynamic loaders for the following library.  You don't need to have any
-of this available, but you won't be able to use associated
+dynamic loaders for the following libraries.  You don't need to have
+any of this available, but you won't be able to use associated
 functionality.
 
  * For CUDA:
+
    - CUDA (cuda_) version 7.0 or more, with the appropriate driver
    - (optional) NCCL (nccl_) for the collectives interface
 
  * For OpenCL:
-  - OpenCL version 1.1 or more
-  - (optional) clBLAS (_clblas) or CLBlast (_clblast) for blas functionality
+
+   - OpenCL version 1.1 or more
+   - (optional) clBLAS (clblas_) or CLBlast (clblast_) for blas functionality
 
 Download
 --------
@@ -135,7 +137,8 @@ due to a restriction of the new SIP feature about loading libraries.
 
 It appears that on some versions, /usr/local is not in the default
 compiler paths so you might need to add ``-L /usr/local/lib -I
-/usr/local/include`` to the ``setup.py build`` command.
+/usr/local/include`` to the ``setup.py build`` command or export the
+paths like for a custom path install.
 
 
 Windows-specific instructions

@@ -4,7 +4,7 @@ cdef extern from "gpuarray/buffer_collectives.h":
     ctypedef struct gpucomm:
         pass
 
-    enum _gpucomm_reduce_ops:
+    enum gpucomm_reduce_ops:
         GA_SUM,
         GA_PROD,
         GA_MAX,

@@ -16,14 +16,16 @@ from pygpu.gpuarray import GpuArrayException
 COMM_ID_BYTES = GA_COMM_ID_BYTES
 
 cdef class GpuCommCliqueId:
-    """Represents a unique id shared among :ref:`GpuComm` communicators which
+    """GpuCommCliqueId(context=None, comm_id=None)
+
+    Represents a unique id shared among :class:`GpuComm` communicators which
     participate in a multi-gpu clique.
 
     Parameters
     ----------
-    context: :ref:`GpuContext`, optional
-        Reference to which gpu this `GpuCommCliqueId` object belongs.
-    comm_id: bytes-like, optional
+    context: GpuContext
+        Reference to which gpu this GpuCommCliqueId object belongs.
+    comm_id: bytes
         Existing unique id to be passed in this object.
 
     """
@@ -100,7 +102,7 @@ cdef class GpuCommCliqueId:
         raise RuntimeError, "Cannot pickle %s object" % self.__class__.__name__
 
     property comm_id:
-        "Unique clique id to be used by each :ref:`GpuComm` in a group of devices"
+        "Unique clique id to be used by each :class:`GpuComm` in a group of devices"
         def __get__(self):
             cdef bytearray res
             res = self.c_comm_id.internal[:GA_COMM_ID_BYTES]
@@ -115,19 +117,21 @@ cdef class GpuCommCliqueId:
 
 
 cdef class GpuComm:
-    """Represents a communicator which participates in a multi-gpu clique.
+    """GpuComm(cid, ndev, rank)
+
+    Represents a communicator which participates in a multi-gpu clique.
 
     It is used to invoke collective operations to gpus inside its clique.
 
     Parameters
     ----------
-    cid: :ref:`GpuCommCliqueId`
+    cid: GpuCommCliqueId
         Unique id shared among participating communicators.
     ndev: int
         Number of communicators inside the clique.
     rank: int
-        User-defined rank of this communicator inside the clique. It influences
-        order of collective operations.
+        User-defined rank of this communicator inside the clique. It
+        influences order of collective operations.
 
     """
     def __dealloc__(self):
@@ -156,26 +160,31 @@ cdef class GpuComm:
             comm_get_rank(self, &gpurank)
             return gpurank
 
-    def reduce(self, GpuArray src not None, op, GpuArray dest=None, int root=-1):
-        """Reduce collective operation for ranks in a communicator world.
+    def reduce(self, GpuArray src not None, op, GpuArray dest=None,
+               int root=-1):
+        """
+        reduce(self, src, op, dest=None, root=-1)
+
+        Reduce collective operation for ranks in a communicator world.
 
         Parameters
         ----------
-        src: :ref:`GpuArray`
+        src: GpuArray
             Array to be reduced.
-        op: string
+        op: str
             Key indicating operation type.
-        dest: :ref:`GpuArray`, optional
-            Array to collecti reduce operation result.
+        dest: GpuArray
+            Array to collect reduce operation result.
         root: int
-            Rank in `GpuComm` which will collect result.
+            Rank in GpuComm which will collect result.
 
         Notes
         -----
-        * `root` is necessary when invoking from a non-root rank. Root caller
-        does not need to provide `root` argument.
-        * Not providing `dest` argument for a root caller will result in creating
-        a new compatible :ref:`GpuArray` and returning result in it.
+        * `root` is necessary when invoking from a non-root rank. Root
+          caller does not need to provide `root` argument.
+        * Not providing `dest` argument for a root caller will result
+          in creating a new compatible :class:`GpuArray` and returning
+          result in it.
 
         """
         cdef int srank
@@ -193,21 +202,24 @@ cdef class GpuComm:
         comm_reduce(self, src, dest, to_reduce_opcode(op), root)
 
     def all_reduce(self, GpuArray src not None, op, GpuArray dest=None):
-        """AllReduce collective operation for ranks in a communicator world.
+        """
+        all_reduce(self, src, op, dest=None)
+
+        AllReduce collective operation for ranks in a communicator world.
 
         Parameters
         ----------
-        src: :ref:`GpuArray`
+        src: GpuArray
             Array to be reduced.
-        op: string
+        op: str
             Key indicating operation type.
-        dest: :ref:`GpuArray`, optional
+        dest: GpuArray
             Array to collect reduce operation result.
 
         Notes
         -----
         * Not providing `dest` argument for a caller will result in creating
-        a new compatible :ref:`GpuArray` and returning result in it.
+          a new compatible :class:`GpuArray` and returning result in it.
 
         """
         if dest is None:
@@ -215,21 +227,24 @@ cdef class GpuComm:
         comm_all_reduce(self, src, dest, to_reduce_opcode(op))
 
     def reduce_scatter(self, GpuArray src not None, op, GpuArray dest=None):
-        """ReduceScatter collective operation for ranks in a communicator world.
+        """
+        reduce_scatter(self, src, op, dest=None)
+
+        ReduceScatter collective operation for ranks in a communicator world.
 
         Parameters
         ----------
-        src: :ref:`GpuArray`
+        src: GpuArray
             Array to be reduced.
-        op: string
+        op: str
             Key indicating operation type.
-        dest: :ref:`GpuArray`, optional
+        dest: GpuArray
             Array to collect reduce operation scattered result.
 
         Notes
         -----
         * Not providing `dest` argument for a caller will result in creating
-        a new compatible :ref:`GpuArray` and returning result in it.
+          a new compatible :class:`GpuArray` and returning result in it.
 
         """
         if dest is None:
@@ -237,11 +252,14 @@ cdef class GpuComm:
         comm_reduce_scatter(self, src, dest, to_reduce_opcode(op))
 
     def broadcast(self, GpuArray array not None, int root=-1):
-        """Broadcast collective operation for ranks in a communicator world.
+        """
+        broadcast(self, array, root=-1)
+
+        Broadcast collective operation for ranks in a communicator world.
 
         Parameters
         ----------
-        array: :ref:`GpuArray`
+        array: GpuArray
             Array to be reduced.
         root: int
             Rank in `GpuComm` which broadcasts its `array`.
@@ -249,7 +267,7 @@ cdef class GpuComm:
         Notes
         -----
         * `root` is necessary when invoking from a non-root rank. Root caller
-        does not need to provide `root` argument.
+          does not need to provide `root` argument.
 
         """
         if root == -1:
@@ -258,23 +276,27 @@ cdef class GpuComm:
 
     def all_gather(self, GpuArray src not None, GpuArray dest=None,
                    unsigned int nd_up=1):
-        """AllGather collective operation for ranks in a communicator world.
+        """
+        all_gather(self, src, dest=None, nd_up=1)
+
+        AllGather collective operation for ranks in a communicator world.
 
         Parameters
         ----------
-        src: :ref:`GpuArray`
+        src: GpuArray
             Array to be gathered.
-        dest: :ref:`GpuArray`, optional
+        dest: GpuArray
             Array to receive all gathered arrays from ranks in `GpuComm`.
-        nd_up: unsigned int
-            Used when creating result array. Indicates how many extra dimensions
-            user wants result to have. Default is 1, which means that the result
-            will store each rank's gathered array in one extra new dimension.
+        nd_up: int
+            Used when creating result array. Indicates how many extra
+            dimensions user wants result to have. Default is 1, which
+            means that the result will store each rank's gathered
+            array in one extra new dimension.
 
         Notes
         -----
         * Providing `nd_up` == 0 means that gathered arrays will be appended to
-        the dimension with the largest stride.
+          the dimension with the largest stride.
 
         """
         if dest is None:

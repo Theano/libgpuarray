@@ -10,10 +10,14 @@ from cpython cimport Py_INCREF, PyNumber_Index
 from cpython.object cimport Py_EQ, Py_NE
 
 def api_version():
+    """api_version()
+    """
     # (library version, module version)
     return (GPUARRAY_API_VERSION, 0)
 
 def abi_version():
+    """abi_version()
+    """
     major_version = GPUARRAY_ABI_VERSION / 1000
     minor_version = GPUARRAY_ABI_VERSION % 1000
     return (major_version, minor_version)
@@ -111,11 +115,13 @@ def register_dtype(np.dtype dtype, cname):
     This function return the associted internal typecode for the new
     type.
 
-    :param dtype: new type
-    :type dtype: numpy.dtype
-    :param cname: C name for the type declarations
-    :type cname: string
-    :rtype: int
+    Parameters
+    ----------
+    dtype: numpy.dtype
+        new type
+    cname: str
+        C name for the type declarations
+
     """
     cdef gpuarray_type *t
     cdef int typecode
@@ -173,9 +179,11 @@ cpdef int dtype_to_typecode(dtype) except -1:
 
     Get the internal typecode for a type.
 
-    :param dtype: type to get the code for
-    :type dtype: numpy.dtype
-    :rtype: int
+    Parameters
+    ----------
+    dtype: numpy.dtype
+        type to get the code for
+
     """
     if isinstance(dtype, int):
         return dtype
@@ -195,9 +203,11 @@ def dtype_to_ctype(dtype):
 
     Return the C name for a type.
 
-    :param dtype: type to get the name for
-    :type dtype: numpy.dtype
-    :rtype: string
+    Parameters
+    ----------
+    dtype: numpy.dtype
+        type to get the name for
+
     """
     cdef int typecode = dtype_to_typecode(dtype)
     cdef const gpuarray_type *t = gpuarray_get_type(typecode)
@@ -488,10 +498,6 @@ def set_default_context(GpuContext ctx):
 
     Set the default context for the module.
 
-    :param ctx: default context
-    :type ctx: GpuContext
-    :rtype: None
-
     The provided context will be used as a default value for all the
     other functions in this module which take a context as parameter.
     Call with `None` to clear the default value.
@@ -502,6 +508,12 @@ def set_default_context(GpuContext ctx):
     This can be helpful to reduce clutter when working with only one
     context. It is strongly discouraged to use this function when
     working with multiple contexts at once.
+
+    Parameters
+    ----------
+    ctx: GpuContext
+        default context
+
     """
     global default_context
     default_context = ctx
@@ -526,7 +538,10 @@ cdef bint pygpu_GpuArray_Check(object o):
     return isinstance(o, GpuArray)
 
 def count_platforms(kind):
-    """Return number of host's platforms compatible with `kind`.
+    """
+    count_platforms(kind)
+
+    Return number of host's platforms compatible with `kind`.
     """
     cdef unsigned int platcount
     cdef int err
@@ -536,7 +551,10 @@ def count_platforms(kind):
     return platcount
 
 def count_devices(kind, unsigned int platform):
-    """Returns number of devices in host's `platform` compatible with `kind`.
+    """
+    count_devices(kind, platform)
+
+    Returns number of devices in host's `platform` compatible with `kind`.
     """
     cdef unsigned int devcount
     cdef int err
@@ -571,16 +589,6 @@ def init(dev, sched='default', disable_alloc_cache=False, single_stream=False):
 
     Creates a context from a device specifier.
 
-    :param dev: device specifier
-    :type dev: string
-    :param sched: optimize scheduling for which type of operation
-    :type sched: {'default', 'single', 'multi'}
-    :param disable_alloc_cache: disable allocation cache (if any)
-    :type disable_alloc_cache: bool
-    :param single_stream: enable single stream mode
-    :type single_stream: bool
-    :rtype: GpuContext
-
     Device specifiers are composed of the type string and the device
     id like so::
 
@@ -599,6 +607,18 @@ def init(dev, sched='default', disable_alloc_cache=False, single_stream=False):
     list available platforms and devices.  You can experiement with
     the values, unavaiable ones will just raise an error, and there
     are no gaps in the valid numbers.
+
+    Parameters
+    ----------
+    dev: str
+        device specifier
+    sched: {'default', 'single', 'multi'}
+        optimize scheduling for which type of operation
+    disable_alloc_cache: bool
+        disable allocation cache (if any)
+    single_stream: bool
+        enable single stream mode
+
     """
     cdef int flags = 0
     if sched == 'single':
@@ -621,17 +641,19 @@ def zeros(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
     Returns an array of zero-initialized values of the requested
     shape, type and order.
 
-    :param shape: number of elements in each dimension
-    :type shape: iterable of ints
-    :param dtype: type of the elements
-    :type dtype: string, numpy.dtype or int
-    :param order: layout of the data in memory, one of 'A'ny, 'C' or 'F'ortran
-    :type order: string
-    :param context: context in which to do the allocation
-    :type context: GpuContext
-    :param cls: class of the returned array (must inherit from GpuArray)
-    :type cls: class
-    :rtype: array
+    Parameters
+    ----------
+    shape: iterable of ints
+        number of elements in each dimension
+    dtype: str, numpy.dtype or int
+        type of the elements
+    order: {'A', 'C', 'F'}
+        layout of the data in memory, one of 'A'ny, 'C' or 'F'ortran
+    context: GpuContext
+        context in which to do the allocation
+    cls: type
+        class of the returned array (must inherit from GpuArray)
+
     """
     res = empty(shape, dtype=dtype, order=order, context=context, cls=cls)
     array_memset(res, 0)
@@ -695,17 +717,19 @@ def empty(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
     Returns an empty (uninitialized) array of the requested shape,
     type and order.
 
-    :param shape: number of elements in each dimension
-    :type shape: iterable of ints
-    :param dtype: type of the elements
-    :type dtype: string, numpy.dtype or int
-    :param order: layout of the data in memory, one of 'A'ny, 'C' or 'F'ortran
-    :type order: string
-    :param context: context in which to do the allocation
-    :type context: GpuContext
-    :param cls: class of the returned array (must inherit from GpuArray)
-    :type cls: class
-    :rtype: array
+    Parameters
+    ----------
+    shape: iterable of ints
+        number of elements in each dimension
+    dtype: str, numpy.dtype or int
+        type of the elements
+    order: {'A', 'C', 'F'}
+        layout of the data in memory, one of 'A'ny, 'C' or 'F'ortran
+    context: GpuContext
+        context in which to do the allocation
+    cls: type
+        class of the returned array (must inherit from GpuArray)
+
     """
     cdef size_t *cdims
     cdef unsigned int nd
@@ -734,16 +758,6 @@ def asarray(a, dtype=None, order='A', GpuContext context=None):
 
     Returns a GpuArray from the data in `a`
 
-    :param a: data
-    :type shape: array-like
-    :param dtype: type of the elements
-    :type dtype: string, numpy.dtype or int
-    :param order: layout of the data in memory, one of 'A'ny, 'C' or 'F'ortran
-    :type order: string or int
-    :param context: context in which to do the allocation
-    :type context: GpuContext
-    :rtype: GpuArray
-
     If `a` is already a GpuArray and all other parameters match, then
     the object itself returned.  If `a` is an instance of a subclass
     of GpuArray then a view of the base class will be returned.
@@ -751,6 +765,18 @@ def asarray(a, dtype=None, order='A', GpuContext context=None):
 
     `context` is optional if `a` is a GpuArray (but must match exactly
     the context of `a` if specified) and is mandatory otherwise.
+
+    Parameters
+    ----------
+    a: array-like
+        data
+    dtype: str, numpy.dtype or int
+        type of the elements
+    order: {'A', 'C', 'F'}
+        layout of the data in memory, one of 'A'ny, 'C' or 'F'ortran
+    context: GpuContext
+        context in which to do the allocation
+
     """
     return array(a, dtype=dtype, order=order, copy=False, context=context,
                  cls=GpuArray)
@@ -761,16 +787,18 @@ def ascontiguousarray(a, dtype=None, GpuContext context=None):
 
     Returns a contiguous array in device memory (C order).
 
-    :param a: input
-    :type a: array-like
-    :param dtype: type of the return array
-    :type dtype: string, numpy.dtype or int
-    :param context: context to use for a new array
-    :type context: GpuContext
-    :rtype: array
-
     `context` is optional if `a` is a GpuArray (but must match exactly
     the context of `a` if specified) and is mandatory otherwise.
+
+    Parameters
+    ----------
+    a: array-like
+        input
+    dtype: str, numpy.dtype or int
+        type of the return array
+    context: GpuContext
+        context to use for a new array
+
     """
     return array(a, order='C', dtype=dtype, ndmin=1, copy=False,
                  context=context)
@@ -781,16 +809,18 @@ def asfortranarray(a, dtype=None, GpuArray context=None):
 
     Returns a contiguous array in device memory (Fortran order)
 
-    :param a: input
-    :type a: array-like
-    :param dtype: type of the elements
-    :type dtype: string, numpy.dtype or int
-    :param context: context in which to do the allocation
-    :type context: GpuContext
-    :rtype: array
-
     `context` is optional if `a` is a GpuArray (but must match exactly
     the context of `a` if specified) and is mandatory otherwise.
+
+    Parameters
+    ----------
+    a: array-like
+        input
+    dtype: str, numpy.dtype or int
+        type of the elements
+    context: GpuContext
+        context in which to do the allocation
+
     """
     return array(a, order='F', dtype=dtype, ndmin=1, copy=False,
                  context=context)
@@ -810,33 +840,39 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
 
     Build a GpuArray from pre-allocated gpudata
 
-    :param data: pointer to a gpudata structure
-    :type data: int
-    :param offset: offset to the data location inside the gpudata
-    :type offset: int
-    :param dtype: data type of the gpudata elements
-    :type dtype: numpy.dtype
-    :param shape: shape to use for the result
-    :type shape: iterable of ints
-    :param context: context of the gpudata
-    :type context: GpuContext
-    :param strides: strides for the results (C contiguous if not specified)
-    :type strides: iterable of ints
-    :param writable: is the data writable?
-    :type writeable: bool
-    :param base: base object that keeps gpudata alive
-    :param cls: view type of the result
+    Parameters
+    ----------
+    data: int
+        pointer to a gpudata structure
+    offset: int
+        offset to the data location inside the gpudata
+    dtype: numpy.dtype
+        data type of the gpudata elements
+    shape: iterable of ints
+        shape to use for the result
+    context: GpuContext
+        context of the gpudata
+    strides: iterable of ints
+        strides for the results (C contiguous if not specified)
+    writable: bool
+        is the data writable?
+    base: object
+        base object that keeps gpudata alive
+    cls: type
+        view type of the result
+
+    Notes
+    -----
+    This function might be deprecated in a later relase since the only
+    way to create gpudata pointers is through libgpuarray functions
+    that aren't exposed at the python level. It can be used with the
+    value of the `gpudata` attribute of an existing GpuArray.
 
     .. warning::
         This function is intended for advanced use and will crash the
         interpreter if used improperly.
 
-    .. note::
-        This function might be deprecated in a later relase since the
-        only way to create gpudata pointers is through libgpuarray
-        functions that aren't exposed at the python level. It can be
-        used with the value of the `gpudata` attribute of an existing
-        GpuArray.
+
     """
     cdef size_t *cdims = NULL
     cdef ssize_t *cstrides = NULL
@@ -886,22 +922,6 @@ def array(proto, dtype=None, copy=True, order=None, unsigned int ndmin=0,
 
     Create a GpuArray from existing data
 
-    :param obj: data to initialize the result
-    :type obj: array-like
-    :param dtype: data type of the result elements
-    :type dtype: string or numpy.dtype or int
-    :param copy: return a copy?
-    :type copy: bool
-    :param order: memory layout of the result
-    :type order: string
-    :param ndmin: minimum number of result dimensions
-    :type ndmin: unsigned int
-    :param context: allocation context
-    :type context: GpuContext
-    :param cls: result class (must inherit from GpuArray)
-    :type cls: class
-    :rtype: GpuArray
-
     This function creates a new GpuArray from the data provided in
     `obj` except if `obj` is already a GpuArray and all the parameters
     match its properties and `copy` is False.
@@ -911,6 +931,24 @@ def array(proto, dtype=None, copy=True, order=None, unsigned int ndmin=0,
 
     This function is similar to :meth:`numpy.array` except that it returns
     GpuArrays.
+
+    Parameters
+    ----------
+    obj: array-like
+        data to initialize the result
+    dtype: string or numpy.dtype or int
+        data type of the result elements
+    copy: bool
+        return a copy?
+    order: str
+        memory layout of the result
+    ndmin: int
+        minimum number of result dimensions
+    context: GpuContext
+        allocation context
+    cls: type
+        result class (must inherit from GpuArray)
+
     """
     return carray(proto, dtype, copy, order, ndmin, context, cls)
 
@@ -979,18 +1017,9 @@ cuda_exit = <void (*)(gpucontext *)>gpuarray_get_extension("cuda_exit")
 
 cdef class GpuContext:
     """
+    GpuContext(kind, devno, flags)
+
     Class that holds all the information pertaining to a context.
-
-    .. code-block:: python
-
-        GpuContext(kind, devno, flags)
-
-    :param kind: module name for the context
-    :type kind: string
-    :param devno: device number
-    :type devno: int
-    :param flags: context flags
-    :type flags: int
 
     The currently implemented modules (for the `kind` parameter) are
     "cuda" and "opencl".  Which are available depends on the build
@@ -1001,6 +1030,16 @@ cdef class GpuContext:
     one value you must bitwise OR them together.
 
     If you want an alternative interface check :meth:`~pygpu.gpuarray.init`.
+
+    Parameters
+    ----------
+    kind: str
+        module name for the context
+    devno: int
+        device number
+    flags: int
+        context flags
+
     """
     def __dealloc__(self):
         if self.ctx != NULL:
@@ -1428,6 +1467,9 @@ cdef int pygpu_transfer(GpuArray res, GpuArray a) except -1:
     return 0
 
 def _split(GpuArray a, ind, unsigned int axis):
+    """
+    _split(a, ind, axis)
+    """
     cdef list r = [None] * (len(ind) + 1)
     cdef Py_ssize_t i
     if not axis < a.ga.nd:
@@ -1464,6 +1506,9 @@ cdef GpuArray pygpu_concatenate(const _GpuArray **a, size_t n,
 
 def _concatenate(list al, unsigned int axis, int restype, object cls,
                  GpuContext context):
+    """
+    _concatenate(al, axis, restype, cls, context)
+    """
     cdef Py_ssize_t i
     context = ensure_context(context)
     cdef const _GpuArray **als = <const _GpuArray **>PyMem_Malloc(sizeof(_GpuArray *) * len(al))
@@ -1486,11 +1531,18 @@ cuda_open_ipc_handle = <gpudata *(*)(gpucontext *, GpuArrayIpcMemHandle *, size_
 
 def open_ipc_handle(GpuContext c, bytes hpy, size_t l):
     """
+    open_ipc_handle(c, hpy, l)
+
     Open an IPC handle to get a new GpuArray from it.
 
-    :param c: context
-    :param hpy: binary handle data received
-    :param l: size of the referred memory block
+    Parameters
+    ----------
+    c: GpuContext
+        context
+    hpy: bytes
+        binary handle data received
+    l: int
+        size of the referred memory block
 
     """
     cdef char *b
@@ -1566,7 +1618,10 @@ cdef class GpuArray:
             raise IndexError, "cannot index with: %s" % (key,)
 
     def write(self, np.ndarray src not None):
-        """Writes host's Numpy array to device's GpuArray.
+        """
+        write(src)
+
+        Writes host's Numpy array to device's GpuArray.
 
         This method is as fast as or even faster than :ref:asarray, because it
         skips possible allocation of a buffer in device's memory. It uses this
@@ -1578,11 +1633,16 @@ cdef class GpuArray:
         to be. It is allowed for this GpuArray and `src` to have different
         shapes.
 
-        :param src: source array in host
-        :type src: np.ndarray
+        Parameters
+        ----------
+        src: numpy.ndarray
+            source array in host
 
-        :raises ValueError: If this GpuArray is not compatible with `src` or
-            if it is not well behaved or contiguous.
+        Raises
+        ------
+        ValueError
+            If this GpuArray is not compatible with `src` or if it is
+            not well behaved or contiguous.
 
         """
         if not self.flags.behaved:
@@ -1605,7 +1665,10 @@ cdef class GpuArray:
         array_write(self, np.PyArray_DATA(src), sz)
 
     def read(self, np.ndarray dst not None):
-        """Reads from this GpuArray into host's Numpy array.
+        """
+        read(dst)
+
+        Reads from this GpuArray into host's Numpy array.
 
         This method is as fast as or even faster than :ref:__array__ method and
         thus :ref:numpy.asarray. This is because it skips allocation of a new
@@ -1617,11 +1680,16 @@ cdef class GpuArray:
         contiguous. It is allowed for this GpuArray and `dst` to have different
         shapes.
 
-        :param dst: destination array in host
-        :type dst: np.ndarray
+        Parameters
+        ----------
+        dst: numpy.ndarray
+            destination array in host
 
-        :raises ValueError: If this GpuArray is not compatible with `src` or
-            if `dst` is not well behaved.
+        Raises
+        ------
+        ValueError
+            If this GpuArray is not compatible with `src` or if `dst`
+            is not well behaved.
 
         """
         if not np.PyArray_ISBEHAVED(dst):
@@ -1641,6 +1709,9 @@ cdef class GpuArray:
         array_read(np.PyArray_DATA(dst), sz, self)
 
     def get_ipc_handle(self):
+        """
+        get_ipc_handle()
+        """
         cdef GpuArrayIpcMemHandle h
         cdef int err
         if cuda_get_ipc_handle is NULL:
@@ -1664,6 +1735,9 @@ cdef class GpuArray:
         return _pygpu_as_ndarray(self, ldtype)
 
     def __bool__(self):
+        """
+        __bool__()
+        """
         if self.size == 0:
             return False
         elif self.size == 1:
@@ -1694,12 +1768,18 @@ cdef class GpuArray:
 
         Return a copy if this array.
 
-        :param order: memory layout of the copy
-        :type order: string
+        Parameters
+        ----------
+        order: {'C', 'A', 'F'}
+            memory layout of the copy
+
         """
         return pygpu_copy(self, to_ga_order(order))
 
     def transfer(self, GpuContext new_ctx):
+        """
+        transfer(new_ctx)
+        """
         cdef GpuArray r
         if not GpuArray_ISONESEGMENT(&self.ga):
             # For now raise an error, may make it work later
@@ -1736,10 +1816,14 @@ cdef class GpuArray:
 
         Return a view of this array.
 
-        :param cls: class of the view (must inherit from GpuArray)
-
         The returned array shares device data with this one and both
         will reflect changes made to the other.
+
+        Parameters
+        ----------
+        cls: type
+            class of the view (must inherit from GpuArray)
+
         """
         return pygpu_view(self, cls)
 
@@ -1749,18 +1833,21 @@ cdef class GpuArray:
 
         Cast the elements of this array to a new type.
 
-        :param dtype: type of the elements of the result
-        :type dtype: string or numpy.dtype or int
-        :param order: memory layout of the result
-        :type order: string
-        :param copy: Always return a copy?
-        :type copy: bool
-
         This function returns a new array will all elements cast to
         the supplied `dtype`, but otherwise unchanged.
 
         If `copy` is False and the type and order match `self` is
         returned.
+
+        Parameters
+        ----------
+        dtype: str or numpy.dtype or int
+            type of the elements of the result
+        order: {'A', 'C', 'F'}
+            memory layout of the result
+        copy: bool
+            Always return a copy?
+
         """
         cdef GpuArray res
         cdef int typecode = dtype_to_typecode(dtype)
@@ -1812,6 +1899,9 @@ cdef class GpuArray:
             free(newdims)
 
     def transpose(self, *params):
+        """
+        transpose(*params)
+        """
         cdef unsigned int *new_axes
         cdef unsigned int i
         if len(params) is 1 and isinstance(params[0], (tuple, list)):
@@ -2006,6 +2096,9 @@ cdef class GpuArray:
         array_setarray(tmp, gv)
 
     def take1(self, GpuArray idx):
+        """
+        take1(idx)
+        """
         cdef GpuArray res
         cdef size_t odim
         if idx.ga.nd != 1:
@@ -2157,52 +2250,18 @@ cdef class GpuArray:
 
 cdef class GpuKernel:
     """
-    .. code-block:: python
-
-        GpuKernel(source, name, types, context=None, cluda=True, have_double=False, have_small=False, have_complex=False, have_half=False)
+    GpuKernel(source, name, types, context=None, cluda=True, have_double=False, have_small=False, have_complex=False, have_half=False, binary=False, cuda=False, opencl=False)
 
     Compile a kernel on the device
-
-    :param source: complete kernel source code
-    :type source: string
-    :param name: function name of the kernel
-    :type name: string
-    :param types: list of argument types
-    :type types: list or tuple
-    :param context: device on which the kernel is compiled
-    :type context: GpuContext
-    :param cluda: use cluda layer?
-    :param have_double: ensure working doubles?
-    :param have_small: ensure types smaller than float will work?
-    :param have_complex: ensure complex types will work?
-    :param have_half: ensure half-floats will work?
-    :param binary: kernel is pre-compiled binary blob?
-    :param ptx: kernel is PTX code?
-    :param cuda: kernel is cuda code?
-    :param opencl: kernel is opencl code?
 
     The kernel function is retrieved using the provided `name` which
     must match what you named your kernel in `source`.  You can safely
     reuse the same name multiple times.
 
-    .. note::
-
-        With the cuda backend, unless you use `cluda=True`, you must
-        either pass the mangled name of your kernel or declare the
-        function 'extern "C"', because cuda uses a C++ compiler
-        unconditionally.
-
     The `have_*` parameter are there to tell libgpuarray that we need
     the particular type or feature to work for this kernel.  If the
-    request can't be satified a
-    :class:`~pygpu.gpuarray.UnsupportedException` will be raised in the
-    constructor.
-
-    .. warning::
-
-        If you do not set the `have_` flags properly, you will either
-        get a device-specific error (the good case) or silent
-        completly bogus data (the bad case).
+    request can't be satified a :class:`.UnsupportedException` will be
+    raised in the constructor.
 
     Once you have the kernel object you can simply call it like so::
 
@@ -2223,6 +2282,48 @@ cdef class GpuKernel:
 
     If you choose to use this interface, make sure to stay within the
     limits of `k.maxlsize` and `ctx.maxgsize` or the call will fail.
+
+    Parameters
+    ----------
+    source: str
+        complete kernel source code
+    name: str
+        function name of the kernel
+    types: list or tuple
+        list of argument types
+    context: GpuContext
+        device on which the kernel is compiled
+    cluda: bool
+        use cluda layer?
+    have_double: bool
+        ensure working doubles?
+    have_small: bool
+        ensure types smaller than float will work?
+    have_complex: bool
+        ensure complex types will work?
+    have_half: bool
+        ensure half-floats will work?
+    binary: bool
+        kernel is pre-compiled binary blob?
+    cuda: bool
+        kernel is cuda code?
+    opencl: bool
+        kernel is opencl code?
+
+    Notes
+    -----
+    With the cuda backend, unless you use `cluda=True`, you must
+    either pass the mangled name of your kernel or declare the
+    function 'extern "C"', because cuda uses a C++ compiler
+    unconditionally.
+
+    .. warning::
+
+        If you do not set the `have_` flags properly, you will either
+        get a device-specific error (the good case) or silent
+        completly bogus data (the bad case).
+
+
     """
     def __dealloc__(self):
         cdef unsigned int numargs
@@ -2304,6 +2405,9 @@ cdef class GpuKernel:
             free(_types)
 
     def __call__(self, *args, n=None, gs=None, ls=None, shared=0):
+        """
+        __call__(*args, n=None, gs=None, ls=None, shared=0)
+        """
         if n == None and (ls == None or gs == None):
             raise ValueError, "Must specify size (n) or both gs and ls"
         self.do_call(n, gs, ls, args, shared)

@@ -5,6 +5,7 @@
 
 #include "loaders/libopencl.h"
 
+/** @cond NEVER */
 #ifdef DEBUG
 #include <assert.h>
 
@@ -29,6 +30,7 @@
 #define ASSERT_KER(k)
 #define CLEAR(o)
 #endif
+/** @endcond */
 
 const char *cl_error_string(cl_int);
 
@@ -72,7 +74,9 @@ typedef struct _cl_ctx {
   char *preamble;
 } cl_ctx;
 
+/** @cond NEVER */
 STATIC_ASSERT(sizeof(cl_ctx) <= sizeof(gpucontext), sizeof_struct_gpucontext_cl);
+/** @endcond */
 
 struct _gpudata {
   cl_mem buf;

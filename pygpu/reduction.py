@@ -130,11 +130,6 @@ KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} out
 class ReductionKernel(object):
     def __init__(self, context, dtype_out, neutral, reduce_expr, redux,
                  map_expr=None, arguments=None, preamble="", init_nd=None):
-        """
-        :param init_nd: used to pre compile the reduction code for
-            this value of nd and the self.init_local_size value.
-
-        """
         self.context = context
         self.neutral = neutral
         self.redux = tuple(redux)

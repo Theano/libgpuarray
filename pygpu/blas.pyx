@@ -54,6 +54,8 @@ cdef api int pygpu_blas_rger(double alpha, GpuArray X, GpuArray Y, GpuArray A,
 
 
 def dot(GpuArray X, GpuArray Y, GpuArray Z=None, overwrite_z=False):
+    """dot(X, Y, Z=None, overwrite_z=False)
+    """
     if Z is None:
         Z = pygpu_empty(0, NULL, X.typecode, GA_ANY_ORDER, X.context, None)
         overwrite_z = True
@@ -65,6 +67,8 @@ def dot(GpuArray X, GpuArray Y, GpuArray Z=None, overwrite_z=False):
 
 def gemv(double alpha, GpuArray A, GpuArray X, double beta=0.0,
          GpuArray Y=None, trans_a=False, overwrite_y=False):
+    """gemv(alpha, A, X, beta=0.0, Y=None, trans_a=False, overwrite_y=False)
+    """
     cdef cb_transpose transA
     cdef size_t Yshp
 
@@ -93,6 +97,8 @@ def gemv(double alpha, GpuArray A, GpuArray X, double beta=0.0,
 
 def gemm(double alpha, GpuArray A, GpuArray B, double beta, GpuArray C=None,
          trans_a=False, trans_b=False, overwrite_c=False):
+    """gemm(alpha, A, B, beta, C=None, trans_a=False, trans_b=False, overwrite_c=False)
+    """
     cdef cb_transpose transA
     cdef cb_transpose transB
     cdef size_t[2] Cshp
@@ -132,6 +138,8 @@ def gemm(double alpha, GpuArray A, GpuArray B, double beta, GpuArray C=None,
 
 def ger(double alpha, GpuArray X, GpuArray Y, GpuArray A=None,
         overwrite_a=False):
+    """ger(alpha, X, Y, A=None, overwrite_a=False)
+    """
     cdef size_t[2] Ashp
 
     if A is None:

@@ -20,12 +20,14 @@ class NoseTester(NoseTester):
         """
         Generate argv for nosetest command
 
-        :type verbose: int
-        :param verbose: Verbosity value for test outputs, in the range 1-10.
-                        Default is 1.
+        Parameters
+        ----------
+        verbose: int
+            Verbosity value for test outputs, in the range 1-10.
+            Default is 1.
+        extra_argv: list
+            List with any extra arguments to pass to nosetests.
 
-        :type extra_argv: list
-        :param extra_argv: List with any extra arguments to pass to nosetests.
         """
         #self.package_path = os.path.abspath(self.package_path)
         argv = [__file__, self.package_path]
@@ -79,29 +81,30 @@ class NoseTester(NoseTester):
         """
         Run tests for module using nose.
 
-        :type verbose: int
-        :param verbose: Verbosity value for test outputs, in the range 1-10.
-                        Default is 1.
+        Parameters
+        ----------
+        verbose: int
+            Verbosity value for test outputs, in the range 1-10.
+            Default is 1.
+        extra_argv: list
+            List with any extra arguments to pass to nosetests.
+        coverage: bool
+            If True, report coverage of pygpu code. Default is False.
+        capture: bool
+            If True, capture the standard output of the tests, like
+            nosetests does in command-line. The output of failing
+            tests will be displayed at the end. Default is True.
+        knownfailure: bool
+            If True, tests raising KnownFailureTest will not be
+            considered Errors nor Failure, but reported as "known
+            failures" and treated quite like skipped tests.  Default
+            is True.
 
-        :type extra_argv: list
-        :param extra_argv: List with any extra arguments to pass to nosetests.
+        Returns
+        -------
+        nose.result.TextTestResult
+            The result of running the tests
 
-        :type coverage: bool
-        :param coverage: If True, report coverage of pygpu code. Default is False.
-
-        :type capture: bool
-        :param capture: If True, capture the standard output of the tests, like
-                        nosetests does in command-line. The output of failing
-                        tests will be displayed at the end. Default is True.
-
-        :type knownfailure: bool
-        :param knownfailure: If True, tests raising KnownFailureTest will
-                not be considered Errors nor Failure, but reported as
-                "known failures" and treated quite like skipped tests.
-                Default is True.
-
-        :returns: Returns the result of running the tests as a
-                  ``nose.result.TextTestResult`` object.
         """
         # cap verbosity at 3 because nose becomes *very* verbose beyond that
         verbose = min(verbose, 3)
