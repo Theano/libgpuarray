@@ -25,8 +25,16 @@ sys.path.insert(0, os.path.abspath('..'))
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest', 'sphinx.ext.todo',
-              'sphinx.ext.ifconfig', 'breathe']
+extensions = ['sphinx.ext.autodoc',
+              'sphinx.ext.doctest',
+              'sphinx.ext.todo',
+              'sphinx.ext.napoleon',
+#              'sphinx.ext.linkcode',
+              'breathe']
+
+todo_include_todos = True
+napoleon_google_docstring = False
+napoleon_include_special_with_doc = False
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -42,7 +50,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'gpuarray'
-copyright = u'2012, Arnaud Bergeron'
+copyright = u'2012--2017, Arnaud Bergeron'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -61,21 +69,21 @@ release = '0.6.5'
 # non-false value, then it is used:
 #today = ''
 # Else, today_fmt is used as the format for a strftime call.
-#today_fmt = '%B %d, %Y'
+today_fmt = '%B %d, %Y'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build']
+exclude_dirs = ['_build', 'scripts']
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 #default_role = None
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
-#add_function_parentheses = True
+add_function_parentheses = True
 
 # If true, the current module name will be prepended to all description
 # unit titles (such as .. function::).
-#add_module_names = True
+add_module_names = True
 
 # If true, sectionauthor and moduleauthor directives will be shown in the
 # output. They are ignored by default.
@@ -87,12 +95,20 @@ pygments_style = 'sphinx'
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
 
-
 # -- Options for HTML output ---------------------------------------------------
 
-# The theme to use for HTML and HTML Help pages.  See the documentation for
-# a list of builtin themes.
-html_theme = 'default'
+
+if os.environ.get('READTHEDOCS') != 'True':
+    try:
+        import sphinx_rtd_theme
+    except ImportError:
+        pass
+    else:
+        html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+    html_theme = 'sphinx_rtd_theme'
+
+def setup(app):
+    app.add_stylesheet('fix_rtd.css')
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -125,11 +141,11 @@ html_static_path = ['_static']
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
-#html_last_updated_fmt = '%b %d, %Y'
+html_last_updated_fmt = '%b %d, %Y'
 
 # If true, SmartyPants will be used to convert quotes and dashes to
 # typographically correct entities.
-#html_use_smartypants = True
+html_use_smartypants = True
 
 # Custom sidebar templates, maps document names to template names.
 #html_sidebars = {}
@@ -166,6 +182,37 @@ html_static_path = ['_static']
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'gpuarraydoc'
+
+
+# Options for the linkcode extension
+# ----------------------------------
+# Resolve function
+# This function is used to populate the (source) links in the API
+
+# XXX: This is broken for now since it doesn't work for cython modules
+def linkcode_resolve(domain, info):
+    def find_source():
+        obj = sys.modules[info['module']]
+        for part in info['fullname'].split('.'):
+            obj = getattr(obj, part)
+        import inspect
+        import os
+        fn = inspect.getsourcefile(obj)
+        fn = os.path.relpath(fn, start=os.path.dirname(pygpu.__file__))
+        source, lineno = inspect.getsourcelines(obj)
+        return fn, lineno, lineno + len(source) - 1
+
+    if domain != 'py' or not info['module']:
+        return None
+    try:
+        filename = 'libgpuarray/pygpu/%s#L%d-L%d' % find_source()
+    except Exception:
+        filename = info['module'].replace('.', '/') + '.py'
+    import subprocess
+    tag = subprocess.Popen(['git', 'rev-parse', 'HEAD'],
+                           stdout=subprocess.PIPE,
+                           universal_newlines=True).communicate()[0][:-1]
+    return "https://github.com/Theano/libgpuarray/blob/%s/%s" % (tag, filename)
 
 
 # -- Options for LaTeX output --------------------------------------------------
