@@ -1031,8 +1031,8 @@ cdef class GpuContext:
 
     If you want an alternative interface check :meth:`~pygpu.gpuarray.init`.
 
-    Paramters
-    ---------
+    Parameters
+    ----------
     kind: str
         module name for the context
     devno: int
