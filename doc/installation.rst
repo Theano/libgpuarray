@@ -24,6 +24,11 @@ This will also install the libgpuarray package automatically.
 
 This should work on Linux, Mac OS and Windows.
 
+This is also available in packages in conda-forge. They could be more
+up to date::
+
+  conda install -c forge pygpu
+
 Build Requirements
 ------------------
 
