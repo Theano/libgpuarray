@@ -1,4 +1,4 @@
 File error.h
 ============
 
-.. doxygenfile:: error.h
+.. doxygenfile:: gpuarray/error.h
