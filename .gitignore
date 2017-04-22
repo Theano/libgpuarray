@@ -18,6 +18,8 @@ distribute*tar.gz
 *.so
 *.o
 *.log
+doc/_build
+doc/_doxybuild
 pygpu/*.c
 pygpu/*.h
 pygpu/version.py
