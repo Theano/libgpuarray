@@ -1,6 +1,6 @@
 #ifndef GPUARRAY_ERROR_H
 #define GPUARRAY_ERROR_H
-/** \file error.h
+/** \file gpuarray/error.h
  *  \brief Error functions.
  */
 
