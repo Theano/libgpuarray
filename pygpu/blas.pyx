@@ -18,6 +18,9 @@ cdef extern from "gpuarray/blas.h":
                        double beta, _GpuArray *C, int nocopy)
     int GpuArray_rger(double alpha, _GpuArray *X, _GpuArray *Y, _GpuArray *A,
                       int nocopy)
+    int GpuArray_rgemmBatch_3d(
+        cb_transpose transA, cb_transpose transB, double alpha,
+        _GpuArray *A, _GpuArray *B, double beta, _GpuArray *C, int nocopy)
 
 cdef api int pygpu_blas_rdot(GpuArray X, GpuArray Y, GpuArray Z, bint nocopy) except -1:
     cdef int err
@@ -50,6 +53,17 @@ cdef api int pygpu_blas_rger(double alpha, GpuArray X, GpuArray Y, GpuArray A,
     err = GpuArray_rger(alpha, &X.ga, &Y.ga, &A.ga, nocopy);
     if err != GA_NO_ERROR:
         raise GpuArrayException(GpuArray_error(&X.ga, err), err)
+    return 0
+
+cdef api int pygpu_blas_rgemmBatch_3d(cb_transpose transA, cb_transpose transB,
+                                      double alpha, GpuArray A, GpuArray B,
+                                      double beta, GpuArray C, bint nocopy) except -1:
+    cdef int err
+    err = GpuArray_rgemmBatch_3d(transA, transB,
+                                 alpha, &A.ga, &B.ga,
+                                 beta, &C.ga, nocopy)
+    if err != GA_NO_ERROR:
+        raise GpuArrayException(GpuArray_error(&A.ga, err), err)
     return 0
 
 
@@ -153,3 +167,47 @@ def ger(double alpha, GpuArray X, GpuArray Y, GpuArray A=None,
     pygpu_blas_rger(alpha, X, Y, A, 0)
 
     return A
+
+def gemmBatch_3d(double alpha, GpuArray A, GpuArray B,
+                 double beta, GpuArray C=None,
+                 trans_a=False, trans_b=False, overwrite_c=False):
+    """gemmBatch_3d(alpha, A, B, beta, C=None, trans_a=False, trans_b=False, overwrite_c=False)
+    """
+    cdef cb_transpose transA
+    cdef cb_transpose transB
+    cdef size_t[3] Cshp
+
+    if trans_a:
+        transA = cb_trans
+    else:
+        transA = cb_no_trans
+    if trans_b:
+        transB = cb_trans
+    else:
+        transB = cb_no_trans
+
+    if A.ga.nd != 3:
+        raise TypeError, "A is not a batch of matrices"
+    if B.ga.nd != 3:
+        raise TypeError, "B is not a batch of matrices"
+
+    Cshp[0] = A.ga.dimensions[0]
+    if transA == cb_no_trans:
+        Cshp[1] = A.ga.dimensions[1]
+    else:
+        Cshp[1] = A.ga.dimensions[2]
+    if transB == cb_no_trans:
+        Cshp[2] = B.ga.dimensions[2]
+    else:
+        Cshp[2] = B.ga.dimensions[1]
+    if C is None:
+        if beta != 0.0:
+            raise ValueError, "C not provided and beta != 0"
+        C = pygpu_empty(3, Cshp, A.ga.typecode, GA_ANY_ORDER, A.context, None)
+        overwrite_c = True
+
+    if not overwrite_c:
+        C = pygpu_copy(C, GA_ANY_ORDER)
+    pygpu_blas_rgemmBatch_3d(transA, transB, alpha, A, B, beta, C, 0)
+
+    return C

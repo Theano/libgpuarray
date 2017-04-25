@@ -167,3 +167,59 @@ def ger(m, n, dtype, order, sliced_x, sliced_y, init_res, overwrite=False):
     gr = gblas.ger(1.0, gX, gY, gA, overwrite_a=overwrite)
 
     numpy.testing.assert_allclose(cr, numpy.asarray(gr), rtol=1e-6)
+
+def test_rgemmBatch_3d():
+    bools = [False, True]
+    for b, (m, n, k), order, trans, offseted_o in product(
+        [1, 17, 31], [(24, 7, 16), (7, 16, 24)], list(product('fc', repeat=3)),
+        list(product(bools, bools)), bools):
+        yield rgemmBatch_3d, b, m, n, k, 'float32', order, trans, \
+            offseted_o, 1, False, False
+    for sliced, overwrite, init_res in product(
+        [1, 2, -1, -2], bools, bools):
+        yield rgemmBatch_3d, 5, 4, 3, 2, 'float32', ('f', 'f', 'f'), \
+            (False, False), False, sliced, overwrite, init_res
+    yield rgemmBatch_3d, 16, 16, 16, 16, 'float64', ('f', 'f', 'f'), (False, False), \
+        False, 1, False, False
+    for alpha, beta, overwrite in product(
+        [0, 1, -1, 0.6], [0, 1, -1, 0.6], bools):
+        yield rgemmBatch_3d, 16, 16, 9, 16, 'float32', ('f', 'f', 'f'), \
+            (False, False), False, 1, overwrite, True, alpha, beta
+
+@guard_devsup
+def rgemmBatch_3d(b, m, n, k, dtype, order, trans, offseted_o, sliced, overwrite,
+         init_res, alpha=1.0, beta=0.0):
+    if trans[0]:
+        shpA = (b,k,m)
+    else:
+        shpA = (b,m,k)
+    if trans[1]:
+        shpB = (b,n,k)
+    else:
+        shpB = (b,k,n)
+
+    cA, gA = gen_gpuarray(shpA, dtype, order=order[0],
+                          offseted_outer=offseted_o,
+                          sliced=sliced, ctx=context)
+    cB, gB = gen_gpuarray(shpB, dtype, order=order[1],
+                          offseted_outer=offseted_o,
+                          sliced=sliced, ctx=context)
+    if init_res:
+        cC, gC = gen_gpuarray((b,m,n), dtype, order=order[2], ctx=context)
+    else:
+        cC, gC = None, None
+
+    cr = numpy.empty((b,m,n), dtype=dtype)
+    if dtype == 'float32':
+        fn_gemm_c = fblas.sgemm
+    else:
+        fn_gemm_c = fblas.dgemm
+    for i in range(b):
+        cCi = cC if cC is None else cC[i]
+        cr[i] = fn_gemm_c(alpha, cA[i], cB[i], beta, cCi, trans_a=trans[0],
+                         trans_b=trans[1], overwrite_c=overwrite)
+
+    gr = gblas.gemmBatch_3d(alpha, gA, gB, beta, gC, trans_a=trans[0],
+                    trans_b=trans[1], overwrite_c=overwrite)
+
+    numpy.testing.assert_allclose(cr, numpy.asarray(gr), rtol=1e-5)
