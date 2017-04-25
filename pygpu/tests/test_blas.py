@@ -171,19 +171,19 @@ def ger(m, n, dtype, order, sliced_x, sliced_y, init_res, overwrite=False):
 def test_rgemmBatch_3d():
     bools = [False, True]
     for b, (m, n, k), order, trans, offseted_o in product(
-        [1, 17, 31], [(24, 7, 16), (7, 16, 24)], list(product('fc', repeat=3)),
+        [1, 17, 31], [(24, 7, 16), (7, 16, 24)], list(product('fc', 'fc', 'c')),
         list(product(bools, bools)), bools):
         yield rgemmBatch_3d, b, m, n, k, 'float32', order, trans, \
             offseted_o, 1, False, False
     for sliced, overwrite, init_res in product(
         [1, 2, -1, -2], bools, bools):
-        yield rgemmBatch_3d, 5, 4, 3, 2, 'float32', ('f', 'f', 'f'), \
+        yield rgemmBatch_3d, 5, 4, 3, 2, 'float32', ('f', 'f', 'c'), \
             (False, False), False, sliced, overwrite, init_res
-    yield rgemmBatch_3d, 16, 16, 16, 16, 'float64', ('f', 'f', 'f'), (False, False), \
+    yield rgemmBatch_3d, 16, 16, 16, 16, 'float64', ('f', 'f', 'c'), (False, False), \
         False, 1, False, False
     for alpha, beta, overwrite in product(
         [0, 1, -1, 0.6], [0, 1, -1, 0.6], bools):
-        yield rgemmBatch_3d, 16, 16, 9, 16, 'float32', ('f', 'f', 'f'), \
+        yield rgemmBatch_3d, 16, 16, 9, 16, 'float32', ('f', 'f', 'c'), \
             (False, False), False, 1, overwrite, True, alpha, beta
 
 @guard_devsup
