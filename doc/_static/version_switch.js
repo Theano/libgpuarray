@@ -53,8 +53,8 @@
 
     vswitch.push('<dl>');
     vswitch.push('<dt>Downloads</dt>');
-    var pdf_url = root_url + current_version + "/libgpuarray.pdf"
-    vswitch.push('<dd><a href=\"', pdf_url, '\">', 'PDF', '</a></dd>');
+//     var pdf_url = root_url + current_version + "/libgpuarray.pdf"
+//     vswitch.push('<dd><a href=\"', pdf_url, '\">', 'PDF', '</a></dd>');
     vswitch.push('</dl>');
 
     vswitch.push('<dl>');
