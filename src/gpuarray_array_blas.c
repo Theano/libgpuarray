@@ -3,7 +3,9 @@
 #include "gpuarray/buffer_blas.h"
 #include "gpuarray/types.h"
 #include "gpuarray/util.h"
-#include "gpuarray/error.h"
+
+#include "private.h"
+#include "util/error.h"
 
 int GpuArray_rdot(GpuArray *X, GpuArray *Y,
                   GpuArray *Z, int nocopy) {
@@ -13,24 +15,28 @@ int GpuArray_rdot(GpuArray *X, GpuArray *Y,
     GpuArray copyY;
     GpuArray *Zp = Z;
     size_t n;
-    void *ctx;
+    gpucontext *ctx = gpudata_context(Xp->data);
     size_t elsize;
     int err;
 
   if (X->typecode != GA_HALF &&
       X->typecode != GA_FLOAT &&
       X->typecode != GA_DOUBLE)
-  return GA_INVALID_ERROR;
+  return error_set(ctx->err, GA_INVALID_ERROR, "Data type not supported");
 
   if (X->nd != 1 || Y->nd != 1 || Z->nd != 0 ||
       X->typecode != Y->typecode || X->typecode != Z->typecode)
-    return GA_VALUE_ERROR;
+    return error_fmt(ctx->err, GA_VALUE_ERROR,
+                     "Wrong number of dimensions: X->nd = %d (expected 1), Y->nd = %d (expected 1), Z->nd = %d (expected 0)",
+                     X->nd, Y->nd, Z->nd);
   n = X->dimensions[0];
   if (!(X->flags & GA_ALIGNED) || !(Y->flags & GA_ALIGNED) ||
       !(Z->flags & GA_ALIGNED))
     return GA_UNALIGNED_ERROR;
   if (X->dimensions[0] != Y->dimensions[0])
-      return GA_VALUE_ERROR;
+      return error_fmt(ctx->err, GA_VALUE_ERROR,
+                       "Shape mismatch: X->dimensions[0] = %d != Y->dimensions[0] = %d",
+                       X->dimensions[0], Y->dimensions[0]);
 
   elsize = gpuarray_get_elsize(X->typecode);
   if (X->strides[0] < 0) {
@@ -49,12 +55,11 @@ int GpuArray_rdot(GpuArray *X, GpuArray *Y,
     else {
       err = GpuArray_copy(&copyY, Y, GA_ANY_ORDER);
       if (err != GA_NO_ERROR)
-	goto cleanup;
+        goto cleanup;
       Yp = &copyY;
     }
   }
 
-  ctx = gpudata_context(Xp->data);
   err = gpublas_setup(ctx);
   if (err != GA_NO_ERROR)
       goto cleanup;
@@ -138,7 +143,7 @@ int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
     else {
       err = GpuArray_copy(&copyA, A, GA_F_ORDER);
       if (err != GA_NO_ERROR)
-	goto cleanup;
+        goto cleanup;
       Ap = &copyA;
     }
   }
@@ -148,7 +153,7 @@ int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
     else {
       err = GpuArray_copy(&copyX, X, GA_ANY_ORDER);
       if (err != GA_NO_ERROR)
-	goto cleanup;
+        goto cleanup;
       Xp = &copyX;
     }
   }
