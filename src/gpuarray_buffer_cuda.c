@@ -1103,6 +1103,10 @@ static int call_compiler(cuda_context *ctx, strb *src, strb *ptx, strb *log) {
 
   if (err != NVRTC_SUCCESS) {
     nvrtcDestroyProgram(&prog);
+#ifdef DEBUG
+    strb_dump(src, stderr);
+    strb_dump(log, stderr);
+#endif
     return error_nvrtc(ctx->err, "nvrtcCompileProgram", err);
   }
 
