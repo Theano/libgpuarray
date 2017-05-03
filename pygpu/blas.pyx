@@ -92,14 +92,14 @@ def gemv(double alpha, GpuArray A, GpuArray X, double beta=0.0,
         transA = cb_no_trans
 
     if A.ga.nd != 2:
-        raise TypeError, "A is not a matrix"
+        raise TypeError("A is not a matrix")
     if transA == cb_no_trans:
         Yshp = A.ga.dimensions[0]
     else:
         Yshp = A.ga.dimensions[1]
     if Y is None:
         if beta != 0.0:
-            raise ValueError, "Y not provided and beta != 0"
+            raise ValueError("Y not provided and beta != 0")
         Y = pygpu_empty(1, &Yshp, A.ga.typecode, GA_ANY_ORDER, A.context, None)
         overwrite_y = True
 
@@ -127,9 +127,9 @@ def gemm(double alpha, GpuArray A, GpuArray B, double beta, GpuArray C=None,
         transB = cb_no_trans
 
     if A.ga.nd != 2:
-        raise TypeError, "A is not a matrix"
+        raise TypeError("A is not a matrix")
     if B.ga.nd != 2:
-        raise TypeError, "B is not a matrix"
+        raise TypeError("B is not a matrix")
     if transA == cb_no_trans:
         Cshp[0] = A.ga.dimensions[0]
     else:
@@ -140,7 +140,7 @@ def gemm(double alpha, GpuArray A, GpuArray B, double beta, GpuArray C=None,
         Cshp[1] = B.ga.dimensions[0]
     if C is None:
         if beta != 0.0:
-            raise ValueError, "C not provided and beta != 0"
+            raise ValueError("C not provided and beta != 0")
         C = pygpu_empty(2, Cshp, A.ga.typecode, GA_ANY_ORDER, A.context, None)
         overwrite_c = True
 
@@ -187,9 +187,9 @@ def gemmBatch_3d(double alpha, GpuArray A, GpuArray B,
         transB = cb_no_trans
 
     if A.ga.nd != 3:
-        raise TypeError, "A is not a batch of matrices"
+        raise TypeError("A is not a batch of matrices")
     if B.ga.nd != 3:
-        raise TypeError, "B is not a batch of matrices"
+        raise TypeError("B is not a batch of matrices")
 
     Cshp[0] = A.ga.dimensions[0]
     if transA == cb_no_trans:
@@ -202,7 +202,7 @@ def gemmBatch_3d(double alpha, GpuArray A, GpuArray B,
         Cshp[2] = B.ga.dimensions[1]
     if C is None:
         if beta != 0.0:
-            raise ValueError, "C not provided and beta != 0"
+            raise ValueError("C not provided and beta != 0")
         C = pygpu_empty(3, Cshp, A.ga.typecode, GA_ANY_ORDER, A.context, None)
         overwrite_c = True
 
