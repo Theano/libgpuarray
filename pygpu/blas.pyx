@@ -204,9 +204,7 @@ def gemmBatch_3d(double alpha, GpuArray A, GpuArray B,
         if beta != 0.0:
             raise ValueError("C not provided and beta != 0")
         C = pygpu_empty(3, Cshp, A.ga.typecode, GA_ANY_ORDER, A.context, None)
-        overwrite_c = True
-
-    if not overwrite_c:
+    else:
         C = pygpu_copy(C, GA_ANY_ORDER)
     pygpu_blas_rgemmBatch_3d(transA, transB, alpha, A, B, beta, C, 0)
 
