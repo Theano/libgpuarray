@@ -5,7 +5,7 @@ with a log of the build messages to abergeron@gmail.com.
 Requirements:
 
  - either an OpenCL runtime (with headers) or the CUDA toolkit
- - CMake [ http://cmake.org ] (to build)
+ - CMake [ https://cmake.org ] (to build)
 
 Run CMake on the CMakeList.txt file in src/ and build according to
 your platform.  Set CMAKE_INSTALL_PREFIX to your desired path if you
