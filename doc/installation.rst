@@ -175,8 +175,8 @@ install step.  It is up to you to copy the headers and libraries to an
 appropriate place.
 
 If you don't have Visual Studio installed, you can get the free
-Express version from `here <http://www.visualstudio.com/>`_ in the
-downloads section (select the "for Windows" edition).
+Express version from `here <https://www.visualstudio.com/>`_ in the
+downloads section (select the "for windows" edition).
 
 .. warning::
    While you may get the library to compile using cygwin, this is not
@@ -226,7 +226,7 @@ you can confirm which device it is running on.
    only the codename of the architecture the GPU belongs to (e.g.
    'Tahiti').
 
-.. _cmake: http://cmake.org/
+.. _cmake: https://cmake.org/
 
 .. _clblas: https://github.com/clMathLibraries/clBLAS
 
@@ -238,10 +238,10 @@ you can confirm which device it is running on.
 
 .. _check: http://check.sourceforge.net/
 
-.. _python: http://python.org/
+.. _python: https://python.org/
 
 .. _cython: http://cython.org/
 
-.. _nosetests: http://nose.readthedocs.org/en/latest/
+.. _nosetests: https://nose.readthedocs.org/en/latest/
 
 .. _mako: http://www.makotemplates.org/
