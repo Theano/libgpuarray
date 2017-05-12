@@ -510,6 +510,89 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   cuda_exit(ctx);
   return GA_NO_ERROR;
 }
+//TODO: change float to half
+static int hgemmStridedBatch(cb_order order, cb_transpose transA, cb_transpose transB,
+			     size_t M, size_t N, size_t K, float alpha,
+			     gpudata *A, size_t lda, ssize_t strideA,
+			     gpudata *B, size_t ldb, ssize_t strideB,
+			     float beta, gpudata *C, size_t ldc, ssize_t strideC,
+			     size_t batchCount) {
+  cuda_context *ctx;
+  blas_handle *h;
+  size_t  t;
+  ssize_t lt;
+  gpudata *T;
+  cb_transpose transT;
+  cublasStatus_t err;
+  __half halpha, hbeta;
+
+  //ignore overflow, underflow, denormalized and inf values. Mayve also nan.
+  uint32_t x = (uint32_t)alpha;
+  alpha = ((x>>16)&0x8000)|((((x&0x7f800000)-0x38000000)>>13)&0x7c00)|((x>>13)&0x03ff);
+  x = (uint32_t)beta;
+  beta = ((x>>16)&0x8000)|((((x&0x7f800000)-0x38000000)>>13)&0x7c00)|((x>>13)&0x03ff);
+  
+  ASSERT_BUF(A);
+  if (cublasHgemmStridedBatched == NULL)
+    return GA_DEVSUP_ERROR;
+
+  ctx = A->ctx;
+  // TODO: stride* are long long int in cuda, LARGE_VAL check for int.
+  if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
+      LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
+      LARGE_VAL(strideA) || LARGE_VAL(strideB) || LARGE_VAL(strideC) ||
+      LARGE_VAL(M * N) || LARGE_VAL(M * K) || LARGE_VAL(K * N))
+    return error_set(ctx->err, GA_XLARGE_ERROR, "Passed-in sizes would overflow the ints in the cublas interface");
+
+  h = (blas_handle *)ctx->blas_handle;
+  cuda_enter(ctx);
+
+  if (order == cb_c) {
+    /* swap A and B */
+    t = N;
+    N = M;
+    M = t;
+    T = A;
+    A = B;
+    B = T;
+    t = lda;
+    lda = ldb;
+    ldb = t;
+    transT = transA;
+    transA = transB;
+    transB = transT;
+    lt = strideA;
+    strideA = strideB;
+    strideB = lt;
+  }
+
+  ASSERT_BUF(A);
+  ASSERT_BUF(B);
+  ASSERT_BUF(C);
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(A, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(B, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C, CUDA_WAIT_ALL));
+  raise(SIGINT);
+  err = cublasHgemmStridedBatched(h->h,
+				  convT(transA), convT(transB),
+				  M, N, K, &halpha,
+				  (__half *)(A->ptr), (int) lda, strideA,
+				  (__half *)(B->ptr), (int) ldb, strideB,
+				  &hbeta,
+				  (__half *)(C->ptr), (int) ldc, strideB,
+				  batchCount);
+  if (err != CUBLAS_STATUS_SUCCESS) {
+    cuda_exit(ctx);
+    return error_cublas(ctx->err, "cublasHgemmStridedBatched", err);
+  }
+
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B, CUDA_WAIT_READ));
+  GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(C, CUDA_WAIT_ALL));
+
+  cuda_exit(ctx);
+  return GA_NO_ERROR;
+}
 
 static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
                       size_t M, size_t N, size_t K, float alpha,
@@ -1578,5 +1661,6 @@ gpuarray_blas_ops cublas_ops = {
   dgemvBatch,
   NULL, /* hgerBatch */
   sgerBatch,
-  dgerBatch
+  dgerBatch,
+  hgemmStridedBatch,
 };

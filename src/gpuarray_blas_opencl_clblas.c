@@ -449,4 +449,5 @@ gpuarray_blas_ops clblas_ops = {
   NULL, /* hgerBatch */
   NULL, /* sgerBatch */
   NULL, /* dgerBatch */
+  NULL, /* hgemmStridedzBatch */
 };

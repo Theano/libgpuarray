@@ -486,7 +486,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   size_t *A_offsets = NULL, *B_offsets = NULL, *C_offsets = NULL;
   size_t i;
 
-  if (A->typecode != GA_FLOAT && A->typecode != GA_DOUBLE)
+  if (A->typecode != GA_FLOAT && A->typecode != GA_DOUBLE && A->typecode != GA_HALF)
     return error_set(ctx->err, GA_INVALID_ERROR, "Unsupported dtype");
 
   if (A->nd != 3 || B->nd != 3 || C->nd != 3)
@@ -624,6 +624,21 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   err = gpublas_setup(ctx);
   if (err != GA_NO_ERROR)
     goto cleanup;
+
+  if(C->typecode == GA_HALF){
+    //TODO: handle offset
+    assert (Ap->offset == 0);
+    assert (Bp->offset == 0);
+    assert (Cp->offset == 0);
+    //TODO: float should be half
+    err = gpublas_hgemmStridedBatch(o, transA, transB, m, n, k, alpha,
+				    Ap->data, lda, Ap->strides[0]/elsize,
+				    Bp->data, ldb, Bp->strides[0]/elsize,
+				    beta,
+				    Cp->data, ldc, Cp->strides[0]/elsize,
+				    batchCount, 0);
+    goto cleanup;
+  }
 
   A_datas = (gpudata**)malloc(batchCount * sizeof(gpudata*));
   B_datas = (gpudata**)malloc(batchCount * sizeof(gpudata*));

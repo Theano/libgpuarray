@@ -214,6 +214,13 @@ struct _gpuarray_blas_ops {
                    gpudata **y, size_t *offY, size_t incY,
                    gpudata **A, size_t *offA, size_t lda,
                    size_t batchCount, int flags);
+  //TODO: float should be half
+  int (*hgemmStridedBatch)(cb_order order, cb_transpose transA, cb_transpose transB,
+			   size_t M, size_t N, size_t K, float alpha,
+			   gpudata *A, size_t lda, ssize_t strideA,
+			   gpudata *B, size_t ldb, ssize_t strideB,
+			   float beta, gpudata *C, size_t ldc, ssize_t strideC,
+			   size_t batchCount);
 };
 
 struct _gpuarray_comm_ops {

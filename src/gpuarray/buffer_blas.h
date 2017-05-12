@@ -115,6 +115,15 @@ GPUARRAY_PUBLIC int gpublas_hgemmBatch(
   float beta, gpudata **C, size_t *offC, size_t ldc,
   size_t batchCount, int flags);
 
+//TODO: float should be half
+GPUARRAY_PUBLIC int gpublas_hgemmStridedBatch(
+  cb_order order, cb_transpose transA, cb_transpose transB,
+  size_t M, size_t N, size_t K, float alpha,
+  gpudata *A, size_t lda, ssize_t strideA,
+  gpudata *B, size_t ldb, ssize_t strideB,
+  float beta, gpudata *C, size_t ldc, ssize_t strideC,
+  size_t batchCount, int flags);
+
 GPUARRAY_PUBLIC int gpublas_sgemmBatch(
   cb_order order, cb_transpose transA, cb_transpose transB,
   size_t M, size_t N, size_t K, float alpha,

@@ -17,9 +17,17 @@ const char *gpublas_error(gpucontext *ctx) {
   return ctx->err->msg;
 }
 
-#define BLAS_OP(buf,name, args)                                         \
+#define BLAS_OP(buf, name, args)                                        \
   gpucontext *ctx = gpudata_context(buf);                               \
   if (ctx->blas_ops->name)                                              \
+    return ctx->blas_ops->name args;                                    \
+  else                                                                  \
+    return error_fmt(ctx->err, GA_DEVSUP_ERROR, "Blas operation not supported by device or missing library: %s", #name)
+
+#define BLAS_OPF(buf, name, args)                                       \
+  gpucontext *ctx = gpudata_context(buf);                               \
+  if (flags != 0) return error_set(ctx->err, GA_INVALID_ERROR, "flags is not 0"); \
+  if (ctx->blas_ops->name)						\
     return ctx->blas_ops->name args;                                    \
   else                                                                  \
     return error_fmt(ctx->err, GA_DEVSUP_ERROR, "Blas operation not supported by device or missing library: %s", #name)
@@ -159,6 +167,19 @@ int gpublas_hgemmBatch(
   BLAS_OPBF(A, hgemmBatch,
             (order, transA, transB, M, N, K, alpha, A, offA, lda,
              B, offB, ldb, beta, C, offC, ldc, batchCount));
+}
+
+//TODO: use half and not float here.
+int gpublas_hgemmStridedBatch(
+    cb_order order, cb_transpose transA, cb_transpose transB,
+    size_t M, size_t N, size_t K, float alpha,
+    gpudata *A, size_t lda, ssize_t strideA,
+    gpudata *B, size_t ldb, ssize_t strideB,
+    float beta, gpudata *C, size_t ldc, ssize_t strideC,
+    size_t batchCount, int flags) {
+  BLAS_OPF(A, hgemmStridedBatch,
+           (order, transA, transB, M, N, K, alpha, A, lda, strideA,
+            B, ldb, strideB, beta, C, ldc, strideC, batchCount));
 }
 
 int gpublas_sgemmBatch(
