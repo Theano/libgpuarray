@@ -1745,6 +1745,12 @@ cdef class GpuArray:
         else:
             raise ValueError('The truth value of a multi-element array is ambiguous')
 
+    def __int__(self):
+        if self.size == 1:
+            return int(numpy.asarray(self))
+        else:
+            raise ValueError('only length-1 arrays can be converted to Python scalars')
+
     def _empty_like_me(self, dtype=None, order='C'):
         """
         _empty_like_me(dtype=None, order='C')

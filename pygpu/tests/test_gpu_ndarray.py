@@ -51,6 +51,13 @@ def test_bool():
     for data in [numpy.empty((0, 33)), [[1]], [[0]], [], [0], [1], 0, 1]:
         assert bool(pygpu.asarray(data, context=ctx)) == bool(numpy.asarray(data))
 
+def test_int():
+    for data in [[[2]], [[0]], [10], [-1], 0, -21]:
+        assert int(pygpu.asarray(data, context=ctx)) == int(numpy.asarray(data))
+
+    # ValueError: only length-1 arrays can be converted to Python scalars.
+    assert_raises(ValueError, int, pygpu.asarray([], context=ctx))
+    assert_raises(ValueError, int, pygpu.asarray([0, 1], context=ctx))
 
 def test_transfer():
     for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
