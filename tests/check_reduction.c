@@ -113,7 +113,7 @@ START_TEST(test_maxandargmax_reduction){
 	ga_assert_ok(GpuArray_memset(&gaMax,    -1));  /* 0xFFFFFFFF is a qNaN. */
 	ga_assert_ok(GpuArray_memset(&gaArgmax, -1));
 
-	ga_assert_ok(GpuArray_maxandargmax(&gaMax, &gaArgmax, &gaSrc, 2, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_MAXANDARGMAX, &gaMax, &gaArgmax, &gaSrc, 2, reduxList));
 
 	ga_assert_ok(GpuArray_read(pMax,    sizeof(*pMax)   *dims[1], &gaMax));
 	ga_assert_ok(GpuArray_read(pArgmax, sizeof(*pArgmax)*dims[1], &gaArgmax));
@@ -205,7 +205,7 @@ START_TEST(test_maxandargmax_idxtranspose){
 	ga_assert_ok(GpuArray_memset(&gaMax,    -1));  /* 0xFFFFFFFF is a qNaN. */
 	ga_assert_ok(GpuArray_memset(&gaArgmax, -1));
 
-	ga_assert_ok(GpuArray_maxandargmax(&gaMax, &gaArgmax, &gaSrc, 2, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_MAXANDARGMAX, &gaMax, &gaArgmax, &gaSrc, 2, reduxList));
 
 	ga_assert_ok(GpuArray_read(pMax,    sizeof(*pMax)   *rdxProdDims, &gaMax));
 	ga_assert_ok(GpuArray_read(pArgmax, sizeof(*pArgmax)*rdxProdDims, &gaArgmax));
@@ -294,7 +294,7 @@ START_TEST(test_maxandargmax_veryhighrank){
 	ga_assert_ok(GpuArray_memset(&gaMax,    -1));  /* 0xFFFFFFFF is a qNaN. */
 	ga_assert_ok(GpuArray_memset(&gaArgmax, -1));
 
-	ga_assert_ok(GpuArray_maxandargmax(&gaMax, &gaArgmax, &gaSrc, 4, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_MAXANDARGMAX, &gaMax, &gaArgmax, &gaSrc, 4, reduxList));
 
 	ga_assert_ok(GpuArray_read(pMax,    sizeof(*pMax)   *rdxProdDims, &gaMax));
 	ga_assert_ok(GpuArray_read(pArgmax, sizeof(*pArgmax)*rdxProdDims, &gaArgmax));
@@ -393,7 +393,7 @@ START_TEST(test_maxandargmax_alldimsreduced){
 	ga_assert_ok(GpuArray_memset(&gaMax,    -1));  /* 0xFFFFFFFF is a qNaN. */
 	ga_assert_ok(GpuArray_memset(&gaArgmax, -1));
 
-	ga_assert_ok(GpuArray_maxandargmax(&gaMax, &gaArgmax, &gaSrc, 3, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_MAXANDARGMAX, &gaMax, &gaArgmax, &gaSrc, 3, reduxList));
 
 	ga_assert_ok(GpuArray_read(pMax,    sizeof(*pMax),    &gaMax));
 	ga_assert_ok(GpuArray_read(pArgmax, sizeof(*pArgmax), &gaArgmax));
@@ -481,7 +481,7 @@ START_TEST(test_minandargmin_reduction){
 	ga_assert_ok(GpuArray_memset(&gaMin,    -1));  /* 0xFFFFFFFF is a qNaN. */
 	ga_assert_ok(GpuArray_memset(&gaArgmin, -1));
 
-	ga_assert_ok(GpuArray_minandargmin(&gaMin, &gaArgmin, &gaSrc, 2, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_MINANDARGMIN, &gaMin, &gaArgmin, &gaSrc, 2, reduxList));
 
 	ga_assert_ok(GpuArray_read(pMin,    sizeof(*pMin)   *dims[1], &gaMin));
 	ga_assert_ok(GpuArray_read(pArgmin, sizeof(*pArgmin)*dims[1], &gaArgmin));
@@ -570,7 +570,7 @@ START_TEST(test_minandargmin_veryhighrank){
 	ga_assert_ok(GpuArray_memset(&gaMin,    -1));  /* 0xFFFFFFFF is a qNaN. */
 	ga_assert_ok(GpuArray_memset(&gaArgmin, -1));
 
-	ga_assert_ok(GpuArray_minandargmin(&gaMin, &gaArgmin, &gaSrc, 4, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_MINANDARGMIN, &gaMin, &gaArgmin, &gaSrc, 4, reduxList));
 
 	ga_assert_ok(GpuArray_read(pMin,    sizeof(*pMin)   *rdxProdDims, &gaMin));
 	ga_assert_ok(GpuArray_read(pArgmin, sizeof(*pArgmin)*rdxProdDims, &gaArgmin));
@@ -669,7 +669,7 @@ START_TEST(test_minandargmin_alldimsreduced){
 	ga_assert_ok(GpuArray_memset(&gaMin,    -1));  /* 0xFFFFFFFF is a qNaN. */
 	ga_assert_ok(GpuArray_memset(&gaArgmin, -1));
 
-	ga_assert_ok(GpuArray_minandargmin(&gaMin, &gaArgmin, &gaSrc, 3, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_MINANDARGMIN, &gaMin, &gaArgmin, &gaSrc, 3, reduxList));
 
 	ga_assert_ok(GpuArray_read(pMin,    sizeof(*pMin),    &gaMin));
 	ga_assert_ok(GpuArray_read(pArgmin, sizeof(*pArgmin), &gaArgmin));
@@ -754,7 +754,7 @@ START_TEST(test_argmax_reduction){
 	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaArgmax, -1));
 
-	ga_assert_ok(GpuArray_argmax(&gaArgmax, &gaSrc, 2, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_ARGMAX, NULL, &gaArgmax, &gaSrc, 2, reduxList));
 
 	ga_assert_ok(GpuArray_read(pArgmax, sizeof(*pArgmax)*dims[1], &gaArgmax));
 
@@ -836,7 +836,7 @@ START_TEST(test_argmax_veryhighrank){
 	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaArgmax, -1));
 
-	ga_assert_ok(GpuArray_argmax(&gaArgmax, &gaSrc, 4, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_ARGMAX, NULL, &gaArgmax, &gaSrc, 4, reduxList));
 
 	ga_assert_ok(GpuArray_read(pArgmax, sizeof(*pArgmax)*rdxProdDims, &gaArgmax));
 
@@ -929,7 +929,7 @@ START_TEST(test_argmax_alldimsreduced){
 	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaArgmax, -1));
 
-	ga_assert_ok(GpuArray_argmax(&gaArgmax, &gaSrc, 3, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_ARGMAX, NULL, &gaArgmax, &gaSrc, 3, reduxList));
 
 	ga_assert_ok(GpuArray_read(pArgmax, sizeof(*pArgmax), &gaArgmax));
 
@@ -1011,7 +1011,7 @@ START_TEST(test_argmin_reduction){
 	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaArgmin, -1));
 
-	ga_assert_ok(GpuArray_argmin(&gaArgmin, &gaSrc, 2, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_ARGMIN, NULL, &gaArgmin, &gaSrc, 2, reduxList));
 
 	ga_assert_ok(GpuArray_read(pArgmin, sizeof(*pArgmin)*dims[1], &gaArgmin));
 
@@ -1093,7 +1093,7 @@ START_TEST(test_argmin_veryhighrank){
 	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaArgmin, -1));
 
-	ga_assert_ok(GpuArray_argmin(&gaArgmin, &gaSrc, 4, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_ARGMIN, NULL, &gaArgmin, &gaSrc, 4, reduxList));
 
 	ga_assert_ok(GpuArray_read(pArgmin, sizeof(*pArgmin)*rdxProdDims, &gaArgmin));
 
@@ -1186,7 +1186,7 @@ START_TEST(test_argmin_alldimsreduced){
 	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaArgmin, -1));
 
-	ga_assert_ok(GpuArray_argmin(&gaArgmin, &gaSrc, 3, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_ARGMIN, NULL, &gaArgmin, &gaSrc, 3, reduxList));
 
 	ga_assert_ok(GpuArray_read(pArgmin, sizeof(*pArgmin), &gaArgmin));
 
@@ -1265,7 +1265,7 @@ START_TEST(test_max_reduction){
 	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaMax,    -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_max(&gaMax, &gaSrc, 2, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_MAX, &gaMax, NULL, &gaSrc, 2, reduxList));
 
 	ga_assert_ok(GpuArray_read(pMax,    sizeof(*pMax)   *dims[1], &gaMax));
 
@@ -1343,7 +1343,7 @@ START_TEST(test_max_veryhighrank){
 	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaMax,    -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_max(&gaMax, &gaSrc, 4, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_MAX, &gaMax, NULL, &gaSrc, 4, reduxList));
 
 	ga_assert_ok(GpuArray_read(pMax,    sizeof(*pMax)   *rdxProdDims, &gaMax));
 
@@ -1431,7 +1431,7 @@ START_TEST(test_max_alldimsreduced){
 	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaMax,    -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_max(&gaMax, &gaSrc, 3, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_MAX, &gaMax, NULL, &gaSrc, 3, reduxList));
 
 	ga_assert_ok(GpuArray_read(pMax,    sizeof(*pMax),    &gaMax));
 
@@ -1507,7 +1507,7 @@ START_TEST(test_min_reduction){
 	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaMin,    -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_min(&gaMin, &gaSrc, 2, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_MIN, &gaMin, NULL, &gaSrc, 2, reduxList));
 
 	ga_assert_ok(GpuArray_read(pMin,    sizeof(*pMin)   *dims[1], &gaMin));
 
@@ -1585,7 +1585,7 @@ START_TEST(test_min_veryhighrank){
 	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaMin,    -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_min(&gaMin, &gaSrc, 4, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_MIN, &gaMin, NULL, &gaSrc, 4, reduxList));
 
 	ga_assert_ok(GpuArray_read(pMin,    sizeof(*pMin)   *rdxProdDims, &gaMin));
 
@@ -1673,7 +1673,7 @@ START_TEST(test_min_alldimsreduced){
 	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaMin,    -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_min(&gaMin, &gaSrc, 3, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_MIN, &gaMin, NULL, &gaSrc, 3, reduxList));
 
 	ga_assert_ok(GpuArray_read(pMin,    sizeof(*pMin),    &gaMin));
 
@@ -1750,7 +1750,7 @@ START_TEST(test_sum_reduction){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_sum   (&gaD, &gaS, 2, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_SUM, &gaD, NULL, &gaS, 2, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD)*dims[1], &gaD));
 
@@ -1826,7 +1826,7 @@ START_TEST(test_sum_veryhighrank){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_sum   (&gaD, &gaS, 4, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_SUM, &gaD, NULL, &gaS, 4, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD)*rdxProdDims, &gaD));
 
@@ -1912,7 +1912,7 @@ START_TEST(test_sum_alldimsreduced){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_sum   (&gaD, &gaS, 3, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_SUM, &gaD, NULL, &gaS, 3, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD), &gaD));
 
@@ -1986,7 +1986,7 @@ START_TEST(test_prod_reduction){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_prod  (&gaD, &gaS, 2, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_PROD, &gaD, NULL, &gaS, 2, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD)*dims[1], &gaD));
 
@@ -2062,7 +2062,7 @@ START_TEST(test_prod_veryhighrank){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_prod  (&gaD, &gaS, 4, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_PROD, &gaD, NULL, &gaS, 4, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD)*rdxProdDims, &gaD));
 
@@ -2148,7 +2148,7 @@ START_TEST(test_prod_alldimsreduced){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_prod  (&gaD, &gaS, 3, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_PROD, &gaD, NULL, &gaS, 3, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD), &gaD));
 
@@ -2225,7 +2225,7 @@ START_TEST(test_prodnz_reduction){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_prodnz(&gaD, &gaS, 2, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_PRODNZ, &gaD, NULL, &gaS, 2, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD)*dims[1], &gaD));
 
@@ -2304,7 +2304,7 @@ START_TEST(test_prodnz_veryhighrank){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_prodnz(&gaD, &gaS, 4, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_PRODNZ, &gaD, NULL, &gaS, 4, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD)*rdxProdDims, &gaD));
 
@@ -2393,7 +2393,7 @@ START_TEST(test_prodnz_alldimsreduced){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_prodnz(&gaD, &gaS, 3, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_PRODNZ, &gaD, NULL, &gaS, 3, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD), &gaD));
 
@@ -2475,7 +2475,7 @@ START_TEST(test_and_reduction){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));
 
-	ga_assert_ok(GpuArray_and   (&gaD, &gaS, 2, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_AND, &gaD, NULL, &gaS, 2, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD)*dims[1], &gaD));
 
@@ -2559,7 +2559,7 @@ START_TEST(test_and_veryhighrank){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_and   (&gaD, &gaS, 4, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_AND, &gaD, NULL, &gaS, 4, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD)*rdxProdDims, &gaD));
 
@@ -2653,7 +2653,7 @@ START_TEST(test_and_alldimsreduced){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_and   (&gaD, &gaS, 3, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_AND, &gaD, NULL, &gaS, 3, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD), &gaD));
 
@@ -2735,7 +2735,7 @@ START_TEST(test_or_reduction){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));
 
-	ga_assert_ok(GpuArray_or    (&gaD, &gaS, 2, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_OR, &gaD, NULL, &gaS, 2, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD)*dims[1], &gaD));
 
@@ -2819,7 +2819,7 @@ START_TEST(test_or_veryhighrank){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_or    (&gaD, &gaS, 4, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_OR, &gaD, NULL, &gaS, 4, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD)*rdxProdDims, &gaD));
 
@@ -2913,7 +2913,7 @@ START_TEST(test_or_alldimsreduced){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_or    (&gaD, &gaS, 3, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_OR, &gaD, NULL, &gaS, 3, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD), &gaD));
 
@@ -2991,7 +2991,7 @@ START_TEST(test_xor_reduction){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));
 
-	ga_assert_ok(GpuArray_xor   (&gaD, &gaS, 2, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_XOR, &gaD, NULL, &gaS, 2, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD)*dims[1], &gaD));
 
@@ -3071,7 +3071,7 @@ START_TEST(test_xor_veryhighrank){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_xor   (&gaD, &gaS, 4, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_XOR, &gaD, NULL, &gaS, 4, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD)*rdxProdDims, &gaD));
 
@@ -3161,7 +3161,7 @@ START_TEST(test_xor_alldimsreduced){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_xor   (&gaD, &gaS, 3, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_XOR, &gaD, NULL, &gaS, 3, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD), &gaD));
 
@@ -3239,7 +3239,7 @@ START_TEST(test_any_reduction){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));
 
-	ga_assert_ok(GpuArray_any   (&gaD, &gaS, 2, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_ANY, &gaD, NULL, &gaS, 2, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD)*dims[1], &gaD));
 
@@ -3319,7 +3319,7 @@ START_TEST(test_any_veryhighrank){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_any   (&gaD, &gaS, 4, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_ANY, &gaD, NULL, &gaS, 4, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD)*rdxProdDims, &gaD));
 
@@ -3409,7 +3409,7 @@ START_TEST(test_any_alldimsreduced){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_any   (&gaD, &gaS, 3, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_ANY, &gaD, NULL, &gaS, 3, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD), &gaD));
 
@@ -3487,7 +3487,7 @@ START_TEST(test_all_reduction){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));
 
-	ga_assert_ok(GpuArray_all   (&gaD, &gaS, 2, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_ALL, &gaD, NULL, &gaS, 2, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD)*dims[1], &gaD));
 
@@ -3567,7 +3567,7 @@ START_TEST(test_all_veryhighrank){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_all   (&gaD, &gaS, 4, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_ALL, &gaD, NULL, &gaS, 4, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD)*rdxProdDims, &gaD));
 
@@ -3657,7 +3657,7 @@ START_TEST(test_all_alldimsreduced){
 	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
 
-	ga_assert_ok(GpuArray_all   (&gaD, &gaS, 3, reduxList));
+	ga_assert_ok(GpuArray_reduction(GA_REDUCE_ALL, &gaD, NULL, &gaS, 3, reduxList));
 
 	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD), &gaD));
 
