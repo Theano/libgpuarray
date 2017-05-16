@@ -563,7 +563,9 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
     goto cleanup;
   }
   if (cA == 2) {
-    lda = Ap->strides[2] / elsize;
+    lda = Ap->dimensions[2] > 1
+          ? Ap->strides[2] / elsize
+          : Ap->dimensions[1];
     if (o == cb_c) {
       if (transA == cb_no_trans)
         transA = cb_trans;
@@ -571,7 +573,9 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
         transA = cb_no_trans;
     }
   } else if (cA == 1) {
-    lda = Ap->strides[1] / elsize;
+    lda = Ap->dimensions[1] > 1
+          ? Ap->strides[1] / elsize
+          : Ap->dimensions[2];
     if (o == cb_fortran) {
       if (transA == cb_no_trans)
         transA = cb_trans;
