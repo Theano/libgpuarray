@@ -254,7 +254,7 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
     else {
       err = GpuArray_copy(&copyA, A, GA_F_ORDER);
       if (err != GA_NO_ERROR)
-	goto cleanup;
+        goto cleanup;
       Ap = &copyA;
     }
   }
@@ -264,7 +264,7 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
     else {
       err = GpuArray_copy(&copyB, B, GA_F_ORDER);
       if (err != GA_NO_ERROR)
-	goto cleanup;
+        goto cleanup;
       Bp = &copyB;
     }
   }
@@ -388,7 +388,7 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
     else {
       err = GpuArray_copy(&copyX, X, GA_ANY_ORDER);
       if (err != GA_NO_ERROR)
-	goto cleanup;
+        goto cleanup;
       Xp = &copyX;
     }
   }
@@ -398,7 +398,7 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
     else {
       err = GpuArray_copy(&copyY, Y, GA_ANY_ORDER);
       if (err != GA_NO_ERROR)
-	goto cleanup;
+        goto cleanup;
       Yp = &copyY;
     }
   }
@@ -526,7 +526,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
       err = GpuArray_copy(&copyA, A, GA_C_ORDER);
       cA = 1;
       if (err != GA_NO_ERROR)
-	goto cleanup;
+        goto cleanup;
       Ap = &copyA;
     }
   }
@@ -538,7 +538,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
       err = GpuArray_copy(&copyB, B, GA_C_ORDER);
       cB = 1;
       if (err != GA_NO_ERROR)
-	goto cleanup;
+        goto cleanup;
       Bp = &copyB;
     }
   }
