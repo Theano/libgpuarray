@@ -76,8 +76,7 @@ static int ga_extcopy(GpuArray *dst, const GpuArray *src) {
                                       (cache_freev_fn)GpuElemwise_free,
                                       ctx->err);
     if (ctx->extcopy_cache == NULL)
-      return error_set(ctx->err, GA_MISC_ERROR,
-                       "No context cache");
+      return ctx->err->code;
     if (cache_add(ctx->extcopy_cache, aa, k) != 0)
       return error_set(ctx->err, GA_MISC_ERROR,
                        "Could not store GpuElemwise copy kernel in context cache");
@@ -472,11 +471,14 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
     return error_set(ctx->err, GA_INVALID_ERROR, "Index array (i) not C-contiguous");
 
   /* Check that the dimensions match namely a[0] == i[0] and a[>0] == v[>0] */
-  if (v->nd == 0 || a->nd == 0 || i->nd != 1 || a->nd != v->nd ||
-      a->dimensions[0] != i->dimensions[0])
+  if (v->nd == 0 || a->nd == 0 || i->nd != 1 || a->nd != v->nd)
     return error_fmt(ctx->err, GA_INVALID_ERROR, "Dimension mismatch. "
-                     "v->nd = %llu, a->nd = %llu, i->nd = %llu, a->dimensions[0] = %llu, i->dimensions[0] = %llu",
-                     v->nd, a->nd, i->nd, a->nd > 0 ? a->dimensions[0] : 0, i->nd > 1 ? i->dimensions[0] : 1);
+                     "v->nd = %llu, a->nd = %llu, i->nd = %llu",
+                     v->nd, a->nd, i->nd);
+  if (a->dimensions[0] != i->dimensions[0])
+    return error_fmt(ctx->err, GA_INVALID_ERROR, "Dimension mismatch. "
+                     "a->dimensions[0] = %llu, i->dimensions[0] = %llu",
+                     a->dimensions[0], i->dimensions[0]);
 
   n[0] = i->dimensions[0];
   n[1] = 1;
@@ -994,7 +996,7 @@ int GpuArray_split(GpuArray **rs, const GpuArray *a, size_t n, size_t *p,
 
 int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
                          unsigned int axis, int restype) {
-  gpucontext *ctx = GpuArray_context(r);
+  gpucontext *ctx = GpuArray_context(as[0]);
   size_t *dims, *res_dims;
   size_t i, res_off;
   unsigned int p;
