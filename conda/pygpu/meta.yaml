@@ -1,0 +1,46 @@
+package:
+    name: "pygpu"
+    version: "0.6.1"
+
+source:
+    git_url: https://github.com/Theano/libgpuarray.git
+    git_rev: master  # TODO: this is for testing. Change to a version tag when done.
+
+build:
+    number: 0
+
+requirements:
+    build:
+        - python
+        - pip
+        - setuptools
+        - cython
+        - mako >=0.7
+        - numpy
+        - libgpuarray ==0.6.1
+        # Avoid mkl download during build phase
+        - nomkl # [not win]
+
+    run:
+        - python
+        - six
+        - nose
+        - mako >=0.7
+        - numpy x.x
+        - libgpuarray ==0.6.1
+
+test:
+    imports:
+        - pygpu
+    requires:
+        # Avoid mkl download during testing
+        - nomkl # [not win]
+
+about:
+    home: https://github.com/Theano/libgpuarray
+    license: MIT
+    license_file: LICENSE
+    summary: "Numpy-like wrapper on libgpuarray for GPU computations"
+
+extra:
+    maintainers:
