@@ -16,6 +16,7 @@
 #include "gpuarray/kernel.h"
 #include "gpuarray/util.h"
 
+#include "util/error.h"
 #include "util/strb.h"
 #include "util/xxhash.h"
 
@@ -40,12 +41,12 @@ static uint32_t extcopy_hash(cache_key_t k) {
 
 static int ga_extcopy(GpuArray *dst, const GpuArray *src) {
   struct extcopy_args a, *aa;
-  gpucontext *ctx = gpudata_context(dst->data);
+  gpucontext *ctx = GpuArray_context(dst);
   GpuElemwise *k = NULL;
   void *args[2];
 
-  if (ctx != gpudata_context(src->data))
-    return GA_INVALID_ERROR;
+  if (ctx != GpuArray_context(src))
+    return error_set(ctx->err, GA_INVALID_ERROR, "src and dst context differ");
 
   a.itype = src->typecode;
   a.otype = dst->typecode;
@@ -62,11 +63,12 @@ static int ga_extcopy(GpuArray *dst, const GpuArray *src) {
     gargs[1].flags = GE_WRITE;
     k = GpuElemwise_new(ctx, "", "dst = src", 2, gargs, 0, 0);
     if (k == NULL)
-      return GA_MISC_ERROR;
+      return error_set(ctx->err, GA_MISC_ERROR,
+                       "Could not instantiate GpuElemwise copy kernel");
     aa = memdup(&a, sizeof(a));
     if (aa == NULL) {
       GpuElemwise_free(k);
-      return GA_MEMORY_ERROR;
+      return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
     }
     if (ctx->extcopy_cache == NULL)
       ctx->extcopy_cache = cache_twoq(4, 8, 8, 2, extcopy_eq, extcopy_hash,
@@ -74,9 +76,10 @@ static int ga_extcopy(GpuArray *dst, const GpuArray *src) {
                                       (cache_freev_fn)GpuElemwise_free,
                                       ctx->err);
     if (ctx->extcopy_cache == NULL)
-      return GA_MISC_ERROR;
+      return ctx->err->code;
     if (cache_add(ctx->extcopy_cache, aa, k) != 0)
-      return GA_MISC_ERROR;
+      return error_set(ctx->err, GA_MISC_ERROR,
+                       "Could not store GpuElemwise copy kernel in context cache");
   }
   args[0] = (void *)src;
   args[1] = (void *)dst;
@@ -105,14 +108,14 @@ int GpuArray_empty(GpuArray *a, gpucontext *ctx, int typecode,
     ord = GA_C_ORDER;
 
   if (ord != GA_C_ORDER && ord != GA_F_ORDER)
-    return GA_VALUE_ERROR;
+    return error_set(ctx->err, GA_VALUE_ERROR, "Invalid order");
 
   for (i = 0; i < nd; i++) {
     size_t d = dims[i];
     /* Check for overflow */
     if ((d >= MUL_NO_OVERFLOW || size >= MUL_NO_OVERFLOW) &&
-	d > 0 && SIZE_MAX / d < size)
-      return GA_VALUE_ERROR;
+        d > 0 && SIZE_MAX / d < size)
+      return error_set(ctx->err, GA_XLARGE_ERROR, "Total array size greater than addressable space");
     size *= d;
   }
 
@@ -127,7 +130,7 @@ int GpuArray_empty(GpuArray *a, gpucontext *ctx, int typecode,
   a->flags = GA_BEHAVED;
   if (a->dimensions == NULL || a->strides == NULL) {
     GpuArray_clear(a);
-    return GA_MEMORY_ERROR;
+    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
   }
   /* Mult will not overflow since calloc succeded */
   memcpy(a->dimensions, dims, sizeof(size_t)*nd);
@@ -176,8 +179,9 @@ int GpuArray_zeros(GpuArray *a, gpucontext *ctx,
 int GpuArray_fromdata(GpuArray *a, gpudata *data, size_t offset, int typecode,
                       unsigned int nd, const size_t *dims,
                       const ssize_t *strides, int writeable) {
+  gpucontext *ctx = gpudata_context(data);
   if (gpuarray_get_type(typecode)->typecode != typecode)
-    return GA_VALUE_ERROR;
+    return error_set(ctx->err, GA_VALUE_ERROR, "typecode mismatch");
   assert(data != NULL);
   a->data = data;
   gpudata_retain(a->data);
@@ -189,7 +193,7 @@ int GpuArray_fromdata(GpuArray *a, gpudata *data, size_t offset, int typecode,
   a->flags = (writeable ? GA_WRITEABLE : 0);
   if (a->dimensions == NULL || a->strides == NULL) {
     GpuArray_clear(a);
-    return GA_MEMORY_ERROR;
+    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
   }
   memcpy(a->dimensions, dims, nd*sizeof(size_t));
   memcpy(a->strides, strides, nd*sizeof(ssize_t));
@@ -233,6 +237,7 @@ int GpuArray_copy_from_host(GpuArray *a, gpucontext *ctx, void *buf,
 }
 
 int GpuArray_view(GpuArray *v, const GpuArray *a) {
+  gpucontext *ctx = GpuArray_context(a);
   v->data = a->data;
   gpudata_retain(a->data);
   v->nd = a->nd;
@@ -243,7 +248,7 @@ int GpuArray_view(GpuArray *v, const GpuArray *a) {
   v->strides = calloc(v->nd, sizeof(ssize_t));
   if (v->dimensions == NULL || v->strides == NULL) {
     GpuArray_clear(v);
-    return GA_MEMORY_ERROR;
+    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
   }
   memcpy(v->dimensions, a->dimensions, v->nd*sizeof(size_t));
   memcpy(v->strides, a->strides, v->nd*sizeof(ssize_t));
@@ -256,6 +261,7 @@ int GpuArray_sync(GpuArray *a) {
 
 int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
                            const ssize_t *stops, const ssize_t *steps) {
+  gpucontext *ctx = GpuArray_context(a);
   unsigned int i, new_i;
   unsigned int new_nd = a->nd;
   size_t *newdims;
@@ -263,7 +269,7 @@ int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
   size_t new_offset = a->offset;
 
   if ((starts == NULL) || (stops == NULL) || (steps == NULL))
-    return GA_VALUE_ERROR;
+    return error_set(ctx->err, GA_VALUE_ERROR, "Invalid slice (contains NULL)");
 
   for (i = 0; i < a->nd; i++) {
     if (steps[i] == 0) new_nd -= 1;
@@ -273,31 +279,40 @@ int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
   if (newdims == NULL || newstrs == NULL) {
     free(newdims);
     free(newstrs);
-    return GA_MEMORY_ERROR;
+    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
   }
 
   new_i = 0;
   for (i = 0; i < a->nd; i++) {
     if (starts[i] < -1 || (starts[i] > 0 &&
-			   (size_t)starts[i] > a->dimensions[i])) {
+                           (size_t)starts[i] > a->dimensions[i])) {
       free(newdims);
       free(newstrs);
-      return GA_VALUE_ERROR;
+      return error_fmt(ctx->err, GA_VALUE_ERROR,
+                       "Invalid slice value: slice(%lld, %lld, %lld) when "
+                       "indexing array on dimension %u of length %lld",
+                       starts[i], stops[i], steps[i], i, a->dimensions[i]);
     }
     if (steps[i] == 0 &&
-	(starts[i] == -1 || (size_t)starts[i] >= a->dimensions[i])) {
+        (starts[i] == -1 || (size_t)starts[i] >= a->dimensions[i])) {
       free(newdims);
       free(newstrs);
-      return GA_VALUE_ERROR;
+      return error_fmt(ctx->err, GA_VALUE_ERROR,
+                       "Invalid slice value: slice(%lld, %lld, %lld) when "
+                       "indexing array on dimension %u of length %lld",
+                       starts[i], stops[i], steps[i], i, a->dimensions[i]);
     }
     new_offset += starts[i] * a->strides[i];
     if (steps[i] != 0) {
       if ((stops[i] < -1 || (stops[i] > 0 &&
-			      (size_t)stops[i] > a->dimensions[i])) ||
-	  (stops[i]-starts[i])/steps[i] < 0) {
+                             (size_t)stops[i] > a->dimensions[i])) ||
+          (stops[i]-starts[i])/steps[i] < 0) {
         free(newdims);
         free(newstrs);
-	return GA_VALUE_ERROR;
+        return error_fmt(ctx->err, GA_VALUE_ERROR,
+                         "Invalid slice value: slice(%lld, %lld, %lld) when "
+                         "indexing array on dimension %u of length %lld",
+                         starts[i], stops[i], steps[i], i, a->dimensions[i]);
       }
       newstrs[new_i] = steps[i] * a->strides[i];
       newdims[new_i] = (stops[i]-starts[i]+steps[i]-
@@ -341,7 +356,7 @@ static int gen_take1_kernel(GpuKernel *k, gpucontext *ctx, char **err_str,
 
   atypes = calloc(nargs, sizeof(int));
   if (atypes == NULL)
-    return GA_MEMORY_ERROR;
+    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
 
   if (addr32) {
     sz = "ga_uint";
@@ -413,7 +428,7 @@ static int gen_take1_kernel(GpuKernel *k, gpucontext *ctx, char **err_str,
                "  }\n"
                "}\n");
   if (strb_error(&sb)) {
-    res = GA_MEMORY_ERROR;
+    res = error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
     goto bail;
   }
   flags |= gpuarray_type_flags(a->typecode, v->typecode, GA_BYTE, -1);
@@ -427,6 +442,7 @@ bail:
 
 int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
                    int check_error) {
+  gpucontext *ctx = GpuArray_context(a);
   size_t n[2], ls[2] = {0, 0}, gs[2] = {0, 0};
   size_t pl;
   gpudata *errbuf;
@@ -440,27 +456,38 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
   int addr32 = 0;
 
   if (!GpuArray_ISWRITEABLE(a))
-    return GA_INVALID_ERROR;
+    return error_set(ctx->err, GA_INVALID_ERROR, "Destination array (a) not writeable");
 
   if (!GpuArray_ISALIGNED(a) || !GpuArray_ISALIGNED(v) ||
       !GpuArray_ISALIGNED(i))
-    return GA_UNALIGNED_ERROR;
+    return error_fmt(ctx->err, GA_UNALIGNED_ERROR,
+                     "Not all arrays are aligned: a (%d), b (%d), i (%d)",
+                     GpuArray_ISALIGNED(a), GpuArray_ISALIGNED(v), GpuArray_ISALIGNED(i));
 
   /* a and i have to be C contiguous */
-  if (!GpuArray_IS_C_CONTIGUOUS(a) || !GpuArray_IS_C_CONTIGUOUS(i))
-    return GA_INVALID_ERROR;
+  if (!GpuArray_IS_C_CONTIGUOUS(a))
+    return error_set(ctx->err, GA_INVALID_ERROR, "Destination array (a) not C-contiguous");
+  if (!GpuArray_IS_C_CONTIGUOUS(i))
+    return error_set(ctx->err, GA_INVALID_ERROR, "Index array (i) not C-contiguous");
 
   /* Check that the dimensions match namely a[0] == i[0] and a[>0] == v[>0] */
-  if (v->nd == 0 || a->nd == 0 || i->nd != 1 || a->nd != v->nd ||
-      a->dimensions[0] != i->dimensions[0])
-    return GA_INVALID_ERROR;
+  if (v->nd == 0 || a->nd == 0 || i->nd != 1 || a->nd != v->nd)
+    return error_fmt(ctx->err, GA_INVALID_ERROR, "Dimension mismatch. "
+                     "v->nd = %llu, a->nd = %llu, i->nd = %llu",
+                     v->nd, a->nd, i->nd);
+  if (a->dimensions[0] != i->dimensions[0])
+    return error_fmt(ctx->err, GA_INVALID_ERROR, "Dimension mismatch. "
+                     "a->dimensions[0] = %llu, i->dimensions[0] = %llu",
+                     a->dimensions[0], i->dimensions[0]);
 
   n[0] = i->dimensions[0];
   n[1] = 1;
 
   for (j = 1; j < v->nd; j++) {
     if (a->dimensions[j] != v->dimensions[j])
-      return GA_INVALID_ERROR;
+      return error_fmt(ctx->err, GA_INVALID_ERROR, "Dimension mismatch. "
+                       "a->dimensions[%llu] = %llu, i->dimensions[%llu] = %llu",
+                       j, a->dimensions[j], j, i->dimensions[j]);
     n[1] *= v->dimensions[j];
   }
 
@@ -472,7 +499,7 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
   if (err != GA_NO_ERROR)
     return err;
 
-  err = gen_take1_kernel(&k, GpuArray_context(a),
+  err = gen_take1_kernel(&k, ctx,
 #if DEBUG
                          &errstr,
 #else
@@ -539,6 +566,7 @@ out:
 }
 
 int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
+  gpucontext *ctx = GpuArray_context(a);
   GpuArray tv;
   size_t sz;
   ssize_t *strs;
@@ -547,7 +575,8 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
   int simple_move = 1;
 
   if (a->nd < v->nd)
-    return GA_VALUE_ERROR;
+    return error_fmt(ctx->err, GA_VALUE_ERROR, "Dimension error. "
+                     "a->nd = %llu, v->nd = %llu", a->nd, v->nd);
 
   if (!GpuArray_ISWRITEABLE(a))
     return GA_VALUE_ERROR;
@@ -559,9 +588,11 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
   for (i = 0; i < v->nd; i++) {
     if (v->dimensions[i] != a->dimensions[i+off]) {
       if (v->dimensions[i] != 1)
-	return GA_VALUE_ERROR;
+        return error_fmt(ctx->err, GA_VALUE_ERROR, "Shape error. "
+                         "v->dimensions[%u] = %llu, a->dimesions[%u + %u] = %llu",
+                         i, v->dimensions[i], i, off, a->dimensions[i + off]);
       else
-	simple_move = 0;
+        simple_move = 0;
     }
   }
 
@@ -576,7 +607,7 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
 
   strs = calloc(a->nd, sizeof(ssize_t));
   if (strs == NULL)
-    return GA_MEMORY_ERROR;
+    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
 
   for (i = off; i < a->nd; i++) {
     if (v->dimensions[i-off] == a->dimensions[i]) {
@@ -612,6 +643,7 @@ int GpuArray_reshape(GpuArray *res, const GpuArray *a, unsigned int nd,
 
 int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
                              const size_t *newdims, ga_order ord) {
+  gpucontext *ctx = GpuArray_context(a);
   ssize_t *newstrides;
   size_t *tmpdims;
   size_t np;
@@ -637,8 +669,8 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
     size_t d = newdims[i];
     /* Check for overflow */
     if ((d >= MUL_NO_OVERFLOW || newsize >= MUL_NO_OVERFLOW) &&
-	d > 0 && SIZE_MAX / d < newsize)
-      return GA_INVALID_ERROR;
+        d > 0 && SIZE_MAX / d < newsize)
+      return error_set(ctx->err, GA_XLARGE_ERROR, "Output array size greater than addressable space");
     newsize *= d;
   }
 
@@ -653,7 +685,7 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
 
   newstrides = calloc(nd, sizeof(ssize_t));
   if (newstrides == NULL)
-    return GA_MEMORY_ERROR;
+    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
 
   while (ni < nd && oi < a->nd) {
     np = newdims[ni];
@@ -707,7 +739,7 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
      Can't do the same with newdims (which is a parameter). */
   tmpdims = calloc(nd, sizeof(size_t));
   if (tmpdims == NULL) {
-    return GA_MEMORY_ERROR;
+    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
   }
   memcpy(tmpdims, newdims, nd*sizeof(size_t));
   a->nd = nd;
@@ -719,7 +751,7 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
   goto fix_flags;
  need_copy:
   free(newstrides);
-  return GA_COPY_ERROR;
+  return error_set(ctx->err, GA_COPY_ERROR, "Copy is needed but disallowed by parameters");
 
  do_final_copy:
   tmpdims = calloc(nd, sizeof(size_t));
@@ -727,7 +759,7 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
   if (tmpdims == NULL || newstrides == NULL) {
     free(tmpdims);
     free(newstrides);
-    return GA_MEMORY_ERROR;
+    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
   }
   memcpy(tmpdims, newdims, nd*sizeof(size_t));
   if (nd > 0) {
@@ -766,6 +798,7 @@ int GpuArray_transpose(GpuArray *res, const GpuArray *a,
 }
 
 int GpuArray_transpose_inplace(GpuArray *a, const unsigned int *new_axes) {
+  gpucontext *ctx = GpuArray_context(a);
   size_t *newdims;
   ssize_t *newstrs;
   unsigned int i;
@@ -777,7 +810,7 @@ int GpuArray_transpose_inplace(GpuArray *a, const unsigned int *new_axes) {
   if (newdims == NULL || newstrs == NULL) {
     free(newdims);
     free(newstrs);
-    return GA_MEMORY_ERROR;
+    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
   }
 
   for (i = 0; i < a->nd; i++) {
@@ -790,7 +823,9 @@ int GpuArray_transpose_inplace(GpuArray *a, const unsigned int *new_axes) {
         if (j == new_axes[k]) {
           free(newdims);
           free(newstrs);
-          return GA_VALUE_ERROR;
+          return error_fmt(ctx->err, GA_VALUE_ERROR,
+                           "Repeated axes in transpose: new_axes[%u] == new_axes[%u] == %u",
+                           i, k, j);
         }
     }
     newdims[i] = a->dimensions[j];
@@ -827,17 +862,24 @@ gpucontext *GpuArray_context(const GpuArray *a) {
 }
 
 int GpuArray_move(GpuArray *dst, const GpuArray *src) {
+  gpucontext *ctx = GpuArray_context(dst);
   size_t sz;
   unsigned int i;
   if (!GpuArray_ISWRITEABLE(dst))
-    return GA_VALUE_ERROR;
-  if (!GpuArray_ISALIGNED(src) || !GpuArray_ISALIGNED(dst))
-    return GA_UNALIGNED_ERROR;
+    return error_set(ctx->err, GA_VALUE_ERROR, "Destination array (dst) not writeable");
+  if (!GpuArray_ISALIGNED(src))
+    return error_set(ctx->err, GA_UNALIGNED_ERROR, "Source array (src) not aligned");
+  if (!GpuArray_ISALIGNED(dst))
+    return error_set(ctx->err, GA_UNALIGNED_ERROR, "Destination array (dst) not aligned");
   if (src->nd != dst->nd)
-    return GA_VALUE_ERROR;
+    return error_fmt(ctx->err, GA_VALUE_ERROR,
+                     "Dimension mismatch. src->nd = %llu, dst->nd = %llu",
+                     src->nd, dst->nd);
   for (i = 0; i < src->nd; i++) {
     if (src->dimensions[i] != dst->dimensions[i])
-      return GA_VALUE_ERROR;
+      return error_fmt(ctx->err, GA_VALUE_ERROR,
+                       "Dimension mismatch. src->dimensions[%u] = %llu, dst->dimensions[%u] = %llu",
+                       i, src->dimensions[i], i, dst->dimensions[i]);
   }
   if (!GpuArray_ISONESEGMENT(dst) || !GpuArray_ISONESEGMENT(src) ||
       GpuArray_ISFORTRAN(dst) != GpuArray_ISFORTRAN(src) ||
@@ -850,22 +892,25 @@ int GpuArray_move(GpuArray *dst, const GpuArray *src) {
 }
 
 int GpuArray_write(GpuArray *dst, const void *src, size_t src_sz) {
+  gpucontext *ctx = GpuArray_context(dst);
   if (!GpuArray_ISWRITEABLE(dst))
-    return GA_VALUE_ERROR;
+    return error_set(ctx->err, GA_VALUE_ERROR, "Destination array (dst) not writeable");
   if (!GpuArray_ISONESEGMENT(dst))
-    return GA_UNSUPPORTED_ERROR;
+    return error_set(ctx->err, GA_UNSUPPORTED_ERROR, "Destination array (dst) not one segment");
   return gpudata_write(dst->data, dst->offset, src, src_sz);
 }
 
 int GpuArray_read(void *dst, size_t dst_sz, const GpuArray *src) {
+  gpucontext *ctx = GpuArray_context(src);
   if (!GpuArray_ISONESEGMENT(src))
-    return GA_UNSUPPORTED_ERROR;
+    return error_set(ctx->err, GA_UNSUPPORTED_ERROR, "Array (src) not one segment");
   return gpudata_read(dst, src->data, src->offset, dst_sz);
 }
 
 int GpuArray_memset(GpuArray *a, int data) {
+  gpucontext *ctx = GpuArray_context(a);
   if (!GpuArray_ISONESEGMENT(a))
-    return GA_UNSUPPORTED_ERROR;
+    return error_set(ctx->err, GA_UNSUPPORTED_ERROR, "Array (a) not one segment");
   return gpudata_memset(a->data, a->offset, data);
 }
 
@@ -881,16 +926,17 @@ int GpuArray_copy(GpuArray *res, const GpuArray *a, ga_order order) {
 }
 
 int GpuArray_transfer(GpuArray *res, const GpuArray *a) {
+  gpucontext *ctx = GpuArray_context(res);
   size_t sz;
   unsigned int i;
 
   if (!GpuArray_ISONESEGMENT(res))
-    return GA_UNSUPPORTED_ERROR;
+    return error_set(ctx->err, GA_UNSUPPORTED_ERROR, "Array (res) not one segment");
   if (!GpuArray_ISONESEGMENT(a))
-    return GA_UNSUPPORTED_ERROR;
+    return error_set(ctx->err, GA_UNSUPPORTED_ERROR, "Array (a) not one segment");
 
   if (res->typecode != a->typecode)
-    return GA_UNSUPPORTED_ERROR;
+    return error_set(ctx->err, GA_UNSUPPORTED_ERROR, "typecode mismatch");
 
   sz = gpuarray_get_elsize(a->typecode);
   for (i = 0; i < a->nd; i++) sz *= a->dimensions[i];
@@ -900,6 +946,7 @@ int GpuArray_transfer(GpuArray *res, const GpuArray *a) {
 
 int GpuArray_split(GpuArray **rs, const GpuArray *a, size_t n, size_t *p,
                    unsigned int axis) {
+  gpucontext *ctx = GpuArray_context(a);
   size_t i;
   ssize_t *starts, *stops, *steps;
   int err;
@@ -912,7 +959,7 @@ int GpuArray_split(GpuArray **rs, const GpuArray *a, size_t n, size_t *p,
     free(starts);
     free(stops);
     free(steps);
-    return GA_MEMORY_ERROR;
+    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
   }
 
   for (i = 0; i < a->nd; i++) {
@@ -949,6 +996,7 @@ int GpuArray_split(GpuArray **rs, const GpuArray *a, size_t n, size_t *p,
 
 int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
                          unsigned int axis, int restype) {
+  gpucontext *ctx = GpuArray_context(as[0]);
   size_t *dims, *res_dims;
   size_t i, res_off;
   unsigned int p;
@@ -956,33 +1004,38 @@ int GpuArray_concatenate(GpuArray *r, const GpuArray **as, size_t n,
   int err = GA_NO_ERROR;
 
   if (axis >= as[0]->nd)
-    return GA_VALUE_ERROR;
+    return error_fmt(ctx->err, GA_VALUE_ERROR, "Invalid axis. "
+                     "axis = %u, as[0]->nd = %llu", axis, as[0]->nd);
 
   dims = calloc(as[0]->nd, sizeof(size_t));
   if (dims == NULL)
-    return GA_MEMORY_ERROR;
+    return error_fmt(ctx->err, GA_MEMORY_ERROR, "Out of memory");
 
   for (p = 0; p < as[0]->nd; p++) {
     dims[p] = as[0]->dimensions[p];
   }
 
   if (!GpuArray_ISALIGNED(as[0])) {
-    err = GA_UNALIGNED_ERROR;
+    err = error_set(ctx->err, GA_UNALIGNED_ERROR, "Unaligned array (as[0]).");
     goto afterloop;
   }
 
   for (i = 1; i < n; i++) {
     if (!GpuArray_ISALIGNED(as[i])) {
-      err = GA_UNALIGNED_ERROR;
+      err = error_fmt(ctx->err, GA_UNALIGNED_ERROR, "Unaligned array (as[%llu]).", i);
       goto afterloop;
     }
     if (as[i]->nd != as[0]->nd) {
-      err = GA_VALUE_ERROR;
+      err = error_fmt(ctx->err, GA_VALUE_ERROR, "Shape mismatch. "
+                      "as[%llu]->nd = %llu, as[0]->nd = %llu",
+                      i, as[i]->nd, as[0]->nd);
       goto afterloop;
     }
     for (p = 0; p < as[0]->nd; p++) {
       if (p != axis && dims[p] != as[i]->dimensions[p]) {
-        err = GA_VALUE_ERROR;
+        err = error_fmt(ctx->err, GA_VALUE_ERROR, "Dimension mismatch. "
+                        "as[%llu]->dimensions[%u] = %llu, as[0]->dimensions[%u] = %llu",
+                        i, p, as[i]->dimensions[p], p, dims[p]);
         goto afterloop;
       } else if (p == axis) {
         dims[p] += as[i]->dimensions[p];
@@ -1067,6 +1120,7 @@ void GpuArray_fprintf(FILE *fd, const GpuArray *a) {
 }
 
 int GpuArray_fdump(FILE *fd, const GpuArray *a) {
+  gpucontext *ctx = GpuArray_context(a);
   char *buf, *p;
   size_t s = GpuArray_ITEMSIZE(a);
   size_t k;
@@ -1078,7 +1132,7 @@ int GpuArray_fdump(FILE *fd, const GpuArray *a) {
 
   buf = malloc(s);
   if (buf == NULL)
-    return GA_MEMORY_ERROR;
+    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
 
   err = GpuArray_read(buf, s, a);
   if (err != GA_NO_ERROR) {
