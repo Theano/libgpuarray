@@ -49,6 +49,9 @@ cdef class arg:
         memset(&self.a, 0, sizeof(gpuelemwise_arg))
 
     def __init__(self, name, type, read=False, write=False, scalar=False):
+        # Make sure to clear previous storage
+        # __init__ may be called more than once
+        free(self.a.name)
         self.a.name = strdup(to_bytes(name))
         if self.a.name is NULL:
             raise MemoryError
@@ -62,6 +65,9 @@ cdef class arg:
             self.a.flags |= GE_SCALAR
         if self.a.flags == 0:
             raise ValueError('no flags specified for arg %s' % (name,))
+
+    def __dealloc__(self):
+        free(self.a.name)
 
     property name:
         def __get__(self):
