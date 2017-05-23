@@ -180,7 +180,6 @@ static inline ncclDataType_t convert_data_type(int typecode) {
   case GA_LONG: return ncclInt64;
   case GA_ULONG: return ncclUint64;
   case GA_HALF: return ncclHalf;
-  case GA_FLOAT16: return ncclHalf;
   }
   return nccl_NUM_TYPES;
 }
