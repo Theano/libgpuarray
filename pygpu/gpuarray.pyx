@@ -2455,7 +2455,7 @@ cdef class GpuKernel:
                     raise ValueError, "nd mismatch for gs (int)"
                 gs[0] = py_gs
             elif isinstance(py_gs, (list, tuple)):
-                if len(py_gs) < 3:
+                if len(py_gs) > 3:
                     raise ValueError, "gs is not of length 3 or less"
                 if len(py_ls) != nd:
                     raise ValueError, "nd mismatch for gs (tuple)"
