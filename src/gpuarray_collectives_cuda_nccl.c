@@ -236,8 +236,9 @@ static inline int check_restrictions(gpudata *src, size_t offsrc,
 static int reduce(gpudata *src, size_t offsrc, gpudata *dest, size_t offdest,
                   size_t count, int typecode, int opcode, int root,
                   gpucomm *comm) {
-  ncclRedOp_t op;
-  ncclDataType_t datatype;
+  // need dummy init so that compiler shuts up
+  ncclRedOp_t op = nccl_NUM_OPS;
+  ncclDataType_t datatype = nccl_NUM_TYPES;
   gpudata *dst = NULL;
   int rank = 0;
   cuda_context *ctx;
@@ -285,8 +286,9 @@ static int reduce(gpudata *src, size_t offsrc, gpudata *dest, size_t offdest,
 static int all_reduce(gpudata *src, size_t offsrc, gpudata *dest,
                       size_t offdest, size_t count, int typecode, int opcode,
                       gpucomm *comm) {
-  ncclRedOp_t op;
-  ncclDataType_t datatype;
+  // need dummy init so that compiler shuts up
+  ncclRedOp_t op = nccl_NUM_OPS;
+  ncclDataType_t datatype = nccl_NUM_TYPES;
   cuda_context *ctx;
 
   ASSERT_BUF(src);
@@ -322,8 +324,9 @@ static int all_reduce(gpudata *src, size_t offsrc, gpudata *dest,
 static int reduce_scatter(gpudata *src, size_t offsrc, gpudata *dest,
                           size_t offdest, size_t count, int typecode,
                           int opcode, gpucomm *comm) {
-  ncclRedOp_t op;
-  ncclDataType_t datatype;
+  // need dummy init so that compiler shuts up
+  ncclRedOp_t op = nccl_NUM_OPS;
+  ncclDataType_t datatype = nccl_NUM_TYPES;
   int ndev = 0;
   size_t resc_size;
   cuda_context *ctx;
@@ -367,7 +370,8 @@ static int reduce_scatter(gpudata *src, size_t offsrc, gpudata *dest,
  */
 static int broadcast(gpudata *array, size_t offset, size_t count, int typecode,
                      int root, gpucomm *comm) {
-  ncclDataType_t datatype;
+  // need dummy init so that compiler shuts up
+  ncclDataType_t datatype = nccl_NUM_TYPES;
   int rank = 0;
   cuda_context *ctx;
 
@@ -406,7 +410,8 @@ static int broadcast(gpudata *array, size_t offset, size_t count, int typecode,
 static int all_gather(gpudata *src, size_t offsrc, gpudata *dest,
                       size_t offdest, size_t count, int typecode,
                       gpucomm *comm) {
-  ncclDataType_t datatype;
+  // need dummy init so that compiler shuts up
+  ncclDataType_t datatype = nccl_NUM_TYPES;
   int ndev = 0;
   size_t resc_size;
   cuda_context *ctx;

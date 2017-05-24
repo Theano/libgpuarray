@@ -58,7 +58,7 @@ static int cl_get_device_count(unsigned int platform, unsigned int* devcount) {
   cl_platform_id p;
   cl_uint numd;
   cl_int err;
-  unsigned int platcount;
+  unsigned int platcount = 0;
 
   /* This will load the library if needed */
   GA_CHECK(cl_get_platform_count(&platcount));
