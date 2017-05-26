@@ -4,7 +4,8 @@ from .dtypes import dtype_to_ctype, get_common_dtype
 from . import gpuarray
 from ._elemwise import GpuElemwise, arg
 
-__all__ = ['GpuElemwise', 'elemwise1', 'elemwise2', 'ielemwise2', 'compare']
+__all__ = ['GpuElemwise', 'arg', 'as_argument',
+           'elemwise1', 'elemwise2', 'ielemwise2', 'compare']
 
 
 def _dtype(o):
