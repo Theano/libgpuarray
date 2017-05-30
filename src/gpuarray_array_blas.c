@@ -445,7 +445,7 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
 }
 
 static inline int is_last_2d_contiguous(const GpuArray *a) {
-  size_t size = GpuArray_ITEMSIZE(a);
+  ssize_t size = GpuArray_ITEMSIZE(a);
 
   if (GpuArray_IS_C_CONTIGUOUS(a))
     return 1; // C contiguous
