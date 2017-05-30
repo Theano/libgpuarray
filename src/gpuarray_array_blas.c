@@ -217,7 +217,7 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
     return GA_INVALID_ERROR;
 
   if (A->nd != 2 || B->nd != 2 || C->nd != 2 ||
-      A->typecode != A->typecode || B->typecode != A->typecode ||
+      B->typecode != A->typecode ||
       C->typecode != A->typecode)
     return GA_VALUE_ERROR;
 
@@ -367,7 +367,7 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
     return GA_INVALID_ERROR;
 
   if (X->nd != 1 || Y->nd != 1 || A->nd != 2 ||
-      X->typecode != X->typecode || Y->typecode != X->typecode ||
+      Y->typecode != X->typecode ||
       A->typecode != X->typecode)
     return GA_VALUE_ERROR;
 
@@ -445,7 +445,7 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
 }
 
 static inline int is_last_2d_contiguous(const GpuArray *a) {
-  size_t size = GpuArray_ITEMSIZE(a);
+  ssize_t size = GpuArray_ITEMSIZE(a);
 
   if (GpuArray_IS_C_CONTIGUOUS(a))
     return 1; // C contiguous
@@ -483,7 +483,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
     return GA_INVALID_ERROR;
 
   if (A->nd != 3 || B->nd != 3 || C->nd != 3 ||
-      A->typecode != A->typecode || B->typecode != A->typecode ||
+      B->typecode != A->typecode ||
       C->typecode != A->typecode)
     return GA_VALUE_ERROR;
 
