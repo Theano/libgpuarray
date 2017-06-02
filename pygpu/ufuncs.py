@@ -765,9 +765,13 @@ def binary_ufunc(a, b, ufunc_name, out=None):
             else:
                 b = numpy.asarray(b, dtype=numpy.result_type(a, b))
 
-        if b.flags.f_contiguous and not b.flags.c_contiguous:
-            order = 'F'
+        if isinstance(b, numpy.ndarray):
+            if b.flags.f_contiguous and not b.flags.c_contiguous:
+                order = 'F'
+            else:
+                order = 'C'
         else:
+            b = numpy.asarray(b)
             order = 'C'
         b = array(b, dtype=b.dtype, copy=False, order=order, context=ctx,
                   cls=cls)
