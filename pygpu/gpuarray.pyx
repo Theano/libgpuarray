@@ -2229,13 +2229,40 @@ cdef class GpuArray:
         def __get__(self):
             return self.ga.offset
 
-    property gpudata:
-        "Return a pointer to the raw backend object."
+    property data:
+        """Return a pointer to the raw OpenCL buffer object.
+
+        This will fail for arrays that have an offset.
+        """
         def __get__(self):
+            if self.context.kind != b"opencl":
+                raise TypeError("This is for OpenCL arrays.")
+            if self.offset != 0:
+                raise ValueError("This array has an offset.")
             # This wizadry grabs the actual backend pointer since it's
             # guarenteed to be the first element of the gpudata
             # structure.
             return <size_t>((<void **>self.ga.data)[0])
+
+    property base_data:
+        "Return a pointer to the backing OpenCL object."
+        def __get__(self):
+            if self.context.kind != b"opencl":
+                raise TypeError("This is for OpenCL arrays.")
+            # This wizadry grabs the actual backend pointer since it's
+            # guarenteed to be the first element of the gpudata
+            # structure.
+            return <size_t>((<void **>self.ga.data)[0])
+
+    property gpudata:
+        "Return a pointer to the raw backend object."
+        def __get__(self):
+            if self.context.kind != b"cuda":
+                raise TypeError("This is for CUDA arrays.")
+            # This wizadry grabs the actual backend pointer since it's
+            # guarenteed to be the first element of the gpudata
+            # structure.
+            return <size_t>((<void **>self.ga.data)[0]) + self.offset
 
     def __str__(self):
         return str(numpy.asarray(self))
