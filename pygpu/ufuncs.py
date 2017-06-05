@@ -340,24 +340,29 @@ BINARY_C_FUNC_TO_UFUNC = {
     'fmod': 'fmod',
 }
 BINARY_UFUNC_TO_C_FUNC = {v: k for k, v in BINARY_C_FUNC_TO_UFUNC.items()}
-BINARY_UFUNC_TO_C_OP = {
+BINARY_UFUNC_TO_C_BINOP = {
     'add': '+',
     'bitwise_and': '&',
     'bitwise_or': '|',
     'bitwise_xor': '^',
-    'equal': '==',
-    'greater': '>',
-    'greater_equal': '>=',
     'left_shift': '<<',
-    'less': '<',
-    'less_equal': '<=',
     'logical_and': '&&',
     'logical_or': '||',
     'multiply': '*',
-    'not_equal': '!=',
     'right_shift': '>>',
     'subtract': '-',
     }
+BINARY_UFUNC_TO_C_CMP = {
+    'equal': '==',
+    'greater': '>',
+    'greater_equal': '>=',
+    'less': '<',
+    'less_equal': '<=',
+    'not_equal': '!=',
+    }
+BINARY_UFUNC_TO_C_OP = {}
+BINARY_UFUNC_TO_C_OP.update(BINARY_UFUNC_TO_C_BINOP)
+BINARY_UFUNC_TO_C_OP.update(BINARY_UFUNC_TO_C_CMP)
 BINARY_UFUNCS = (list(BINARY_UFUNC_TO_C_FUNC.keys()) +
                  list(BINARY_UFUNC_TO_C_OP.keys()))
 BINARY_UFUNCS.extend(['floor_divide', 'true_divide', 'logical_xor',
@@ -1063,6 +1068,191 @@ UFUNC_SYNONYMS = [
     ]
 
 
+# --- Reductions from binary ufuncs --- #
+
+
+def make_binary_ufunc_reduce(name):
+
+    npy_ufunc = getattr(numpy, name)
+
+    binop = BINARY_UFUNC_TO_C_BINOP.get(name, None)
+    if binop is not None:
+
+        def reduce_wrapper(a, axis=0, dtype=None, out=None, keepdims=False):
+            return reduce_with_op(a, binop, npy_ufunc.identity, axis, dtype,
+                                  out, keepdims)
+
+        return reduce_wrapper
+
+    cmp = BINARY_UFUNC_TO_C_CMP.get(name, None)
+    if cmp is not None:
+
+        def reduce_wrapper(a, axis=0, dtype=None, out=None, keepdims=False):
+            return reduce_with_cmp(a, cmp, npy_ufunc.identity, axis, dtype,
+                                   out, keepdims)
+
+        return reduce_wrapper
+
+    # TODO: add reduction with binary function, not possible currently since
+    # no sensible "neutral" can be defined. We need a variant of `reduce1`
+    # that initializes the accumulator with the first element along a given
+    # reduction axis.
+    return None
+
+
+# --- Add (incomplete) ufunc class --- #
+
+
+# TODO: find out how to use one Ufunc class with __call__ signature depending
+# on nin and nout. What doesn't work:
+# - Setting __call__ on the class in __new__ since later instantiations of
+#   the class overwrite previous ones (only one class object)
+#   object will not be registered as callable
+# - Setting __call__ on an instance (in __new__ or __init__), since the
+#   object will not be registered as callable
+# - Metaclass using __call__, need to find a more complete reference
+#
+# We need some way of setting __call__ on the class, but making one copy of
+# the class per call signature. Not sure how that makes any sense though...
+
+
+class UfuncBase(object):
+
+    def __init__(self, name, nin, nout, call, **kwargs):
+        self.name = name
+        self.nin = nin
+        self.nout = nout
+        self.nargs = self.nin + self.nout
+        self._call = call
+
+        self.identity = kwargs.pop('identity', None)
+
+        # Wrappers for numpy methods that take care of the array conversions
+
+        def _at_not_impl(self, a, indices, b=None):
+            """Not implemented."""
+            raise NotImplementedError
+
+        def _accumulate_wrapper(array, axis=0, dtype=None, out=None,
+                                keepdims=None):
+            if out is not None:
+                out_ndarray = numpy.asarray(out)
+                out_ndarray = self._npy_accumulate(array, axis, dtype,
+                                                   out_ndarray, keepdims)
+                out[:] = out_ndarray
+            else:
+                ctx = getattr(array, 'context', None)
+                out_ndarray = self._npy_accumulate(array, axis, dtype,
+                                                   None, keepdims)
+                out = array(out_ndarray, context=ctx, cls=ndgpuarray)
+
+            return out
+
+        def _outer_wrapper(A, B, **kwargs):
+            out = kwargs.pop('out', None)
+            if out is not None:
+                out_ndarray = numpy.asarray(out)
+                out_ndarray = self._npy_outer(A, B, out=out_ndarray, **kwargs)
+                out[:] = out_ndarray
+            else:
+                ctx = getattr(array, 'context', None)
+                out_ndarray = self._npy_outer(A, B, **kwargs)
+                out = array(out_ndarray, context=ctx, cls=ndgpuarray)
+
+            return out
+
+        def _reduce_wrapper(a, axis=0, dtype=None, out=None,
+                            keepdims=False):
+            if out is not None:
+                out_ndarray = numpy.asarray(out)
+                out_ndarray = self._npy_reduce(a, axis, dtype, out_ndarray,
+                                               keepdims)
+                out[:] = out_ndarray
+            else:
+                ctx = getattr(a, 'context', None)
+                out_ndarray = self._npy_reduce(a, axis, dtype, None,
+                                               keepdims)
+                if numpy.isscalar(out_ndarray):
+                    out = out_ndarray
+                else:
+                    out = array(out_ndarray, context=ctx, cls=ndgpuarray)
+
+            return out
+
+        def _reduceat_wrapper(a, indices, axis=0, dtype=None, out=None):
+            if out is not None:
+                out_ndarray = numpy.asarray(out)
+                out_ndarray = self._npy_reduceat(a, indices, axis, dtype,
+                                                 out_ndarray)
+                out[:] = out_ndarray
+            else:
+                ctx = getattr(a, 'context', None)
+                out_ndarray = self._npy_reduceat(a, indices, axis, dtype,
+                                                 None)
+                if numpy.isscalar(out_ndarray):
+                    out = out_ndarray
+                else:
+                    out = array(out_ndarray, context=ctx, cls=ndgpuarray)
+
+            return out
+
+        numpy_ufunc = getattr(numpy, name)
+
+        self.accumulate = kwargs.pop('accumulate', _accumulate_wrapper)
+        self.accumulate.__name__ = self.accumulate.__qualname__ = 'accumulate'
+        self._npy_accumulate = numpy_ufunc.accumulate
+
+        self.at = kwargs.pop('at', _at_not_impl)
+        self.at.__qualname__ = name + '.at'
+        self.at.__name__ = 'at'
+
+        self.outer = kwargs.pop('outer', _outer_wrapper)
+        self.outer.__name__ = 'outer'
+        self.outer.__qualname__ = name + '.outer'
+        self._npy_outer = numpy_ufunc.outer
+
+        reduce = kwargs.pop('reduce', None)
+        if reduce is None:
+            self.reduce = _reduce_wrapper
+        else:
+            self.reduce = reduce
+        self.reduce.__name__ = 'reduce'
+        self.reduce.__qualname__ = name + '.reduce'
+        self._npy_reduce = numpy_ufunc.reduce
+
+        self.reduceat = kwargs.pop('reduceat', _reduceat_wrapper)
+        self.reduceat.__name__ = 'reduceat'
+        self.reduceat.__qualname__ = name + '.reduceat'
+        self._npy_reduceat = numpy_ufunc.reduceat
+
+    def __repr__(self):
+        return '<ufunc {}>'.format(self.name)
+
+
+class Ufunc01(UfuncBase):
+
+    def __call__(self, out=None):
+        return self._call(out=out)
+
+
+class Ufunc11(UfuncBase):
+
+    def __call__(self, x, out=None):
+        return self._call(x, out=out)
+
+
+class Ufunc12(UfuncBase):
+
+    def __call__(self, x, out1=None, out2=None):
+        return self._call(x, out1=out1, out2=out2)
+
+
+class Ufunc21(UfuncBase):
+
+    def __call__(self, x1, x2, out=None):
+        return self._call(x1, x2, out=out)
+
+
 # --- Add ufuncs to global namespace --- #
 
 
@@ -1077,17 +1267,15 @@ def make_unary_ufunc(name, doc):
 # Add the ufuncs to the module dictionary
 for ufunc_name in UNARY_UFUNCS:
     npy_ufunc = getattr(numpy, ufunc_name)
+    assert npy_ufunc.nin == 1
+    assert npy_ufunc.nout == 1
     descr = npy_ufunc.__doc__.splitlines()[2]
     # Numpy occasionally uses single ticks for doc, we only use them for links
-    descr = re.sub('`+', '``', descr)
-    doc = descr + """
-
-See Also
---------
-numpy.{}
-""".format(ufunc_name)
-
-    globals()[ufunc_name] = make_unary_ufunc(ufunc_name, doc)
+    doc = re.sub('`+', '``', descr)
+    ufunc = Ufunc11(ufunc_name, nin=1, nout=1,
+                    call=make_unary_ufunc(ufunc_name, doc),
+                    identity=npy_ufunc.identity)
+    globals()[ufunc_name] = ufunc
 
 
 def make_unary_ufunc_two_out(name, doc):
@@ -1103,15 +1291,11 @@ for ufunc_name in UNARY_UFUNCS_TWO_OUT:
     npy_ufunc = getattr(numpy, ufunc_name)
     descr = npy_ufunc.__doc__.splitlines()[2]
     # Numpy occasionally uses single ticks for doc, we only use them for links
-    descr = re.sub('`+', '``', descr)
-    doc = descr + """
-
-See Also
---------
-numpy.{}
-""".format(ufunc_name)
-
-    globals()[ufunc_name] = make_unary_ufunc_two_out(ufunc_name, doc)
+    doc = re.sub('`+', '``', descr)
+    ufunc = Ufunc12(ufunc_name, nin=1, nout=2,
+                    call=make_unary_ufunc_two_out(ufunc_name, doc),
+                    identity=npy_ufunc.identity)
+    globals()[ufunc_name] = ufunc
 
 
 def make_binary_ufunc(name, doc):
@@ -1127,15 +1311,12 @@ for ufunc_name in BINARY_UFUNCS:
     npy_ufunc = getattr(numpy, ufunc_name)
     descr = npy_ufunc.__doc__.splitlines()[2]
     # Numpy occasionally uses single ticks for doc, we only use them for links
-    descr = re.sub('`+', '``', descr)
-    doc = descr + """
-
-See Also
---------
-numpy.{}
-""".format(ufunc_name)
-
-    globals()[ufunc_name] = make_binary_ufunc(ufunc_name, doc)
+    doc = re.sub('`+', '``', descr)
+    ufunc = Ufunc21(ufunc_name, nin=2, nout=1,
+                    call=make_binary_ufunc(ufunc_name, doc),
+                    identity=npy_ufunc.identity,
+                    reduce=make_binary_ufunc_reduce(ufunc_name))
+    globals()[ufunc_name] = ufunc
 
 
 for name, alt_name in UFUNC_SYNONYMS:
