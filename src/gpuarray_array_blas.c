@@ -625,65 +625,34 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   if (err != GA_NO_ERROR)
     goto cleanup;
 
-  if(C->typecode == GA_HALF){
-    //TODO: handle offset
-    assert (Ap->offset == 0);
-    assert (Bp->offset == 0);
-    assert (Cp->offset == 0);
-    //TODO: float should be half
-    err = gpublas_hgemmStridedBatch(o, transA, transB, m, n, k, alpha,
-				    Ap->data, lda, Ap->strides[0]/elsize,
-				    Bp->data, ldb, Bp->strides[0]/elsize,
-				    beta,
-				    Cp->data, ldc, Cp->strides[0]/elsize,
-				    batchCount, 0);
-    goto cleanup;
-  }
-
-  A_datas = (gpudata**)malloc(batchCount * sizeof(gpudata*));
-  B_datas = (gpudata**)malloc(batchCount * sizeof(gpudata*));
-  C_datas = (gpudata**)malloc(batchCount * sizeof(gpudata*));
-
-  A_offsets = (size_t*)malloc(batchCount * sizeof(size_t));
-  B_offsets = (size_t*)malloc(batchCount * sizeof(size_t));
-  C_offsets = (size_t*)malloc(batchCount * sizeof(size_t));
-
-  for (i = 0; i < batchCount; i++) {
-    A_datas[i] = Ap->data;
-    B_datas[i] = Bp->data;
-    C_datas[i] = Cp->data;
-    A_offsets[i] = (Ap->offset + i * Ap->strides[0]) / elsize;
-    B_offsets[i] = (Bp->offset + i * Bp->strides[0]) / elsize;
-    C_offsets[i] = (Cp->offset + i * Cp->strides[0]) / elsize;
-  }
-
   switch (C->typecode) {
   case GA_HALF:
-    err = gpublas_hgemmBatch(o, transA, transB, m, n, k, (float)alpha,
-                             A_datas, A_offsets, lda,
-                             B_datas, B_offsets, ldb,
-                             (float)beta,
-                             C_datas, C_offsets, ldc, batchCount, 0);
+    err = gpublas_hgemm3d(o, transA, transB, m, n, k, (float)alpha,
+                          Ap->data, Ap->offset/elsize, lda, Ap->strides[0]/elsize,
+                          Bp->data, Bp->offset/elsize, ldb, Bp->strides[0]/elsize,
+                          (float)beta,
+                          Cp->data, Cp->offset/elsize, ldc, Cp->strides[0]/elsize,
+                          batchCount, 0);
     break;
   case GA_FLOAT:
-    err = gpublas_sgemmBatch(o, transA, transB, m, n, k, (float)alpha,
-                             A_datas, A_offsets, lda,
-                             B_datas, B_offsets, ldb,
-                             (float)beta,
-                             C_datas, C_offsets, ldc, batchCount, 0);
+    err = gpublas_sgemm3d(o, transA, transB, m, n, k, (float)alpha,
+                          Ap->data, Ap->offset/elsize, lda, Ap->strides[0]/elsize,
+                          Bp->data, Bp->offset/elsize, ldb, Bp->strides[0]/elsize,
+                          (float)beta,
+                          Cp->data, Cp->offset/elsize, ldc, Cp->strides[0]/elsize,
+                          batchCount, 0);
     break;
   case GA_DOUBLE:
-    err = gpublas_dgemmBatch(o, transA, transB, m, n, k, (double)alpha,
-                             A_datas, A_offsets, lda,
-                             B_datas, B_offsets, ldb,
-                             (double)beta,
-                             C_datas, C_offsets, ldc, batchCount, 0);
+    err = gpublas_dgemm3d(o, transA, transB, m, n, k, (double)alpha,
+                          Ap->data, Ap->offset/elsize, lda, Ap->strides[0]/elsize,
+                          Bp->data, Bp->offset/elsize, ldb, Bp->strides[0]/elsize,
+                          (double)beta,
+                          Cp->data, Cp->offset/elsize, ldc, Cp->strides[0]/elsize,
+                          batchCount, 0);
     break;
   }
 
   cleanup:
-  free(A_datas); free(B_datas); free(C_datas);
-  free(A_offsets); free(B_offsets); free(C_offsets);
   if (Ap == &copyA)
     GpuArray_clear(&copyA);
   if (Bp == &copyB)
