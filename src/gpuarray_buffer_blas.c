@@ -169,19 +169,6 @@ int gpublas_hgemmBatch(
              B, offB, ldb, beta, C, offC, ldc, batchCount));
 }
 
-//TODO: use half and not float here.
-int gpublas_hgemmStridedBatch(
-    cb_order order, cb_transpose transA, cb_transpose transB,
-    size_t M, size_t N, size_t K, float alpha,
-    gpudata *A, size_t lda, ssize_t strideA,
-    gpudata *B, size_t ldb, ssize_t strideB,
-    float beta, gpudata *C, size_t ldc, ssize_t strideC,
-    size_t batchCount, int flags) {
-  BLAS_OPF(A, hgemmStridedBatch,
-           (order, transA, transB, M, N, K, alpha, A, lda, strideA,
-            B, ldb, strideB, beta, C, ldc, strideC, batchCount));
-}
-
 int gpublas_sgemmBatch(
   cb_order order, cb_transpose transA, cb_transpose transB,
   size_t M, size_t N, size_t K, float alpha,
@@ -270,4 +257,41 @@ int gpublas_dgerBatch(cb_order order, size_t M, size_t N, double alpha,
   BLAS_OPB(x, dgerBatch,
            (order, M, N, alpha, x, offX, incX, y, offY, incY,
             A, offA, lda, batchCount, flags));
+}
+
+
+int gpublas_hgemm3d(
+    cb_order order, cb_transpose transA, cb_transpose transB,
+    size_t M, size_t N, size_t K, float alpha,
+    gpudata *A, size_t lda, ssize_t strideA,
+    gpudata *B, size_t ldb, ssize_t strideB,
+    float beta, gpudata *C, size_t ldc, ssize_t strideC,
+    size_t batchCount, int flags) {
+  BLAS_OPBF(A, hgemm3d,
+            (order, transA, transB, M, N, K, alpha, A, lda, strideA,
+             B, ldb, strideB, beta, C, ldc, strideC, batchCount));
+}
+
+int gpublas_sgemm3d(
+    cb_order order, cb_transpose transA, cb_transpose transB,
+    size_t M, size_t N, size_t K, float alpha,
+    gpudata *A, size_t lda, ssize_t strideA,
+    gpudata *B, size_t ldb, ssize_t strideB,
+    float beta, gpudata *C, size_t ldc, ssize_t strideC,
+    size_t batchCount, int flags) {
+  BLAS_OPBF(A, sgemm3d,
+            (order, transA, transB, M, N, K, alpha, A, lda, strideA,
+             B, ldb, strideB, beta, C, ldc, strideC, batchCount));
+}
+
+int gpublas_dgemm3d(
+    cb_order order, cb_transpose transA, cb_transpose transB,
+    size_t M, size_t N, size_t K, float alpha,
+    gpudata *A, size_t lda, ssize_t strideA,
+    gpudata *B, size_t ldb, ssize_t strideB,
+    float beta, gpudata *C, size_t ldc, ssize_t strideC,
+    size_t batchCount, int flags) {
+  BLAS_OPBF(A, dgemm3d,
+            (order, transA, transB, M, N, K, alpha, A, lda, strideA,
+             B, ldb, strideB, beta, C, ldc, strideC, batchCount));
 }
