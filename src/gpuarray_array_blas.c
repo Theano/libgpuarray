@@ -482,9 +482,6 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   cb_order o;
   int cA, cB, cC;
   int err;
-  gpudata **A_datas = NULL, **B_datas = NULL, **C_datas = NULL;
-  size_t *A_offsets = NULL, *B_offsets = NULL, *C_offsets = NULL;
-  size_t i;
 
   if (A->typecode != GA_FLOAT && A->typecode != GA_DOUBLE && A->typecode != GA_HALF)
     return error_set(ctx->err, GA_INVALID_ERROR, "Unsupported dtype");
@@ -627,7 +624,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
 
   switch (C->typecode) {
   case GA_HALF:
-    err = gpublas_hgemm3d(o, transA, transB, m, n, k, (float)alpha,
+    err = gpublas_hgemm3D(o, transA, transB, m, n, k, (float)alpha,
                           Ap->data, Ap->offset/elsize, lda, Ap->strides[0]/elsize,
                           Bp->data, Bp->offset/elsize, ldb, Bp->strides[0]/elsize,
                           (float)beta,
@@ -635,7 +632,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
                           batchCount, 0);
     break;
   case GA_FLOAT:
-    err = gpublas_sgemm3d(o, transA, transB, m, n, k, (float)alpha,
+    err = gpublas_sgemm3D(o, transA, transB, m, n, k, (float)alpha,
                           Ap->data, Ap->offset/elsize, lda, Ap->strides[0]/elsize,
                           Bp->data, Bp->offset/elsize, ldb, Bp->strides[0]/elsize,
                           (float)beta,
@@ -643,7 +640,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
                           batchCount, 0);
     break;
   case GA_DOUBLE:
-    err = gpublas_dgemm3d(o, transA, transB, m, n, k, (double)alpha,
+    err = gpublas_dgemm3D(o, transA, transB, m, n, k, (double)alpha,
                           Ap->data, Ap->offset/elsize, lda, Ap->strides[0]/elsize,
                           Bp->data, Bp->offset/elsize, ldb, Bp->strides[0]/elsize,
                           (double)beta,

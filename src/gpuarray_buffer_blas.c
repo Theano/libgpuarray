@@ -260,38 +260,48 @@ int gpublas_dgerBatch(cb_order order, size_t M, size_t N, double alpha,
 }
 
 
-int gpublas_hgemm3d(
+#define BLAS_OP3F(b, name, args)                                        \
+  gpucontext *ctx;                                                      \
+  if (batchCount == 0) return GA_NO_ERROR;                              \
+  ctx = gpudata_context(b);                                             \
+  if (flags != 0) return error_set(ctx->err, GA_INVALID_ERROR, "flags is not 0"); \
+  if (ctx->blas_ops->name)                                              \
+    return ctx->blas_ops->name args;                                    \
+  else                                                                  \
+    return error_fmt(ctx->err, GA_DEVSUP_ERROR, "Blas operation not supported by library in use: %s", #name)
+
+int gpublas_hgemm3D(
     cb_order order, cb_transpose transA, cb_transpose transB,
     size_t M, size_t N, size_t K, float alpha,
-    gpudata *A, size_t lda, ssize_t strideA,
-    gpudata *B, size_t ldb, ssize_t strideB,
-    float beta, gpudata *C, size_t ldc, ssize_t strideC,
+    gpudata *A, size_t offA, size_t lda, ssize_t strideA,
+    gpudata *B, size_t offB, size_t ldb, ssize_t strideB,
+    float beta, gpudata *C, size_t offC, size_t ldc, ssize_t strideC,
     size_t batchCount, int flags) {
-  BLAS_OPBF(A, hgemm3d,
-            (order, transA, transB, M, N, K, alpha, A, lda, strideA,
-             B, ldb, strideB, beta, C, ldc, strideC, batchCount));
+  BLAS_OP3F(A, hgemm3D,
+            (order, transA, transB, M, N, K, alpha, A, offA, lda, strideA,
+             B, offB, ldb, strideB, beta, C, offC, ldc, strideC, batchCount));
 }
 
-int gpublas_sgemm3d(
+int gpublas_sgemm3D(
     cb_order order, cb_transpose transA, cb_transpose transB,
     size_t M, size_t N, size_t K, float alpha,
-    gpudata *A, size_t lda, ssize_t strideA,
-    gpudata *B, size_t ldb, ssize_t strideB,
-    float beta, gpudata *C, size_t ldc, ssize_t strideC,
+    gpudata *A, size_t offA, size_t lda, ssize_t strideA,
+    gpudata *B, size_t offB, size_t ldb, ssize_t strideB,
+    float beta, gpudata *C, size_t offC, size_t ldc, ssize_t strideC,
     size_t batchCount, int flags) {
-  BLAS_OPBF(A, sgemm3d,
-            (order, transA, transB, M, N, K, alpha, A, lda, strideA,
-             B, ldb, strideB, beta, C, ldc, strideC, batchCount));
+  BLAS_OP3F(A, sgemm3D,
+            (order, transA, transB, M, N, K, alpha, A, offA, lda, strideA,
+             B, offB, ldb, strideB, beta, C, offC, ldc, strideC, batchCount));
 }
 
-int gpublas_dgemm3d(
+int gpublas_dgemm3D(
     cb_order order, cb_transpose transA, cb_transpose transB,
-    size_t M, size_t N, size_t K, float alpha,
-    gpudata *A, size_t lda, ssize_t strideA,
-    gpudata *B, size_t ldb, ssize_t strideB,
-    float beta, gpudata *C, size_t ldc, ssize_t strideC,
+    size_t M, size_t N, size_t K, double alpha,
+    gpudata *A, size_t offA, size_t lda, ssize_t strideA,
+    gpudata *B, size_t offB, size_t ldb, ssize_t strideB,
+    double beta, gpudata *C, size_t offC, size_t ldc, ssize_t strideC,
     size_t batchCount, int flags) {
-  BLAS_OPBF(A, dgemm3d,
-            (order, transA, transB, M, N, K, alpha, A, lda, strideA,
-             B, ldb, strideB, beta, C, ldc, strideC, batchCount));
+  BLAS_OP3F(A, dgemm3D,
+            (order, transA, transB, M, N, K, alpha, A, offA, lda, strideA,
+             B, offB, ldb, strideB, beta, C, offC, ldc, strideC, batchCount));
 }

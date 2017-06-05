@@ -533,7 +533,7 @@ static int hgemm3D(cb_order order, cb_transpose transA, cb_transpose transB,
   ctx = A->ctx;
 
   if (cublasHgemmStridedBatched == NULL)
-    return error_set(ctx->error, GA_DEVSUP_ERROR, "cublasHgemmStridedBatched not available in your version of cuBLAS");
+    return error_set(ctx->err, GA_DEVSUP_ERROR, "cublasHgemmStridedBatched not available in your version of cuBLAS");
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
       LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
@@ -573,11 +573,11 @@ static int hgemm3D(cb_order order, cb_transpose transA, cb_transpose transB,
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C, CUDA_WAIT_ALL));
   err = cublasHgemmStridedBatched(h->h,
 				  convT(transA), convT(transB),
-				  M, N, K, &halpha,
+				  M, N, K, (__half *)&halpha,
 				  ((__half *)A->ptr) + offA, lda, strideA,
 				  ((__half *)B->ptr) + offB, ldb, strideB,
-				  &hbeta,
-				  ((__half *)C->ptr) + offC, ldc, strideB,
+				  (__half *)&hbeta,
+				  ((__half *)C->ptr) + offC, ldc, strideC,
 				  batchCount);
   if (err != CUBLAS_STATUS_SUCCESS) {
     cuda_exit(ctx);
@@ -613,7 +613,7 @@ static int sgemm3D(cb_order order, cb_transpose transA, cb_transpose transB,
   ctx = A->ctx;
 
   if (cublasSgemmStridedBatched == NULL)
-    return error_set(ctx->error, GA_DEVSUP_ERROR, "cublasSgemmStridedBatched not available in your version of cuBLAS");
+    return error_set(ctx->err, GA_DEVSUP_ERROR, "cublasSgemmStridedBatched not available in your version of cuBLAS");
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
       LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
@@ -655,7 +655,7 @@ static int sgemm3D(cb_order order, cb_transpose transA, cb_transpose transB,
 				  ((float *)A->ptr) + offA, (int)lda, strideA,
 				  ((float *)B->ptr) + offB, (int)ldb, strideB,
 				  &beta,
-				  ((float *)C->ptr) + offC, (int)ldc, strideB,
+				  ((float *)C->ptr) + offC, (int)ldc, strideC,
 				  batchCount);
   if (err != CUBLAS_STATUS_SUCCESS) {
     cuda_exit(ctx);
@@ -691,7 +691,7 @@ static int dgemm3D(cb_order order, cb_transpose transA, cb_transpose transB,
   ctx = A->ctx;
 
   if (cublasDgemmStridedBatched == NULL)
-    return error_set(ctx->error, GA_DEVSUP_ERROR, "cublasDgemmStridedBatched not available in your version of cuBLAS");
+    return error_set(ctx->err, GA_DEVSUP_ERROR, "cublasDgemmStridedBatched not available in your version of cuBLAS");
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
       LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
@@ -733,7 +733,7 @@ static int dgemm3D(cb_order order, cb_transpose transA, cb_transpose transB,
 				  ((double *)A->ptr) + offA, (int)lda, strideA,
 				  ((double *)B->ptr) + offB, (int)ldb, strideB,
 				  &beta,
-				  ((double *)C->ptr) + offC, (int)ldc, strideB,
+				  ((double *)C->ptr) + offC, (int)ldc, strideC,
 				  batchCount);
   if (err != CUBLAS_STATUS_SUCCESS) {
     cuda_exit(ctx);

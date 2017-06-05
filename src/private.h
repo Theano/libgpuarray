@@ -214,23 +214,23 @@ struct _gpuarray_blas_ops {
                    gpudata **y, size_t *offY, size_t incY,
                    gpudata **A, size_t *offA, size_t lda,
                    size_t batchCount, int flags);
-  int (*hgemm3d)(cb_order order, cb_transpose transA, cb_transpose transB,
+  int (*hgemm3D)(cb_order order, cb_transpose transA, cb_transpose transB,
                  size_t M, size_t N, size_t K, float alpha,
-                 gpudata *A, size_t lda, ssize_t strideA,
-                 gpudata *B, size_t ldb, ssize_t strideB,
-                 float beta, gpudata *C, size_t ldc, ssize_t strideC,
+                 gpudata *A, size_t offA, size_t lda, ssize_t strideA,
+                 gpudata *B, size_t offB, size_t ldb, ssize_t strideB,
+                 float beta, gpudata *C, size_t offC, size_t ldc, ssize_t strideC,
                  size_t batchCount);
-  int (*sgemm3d)(cb_order order, cb_transpose transA, cb_transpose transB,
+  int (*sgemm3D)(cb_order order, cb_transpose transA, cb_transpose transB,
                  size_t M, size_t N, size_t K, float alpha,
-                 gpudata *A, size_t lda, ssize_t strideA,
-                 gpudata *B, size_t ldb, ssize_t strideB,
-                 float beta, gpudata *C, size_t ldc, ssize_t strideC,
+                 gpudata *A, size_t offA, size_t lda, ssize_t strideA,
+                 gpudata *B, size_t offB, size_t ldb, ssize_t strideB,
+                 float beta, gpudata *C, size_t offC, size_t ldc, ssize_t strideC,
                  size_t batchCount);
-  int (*dgemm3d)(cb_order order, cb_transpose transA, cb_transpose transB,
+  int (*dgemm3D)(cb_order order, cb_transpose transA, cb_transpose transB,
                  size_t M, size_t N, size_t K, double alpha,
-                 gpudata *A, size_t lda, ssize_t strideA,
-                 gpudata *B, size_t ldb, ssize_t strideB,
-                 double beta, gpudata *C, size_t ldc, ssize_t strideC,
+                 gpudata *A, size_t offA, size_t lda, ssize_t strideA,
+                 gpudata *B, size_t offB, size_t ldb, ssize_t strideB,
+                 double beta, gpudata *C, size_t offC, size_t ldc, ssize_t strideC,
                  size_t batchCount);
 };
 
