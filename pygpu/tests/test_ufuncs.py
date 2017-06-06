@@ -4,7 +4,9 @@ import numpy
 import pygpu
 from pygpu.dtypes import NAME_TO_DTYPE
 from pygpu import ufuncs
-from pygpu.ufuncs import UNARY_UFUNCS, UNARY_UFUNCS_TWO_OUT, BINARY_UFUNCS
+from pygpu.ufuncs import (
+    UNARY_UFUNCS, UNARY_UFUNCS_TWO_OUT, BINARY_UFUNCS, BINARY_UFUNC_TO_C_CMP,
+    BINARY_UFUNC_TO_C_BINOP, BINARY_UFUNC_TO_C_FUNC)
 from pygpu.tests.support import context
 
 
@@ -434,6 +436,125 @@ def check_binary_ufunc_scalar_right(ufunc, scalar, dtype):
             npy_result = npy_result.astype('float32')
 
         gpuary_result = gpuary_ufunc(gpuary_arr, scalar)
+        assert npy_result.shape == gpuary_result.shape
+        assert npy_result.dtype == gpuary_result.dtype
+        assert numpy.allclose(gpuary_result, npy_result, rtol=rtol,
+                              atol=rtol, equal_nan=True)
+
+
+def test_binary_ufuncs_reduce():
+    for ufunc in BINARY_UFUNC_TO_C_FUNC:
+        # Only one axis parameter can be used since it's not reorderable
+        for axis in [0, 1, 2]:
+            for keepdims in [True, False]:
+                if (ufunc in fail_binary and
+                    'float32' in fail_binary[ufunc].get('dtype1',
+                                                        ['float32']) and
+                        'float32' in fail_binary[ufunc].get('dtype2',
+                                                            ['float32'])):
+                    pass
+                else:
+                    yield check_binary_ufunc_reduce, ufunc, axis, keepdims
+
+    for ufunc in BINARY_UFUNC_TO_C_BINOP:
+        for axis in axis_params:
+            for keepdims in [True, False]:
+                if (ufunc in fail_binary and
+                    'float32' in fail_binary[ufunc].get('dtype1',
+                                                        ['float32']) and
+                        'float32' in fail_binary[ufunc].get('dtype2',
+                                                            ['float32'])):
+                    pass
+                elif ufunc.startswith('bitwise') or ufunc.endswith('shift'):
+                    # Invalid source
+                    pass
+                elif ufunc.startswith('logical'):
+                    # Wrong resulting dtype (float instead of bool)
+                    pass
+                elif ufunc in ('subtract',):
+                    # Not reorderable
+                    pass
+                else:
+                    yield check_binary_ufunc_reduce, ufunc, axis, keepdims
+
+    for ufunc in BINARY_UFUNC_TO_C_CMP:
+        for axis in axis_params:
+            for keepdims in [True, False]:
+                if (ufunc in fail_binary and
+                    'float32' in fail_binary[ufunc].get('dtype1',
+                                                        ['float32']) and
+                        'float32' in fail_binary[ufunc].get('dtype2',
+                                                            ['float32'])):
+                    pass
+                elif ufunc in ('equal', 'not_equal',
+                               'greater', 'greater_equal',
+                               'less', 'less_equal'):
+                    # Not reorderable
+                    pass
+                else:
+                    yield check_binary_ufunc_reduce, ufunc, axis, keepdims
+
+
+def check_binary_ufunc_reduce(ufunc, axis, keepdims):
+    """Test GpuArray ufunc.reduce against equivalent Numpy result."""
+    gpuary_ufunc = getattr(ufuncs, ufunc)
+    npy_ufunc = getattr(numpy, ufunc)
+
+    npy_arr, gpuary_arr = npy_and_gpuary_arrays(shape=(2, 3, 4),
+                                                dtype='float32')
+    # Determine relative tolerance from dtype
+    try:
+        res = numpy.finfo('float32').resolution
+    except ValueError:
+        res = 0
+    rtol = 2 * npy_arr.size * res
+
+    # No explicit out dtype
+    try:
+        npy_result = npy_ufunc.reduce(npy_arr, axis=axis, keepdims=keepdims)
+    except TypeError:
+        # Make sure missing signature produces a TypeError, then bail out
+        with assert_raises(TypeError):
+            gpuary_result = gpuary_ufunc.reduce(gpuary_arr, axis=axis,
+                                                keepdims=keepdims)
+        return
+
+    gpuary_result = gpuary_ufunc.reduce(gpuary_arr, axis=axis,
+                                        keepdims=keepdims)
+    if numpy.isscalar(npy_result):
+        assert numpy.isscalar(gpuary_result)
+        assert numpy.isclose(gpuary_result, npy_result, rtol=rtol,
+                             atol=rtol, equal_nan=True)
+    else:
+        assert npy_result.shape == gpuary_result.shape
+        assert npy_result.dtype == gpuary_result.dtype
+        assert numpy.allclose(gpuary_result, npy_result, rtol=rtol,
+                              atol=rtol, equal_nan=True)
+
+    # With out array
+    out = pygpu.empty(npy_result.shape, npy_result.dtype)
+    gpuary_result = gpuary_ufunc.reduce(gpuary_arr, axis=axis, out=out,
+                                        keepdims=keepdims)
+    assert numpy.allclose(out, npy_result, rtol=rtol, atol=rtol,
+                          equal_nan=True)
+    assert out is gpuary_result
+
+    # Explicit out dtype, supported by some reductions only
+    if ufunc in BINARY_UFUNC_TO_C_BINOP or ufunc in BINARY_UFUNC_TO_C_FUNC:
+        gpuary_result = gpuary_ufunc.reduce(gpuary_arr, axis=axis,
+                                            dtype='float64',
+                                            keepdims=keepdims)
+        assert gpuary_result.dtype == 'float64'
+        assert numpy.allclose(out, npy_result, rtol=rtol, atol=rtol,
+                              equal_nan=True)
+
+    # Using numpy arrays as input
+    gpuary_result = gpuary_ufunc.reduce(npy_arr, axis=axis, keepdims=keepdims)
+    if numpy.isscalar(npy_result):
+        assert numpy.isscalar(gpuary_result)
+        assert numpy.isclose(gpuary_result, npy_result, rtol=rtol,
+                             atol=rtol, equal_nan=True)
+    else:
         assert npy_result.shape == gpuary_result.shape
         assert npy_result.dtype == gpuary_result.dtype
         assert numpy.allclose(gpuary_result, npy_result, rtol=rtol,
