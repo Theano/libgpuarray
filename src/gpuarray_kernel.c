@@ -12,7 +12,7 @@ int GpuKernel_init(GpuKernel *k, gpucontext *ctx, unsigned int count,
 
   k->args = calloc(argcount, sizeof(void *));
   if (k->args == NULL)
-    return GA_MEMORY_ERROR;
+    return error_sys(ctx->err, "calloc");
   k->k = gpukernel_init(ctx, count, strs, lens, name, argcount, types,
                         flags, &res, err_str);
   if (res != GA_NO_ERROR)
