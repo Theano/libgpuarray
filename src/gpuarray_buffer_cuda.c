@@ -501,7 +501,7 @@ static cuda_context *do_init(CUdevice dev, int flags, error *e) {
   if (flags & GA_CTX_SINGLE_THREAD)
     fl = CU_CTX_SCHED_SPIN;
   if (flags & GA_CTX_MULTI_THREAD)
-    fl = CU_CTX_SCHED_YIELD;
+    fl = CU_CTX_SCHED_BLOCKING_SYNC;
   err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_UNIFIED_ADDRESSING, dev);
   CHKFAIL(e, "cuDeviceGetAttribute", NULL);
   if (i != 1) {
