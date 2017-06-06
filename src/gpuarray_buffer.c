@@ -23,7 +23,7 @@ const gpuarray_buffer_ops *gpuarray_get_ops(const char *name) {
 int gpu_get_platform_count(const char* name, unsigned int* platcount) {
   const gpuarray_buffer_ops* ops = gpuarray_get_ops(name);
   if (ops == NULL) {
-    return error_set(&global_err, GA_INVALID_ERROR, "Invalid platform");
+    return error_set(global_err, GA_INVALID_ERROR, "Invalid platform");
   }
   return ops->get_platform_count(platcount);
 }
@@ -32,7 +32,7 @@ int gpu_get_device_count(const char* name, unsigned int platform,
                          unsigned int* devcount) {
   const gpuarray_buffer_ops* ops = gpuarray_get_ops(name);
   if (ops == NULL) {
-    return error_set(&global_err, GA_INVALID_ERROR, "Invalid platform");
+    return error_set(global_err, GA_INVALID_ERROR, "Invalid platform");
   }
   return ops->get_device_count(platform, devcount);
 }
@@ -121,8 +121,10 @@ int gpudata_transfer(gpudata *dst, size_t dstoff, gpudata *src, size_t srcoff,
 
   /* Fallback to host copy */
   tmp = malloc(sz);
-  if (tmp == NULL)
-    return error_sys(ctx->err, "malloc");
+  if (tmp == NULL) {
+    error_sys(src_ctx->err, "malloc");
+    return error_sys(dst_ctx->err, "malloc");
+  }
   res = src_ctx->ops->buffer_read(tmp, src, srcoff, sz);
   if (res != GA_NO_ERROR) {
     free(tmp);

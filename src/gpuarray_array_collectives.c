@@ -49,6 +49,7 @@ static inline int check_gpuarrays(int times_src, const GpuArray* src,
 
 int GpuArray_reduce_from(const GpuArray* src, int opcode, int root,
                          gpucomm* comm) {
+  gpucontext *ctx = gpudata_context(src->data);
   size_t total_elems;
   if (!GpuArray_ISALIGNED(src))
     return error_set(ctx->err, GA_UNALIGNED_ERROR, "Unaligned input");
@@ -90,9 +91,11 @@ int GpuArray_reduce_scatter(const GpuArray* src, GpuArray* dest, int opcode,
                                 comm);
 }
 
-int GpuArray_broadcast(GpuArray* array, int root, gpucomm* comm) {
-  int rank = 0;
+int GpuArray_broadcast(GpuArray *array, int root, gpucomm *comm) {
+  gpucontext *ctx = gpudata_context(array->data);
   size_t total_elems;
+  int rank = 0;
+
   GA_CHECK(gpucomm_get_rank(comm, &rank));
   if (rank == root) {
     if (!GpuArray_CHKFLAGS(array, GA_BEHAVED))

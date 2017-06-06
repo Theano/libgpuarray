@@ -272,6 +272,7 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
                        size_t *_n, unsigned int *_nd, size_t **_dims,
                        ssize_t ***_strides, int *_call32) {
   size_t n;
+  gpucontext *ctx = GpuKernel_context(&ge->k_contig);
   GpuArray *a = NULL, *v;
   unsigned int i, j, p, num_arrays = 0, nd = 0, nnd;
   int call32 = 1;
@@ -443,7 +444,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
 
   ktypes = calloc(p, sizeof(int));
   if (ktypes == NULL) {
-    res = error_fmt(ctx->err, "calloc");
+    res = error_sys(ctx->err, "calloc");
     goto bail;
   }
 
@@ -511,7 +512,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
   strb_appends(&sb, "}\n}\n");
 
   if (strb_error(&sb)) {
-    error_set(ctx->err, GA_MISC_ERROR, "Formatting error creating kernel source");
+    res = error_set(ctx->err, GA_MISC_ERROR, "Formatting error creating kernel source");
     goto bail;
   }
 

@@ -102,11 +102,11 @@ int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
   GpuArray *Xp = X;
   GpuArray copyX;
   GpuArray *Yp = Y;
+  gpucontext *ctx = gpudata_context(Ap->data);
   size_t elsize;
   size_t m, n, lda;
   cb_order o;
   int err;
-  void *ctx = gpudata_context(Ap->data);
 
   if (A->typecode != GA_HALF &&
       A->typecode != GA_FLOAT &&
@@ -205,7 +205,7 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
   GpuArray *Bp = B;
   GpuArray copyB;
   GpuArray *Cp = C;
-  void *ctx = gpudata_context(Ap->data);
+  gpucontext *ctx = gpudata_context(Ap->data);
   size_t elsize;
   size_t m, n, k, lda, ldb, ldc;
   cb_order o;
@@ -355,7 +355,7 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
   GpuArray *Yp = Y;
   GpuArray copyY;
   GpuArray *Ap = A;
-  void *ctx = gpudata_context(Xp->data);
+  gpucontext *ctx = gpudata_context(Xp->data);
   size_t elsize;
   size_t m, n, lda;
   cb_order o;
@@ -372,12 +372,12 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
 
   if (!(X->flags & GA_ALIGNED) || !(Y->flags & GA_ALIGNED) ||
       !(A->flags & GA_ALIGNED))
-    return error_set(ctx->err, GA_UNALIGNED_ERROR, "Unaligned inputs";
+    return error_set(ctx->err, GA_UNALIGNED_ERROR, "Unaligned inputs");
 
   m = X->dimensions[0];
   n = Y->dimensions[0];
   if (A->dimensions[0] != m || A->dimensions[1] != n)
-    return error_set(ctx->err, GA_VALUE_ERROR, "Incompatible shapes";
+    return error_set(ctx->err, GA_VALUE_ERROR, "Incompatible shapes");
 
   elsize = gpuarray_get_elsize(X->typecode);
 
@@ -468,7 +468,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   GpuArray *Bp = B;
   GpuArray copyB;
   GpuArray *Cp = C;
-  void *ctx = gpudata_context(A->data);
+  gpucontext *ctx = gpudata_context(A->data);
   size_t elsize;
   size_t batchCount, m, n, k, lda, ldb, ldc;
   cb_order o;

@@ -2,6 +2,9 @@
 #include "gpuarray/error.h"
 #include "gpuarray/types.h"
 
+#include "util/error.h"
+#include "private.h"
+
 #include <stdlib.h>
 
 int GpuKernel_init(GpuKernel *k, gpucontext *ctx, unsigned int count,
