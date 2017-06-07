@@ -649,6 +649,62 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
     break;
   }
 
+  if (err == GA_DEVSUP_ERROR) {
+    gpudata **A_datas = NULL, **B_datas = NULL, **C_datas = NULL;
+    size_t *A_offsets = NULL, *B_offsets = NULL, *C_offsets = NULL;
+    size_t i;
+
+    A_datas = (gpudata**)malloc(batchCount * sizeof(gpudata*));
+    B_datas = (gpudata**)malloc(batchCount * sizeof(gpudata*));
+    C_datas = (gpudata**)malloc(batchCount * sizeof(gpudata*));
+
+    A_offsets = (size_t*)malloc(batchCount * sizeof(size_t));
+    B_offsets = (size_t*)malloc(batchCount * sizeof(size_t));
+    C_offsets = (size_t*)malloc(batchCount * sizeof(size_t));
+
+    if (A_datas == NULL || B_datas == NULL || C_datas == NULL ||
+        A_offsets == NULL || B_offsets == NULL || C_offsets) {
+      err = error_sys(ctx->err, "malloc");
+      goto old_cleanup;
+    }
+
+    for (i = 0; i < batchCount; i++) {
+      A_datas[i] = Ap->data;
+      B_datas[i] = Bp->data;
+      C_datas[i] = Cp->data;
+      A_offsets[i] = (Ap->offset + i * Ap->strides[0]) / elsize;
+      B_offsets[i] = (Bp->offset + i * Bp->strides[0]) / elsize;
+      C_offsets[i] = (Cp->offset + i * Cp->strides[0]) / elsize;
+    }
+
+    switch (C->typecode) {
+      case GA_HALF:
+        err = gpublas_hgemmBatch(o, transA, transB, m, n, k, (float)alpha,
+                                 A_datas, A_offsets, lda,
+                                 B_datas, B_offsets, ldb,
+                                 (float)beta,
+                                 C_datas, C_offsets, ldc, batchCount, 0);
+        break;
+      case GA_FLOAT:
+        err = gpublas_sgemmBatch(o, transA, transB, m, n, k, (float)alpha,
+                                 A_datas, A_offsets, lda,
+                                 B_datas, B_offsets, ldb,
+                                 (float)beta,
+                                 C_datas, C_offsets, ldc, batchCount, 0);
+        break;
+      case GA_DOUBLE:
+        err = gpublas_dgemmBatch(o, transA, transB, m, n, k, (double)alpha,
+                                 A_datas, A_offsets, lda,
+                                 B_datas, B_offsets, ldb,
+                                 (double)beta,
+                                 C_datas, C_offsets, ldc, batchCount, 0);
+        break;
+    }
+  old_cleanup:
+    free(A_datas); free(B_datas); free(C_datas);
+    free(A_offsets); free(B_offsets); free(C_offsets);
+  }
+
   cleanup:
   if (Ap == &copyA)
     GpuArray_clear(&copyA);
