@@ -37,8 +37,10 @@ static inline int check_gpuarrays(int times_src, const GpuArray* src,
     return error_set(ctx->err, GA_VALUE_ERROR, "Size mismatch for transfer");
   if (src->typecode != dest->typecode)
     return error_set(ctx->err, GA_VALUE_ERROR, "Type mismatch");
-  if (!GpuArray_ISALIGNED(src) || !GpuArray_CHKFLAGS(dest, GA_BEHAVED))
-    return error_set(ctx->err, GA_UNALIGNED_ERROR, "Misbehaved arrays");
+  if (!GpuArray_ISALIGNED(src) || !GpuArray_ISALIGNED(dest))
+    return error_set(ctx->err, GA_UNALIGNED_ERROR, "Unaligned arrays");
+  if (!GpuArray_ISWRITEABLE(dest))
+    return error_set(ctx->err, GA_INVALID_ERROR, "Unwritable destination");
 
   if (times_src >= times_dest)
     *count = count_src;

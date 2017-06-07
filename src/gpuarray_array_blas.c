@@ -24,11 +24,12 @@ int GpuArray_rdot(GpuArray *X, GpuArray *Y,
       X->typecode != GA_DOUBLE)
   return error_set(ctx->err, GA_INVALID_ERROR, "Data type not supported");
 
-  if (X->nd != 1 || Y->nd != 1 || Z->nd != 0 ||
-      X->typecode != Y->typecode || X->typecode != Z->typecode)
+  if (X->nd != 1 || Y->nd != 1 || Z->nd != 0)
     return error_fmt(ctx->err, GA_VALUE_ERROR,
-                     "Wrong number of dimensions: X->nd = %d (expected 1), Y->nd = %d (expected 1), Z->nd = %d (expected 0)",
+                     "Wrong number of dimensions: X->nd = %u (expected 1), Y->nd = %u (expected 1), Z->nd = %u (expected 0)",
                      X->nd, Y->nd, Z->nd);
+  if (X->typecode != Y->typecode || X->typecode != Z->typecode)
+    error_set(ctx->err, GA_VALUE_ERROR, "Inconsistent dtypes");
   n = X->dimensions[0];
   if (!(X->flags & GA_ALIGNED) || !(Y->flags & GA_ALIGNED) ||
       !(Z->flags & GA_ALIGNED))
@@ -111,11 +112,14 @@ int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
   if (A->typecode != GA_HALF &&
       A->typecode != GA_FLOAT &&
       A->typecode != GA_DOUBLE)
-    return error_set(ctx->err, GA_INVALID_ERROR, "Unsupported data type");
+    return error_set(ctx->err, GA_INVALID_ERROR, "Unsupported dtype");
 
-  if (A->nd != 2 || X->nd != 1 || Y->nd != 1 ||
-      X->typecode != A->typecode || Y->typecode != A->typecode)
-    return error_set(ctx->err, GA_VALUE_ERROR, "Bad shape or inconsistent types");
+  if (A->nd != 2 || X->nd != 1 || Y->nd != 1)
+    return error_fmt(ctx->err, GA_VALUE_ERROR,
+                     "Wrong number of dimensions: A->nd = %u (expected 2), X->nd = %u (expected 1), Y->nd = %u (expected 1)",
+                     A->nd, X->nd, Y->nd);
+  if (X->typecode != A->typecode || Y->typecode != A->typecode)
+    return error_set(ctx->err, GA_VALUE_ERROR, "Inconsistent dtypes");
 
   if (!(A->flags & GA_ALIGNED) || !(X->flags & GA_ALIGNED) ||
       !(Y->flags & GA_ALIGNED))
@@ -213,12 +217,14 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
 
   if (A->typecode != GA_HALF && A->typecode != GA_FLOAT &&
       A->typecode != GA_DOUBLE)
-    return error_set(ctx->err, GA_INVALID_ERROR, "Unsupported type");
+    return error_set(ctx->err, GA_INVALID_ERROR, "Unsupported dtype");
 
-  if (A->nd != 2 || B->nd != 2 || C->nd != 2 ||
-      B->typecode != A->typecode ||
-      C->typecode != A->typecode)
-    return error_set(ctx->err, GA_VALUE_ERROR, "Inconsistent nd or types");
+  if (A->nd != 2 || B->nd != 2 || C->nd != 2)
+    return error_fmt(ctx->err, GA_VALUE_ERROR,
+                     "Wrong number of dimensions: A->nd = %u (expected 2), B->nd = %u (expected 2), C->nd = %u (expected 2)",
+                     A->nd, B->nd, C->nd);
+  if (B->typecode != A->typecode || C->typecode != A->typecode)
+    return error_set(ctx->err, GA_VALUE_ERROR, "Inconsistent dtypes");
 
   if (!(A->flags & GA_ALIGNED) || !(B->flags & GA_ALIGNED) ||
       !(C->flags & GA_ALIGNED))
@@ -363,12 +369,14 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
 
   if (X->typecode != GA_HALF && X->typecode != GA_FLOAT &&
       X->typecode != GA_DOUBLE)
-    return error_set(ctx->err, GA_INVALID_ERROR, "Unsupported type");
+    return error_set(ctx->err, GA_INVALID_ERROR, "Unsupported dtype");
 
-  if (X->nd != 1 || Y->nd != 1 || A->nd != 2 ||
-      Y->typecode != X->typecode ||
-      A->typecode != X->typecode)
-    return error_set(ctx->err, GA_VALUE_ERROR, "Invalid dims or inconsistent types");
+  if (X->nd != 1 || Y->nd != 1 || A->nd != 2)
+    return error_fmt(ctx->err, GA_VALUE_ERROR,
+                     "Wrong number of dimensions: X->nd = %u (expected 1), Y->nd = %u (expected 1), A->nd = %u (expected 2)",
+                     X->nd, Y->nd, A->nd);
+  if (Y->typecode != X->typecode || A->typecode != X->typecode)
+    return error_set(ctx->err, GA_VALUE_ERROR, "Inconsistent dtypes");
 
   if (!(X->flags & GA_ALIGNED) || !(Y->flags & GA_ALIGNED) ||
       !(A->flags & GA_ALIGNED))
@@ -479,12 +487,14 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   size_t i;
 
   if (A->typecode != GA_FLOAT && A->typecode != GA_DOUBLE)
-    return error_set(ctx->err, GA_INVALID_ERROR, "Unsupported type");
+    return error_set(ctx->err, GA_INVALID_ERROR, "Unsupported dtype");
 
-  if (A->nd != 3 || B->nd != 3 || C->nd != 3 ||
-      B->typecode != A->typecode ||
-      C->typecode != A->typecode)
-    return error_set(ctx->err, GA_VALUE_ERROR, "Invalid dims or inconsistent types");
+  if (A->nd != 3 || B->nd != 3 || C->nd != 3)
+    return error_fmt(ctx->err, GA_VALUE_ERROR,
+                     "Wrong number of dimensions: A->nd = %u (expected 3), B->nd = %u (expected 3), C->nd = %u (expected 3)",
+                     A->nd, B->nd, C->nd);
+  if (B->typecode != A->typecode || C->typecode != A->typecode)
+    return error_set(ctx->err, GA_VALUE_ERROR, "Inconsistent dtypes");
 
   if (!(A->flags & GA_ALIGNED) || !(B->flags & GA_ALIGNED) ||
       !(C->flags & GA_ALIGNED))
@@ -558,7 +568,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
           ? Cp->strides[1] / elsize
           : Cp->dimensions[2];
   } else {
-    err = error_set(ctx->err, GA_VALUE_ERROR, "Invalid internal result for C");
+    err = error_set(ctx->err, GA_MISC_ERROR, "Invalid internal result for C");
     goto cleanup;
   }
   if (cA == 2) {
@@ -582,7 +592,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
         transA = cb_no_trans;
     }
   } else {
-    err = error_set(ctx->err, GA_VALUE_ERROR, "Invalid internal result for A");
+    err = error_set(ctx->err, GA_MISC_ERROR, "Invalid internal result for A");
     goto cleanup;
   }
   if (cB == 2) {
@@ -606,7 +616,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
         transB = cb_no_trans;
     }
   } else {
-    err = error_set(ctx->err, GA_VALUE_ERROR, "Invalid internal result for B");
+    err = error_set(ctx->err, GA_MISC_ERROR, "Invalid internal result for B");
     goto cleanup;
   }
 

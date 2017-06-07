@@ -455,7 +455,7 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
   int addr32 = 0;
 
   if (!GpuArray_ISWRITEABLE(a))
-    return error_set(ctx->err, GA_INVALID_ERROR, "Destination array (a) not writeable");
+    return error_set(ctx->err, GA_VALUE_ERROR, "Destination array not writeable");
 
   if (!GpuArray_ISALIGNED(a) || !GpuArray_ISALIGNED(v) ||
       !GpuArray_ISALIGNED(i))
@@ -578,7 +578,7 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
                      "a->nd = %llu, v->nd = %llu", a->nd, v->nd);
 
   if (!GpuArray_ISWRITEABLE(a))
-    return error_set(ctx->err, GA_INVALID_ERROR, "Destination array not writable");
+    return error_set(ctx->err, GA_VALUE_ERROR, "Destination array not writable");
   if (!GpuArray_ISALIGNED(v) || !GpuArray_ISALIGNED(a))
     return error_set(ctx->err, GA_UNALIGNED_ERROR, "One of the inputs is unaligned");
 
@@ -673,7 +673,7 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
     newsize *= d;
   }
 
-  if (newsize != oldsize) return error_set(ctx->err, GA_INVALID_ERROR, "New shope differs in total size");
+  if (newsize != oldsize) return error_set(ctx->err, GA_INVALID_ERROR, "New shape differs in total size");
 
   /* If the source and desired layouts are the same, then just copy
      strides and dimensions */
@@ -1159,7 +1159,7 @@ int GpuArray_fdump(FILE *fd, const GpuArray *a) {
     default:
       free(buf);
       fprintf(fd, "<unsupported data type %d>\n", a->typecode);
-      return error_set(ctx->err, GA_UNSUPPORTED_ERROR, "Unsupported data type for dump");
+      return error_fmt(ctx->err, GA_UNSUPPORTED_ERROR, "Unsupported data type for dump: %d", a->typecode);
     }
     s -= gpuarray_get_elsize(a->typecode);
     p += gpuarray_get_elsize(a->typecode);

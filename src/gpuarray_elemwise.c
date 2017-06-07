@@ -330,7 +330,7 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
           /* We can't broadcast outputs */
           if (ISCLR(flags, GE_BROADCAST) || is_output(ge->args[i]) ||
               v->dimensions[j] != 1) {
-            return error_fmt(ctx->err, GA_VALUE_ERROR, "Mismatched dimension %u for input %u", j, i);
+            return error_fmt(ctx->err, GA_VALUE_ERROR, "Mismatched dimension %u for input %u (expected %" SPREFIX "u got %" SPREFIX "u)", j, i, ge->dims[j], v->dimensions[j]);
           }
         }
         /* If the dimension is 1 set the strides to 0 regardless since
@@ -543,10 +543,10 @@ static int check_contig(GpuElemwise *ge, void **args,
       f_contig &= GpuArray_IS_F_CONTIGUOUS(v);
       if (a != v) {
         if (a->nd != v->nd)
-          return error_set(ctx->err, GA_INVALID_ERROR, "Mismatched nd");
+          return error_fmt(ctx->err, GA_INVALID_ERROR, "Mismatched nd for input %u (expected %u, got %u)", i, a->nd, v->nd);
         for (j = 0; j < a->nd; j++) {
           if (v->dimensions[j] != a->dimensions[j])
-            return error_fmt(ctx->err, GA_VALUE_ERROR, "Mismatched dimension %u", j);
+            return error_fmt(ctx->err, GA_VALUE_ERROR, "Mismatched dimension %u (expected %" SPREFIX "u, got %" SPREFIX "u)", j, a->dimensions[j], v->dimensions[j]);
         }
       }
     }
