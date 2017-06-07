@@ -99,18 +99,16 @@ GPUARRAY_PUBLIC void gpuarray_elemwise_collapse(unsigned int n,
                                                 size_t *dim, ssize_t **strs);
 
 
-typedef uint16_t ga_half_t;
-
 /* code strongly inspired from
    https://github.com/numpy/numpy/blob/master/numpy/core/src/npymath/halffloat.c#L246 */
 
-static inline ga_half_t ga_float2half(float f) {
+static inline half_t ga_float2half(float f) {
   union {
     float f;
     uint32_t bits;
   } bf;
   union {
-    ga_half_t h;
+    half_t h;
     uint16_t bits;
   } bh;
 
