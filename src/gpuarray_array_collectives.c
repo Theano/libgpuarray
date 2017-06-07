@@ -29,15 +29,18 @@ static inline size_t find_total_elems(const GpuArray* array) {
 static inline int check_gpuarrays(int times_src, const GpuArray* src,
                                   int times_dest, const GpuArray* dest,
                                   size_t* count) {
+  gpucontext *ctx = gpudata_context(src->data);
   size_t count_src, count_dest;
   count_src = find_total_elems(src);
   count_dest = find_total_elems(dest);
   if (times_src * count_src != times_dest * count_dest)
-    return GA_VALUE_ERROR;
+    return error_set(ctx->err, GA_VALUE_ERROR, "Size mismatch for transfer");
   if (src->typecode != dest->typecode)
-    return GA_VALUE_ERROR;
-  if (!GpuArray_ISALIGNED(src) || !GpuArray_CHKFLAGS(dest, GA_BEHAVED))
-    return GA_UNALIGNED_ERROR;
+    return error_set(ctx->err, GA_VALUE_ERROR, "Type mismatch");
+  if (!GpuArray_ISALIGNED(src) || !GpuArray_ISALIGNED(dest))
+    return error_set(ctx->err, GA_UNALIGNED_ERROR, "Unaligned arrays");
+  if (!GpuArray_ISWRITEABLE(dest))
+    return error_set(ctx->err, GA_INVALID_ERROR, "Unwritable destination");
 
   if (times_src >= times_dest)
     *count = count_src;
@@ -48,9 +51,10 @@ static inline int check_gpuarrays(int times_src, const GpuArray* src,
 
 int GpuArray_reduce_from(const GpuArray* src, int opcode, int root,
                          gpucomm* comm) {
+  gpucontext *ctx = gpudata_context(src->data);
   size_t total_elems;
   if (!GpuArray_ISALIGNED(src))
-    return GA_UNALIGNED_ERROR;
+    return error_set(ctx->err, GA_UNALIGNED_ERROR, "Unaligned input");
   total_elems = find_total_elems(src);
   return gpucomm_reduce(src->data, src->offset, NULL, 0, total_elems,
                         src->typecode, opcode, root, comm);
@@ -89,16 +93,18 @@ int GpuArray_reduce_scatter(const GpuArray* src, GpuArray* dest, int opcode,
                                 comm);
 }
 
-int GpuArray_broadcast(GpuArray* array, int root, gpucomm* comm) {
-  int rank = 0;
+int GpuArray_broadcast(GpuArray *array, int root, gpucomm *comm) {
+  gpucontext *ctx = gpudata_context(array->data);
   size_t total_elems;
+  int rank = 0;
+
   GA_CHECK(gpucomm_get_rank(comm, &rank));
   if (rank == root) {
     if (!GpuArray_CHKFLAGS(array, GA_BEHAVED))
-      return GA_UNALIGNED_ERROR;
+      return error_set(ctx->err, GA_UNALIGNED_ERROR, "Unaligned input");
   } else {
     if (!GpuArray_ISALIGNED(array))
-      return GA_UNALIGNED_ERROR;
+      return error_set(ctx->err, GA_UNALIGNED_ERROR, "Unaligned input");
   }
 
   total_elems = find_total_elems(array);

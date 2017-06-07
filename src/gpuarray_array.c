@@ -63,12 +63,11 @@ static int ga_extcopy(GpuArray *dst, const GpuArray *src) {
     gargs[1].flags = GE_WRITE;
     k = GpuElemwise_new(ctx, "", "dst = src", 2, gargs, 0, 0);
     if (k == NULL)
-      return error_set(ctx->err, GA_MISC_ERROR,
-                       "Could not instantiate GpuElemwise copy kernel");
+      return ctx->err->code;
     aa = memdup(&a, sizeof(a));
     if (aa == NULL) {
       GpuElemwise_free(k);
-      return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
+      return error_sys(ctx->err, "memdup");
     }
     if (ctx->extcopy_cache == NULL)
       ctx->extcopy_cache = cache_twoq(4, 8, 8, 2, extcopy_eq, extcopy_hash,
@@ -120,7 +119,7 @@ int GpuArray_empty(GpuArray *a, gpucontext *ctx, int typecode,
   }
 
   a->data = gpudata_alloc(ctx, size, NULL, 0, &res);
-  if (a->data == NULL) return res;
+  if (a->data == NULL) return ctx->err->code;
   a->nd = nd;
   a->offset = 0;
   a->typecode = typecode;
@@ -130,7 +129,7 @@ int GpuArray_empty(GpuArray *a, gpucontext *ctx, int typecode,
   a->flags = GA_BEHAVED;
   if (a->dimensions == NULL || a->strides == NULL) {
     GpuArray_clear(a);
-    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
+    return error_sys(ctx->err, "calloc");
   }
   /* Mult will not overflow since calloc succeded */
   memcpy(a->dimensions, dims, sizeof(size_t)*nd);
@@ -279,7 +278,7 @@ int GpuArray_index_inplace(GpuArray *a, const ssize_t *starts,
   if (newdims == NULL || newstrs == NULL) {
     free(newdims);
     free(newstrs);
-    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
+    return error_sys(ctx->err, "calloc");
   }
 
   new_i = 0;
@@ -456,7 +455,7 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
   int addr32 = 0;
 
   if (!GpuArray_ISWRITEABLE(a))
-    return error_set(ctx->err, GA_INVALID_ERROR, "Destination array (a) not writeable");
+    return error_set(ctx->err, GA_VALUE_ERROR, "Destination array not writeable");
 
   if (!GpuArray_ISALIGNED(a) || !GpuArray_ISALIGNED(v) ||
       !GpuArray_ISALIGNED(i))
@@ -579,9 +578,9 @@ int GpuArray_setarray(GpuArray *a, const GpuArray *v) {
                      "a->nd = %llu, v->nd = %llu", a->nd, v->nd);
 
   if (!GpuArray_ISWRITEABLE(a))
-    return GA_VALUE_ERROR;
+    return error_set(ctx->err, GA_VALUE_ERROR, "Destination array not writable");
   if (!GpuArray_ISALIGNED(v) || !GpuArray_ISALIGNED(a))
-    return GA_UNALIGNED_ERROR;
+    return error_set(ctx->err, GA_UNALIGNED_ERROR, "One of the inputs is unaligned");
 
   off = a->nd - v->nd;
 
@@ -674,7 +673,7 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
     newsize *= d;
   }
 
-  if (newsize != oldsize) return GA_INVALID_ERROR;
+  if (newsize != oldsize) return error_set(ctx->err, GA_INVALID_ERROR, "New shape differs in total size");
 
   /* If the source and desired layouts are the same, then just copy
      strides and dimensions */
@@ -685,7 +684,7 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
 
   newstrides = calloc(nd, sizeof(ssize_t));
   if (newstrides == NULL)
-    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
+    return error_sys(ctx->err, "calloc");
 
   while (ni < nd && oi < a->nd) {
     np = newdims[ni];
@@ -739,7 +738,7 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
      Can't do the same with newdims (which is a parameter). */
   tmpdims = calloc(nd, sizeof(size_t));
   if (tmpdims == NULL) {
-    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
+    return error_sys(ctx->err, "calloc");
   }
   memcpy(tmpdims, newdims, nd*sizeof(size_t));
   a->nd = nd;
@@ -759,7 +758,7 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
   if (tmpdims == NULL || newstrides == NULL) {
     free(tmpdims);
     free(newstrides);
-    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
+    return error_sys(ctx->err, "calloc");
   }
   memcpy(tmpdims, newdims, nd*sizeof(size_t));
   if (nd > 0) {
@@ -959,7 +958,7 @@ int GpuArray_split(GpuArray **rs, const GpuArray *a, size_t n, size_t *p,
     free(starts);
     free(stops);
     free(steps);
-    return error_set(ctx->err, GA_MEMORY_ERROR, "Out of memory");
+    return error_sys(ctx->err, "calloc");
   }
 
   for (i = 0; i < a->nd; i++) {
@@ -1160,7 +1159,7 @@ int GpuArray_fdump(FILE *fd, const GpuArray *a) {
     default:
       free(buf);
       fprintf(fd, "<unsupported data type %d>\n", a->typecode);
-      return GA_UNSUPPORTED_ERROR;
+      return error_fmt(ctx->err, GA_UNSUPPORTED_ERROR, "Unsupported data type for dump: %d", a->typecode);
     }
     s -= gpuarray_get_elsize(a->typecode);
     p += gpuarray_get_elsize(a->typecode);

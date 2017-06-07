@@ -150,7 +150,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k, gpucontext *ctx,
 
   ktypes = calloc(p, sizeof(int));
   if (ktypes == NULL)
-    return GA_MEMORY_ERROR;
+    return error_sys(ctx->err, "calloc");
 
   p = 0;
 
@@ -272,6 +272,7 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
                        size_t *_n, unsigned int *_nd, size_t **_dims,
                        ssize_t ***_strides, int *_call32) {
   size_t n;
+  gpucontext *ctx = GpuKernel_context(&ge->k_contig);
   GpuArray *a = NULL, *v;
   unsigned int i, j, p, num_arrays = 0, nd = 0, nnd;
   int call32 = 1;
@@ -282,23 +283,22 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
       if (num_arrays == 0)
         nd = ((GpuArray *)args[i])->nd;
       else if (((GpuArray *)args[i])->nd != nd)
-        return GA_VALUE_ERROR;
+        return error_fmt(ctx->err, GA_VALUE_ERROR, "Arg %u has differing nd = %u", i, ((GpuArray *)args[i])->nd);
       ++num_arrays;
       if (a == NULL && is_output(ge->args[i]))
         a = (GpuArray *)args[i];
     }
   }
 
-  /* No output arrays, this is an error */
   if (a == NULL)
-    return GA_VALUE_ERROR;
+    return error_set(ctx->err, GA_VALUE_ERROR, "No output arrays");
 
   /* Check if we need to grow the internal buffers */
   if (nd > ge->nd) {
     nnd = ge->nd * 2;
     while (nd > nnd) nnd *= 2;
     if (ge_grow(ge, nnd))
-      return GA_MEMORY_ERROR;
+      return error_sys(ctx->err, "ge_grow");
   }
 
   /* Now we know that all array arguments have the same number of
@@ -330,7 +330,7 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
           /* We can't broadcast outputs */
           if (ISCLR(flags, GE_BROADCAST) || is_output(ge->args[i]) ||
               v->dimensions[j] != 1) {
-            return GA_VALUE_ERROR;
+            return error_fmt(ctx->err, GA_VALUE_ERROR, "Mismatched dimension %u for input %u (expected %" SPREFIX "u got %" SPREFIX "u)", j, i, ge->dims[j], v->dimensions[j]);
           }
         }
         /* If the dimension is 1 set the strides to 0 regardless since
@@ -370,7 +370,7 @@ static int call_basic(GpuElemwise *ge, void **args, size_t n, unsigned int nd,
   unsigned int p = 0, i, j, l;
   int err;
 
-  if (nd == 0) return GA_VALUE_ERROR;
+  if (nd == 0) return error_set(GpuKernel_context(&ge->k_contig)->err, GA_VALUE_ERROR, "nd == 0");
 
   if (call32)
     k = &ge->k_basic_32[nd-1];
@@ -434,7 +434,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
   unsigned int p;
   unsigned int j;
   int flags = GA_USE_CLUDA;
-  int res = GA_MEMORY_ERROR;
+  int res;
 
   flags |= gpuarray_type_flagsa(n, args);
 
@@ -443,8 +443,10 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
     p += ISSET(args[j].flags, GE_SCALAR) ? 1 : 2;
 
   ktypes = calloc(p, sizeof(int));
-  if (ktypes == NULL)
+  if (ktypes == NULL) {
+    res = error_sys(ctx->err, "calloc");
     goto bail;
+  }
 
   p = 0;
 
@@ -509,8 +511,10 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
   }
   strb_appends(&sb, "}\n}\n");
 
-  if (strb_error(&sb))
+  if (strb_error(&sb)) {
+    res = error_set(ctx->err, GA_MISC_ERROR, "Formatting error creating kernel source");
     goto bail;
+  }
 
   res = GpuKernel_init(k, ctx, 1, (const char **)&sb.s, &sb.l, "elem",
                        p, ktypes, flags, err_str);
@@ -523,6 +527,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
 static int check_contig(GpuElemwise *ge, void **args,
                         size_t *_n, int *contig) {
   GpuArray *a = NULL, *v;
+  gpucontext *ctx = GpuKernel_context(&ge->k_contig);
   size_t n = 1;
   unsigned int i, j;
   int c_contig = 1, f_contig = 1;
@@ -538,10 +543,10 @@ static int check_contig(GpuElemwise *ge, void **args,
       f_contig &= GpuArray_IS_F_CONTIGUOUS(v);
       if (a != v) {
         if (a->nd != v->nd)
-          return GA_INVALID_ERROR;
+          return error_fmt(ctx->err, GA_INVALID_ERROR, "Mismatched nd for input %u (expected %u, got %u)", i, a->nd, v->nd);
         for (j = 0; j < a->nd; j++) {
           if (v->dimensions[j] != a->dimensions[j])
-            return GA_VALUE_ERROR;
+            return error_fmt(ctx->err, GA_VALUE_ERROR, "Mismatched dimension %u (expected %" SPREFIX "u, got %" SPREFIX "u)", j, a->dimensions[j], v->dimensions[j]);
         }
       }
     }
@@ -589,24 +594,33 @@ GpuElemwise *GpuElemwise_new(gpucontext *ctx,
   int ret;
 
   res = calloc(1, sizeof(*res));
-  if (res == NULL) return NULL;
+  if (res == NULL) {
+    error_sys(ctx->err, "calloc");
+    return NULL;
+  }
 
   res->flags = flags;
   res->nd = 8;
   res->n = n;
 
   res->expr = strdup(expr);
-  if (res->expr == NULL)
+  if (res->expr == NULL) {
+    error_sys(ctx->err, "strdup");
     goto fail;
+  }
   if (preamble != NULL) {
     res->preamble = strdup(preamble);
-    if (res->preamble == NULL)
+    if (res->preamble == NULL) {
+      error_sys(ctx->err, "strdup");
       goto fail;
+    }
   }
 
   res->args = copy_args(n, args);
-  if (res->args == NULL)
+  if (res->args == NULL) {
+    error_sys(ctx->err, "copy_args");
     goto fail;
+  }
 
   /* Count the arrays in the arguements */
   res->narray = 0;
@@ -615,18 +629,26 @@ GpuElemwise *GpuElemwise_new(gpucontext *ctx,
 
   while (res->nd < nd) res->nd *= 2;
   res->dims = calloc(res->nd, sizeof(size_t));
-  if (res->dims == NULL)
+  if (res->dims == NULL) {
+    error_sys(ctx->err, "calloc");
     goto fail;
+  }
   res->strides = strides_array(res->narray, res->nd);
-  if (res->strides == NULL)
+  if (res->strides == NULL) {
+    error_sys(ctx->err, "strides_array");
     goto fail;
+  }
   res->k_basic = calloc(res->nd, sizeof(GpuKernel));
-  if (res->k_basic == NULL)
+  if (res->k_basic == NULL) {
+    error_sys(ctx->err, "calloc");
     goto fail;
+  }
 
   res->k_basic_32 = calloc(res->nd, sizeof(GpuKernel));
-  if (res->k_basic_32 == NULL)
+  if (res->k_basic_32 == NULL) {
+    error_sys(ctx->err, "calloc");
     goto fail;
+  }
 
   ret = gen_elemwise_contig_kernel(&res->k_contig, ctx,
 #ifdef DEBUG

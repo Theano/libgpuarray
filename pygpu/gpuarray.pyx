@@ -336,7 +336,7 @@ cdef int array_take1(GpuArray r, GpuArray a, GpuArray i,
     err = GpuArray_take1(&r.ga, &a.ga, &i.ga, check_err)
     if err != GA_NO_ERROR:
         if err == GA_VALUE_ERROR:
-            raise IndexError, "Index out of bounds"
+            raise IndexError, GpuArray_error(&r.ga, err)
         raise get_exc(err), GpuArray_error(&r.ga, err)
 
 cdef int array_setarray(GpuArray v, GpuArray a) except -1:
@@ -1054,10 +1054,7 @@ cdef class GpuContext:
         self.kind = kind
         self.ctx = gpucontext_init(<char *>self.kind, devno, flags, &err)
         if (err != GA_NO_ERROR):
-            if err == GA_VALUE_ERROR:
-                raise get_exc(err), "No device %d"%(devno,)
-            else:
-                raise get_exc(err), gpucontext_error(NULL, err).decode('utf-8') + ": " + str(devno)
+            raise get_exc(err), gpucontext_error(NULL, err)
 
     def __enter__(self):
         if cuda_enter == NULL:
@@ -1415,10 +1412,7 @@ cdef GpuArray pygpu_index(GpuArray a, const ssize_t *starts,
                           const ssize_t *stops, const ssize_t *steps):
     cdef GpuArray res
     res = new_GpuArray(type(a), a.context, a.base)
-    try:
-        array_index(res, a, starts, stops, steps)
-    except ValueError, e:
-        raise IndexError, "index out of bounds"
+    array_index(res, a, starts, stops, steps)
     return res
 
 cdef GpuArray pygpu_reshape(GpuArray a, unsigned int nd, const size_t *newdims,
@@ -1430,7 +1424,7 @@ cdef GpuArray pygpu_reshape(GpuArray a, unsigned int nd, const size_t *newdims,
         return res
     cdef unsigned int caxis = <unsigned int>compute_axis
     if caxis >= nd:
-        raise ValueError("You wanted us to compute the shape of a dimensions that don't exist")
+        raise ValueError("compute_axis is out of bounds")
 
     cdef size_t *cdims
     cdef size_t tot = 1
@@ -1554,7 +1548,7 @@ def open_ipc_handle(GpuContext c, bytes hpy, size_t l):
 
     d = cuda_open_ipc_handle(c.ctx, &h, l)
     if d is NULL:
-        raise GpuArrayException, "could not open handle"
+        raise GpuArrayException, gpucontext_error(c.ctx, 0)
     return <size_t>d
 
 cdef class GpuArray:

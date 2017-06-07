@@ -24,15 +24,16 @@ int GpuArray_rdot(GpuArray *X, GpuArray *Y,
       X->typecode != GA_DOUBLE)
   return error_set(ctx->err, GA_INVALID_ERROR, "Data type not supported");
 
-  if (X->nd != 1 || Y->nd != 1 || Z->nd != 0 ||
-      X->typecode != Y->typecode || X->typecode != Z->typecode)
+  if (X->nd != 1 || Y->nd != 1 || Z->nd != 0)
     return error_fmt(ctx->err, GA_VALUE_ERROR,
-                     "Wrong number of dimensions: X->nd = %d (expected 1), Y->nd = %d (expected 1), Z->nd = %d (expected 0)",
+                     "Wrong number of dimensions: X->nd = %u (expected 1), Y->nd = %u (expected 1), Z->nd = %u (expected 0)",
                      X->nd, Y->nd, Z->nd);
+  if (X->typecode != Y->typecode || X->typecode != Z->typecode)
+    error_set(ctx->err, GA_VALUE_ERROR, "Inconsistent dtypes");
   n = X->dimensions[0];
   if (!(X->flags & GA_ALIGNED) || !(Y->flags & GA_ALIGNED) ||
       !(Z->flags & GA_ALIGNED))
-    return GA_UNALIGNED_ERROR;
+    return error_set(ctx->err, GA_UNALIGNED_ERROR, "One of the inputs is unaligned");
   if (X->dimensions[0] != Y->dimensions[0])
       return error_fmt(ctx->err, GA_VALUE_ERROR,
                        "Shape mismatch: X->dimensions[0] = %d != Y->dimensions[0] = %d",
@@ -41,7 +42,7 @@ int GpuArray_rdot(GpuArray *X, GpuArray *Y,
   elsize = gpuarray_get_elsize(X->typecode);
   if (X->strides[0] < 0) {
     if (nocopy)
-      return GA_COPY_ERROR;
+      return error_set(ctx->err, GA_COPY_ERROR, "Copy required for X");
     else {
       err = GpuArray_copy(&copyX, X, GA_ANY_ORDER);
       if (err != GA_NO_ERROR)
@@ -51,7 +52,7 @@ int GpuArray_rdot(GpuArray *X, GpuArray *Y,
   }
   if (Y->strides[0] < 0) {
     if (nocopy)
-      return GA_COPY_ERROR;
+      return error_set(ctx->err, GA_COPY_ERROR, "Copy required for Y");
     else {
       err = GpuArray_copy(&copyY, Y, GA_ANY_ORDER);
       if (err != GA_NO_ERROR)
@@ -102,7 +103,7 @@ int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
   GpuArray *Xp = X;
   GpuArray copyX;
   GpuArray *Yp = Y;
-  void *ctx;
+  gpucontext *ctx = gpudata_context(Ap->data);
   size_t elsize;
   size_t m, n, lda;
   cb_order o;
@@ -111,15 +112,18 @@ int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
   if (A->typecode != GA_HALF &&
       A->typecode != GA_FLOAT &&
       A->typecode != GA_DOUBLE)
-    return GA_INVALID_ERROR;
+    return error_set(ctx->err, GA_INVALID_ERROR, "Unsupported dtype");
 
-  if (A->nd != 2 || X->nd != 1 || Y->nd != 1 ||
-      X->typecode != A->typecode || Y->typecode != A->typecode)
-    return GA_VALUE_ERROR;
+  if (A->nd != 2 || X->nd != 1 || Y->nd != 1)
+    return error_fmt(ctx->err, GA_VALUE_ERROR,
+                     "Wrong number of dimensions: A->nd = %u (expected 2), X->nd = %u (expected 1), Y->nd = %u (expected 1)",
+                     A->nd, X->nd, Y->nd);
+  if (X->typecode != A->typecode || Y->typecode != A->typecode)
+    return error_set(ctx->err, GA_VALUE_ERROR, "Inconsistent dtypes");
 
   if (!(A->flags & GA_ALIGNED) || !(X->flags & GA_ALIGNED) ||
       !(Y->flags & GA_ALIGNED))
-    return GA_UNALIGNED_ERROR;
+    return error_set(ctx->err, GA_UNALIGNED_ERROR, "Unaligned inputs");
 
   if (transA == cb_no_trans) {
     m = A->dimensions[0];
@@ -130,7 +134,7 @@ int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
   }
 
   if (Y->dimensions[0] != m || X->dimensions[0] != n)
-    return GA_VALUE_ERROR;
+    return error_set(ctx->err, GA_VALUE_ERROR, "Inconsistent shapes");
 
   m = A->dimensions[0];
   n = A->dimensions[1];
@@ -139,7 +143,7 @@ int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
 
   if (!GpuArray_ISONESEGMENT(A)) {
     if (nocopy)
-      return GA_COPY_ERROR;
+      return error_set(ctx->err, GA_COPY_ERROR, "Copy required for A");
     else {
       err = GpuArray_copy(&copyA, A, GA_F_ORDER);
       if (err != GA_NO_ERROR)
@@ -149,7 +153,7 @@ int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
   }
   if (X->strides[0] < 0) {
     if (nocopy)
-      return GA_COPY_ERROR;
+      return error_set(ctx->err, GA_COPY_ERROR, "Copy required for X");
     else {
       err = GpuArray_copy(&copyX, X, GA_ANY_ORDER);
       if (err != GA_NO_ERROR)
@@ -158,7 +162,7 @@ int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
     }
   }
   if (Y->strides[0] < 0) {
-    err = GA_VALUE_ERROR;
+    err = error_set(ctx->err, GA_VALUE_ERROR, "Negative strides for Y");
     goto cleanup;
   }
 
@@ -170,11 +174,10 @@ int GpuArray_rgemv(cb_transpose transA, double alpha, GpuArray *A,
     lda = Ap->dimensions[1];
   } else {
     /* Might be worth looking at making degenerate matrices (1xn) work here. */
-    err = GA_VALUE_ERROR;
+    err = error_set(ctx->err, GA_VALUE_ERROR, "Noncontiguous A");
     goto cleanup;
   }
 
-  ctx = gpudata_context(Ap->data);
   err = gpublas_setup(ctx);
   if (err != GA_NO_ERROR)
     goto cleanup;
@@ -206,7 +209,7 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
   GpuArray *Bp = B;
   GpuArray copyB;
   GpuArray *Cp = C;
-  void *ctx;
+  gpucontext *ctx = gpudata_context(Ap->data);
   size_t elsize;
   size_t m, n, k, lda, ldb, ldc;
   cb_order o;
@@ -214,16 +217,18 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
 
   if (A->typecode != GA_HALF && A->typecode != GA_FLOAT &&
       A->typecode != GA_DOUBLE)
-    return GA_INVALID_ERROR;
+    return error_set(ctx->err, GA_INVALID_ERROR, "Unsupported dtype");
 
-  if (A->nd != 2 || B->nd != 2 || C->nd != 2 ||
-      B->typecode != A->typecode ||
-      C->typecode != A->typecode)
-    return GA_VALUE_ERROR;
+  if (A->nd != 2 || B->nd != 2 || C->nd != 2)
+    return error_fmt(ctx->err, GA_VALUE_ERROR,
+                     "Wrong number of dimensions: A->nd = %u (expected 2), B->nd = %u (expected 2), C->nd = %u (expected 2)",
+                     A->nd, B->nd, C->nd);
+  if (B->typecode != A->typecode || C->typecode != A->typecode)
+    return error_set(ctx->err, GA_VALUE_ERROR, "Inconsistent dtypes");
 
   if (!(A->flags & GA_ALIGNED) || !(B->flags & GA_ALIGNED) ||
       !(C->flags & GA_ALIGNED))
-    return GA_UNALIGNED_ERROR;
+    return error_set(ctx->err, GA_UNALIGNED_ERROR, "Unaligned inputs");
 
   if (transA == cb_no_trans) {
     m = A->dimensions[0];
@@ -236,21 +241,21 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
   if (transB == cb_no_trans) {
     n = B->dimensions[1];
     if (B->dimensions[0] != k)
-      return GA_VALUE_ERROR;
+      return error_set(ctx->err, GA_VALUE_ERROR, "mismatched shapes");
   } else {
     n = B->dimensions[0];
     if (B->dimensions[1] != k)
-      return GA_VALUE_ERROR;
+      return error_set(ctx->err, GA_VALUE_ERROR, "mismatched shapes");
   }
 
   if (C->dimensions[0] != m || C->dimensions[1] != n)
-    return GA_VALUE_ERROR;
+    return error_set(ctx->err, GA_VALUE_ERROR, "mismatched shapes");
 
   elsize = gpuarray_get_elsize(A->typecode);
 
   if (!GpuArray_ISONESEGMENT(A)) {
     if (nocopy)
-      return GA_COPY_ERROR;
+      return error_set(ctx->err, GA_COPY_ERROR, "Need copy for A");
     else {
       err = GpuArray_copy(&copyA, A, GA_F_ORDER);
       if (err != GA_NO_ERROR)
@@ -260,7 +265,7 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
   }
   if (!GpuArray_ISONESEGMENT(B)) {
     if (nocopy)
-      return GA_COPY_ERROR;
+      return error_set(ctx->err, GA_COPY_ERROR, "Need copy for B");
     else {
       err = GpuArray_copy(&copyB, B, GA_F_ORDER);
       if (err != GA_NO_ERROR)
@@ -269,7 +274,7 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
     }
   }
   if (!GpuArray_ISONESEGMENT(C)) {
-    err = GA_VALUE_ERROR;
+    err = error_set(ctx->err, GA_VALUE_ERROR, "Noncontiguous C");
     goto cleanup;
   }
 
@@ -280,7 +285,7 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
     o = cb_c;
     ldc = Cp->dimensions[1];
   } else {
-    err = GA_VALUE_ERROR;
+    err = error_set(ctx->err, GA_VALUE_ERROR, "Noncontiguous C");
     goto cleanup;
   }
   if (Ap->flags & GA_F_CONTIGUOUS) {
@@ -300,7 +305,7 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
         transA = cb_no_trans;
     }
   } else {
-    err = GA_VALUE_ERROR;
+    err = error_set(ctx->err, GA_VALUE_ERROR, "Noncontiguous A");
     goto cleanup;
   }
   if (Bp->flags & GA_F_CONTIGUOUS) {
@@ -320,7 +325,7 @@ int GpuArray_rgemm(cb_transpose transA, cb_transpose transB, double alpha,
         transB = cb_no_trans;
     }
   } else {
-    err = GA_VALUE_ERROR;
+    err = error_set(ctx->err, GA_VALUE_ERROR, "Noncontiguous B");
     goto cleanup;
   }
 
@@ -356,7 +361,7 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
   GpuArray *Yp = Y;
   GpuArray copyY;
   GpuArray *Ap = A;
-  void *ctx;
+  gpucontext *ctx = gpudata_context(Xp->data);
   size_t elsize;
   size_t m, n, lda;
   cb_order o;
@@ -364,27 +369,29 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
 
   if (X->typecode != GA_HALF && X->typecode != GA_FLOAT &&
       X->typecode != GA_DOUBLE)
-    return GA_INVALID_ERROR;
+    return error_set(ctx->err, GA_INVALID_ERROR, "Unsupported dtype");
 
-  if (X->nd != 1 || Y->nd != 1 || A->nd != 2 ||
-      Y->typecode != X->typecode ||
-      A->typecode != X->typecode)
-    return GA_VALUE_ERROR;
+  if (X->nd != 1 || Y->nd != 1 || A->nd != 2)
+    return error_fmt(ctx->err, GA_VALUE_ERROR,
+                     "Wrong number of dimensions: X->nd = %u (expected 1), Y->nd = %u (expected 1), A->nd = %u (expected 2)",
+                     X->nd, Y->nd, A->nd);
+  if (Y->typecode != X->typecode || A->typecode != X->typecode)
+    return error_set(ctx->err, GA_VALUE_ERROR, "Inconsistent dtypes");
 
   if (!(X->flags & GA_ALIGNED) || !(Y->flags & GA_ALIGNED) ||
       !(A->flags & GA_ALIGNED))
-    return GA_UNALIGNED_ERROR;
+    return error_set(ctx->err, GA_UNALIGNED_ERROR, "Unaligned inputs");
 
   m = X->dimensions[0];
   n = Y->dimensions[0];
   if (A->dimensions[0] != m || A->dimensions[1] != n)
-    return GA_VALUE_ERROR;
+    return error_set(ctx->err, GA_VALUE_ERROR, "Incompatible shapes");
 
   elsize = gpuarray_get_elsize(X->typecode);
 
   if (X->strides[0] < 0) {
     if (nocopy)
-      return GA_COPY_ERROR;
+      return error_set(ctx->err, GA_COPY_ERROR, "Need copy for X");
     else {
       err = GpuArray_copy(&copyX, X, GA_ANY_ORDER);
       if (err != GA_NO_ERROR)
@@ -394,7 +401,7 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
   }
   if (Y->strides[0] < 0) {
     if (nocopy)
-      return GA_COPY_ERROR;
+      return error_set(ctx->err, GA_COPY_ERROR, "Need copy for Y");
     else {
       err = GpuArray_copy(&copyY, Y, GA_ANY_ORDER);
       if (err != GA_NO_ERROR)
@@ -403,7 +410,7 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
     }
   }
   if (!GpuArray_ISONESEGMENT(A)) {
-    err = GA_VALUE_ERROR;
+    err = error_set(ctx->err, GA_VALUE_ERROR, "Noncontiguous A");
     goto cleanup;
   }
 
@@ -415,7 +422,7 @@ int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y, GpuArray *A,
     lda = Ap->dimensions[1];
   } else {
     /* Might be worth looking at making degenerate matrices (1xn) work here. */
-    err = GA_VALUE_ERROR;
+    err = error_set(ctx->err, GA_VALUE_ERROR, "Noncontiguous A");
     goto cleanup;
   }
 
@@ -469,7 +476,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   GpuArray *Bp = B;
   GpuArray copyB;
   GpuArray *Cp = C;
-  void *ctx;
+  gpucontext *ctx = gpudata_context(A->data);
   size_t elsize;
   size_t batchCount, m, n, k, lda, ldb, ldc;
   cb_order o;
@@ -480,20 +487,22 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   size_t i;
 
   if (A->typecode != GA_FLOAT && A->typecode != GA_DOUBLE)
-    return GA_INVALID_ERROR;
+    return error_set(ctx->err, GA_INVALID_ERROR, "Unsupported dtype");
 
-  if (A->nd != 3 || B->nd != 3 || C->nd != 3 ||
-      B->typecode != A->typecode ||
-      C->typecode != A->typecode)
-    return GA_VALUE_ERROR;
+  if (A->nd != 3 || B->nd != 3 || C->nd != 3)
+    return error_fmt(ctx->err, GA_VALUE_ERROR,
+                     "Wrong number of dimensions: A->nd = %u (expected 3), B->nd = %u (expected 3), C->nd = %u (expected 3)",
+                     A->nd, B->nd, C->nd);
+  if (B->typecode != A->typecode || C->typecode != A->typecode)
+    return error_set(ctx->err, GA_VALUE_ERROR, "Inconsistent dtypes");
 
   if (!(A->flags & GA_ALIGNED) || !(B->flags & GA_ALIGNED) ||
       !(C->flags & GA_ALIGNED))
-    return GA_UNALIGNED_ERROR;
+    return error_set(ctx->err, GA_UNALIGNED_ERROR, "Unaligned input");
 
   batchCount = A->dimensions[0];
   if (B->dimensions[0] != batchCount || C->dimensions[0] != batchCount)
-    return GA_VALUE_ERROR;
+    return error_set(ctx->err, GA_VALUE_ERROR, "Mismatched first dimension");
 
   if (transA == cb_no_trans) {
     m = A->dimensions[1];
@@ -506,22 +515,22 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   if (transB == cb_no_trans) {
     n = B->dimensions[2];
     if (B->dimensions[1] != k)
-      return GA_VALUE_ERROR;
+      return error_set(ctx->err, GA_VALUE_ERROR, "Mismatched shape");
   } else {
     n = B->dimensions[1];
     if (B->dimensions[2] != k)
-      return GA_VALUE_ERROR;
+      return error_set(ctx->err, GA_VALUE_ERROR, "Mismatched shape");
   }
 
   if (C->dimensions[1] != m || C->dimensions[2] != n)
-    return GA_VALUE_ERROR;
+    return error_set(ctx->err, GA_VALUE_ERROR, "Mismatched shape");
 
   elsize = gpuarray_get_elsize(A->typecode);
 
   cA = is_last_2d_contiguous(A);
   if (!cA) {
     if (nocopy)
-      return GA_COPY_ERROR;
+      return error_set(ctx->err, GA_COPY_ERROR, "Need copy for A");
     else {
       err = GpuArray_copy(&copyA, A, GA_C_ORDER);
       cA = 1;
@@ -533,7 +542,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   cB = is_last_2d_contiguous(B);
   if (!cB) {
     if (nocopy)
-      return GA_COPY_ERROR;
+      return error_set(ctx->err, GA_COPY_ERROR, "Need copy for B");
     else {
       err = GpuArray_copy(&copyB, B, GA_C_ORDER);
       cB = 1;
@@ -544,7 +553,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
   }
   cC = is_last_2d_contiguous(C);
   if (!cC) {
-    err = GA_VALUE_ERROR;
+    err = error_set(ctx->err, GA_VALUE_ERROR, "Noncontiguous last 2d C");
     goto cleanup;
   }
 
@@ -559,7 +568,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
           ? Cp->strides[1] / elsize
           : Cp->dimensions[2];
   } else {
-    err = GA_VALUE_ERROR;
+    err = error_set(ctx->err, GA_MISC_ERROR, "Invalid internal result for C");
     goto cleanup;
   }
   if (cA == 2) {
@@ -583,7 +592,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
         transA = cb_no_trans;
     }
   } else {
-    err = GA_VALUE_ERROR;
+    err = error_set(ctx->err, GA_MISC_ERROR, "Invalid internal result for A");
     goto cleanup;
   }
   if (cB == 2) {
@@ -607,7 +616,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
         transB = cb_no_trans;
     }
   } else {
-    err = GA_VALUE_ERROR;
+    err = error_set(ctx->err, GA_MISC_ERROR, "Invalid internal result for B");
     goto cleanup;
   }
 

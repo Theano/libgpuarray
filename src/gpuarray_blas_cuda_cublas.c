@@ -461,7 +461,7 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   ASSERT_BUF(C);
 
   if (cublasSgemmEx == NULL)
-    return GA_DEVSUP_ERROR;
+    return error_set(ctx->err, GA_DEVSUP_ERROR, "cublasSgemmEx unavailable");
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
       LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
@@ -1334,7 +1334,7 @@ static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
   }
   if (gs[0] * gs[1] * gs[2] > 65535) {
     if (gs[0] * gs[1] > 65535)
-      return GA_VALUE_ERROR;
+      return error_set(ctx->err, GA_VALUE_ERROR, "Input too large");
     gs[2] = (65535 / (gs[0] * gs[1]));
   }
 
@@ -1465,7 +1465,7 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
   }
   if (gs[0] * gs[1] * gs[2] > 65535) {
     if (gs[0] * gs[1] > 65535)
-      return GA_VALUE_ERROR;
+      return error_set(ctx->err, GA_VALUE_ERROR, "Input too large");
     gs[2] = (65535 / (gs[0] * gs[1]));
   }
 
