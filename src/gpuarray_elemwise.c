@@ -594,24 +594,33 @@ GpuElemwise *GpuElemwise_new(gpucontext *ctx,
   int ret;
 
   res = calloc(1, sizeof(*res));
-  if (res == NULL) return NULL;
+  if (res == NULL) {
+    error_sys(ctx->err, "calloc");
+    return NULL;
+  }
 
   res->flags = flags;
   res->nd = 8;
   res->n = n;
 
   res->expr = strdup(expr);
-  if (res->expr == NULL)
+  if (res->expr == NULL) {
+    error_sys(ctx->err, "strdup");
     goto fail;
+  }
   if (preamble != NULL) {
     res->preamble = strdup(preamble);
-    if (res->preamble == NULL)
+    if (res->preamble == NULL) {
+      error_sys(ctx->err, "strdup");
       goto fail;
+    }
   }
 
   res->args = copy_args(n, args);
-  if (res->args == NULL)
+  if (res->args == NULL) {
+    error_sys(ctx->err, "copy_args");
     goto fail;
+  }
 
   /* Count the arrays in the arguements */
   res->narray = 0;
@@ -620,18 +629,26 @@ GpuElemwise *GpuElemwise_new(gpucontext *ctx,
 
   while (res->nd < nd) res->nd *= 2;
   res->dims = calloc(res->nd, sizeof(size_t));
-  if (res->dims == NULL)
+  if (res->dims == NULL) {
+    error_sys(ctx->err, "calloc");
     goto fail;
+  }
   res->strides = strides_array(res->narray, res->nd);
-  if (res->strides == NULL)
+  if (res->strides == NULL) {
+    error_sys(ctx->err, "strides_array");
     goto fail;
+  }
   res->k_basic = calloc(res->nd, sizeof(GpuKernel));
-  if (res->k_basic == NULL)
+  if (res->k_basic == NULL) {
+    error_sys(ctx->err, "calloc");
     goto fail;
+  }
 
   res->k_basic_32 = calloc(res->nd, sizeof(GpuKernel));
-  if (res->k_basic_32 == NULL)
+  if (res->k_basic_32 == NULL) {
+    error_sys(ctx->err, "calloc");
     goto fail;
+  }
 
   ret = gen_elemwise_contig_kernel(&res->k_contig, ctx,
 #ifdef DEBUG
