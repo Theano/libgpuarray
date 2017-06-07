@@ -260,8 +260,8 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
                                  (vread_fn)kernel_read,
                                  res->err);
     if (res->disk_cache == NULL) {
-      // TODO use better error messages when they are available.
-      fprintf(stderr, "Error initializing disk cache, disabling\n");
+      fprintf(stderr, "Error initializing disk cache, disabling: %s\n",
+              global_err->msg);
       cache_destroy(mem_cache);
       goto fail_disk_cache;
     }
