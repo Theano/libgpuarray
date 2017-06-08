@@ -118,10 +118,20 @@ int GpuArray_empty(GpuArray *a, gpucontext *ctx, int typecode,
     size *= d;
   }
 
+  /* We add a offset of 64 to all arrays in DEBUG to help catch errors. */
+#ifdef DEBUG
+  assert(SIZE_MAX - size > 64);
+  size += 64;
+#endif
+
   a->data = gpudata_alloc(ctx, size, NULL, 0, &res);
   if (a->data == NULL) return ctx->err->code;
   a->nd = nd;
+#ifdef DEBUG
+  a->offset = 64;
+#else
   a->offset = 0;
+#endif
   a->typecode = typecode;
   a->dimensions = calloc(nd, sizeof(size_t));
   a->strides = calloc(nd, sizeof(ssize_t));

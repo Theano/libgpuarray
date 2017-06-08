@@ -1,10 +1,11 @@
 from string import Template
-from .gpuarray import GpuArray, GpuKernel
+from .gpuarray import GpuArray, GpuKernel, SIZE
 
 
 def _generate_kernel(ctx, cols, upper=True):
     tmpl = Template("""
-    KERNEL void extract_tri(GLOBAL_MEM ga_float *a, ga_uint N) {
+    KERNEL void extract_tri(GLOBAL_MEM ga_float *a, ga_size a_off, ga_uint N) {
+        a = (GLOBAL_MEM ga_float *)(((char *)a) + a_off);
         unsigned int idx = GID_1 * LDIM_0 * GDIM_0 +
                            GID_0 * LDIM_0 + LID_0;
         unsigned int ix = idx/${cols};
@@ -20,7 +21,7 @@ def _generate_kernel(ctx, cols, upper=True):
     else:
         le = '<'
     src = tmpl.substitute(cols=cols, le=le)
-    spec = [GpuArray, 'uint32']
+    spec = [GpuArray, SIZE, 'uint32']
     k = GpuKernel(src, "extract_tri", spec, context=ctx)
     return k
 
@@ -40,7 +41,7 @@ def triu(A, inplace=True):
         upper = True
         cols = A.shape[1]
     k = _generate_kernel(A.context, cols, upper)
-    k(A, A.shape[0] * A.shape[1], n=A.shape[0] * A.shape[1])
+    k(A, A.offset, A.shape[0] * A.shape[1], n=A.shape[0] * A.shape[1])
     return A
 
 
@@ -59,5 +60,5 @@ def tril(A, inplace=True):
         upper = False
         cols = A.shape[1]
     k = _generate_kernel(A.context, cols, upper)
-    k(A, A.shape[0] * A.shape[1], n=A.shape[0] * A.shape[1])
+    k(A, A.offset, A.shape[0] * A.shape[1], n=A.shape[0] * A.shape[1])
     return A
