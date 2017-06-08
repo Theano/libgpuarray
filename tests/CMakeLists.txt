@@ -1,4 +1,4 @@
-include(CheckSymbolExists)
+include(CheckCSourceCompiles)
 find_package(PkgConfig)
 
 pkg_search_module(CHECK check)
@@ -17,8 +17,15 @@ if(NOT CHECK_FOUND)
 endif()
 
 if(CHECK_FOUND)
-  set(CMAKE_REQUIRED_INCLUDE ${CHECK_INCLUDE_DIRS})
-  CHECK_SYMBOL_EXISTS(ck_assert_ptr_ne "check.h" CHECK_FUNCS)
+  set(CMAKE_REQUIRED_FLAGS ${CHECK_C_FLAGS} ${CHECK_LDFLAGS_OTHERS})
+  set(CMAKE_REQUIRED_INCLUDES ${CHECK_INCLUDE_DIRS})
+  set(CMAKE_REQUIRED_LIBRARIES ${CHECK_LIBRARIES})
+  CHECK_C_SOURCE_COMPILES(
+    "#include <check.h>
+     int main() {
+       ck_assert_ptr_ne(NULL, NULL);
+     }"
+    CHECK_FUNCS)
   if (NOT CHECK_FUNCS)
     set(CHECK_FOUND 0)
   endif()
