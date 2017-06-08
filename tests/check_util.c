@@ -129,20 +129,20 @@ START_TEST(test_float2half) {
     65520.f,
   };
   const ga_half_t h[] = {
-    0x0001u, /* 2e-24 */
-    0x0000u, /* 0 */
-    0x0000u, /* 0 */
-    0x3c01u, /* 1.0 + 2e-10 */
-    0x3c00u, /* 1.0 */
-    0x7bffu, /* 65504 */
-    0x7c00u, /* Inf */
+    {0x0001u}, /* 2e-24 */
+    {0x0000u}, /* 0 */
+    {0x0000u}, /* 0 */
+    {0x3c01u}, /* 1.0 + 2e-10 */
+    {0x3c00u}, /* 1.0 */
+    {0x7bffu}, /* 65504 */
+    {0x7c00u}, /* Inf */
   };
   unsigned int i;
   ga_half_t hr;
 
   for (i = 0; i < sizeof(f)/sizeof(f[0]); i++) {
     hr = ga_float2half(f[i]);
-    ck_assert_int_eq(hr, h[i]);
+    ck_assert_int_eq(hr.h, h[i].h);
   }
 }
 END_TEST
