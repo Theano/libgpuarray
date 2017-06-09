@@ -696,41 +696,43 @@ int GpuArray_reshape_inplace(GpuArray *a, unsigned int nd,
   if (newstrides == NULL)
     return error_sys(ctx->err, "calloc");
 
-  while (ni < nd && oi < a->nd) {
-    np = newdims[ni];
-    op = a->dimensions[oi];
+  if (newsize != 0) {
+    while (ni < nd && oi < a->nd) {
+      np = newdims[ni];
+      op = a->dimensions[oi];
 
-    while (np != op) {
-      if (np < op) {
-        np *= newdims[nj++];
-      } else {
-        op *= a->dimensions[oj++];
+      while (np != op) {
+        if (np < op) {
+          np *= newdims[nj++];
+        } else {
+          op *= a->dimensions[oj++];
+        }
       }
-    }
 
-    for (ok = oi; ok < oj - 1; ok++) {
+      for (ok = oi; ok < oj - 1; ok++) {
+        if (ord == GA_F_ORDER) {
+          if (a->strides[ok+1] != (ssize_t)a->dimensions[ok]*a->strides[ok])
+            goto need_copy;
+        } else {
+          if (a->strides[ok] != (ssize_t)a->dimensions[ok+1]*a->strides[ok+1])
+            goto need_copy;
+        }
+      }
+
       if (ord == GA_F_ORDER) {
-        if (a->strides[ok+1] != (ssize_t)a->dimensions[ok]*a->strides[ok])
-          goto need_copy;
+        newstrides[ni] = a->strides[oi];
+        for (nk = ni + 1; nk < nj; nk++) {
+          newstrides[nk] = newstrides[nk - 1]*newdims[nk - 1];
+        }
       } else {
-        if (a->strides[ok] != (ssize_t)a->dimensions[ok+1]*a->strides[ok+1])
-          goto need_copy;
+        newstrides[nj-1] = a->strides[oj-1];
+        for (nk = nj-1; nk > ni; nk--) {
+          newstrides[nk-1] = newstrides[nk]*newdims[nk];
+        }
       }
+      ni = nj++;
+      oi = oj++;
     }
-
-    if (ord == GA_F_ORDER) {
-      newstrides[ni] = a->strides[oi];
-      for (nk = ni + 1; nk < nj; nk++) {
-        newstrides[nk] = newstrides[nk - 1]*newdims[nk - 1];
-      }
-    } else {
-      newstrides[nj-1] = a->strides[oj-1];
-      for (nk = nj-1; nk > ni; nk--) {
-        newstrides[nk-1] = newstrides[nk]*newdims[nk];
-      }
-    }
-    ni = nj++;
-    oi = oj++;
   }
 
   /* Fixup trailing ones */

@@ -270,6 +270,20 @@ START_TEST(test_take1_offset) {
 }
 END_TEST
 
+START_TEST(test_reshape_0) {
+  /* This tests that we don't segfault when reshaping 0-sized arrays */
+  const size_t odims[3] = {24, 0, 33};
+  const size_t ndims1[3] = {0, 24, 33};
+  const size_t ndims2[3] = {24, 33, 0};
+
+  GpuArray v;
+  ga_assert_ok(GpuArray_empty(&v, ctx, GA_FLOAT, 3, odims, GA_C_ORDER));
+  ga_assert_ok(GpuArray_reshape_inplace(&v, 3, ndims1, GA_ANY_ORDER));
+  ga_assert_ok(GpuArray_reshape_inplace(&v, 3, odims, GA_ANY_ORDER));
+  ga_assert_ok(GpuArray_reshape_inplace(&v, 3, ndims2, GA_ANY_ORDER));
+}
+END_TEST
+
 Suite *get_suite(void) {
   Suite *s = suite_create("array");
   TCase *tc = tcase_create("take1");
@@ -277,6 +291,7 @@ Suite *get_suite(void) {
   tcase_set_timeout(tc, 8.0);
   tcase_add_test(tc, test_take1_ok);
   tcase_add_test(tc, test_take1_offset);
+  tcase_add_test(tc, test_reshape_0);
   suite_add_tcase(s, tc);
   return s;
 }
