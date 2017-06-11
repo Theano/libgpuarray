@@ -3,6 +3,7 @@
 import mako
 import numpy
 import re
+import sys
 import warnings
 from pygpu._array import ndgpuarray
 from pygpu.dtypes import dtype_to_ctype, NAME_TO_DTYPE
@@ -10,6 +11,8 @@ from pygpu._elemwise import arg
 from pygpu.elemwise import as_argument, GpuElemwise
 from pygpu.reduction import reduce1
 from pygpu.gpuarray import GpuArray, array, empty, get_default_context
+
+PY3 = sys.version_info.major >= 3
 
 
 # --- Helper functions --- #
@@ -58,9 +61,8 @@ def _prepare_array_for_reduction(a, out):
 
     if need_context:
         ctx = get_default_context()
-        cls = ndgpuarray  # TODO: sensible choice as default?
+        cls = ndgpuarray
 
-    # TODO: can CPU memory handed directly to kernels?
     if not isinstance(a, GpuArray):
         a = numpy.asarray(a)
         if a.flags.f_contiguous and not a.flags.c_contiguous:
@@ -575,9 +577,8 @@ def unary_ufunc(a, ufunc_name, out=None):
 
     if need_context:
         ctx = get_default_context()
-        cls = ndgpuarray  # TODO: sensible choice as default?
+        cls = ndgpuarray
 
-    # TODO: can CPU memory handed directly to kernels?
     if not isinstance(a, GpuArray):
         a = numpy.asarray(a)
         if a.flags.f_contiguous and not a.flags.c_contiguous:
@@ -739,11 +740,8 @@ def binary_ufunc(a, b, ufunc_name, out=None):
             break
     if need_context:
         ctx = get_default_context()
-        # TODO: sensible choice? Makes sense to choose the more "feature-rich"
-        # variant here perhaps.
         cls = ndgpuarray
 
-    # TODO: can CPU memory handed directly to kernels?
     if not isinstance(a, GpuArray):
         if numpy.isscalar(a):
             # TODO: this is quite hacky, perhaps mixed input signatures
@@ -760,6 +758,7 @@ def binary_ufunc(a, b, ufunc_name, out=None):
             order = 'C'
         a = array(a, dtype=a.dtype, copy=False, order=order, context=ctx,
                   cls=cls)
+
     if not isinstance(b, GpuArray):
         if numpy.isscalar(b):
             # TODO: this is quite hacky, perhaps mixed input signatures
@@ -981,9 +980,8 @@ def unary_ufunc_two_out(a, ufunc_name, out1=None, out2=None):
 
     if need_context:
         ctx = get_default_context()
-        cls = ndgpuarray  # TODO: sensible choice as default?
+        cls = ndgpuarray
 
-    # TODO: can CPU memory handed directly to kernels?
     if not isinstance(a, GpuArray):
         a = numpy.asarray(a)
         if a.flags.f_contiguous and not a.flags.c_contiguous:
@@ -1078,9 +1076,7 @@ UFUNC_SYNONYMS = [
 
 
 def make_binary_ufunc_reduce(name):
-
     npy_ufunc = getattr(numpy, name)
-
     binop = BINARY_UFUNC_TO_C_BINOP.get(name, None)
     if binop is not None:
 
@@ -1153,15 +1149,19 @@ class UfuncBase(object):
             return NotImplemented
 
         self.accumulate = kwargs.pop('accumulate', _accumulate_not_impl)
-        self.accumulate.__name__ = self.accumulate.__qualname__ = 'accumulate'
+        self.accumulate.__name__ = 'accumulate'
+        if PY3:
+            self.accumulate.__qualname__ = 'accumulate'
 
         self.at = kwargs.pop('at', _at_not_impl)
-        self.at.__qualname__ = name + '.at'
         self.at.__name__ = 'at'
+        if PY3:
+            self.at.__qualname__ = name + '.at'
 
         self.outer = kwargs.pop('outer', _outer_not_impl)
         self.outer.__name__ = 'outer'
-        self.outer.__qualname__ = name + '.outer'
+        if PY3:
+            self.outer.__qualname__ = name + '.outer'
 
         reduce = kwargs.pop('reduce', None)
         if reduce is None:
@@ -1169,11 +1169,13 @@ class UfuncBase(object):
         else:
             self.reduce = reduce
         self.reduce.__name__ = 'reduce'
-        self.reduce.__qualname__ = name + '.reduce'
+        if PY3:
+            self.reduce.__qualname__ = name + '.reduce'
 
         self.reduceat = kwargs.pop('reduceat', _reduceat_not_impl)
         self.reduceat.__name__ = 'reduceat'
-        self.reduceat.__qualname__ = name + '.reduceat'
+        if PY3:
+            self.reduceat.__qualname__ = name + '.reduceat'
 
     def __repr__(self):
         return '<ufunc {}>'.format(self.name)
@@ -1207,9 +1209,13 @@ class Ufunc21(UfuncBase):
 
 
 def make_unary_ufunc(name, doc):
+
     def wrapper(a, out=None):
         return unary_ufunc(a, name, out)
-    wrapper.__qualname__ = wrapper.__name__ = name
+
+    wrapper.__name__ = name
+    if PY3:
+        wrapper.__qualname__ = name
     wrapper.__doc__ = doc
     return wrapper
 
@@ -1229,9 +1235,13 @@ for ufunc_name in UNARY_UFUNCS:
 
 
 def make_unary_ufunc_two_out(name, doc):
+
     def wrapper(a, out1=None, out2=None):
         return unary_ufunc_two_out(a, name, out1, out2)
-    wrapper.__qualname__ = wrapper.__name__ = name
+
+    wrapper.__name__ = name
+    if PY3:
+        wrapper.__qualname__ = name
     wrapper.__doc__ = doc
     return wrapper
 
@@ -1249,10 +1259,13 @@ for ufunc_name in UNARY_UFUNCS_TWO_OUT:
 
 
 def make_binary_ufunc(name, doc):
+
     def wrapper(a, b, out=None):
         return binary_ufunc(a, b, name, out)
 
-    wrapper.__qualname__ = wrapper.__name__ = name
+    wrapper.__name__ = name
+    if PY3:
+        wrapper.__qualname__ = name
     wrapper.__doc__ = doc
     return wrapper
 
