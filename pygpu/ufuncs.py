@@ -1050,8 +1050,14 @@ def unary_ufunc_two_out(a, ufunc_name, out1=None, out2=None):
     return out1, out2
 
 
+# TODO: add ufuncs conditionally depending on Numpy version?
 MISSING_UFUNCS = [
     'conjugate',  # no complex dtype yet
+    'float_power',  # new in Numpy 1.12
+    'divmod',  # new in Numpy 1.13
+    'heaviside',  # new in Numpy 1.13
+    'isnat',  # new in Numpy 1.13
+    'positive',  # new in Numpy 1.13
     ]
 
 
@@ -1112,8 +1118,8 @@ def make_binary_ufunc_reduce(name):
 #   object will not be registered as callable
 # - Metaclass using __call__, need to find a more complete reference
 #
-# We need some way of setting __call__ on the class, but making one copy of
-# the class per call signature. Not sure how that makes any sense though...
+# We need some way of setting the __call__ signature of an instance,
+# probably by modifying __call__.__code__.
 
 
 class UfuncBase(object):
@@ -1127,103 +1133,47 @@ class UfuncBase(object):
 
         self.identity = kwargs.pop('identity', None)
 
-        # Wrappers for numpy methods that take care of the array conversions
+        # Wrappers for unimplemented stuff
 
-        def _at_not_impl(self, a, indices, b=None):
-            """Not implemented."""
-            raise NotImplementedError
+        def _at_not_impl(a, indices, b=None):
+            return NotImplemented
 
-        def _accumulate_wrapper(array, axis=0, dtype=None, out=None,
-                                keepdims=None):
-            if out is not None:
-                out_ndarray = numpy.asarray(out)
-                out_ndarray = self._npy_accumulate(array, axis, dtype,
-                                                   out_ndarray, keepdims)
-                out[:] = out_ndarray
-            else:
-                ctx = getattr(array, 'context', None)
-                out_ndarray = self._npy_accumulate(array, axis, dtype,
-                                                   None, keepdims)
-                out = array(out_ndarray, context=ctx, cls=ndgpuarray)
+        def _accumulate_not_impl(array, axis=0, dtype=None, out=None,
+                                 keepdims=None):
+            return NotImplemented
 
-            return out
+        def _outer_not_impl(A, B, **kwargs):
+            return NotImplemented
 
-        def _outer_wrapper(A, B, **kwargs):
-            out = kwargs.pop('out', None)
-            if out is not None:
-                out_ndarray = numpy.asarray(out)
-                out_ndarray = self._npy_outer(A, B, out=out_ndarray, **kwargs)
-                out[:] = out_ndarray
-            else:
-                ctx = getattr(array, 'context', None)
-                out_ndarray = self._npy_outer(A, B, **kwargs)
-                out = array(out_ndarray, context=ctx, cls=ndgpuarray)
+        def _reduce_not_impl(a, axis=0, dtype=None, out=None,
+                             keepdims=False):
+            return NotImplemented
 
-            return out
+        def _reduceat_not_impl(a, indices, axis=0, dtype=None, out=None):
+            return NotImplemented
 
-        def _reduce_wrapper(a, axis=0, dtype=None, out=None,
-                            keepdims=False):
-            if out is not None:
-                out_ndarray = numpy.asarray(out)
-                out_ndarray = self._npy_reduce(a, axis, dtype, out_ndarray,
-                                               keepdims)
-                out[:] = out_ndarray
-            else:
-                ctx = getattr(a, 'context', None)
-                out_ndarray = self._npy_reduce(a, axis, dtype, None,
-                                               keepdims)
-                if numpy.isscalar(out_ndarray):
-                    out = out_ndarray
-                else:
-                    out = array(out_ndarray, context=ctx, cls=ndgpuarray)
-
-            return out
-
-        def _reduceat_wrapper(a, indices, axis=0, dtype=None, out=None):
-            if out is not None:
-                out_ndarray = numpy.asarray(out)
-                out_ndarray = self._npy_reduceat(a, indices, axis, dtype,
-                                                 out_ndarray)
-                out[:] = out_ndarray
-            else:
-                ctx = getattr(a, 'context', None)
-                out_ndarray = self._npy_reduceat(a, indices, axis, dtype,
-                                                 None)
-                if numpy.isscalar(out_ndarray):
-                    out = out_ndarray
-                else:
-                    out = array(out_ndarray, context=ctx, cls=ndgpuarray)
-
-            return out
-
-        numpy_ufunc = getattr(numpy, name)
-
-        self.accumulate = kwargs.pop('accumulate', _accumulate_wrapper)
+        self.accumulate = kwargs.pop('accumulate', _accumulate_not_impl)
         self.accumulate.__name__ = self.accumulate.__qualname__ = 'accumulate'
-        self._npy_accumulate = numpy_ufunc.accumulate
 
         self.at = kwargs.pop('at', _at_not_impl)
         self.at.__qualname__ = name + '.at'
         self.at.__name__ = 'at'
 
-        self.outer = kwargs.pop('outer', _outer_wrapper)
+        self.outer = kwargs.pop('outer', _outer_not_impl)
         self.outer.__name__ = 'outer'
         self.outer.__qualname__ = name + '.outer'
-        self._npy_outer = numpy_ufunc.outer
 
         reduce = kwargs.pop('reduce', None)
         if reduce is None:
-            self.reduce = _reduce_wrapper
+            self.reduce = _reduce_not_impl
         else:
             self.reduce = reduce
         self.reduce.__name__ = 'reduce'
         self.reduce.__qualname__ = name + '.reduce'
-        self._npy_reduce = numpy_ufunc.reduce
 
-        self.reduceat = kwargs.pop('reduceat', _reduceat_wrapper)
+        self.reduceat = kwargs.pop('reduceat', _reduceat_not_impl)
         self.reduceat.__name__ = 'reduceat'
         self.reduceat.__qualname__ = name + '.reduceat'
-        self._npy_reduceat = numpy_ufunc.reduceat
 
     def __repr__(self):
         return '<ufunc {}>'.format(self.name)
