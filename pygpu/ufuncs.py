@@ -662,12 +662,12 @@ def unary_ufunc(a, ufunc_name, out=None):
 
     # Other cases: specific functions
     if ufunc_name == 'deg2rad':
-        oper = 'res = ({rdt})({}) * ({rdt}) a'.format(numpy.deg2rad(1),
-                                                      rdt=c_res_dtype)
+        oper = 'res = ({rdt})({:.45f}) * ({rdt}) a'.format(numpy.deg2rad(1.0),
+                                                           rdt=c_res_dtype)
 
     elif ufunc_name == 'rad2deg':
-        oper = 'res = ({rdt})({}) * ({rdt}) a'.format(numpy.rad2deg(1),
-                                                      rdt=c_res_dtype)
+        oper = 'res = ({rdt})({:.45f}) * ({rdt}) a'.format(numpy.rad2deg(1.0),
+                                                           rdt=c_res_dtype)
 
     elif ufunc_name == 'reciprocal':
         oper = 'res = ({dt}) (({dt}) 1.0) / a'.format(dt=c_res_dtype)
