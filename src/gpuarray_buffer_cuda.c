@@ -1270,10 +1270,10 @@ static void _cuda_freekernel(gpukernel *k) {
   }
 }
 
-static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
-                                 const char **strings, const size_t *lengths,
-                                 const char *fname, unsigned int argcount,
-                                 const int *types, int flags, char **err_str) {
+static int cuda_newkernel(gpukernel **k, gpucontext *c, unsigned int count,
+                          const char **strings, const size_t *lengths,
+                          const char *fname, unsigned int argcount,
+                          const int *types, int flags, char **err_str) {
     cuda_context *ctx = (cuda_context *)c;
     strb src = STRB_STATIC_INIT;
     strb bin = STRB_STATIC_INIT;
@@ -1285,32 +1285,25 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
     unsigned int i;
     int major, minor;
 
-    if (count == 0) {
-      error_set(ctx->err, GA_VALUE_ERROR, "String count is 0");
-      return NULL;
-    }
+    if (count == 0)
+      return error_set(ctx->err, GA_VALUE_ERROR, "String count is 0");
 
-    if (flags & GA_USE_OPENCL) {
-      error_set(ctx->err, GA_DEVSUP_ERROR, "OpenCL kernel not supported on cuda devices");
-      return NULL;
-    }
+    if (flags & GA_USE_OPENCL)
+      return error_set(ctx->err, GA_DEVSUP_ERROR, "OpenCL kernel not supported on cuda devices");
 
-    if (flags & GA_USE_BINARY) {
-      error_set(ctx->err, GA_UNSUPPORTED_ERROR, "Binary mode not supported any more");
-      return NULL;
-    }
+    if (flags & GA_USE_BINARY)
+      return error_set(ctx->err, GA_UNSUPPORTED_ERROR, "Binary mode not supported any more");
 
     cuda_enter(ctx);
 
     err = cuCtxGetDevice(&dev);
     if (err != CUDA_SUCCESS) {
       cuda_exit(ctx);
-      error_cuda(ctx->err, "cuCtxGetDevice", err);
-      return NULL;
+      return error_cuda(ctx->err, "cuCtxGetDevice", err);
     }
 
     if (get_cc(dev, &major, &minor, ctx->err) != GA_NO_ERROR)
-      return NULL;
+      return ctx->err->code;
 
     // GA_USE_CLUDA is done later
     // GA_USE_SMALL will always work
@@ -1318,14 +1311,13 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
     if (flags & GA_USE_DOUBLE) {
       if (major < 1 || (major == 1 && minor < 3)) {
         cuda_exit(ctx);
-        error_set(ctx->err, GA_DEVSUP_ERROR, "Requested double support and current device doesn't support them");
-        return NULL;
+        return error_set(ctx->err, GA_DEVSUP_ERROR, "Requested double support and current device doesn't support them");
       }
     }
     if (flags & GA_USE_COMPLEX) {
       // just for now since it is most likely broken
       cuda_exit(ctx);
-      error_set(ctx->err, GA_UNSUPPORTED_ERROR, "Complex support is not there yet.");
+      return error_set(ctx->err, GA_UNSUPPORTED_ERROR, "Complex support is not there yet.");
     }
 
     if (flags & GA_USE_CLUDA) {
@@ -1347,17 +1339,17 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
     strb_append0(&src);
 
     if (strb_error(&src)) {
-      error_sys(ctx->err, "strb");
       strb_clear(&src);
       cuda_exit(ctx);
-      return NULL;
+      return error_sys(ctx->err, "strb");
     }
 
     res = (gpukernel *)cache_get(ctx->kernel_cache, &src);
     if (res != NULL) {
       res->refcnt++;
       strb_clear(&src);
-      return res;
+      *k = res;
+      return GA_NO_ERROR;
     }
 
     if (compile(ctx, &src, &bin, &log) != GA_NO_ERROR) {
@@ -1375,25 +1367,23 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
       strb_clear(&bin);
       strb_clear(&log);
       cuda_exit(ctx);
-      return NULL;
+      return ctx->err->code;
     }
     strb_clear(&log);
 
     if (strb_error(&bin)) {
-      error_sys(ctx->err, "strb");
       strb_clear(&src);
       strb_clear(&bin);
       cuda_exit(ctx);
-      return NULL;
+      return error_sys(ctx->err, "strb");
     }
 
     res = calloc(1, sizeof(*res));
     if (res == NULL) {
-      error_sys(ctx->err, "calloc");
       strb_clear(&src);
       strb_clear(&bin);
       cuda_exit(ctx);
-      return NULL;
+      return error_sys(ctx->err, "calloc");
     }
 
     /* Don't clear bin after this */
@@ -1403,20 +1393,18 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
     res->argcount = argcount;
     res->types = calloc(argcount, sizeof(int));
     if (res->types == NULL) {
-      error_sys(ctx->err, "calloc");
       _cuda_freekernel(res);
       strb_clear(&src);
       cuda_exit(ctx);
-      return NULL;
+      return error_sys(ctx->err, "calloc");
     }
     memcpy(res->types, types, argcount*sizeof(int));
     res->args = calloc(argcount, sizeof(void *));
     if (res->args == NULL) {
-      error_sys(ctx->err, "calloc");
       _cuda_freekernel(res);
       strb_clear(&src);
       cuda_exit(ctx);
-      return NULL;
+      return error_sys(ctx->err, "calloc");
     }
 
     err = cuModuleLoadData(&res->m, bin.s);
@@ -1425,16 +1413,15 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
       _cuda_freekernel(res);
       strb_clear(&src);
       cuda_exit(ctx);
-      return NULL;
+      return error_cuda(ctx->err, "cuModuleLoadData", err);
     }
 
     err = cuModuleGetFunction(&res->k, res->m, fname);
     if (err != CUDA_SUCCESS) {
-      error_cuda(ctx->err, "cuModuleGetFunction", err);
       _cuda_freekernel(res);
       strb_clear(&src);
       cuda_exit(ctx);
-      return NULL;
+      return error_cuda(ctx->err, "cuModuleGetFunction", err);
     }
 
     res->ctx = ctx;
@@ -1451,7 +1438,8 @@ static gpukernel *cuda_newkernel(gpucontext *c, unsigned int count,
     } else {
       strb_clear(&src);
     }
-    return res;
+    *k = res;
+    return GA_NO_ERROR;
 }
 
 static void cuda_retainkernel(gpukernel *k) {

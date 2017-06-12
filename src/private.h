@@ -88,10 +88,10 @@ struct _gpuarray_buffer_ops {
   int (*buffer_read)(void *dst, gpudata *src, size_t srcoff, size_t sz);
   int (*buffer_write)(gpudata *dst, size_t dstoff, const void *src, size_t sz);
   int (*buffer_memset)(gpudata *dst, size_t dstoff, int data);
-  gpukernel *(*kernel_alloc)(gpucontext *ctx, unsigned int count,
-                             const char **strings, const size_t *lengths,
-                             const char *fname, unsigned int numargs,
-                             const int *typecodes, int flags, char **err_str);
+  int (*kernel_alloc)(gpukernel **k, gpucontext *ctx, unsigned int count,
+                      const char **strings, const size_t *lengths,
+                      const char *fname, unsigned int numargs,
+                      const int *typecodes, int flags, char **err_str);
   void (*kernel_retain)(gpukernel *k);
   void (*kernel_release)(gpukernel *k);
   int (*kernel_setarg)(gpukernel *k, unsigned int i, void *a);

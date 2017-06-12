@@ -28,10 +28,10 @@ static int cl_property(gpucontext *c, gpudata *b, gpukernel *k, int p, void *r);
 static gpudata *cl_alloc(gpucontext *c, size_t size, void *data, int flags);
 static void cl_release(gpudata *b);
 static void cl_free_ctx(cl_ctx *ctx);
-static gpukernel *cl_newkernel(gpucontext *ctx, unsigned int count,
-                               const char **strings, const size_t *lengths,
-                               const char *fname, unsigned int argcount,
-                               const int *types, int flags, char **err_str);
+static int cl_newkernel(gpukernel **k, gpucontext *ctx, unsigned int count,
+                        const char **strings, const size_t *lengths,
+                        const char *fname, unsigned int argcount,
+                        const int *types, int flags, char **err_str);
 static const char CL_CONTEXT_PREAMBLE[] =
 "#define GA_WARP_SIZE %lu\n";  // to be filled by cl_make_ctx()
 
@@ -187,8 +187,7 @@ cl_ctx *cl_make_ctx(cl_context ctx, int flags) {
   rlk[0] = dummy_kern;
   len = sizeof(dummy_kern);
   // this dummy kernel does not require a CLUDA preamble
-  m = cl_newkernel((gpucontext *)res, 1, rlk, &len, "kdummy", 0, NULL, 0, NULL);
-  if (m == NULL)
+  if (cl_newkernel(&m, (gpucontext *)res, 1, rlk, &len, "kdummy", 0, NULL, 0, NULL) != GA_NO_ERROR)
     goto fail;
   ret = cl_property((gpucontext *)res, NULL, m, GA_KERNEL_PROP_PREFLSIZE, &warp_size);
   if (ret != GA_NO_ERROR)
@@ -770,8 +769,9 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
   rlk[0] = local_kern;
   type = GA_BUFFER;
 
-  m = cl_newkernel((gpucontext *)ctx, 1, rlk, &sz, "kmemset", 1, &type, 0, NULL);
-  if (m == NULL) return ctx->err->code;
+  r = cl_newkernel(&m, (gpucontext *)ctx, 1, rlk, &sz, "kmemset", 1, &type, 0, NULL);
+  if (r != GA_NO_ERROR)
+    return r;
 
   /* Cheap kernel scheduling */
   res = cl_property(NULL, NULL, m, GA_KERNEL_PROP_MAXLSIZE, &ls);
@@ -814,10 +814,10 @@ static int cl_check_extensions(const char **preamble, unsigned int *count,
   return GA_NO_ERROR;
 }
 
-static gpukernel *cl_newkernel(gpucontext *c, unsigned int count,
-                               const char **strings, const size_t *lengths,
-                               const char *fname, unsigned int argcount,
-                               const int *types, int flags, char **err_str) {
+static int cl_newkernel(gpukernel **k, gpucontext *c, unsigned int count,
+                        const char **strings, const size_t *lengths,
+                        const char *fname, unsigned int argcount,
+                        const int *types, int flags, char **err_str) {
   cl_ctx *ctx = (cl_ctx *)c;
   gpukernel *res;
   cl_device_id dev;
@@ -834,41 +834,33 @@ static gpukernel *cl_newkernel(gpucontext *c, unsigned int count,
 
   ASSERT_CTX(ctx);
 
-  if (count == 0) {
-    error_set(ctx->err, GA_VALUE_ERROR, "Empty kernel source list");
-    return NULL;
-  }
+  if (count == 0)
+    return error_set(ctx->err, GA_VALUE_ERROR, "Empty kernel source list");
 
   dev = get_dev(ctx->ctx, ctx->err);
-  if (dev == NULL) return NULL;
+  if (dev == NULL) return ctx->err->code;
 
   if (flags & GA_USE_BINARY) {
     // GA_USE_BINARY is exclusive
-    if (flags & ~GA_USE_BINARY) {
-      error_set(ctx->err, GA_INVALID_ERROR, "Cannot combine GA_USE_BINARY with any other flag");
-      return NULL;
-    }
+    if (flags & ~GA_USE_BINARY)
+      return error_set(ctx->err, GA_INVALID_ERROR, "Cannot combine GA_USE_BINARY with any other flag");
+
     // We need the length for binary data and there is only one blob.
-    if (count != 1 || lengths == NULL || lengths[0] == 0) {
-      error_set(ctx->err, GA_VALUE_ERROR, "GA_USE_BINARY requires the length to be specified");
-      return NULL;
-    }
+    if (count != 1 || lengths == NULL || lengths[0] == 0)
+      return error_set(ctx->err, GA_VALUE_ERROR, "GA_USE_BINARY requires the length to be specified");
+
     p = clCreateProgramWithBinary(ctx->ctx, 1, &dev, lengths, (const unsigned char **)strings, NULL, &err);
-    if (err != CL_SUCCESS) {
-      error_cl(ctx->err, "clCreateProgramWithBinary", err);
-      return NULL;
-    }
+    if (err != CL_SUCCESS)
+      return error_cl(ctx->err, "clCreateProgramWithBinary", err);
   } else {
 
     if (cl_check_extensions(preamble, &n, flags, ctx))
-      return NULL;
+      return ctx->err->code;
 
     if (n != 0) {
       news = calloc(count+n, sizeof(const char *));
-      if (news == NULL) {
-        error_sys(ctx->err, "calloc");
-        return NULL;
-      }
+      if (news == NULL)
+        return error_sys(ctx->err, "calloc");
       memcpy(news, preamble, n*sizeof(const char *));
       memcpy(news+n, strings, count*sizeof(const char *));
       if (lengths == NULL) {
@@ -877,8 +869,7 @@ static gpukernel *cl_newkernel(gpucontext *c, unsigned int count,
         newl = calloc(count+n, sizeof(size_t));
         if (newl == NULL) {
           free(news);
-          error_sys(ctx->err, "calloc");
-          return NULL;
+          return error_sys(ctx->err, "calloc");
         }
         memcpy(newl+n, lengths, count*sizeof(size_t));
       }
@@ -893,8 +884,7 @@ static gpukernel *cl_newkernel(gpucontext *c, unsigned int count,
         free(news);
         free(newl);
       }
-      error_cl(ctx->err, "clCreateProgramWithSource", err);
-      return NULL;
+      return error_cl(ctx->err, "clCreateProgramWithSource", err);
     }
   }
 
@@ -936,8 +926,7 @@ static gpukernel *cl_newkernel(gpucontext *c, unsigned int count,
       free(news);
       free(newl);
     }
-    error_cl(ctx->err, "clBuildProgram", err);
-    return NULL;
+    return error_cl(ctx->err, "clBuildProgram", err);
   }
 
   if (n != 0) {
@@ -946,10 +935,9 @@ static gpukernel *cl_newkernel(gpucontext *c, unsigned int count,
   }
 
   res = malloc(sizeof(*res));
-  if (res == NULL) {
-    error_sys(ctx->err, "malloc");
-    return NULL;
-  }
+  if (res == NULL)
+    return error_sys(ctx->err, "malloc");
+
   res->refcnt = 1;
   res->ev = NULL;
   res->argcount = argcount;
@@ -962,25 +950,23 @@ static gpukernel *cl_newkernel(gpucontext *c, unsigned int count,
   TAG_KER(res);
   if (err != CL_SUCCESS) {
     cl_releasekernel(res);
-    error_cl(ctx->err, "clCreateKernel", err);
-    return NULL;
+    return error_cl(ctx->err, "clCreateKernel", err);
   }
   res->types = calloc(argcount, sizeof(int));
   if (res->types == NULL) {
     cl_releasekernel(res);
-    error_sys(ctx->err, "calloc");
-    return NULL;
+    return error_sys(ctx->err, "calloc");
   }
   memcpy(res->types, types, argcount * sizeof(int));
 
   res->evr = calloc(argcount, sizeof(cl_event *));
   if (res->evr == NULL) {
     cl_releasekernel(res);
-    error_sys(ctx->err, "calloc");
-    return NULL;
+    return error_sys(ctx->err, "calloc");
   }
 
-  return res;
+  *k = res;
+  return GA_NO_ERROR;
 }
 
 static void cl_retainkernel(gpukernel *k) {
