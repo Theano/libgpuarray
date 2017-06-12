@@ -1,9 +1,6 @@
-from pygpu.tools import (as_argument, Argument, ArrayArg, ScalarArg,
-                         check_args, Counter, lfu_cache)
+from pygpu.tools import check_args
 
-
-from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
-                      context, gen_gpuarray, dtypes_no_complex)
+from .support import context, gen_gpuarray
 
 
 def test_check_args_simple():
@@ -102,7 +99,7 @@ def test_check_args_broadcast_2():
                           offseted_inner=True)
     bc, bg = gen_gpuarray((50, 1, 20), 'float32', ctx=context)
     n, nd, dims, strs, offsets = check_args((ag, bg), collapse=True,
-                                                    broadcast=True)
+                                            broadcast=True)
     assert n == 1000
     assert nd == 2
     assert dims == (50, 20)
