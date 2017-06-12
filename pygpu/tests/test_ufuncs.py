@@ -466,13 +466,13 @@ def test_binary_ufuncs_reduce():
                                                             ['float32'])):
                     pass
                 elif ufunc.startswith('bitwise') or ufunc.endswith('shift'):
-                    # Invalid source
+                    # Invalid source error from CUDA
                     pass
                 elif ufunc.startswith('logical'):
                     # Wrong resulting dtype (float instead of bool)
                     pass
                 elif ufunc in ('subtract',):
-                    # Not reorderable
+                    # Not reorderable, thus only applicable along one axis
                     pass
                 else:
                     yield check_binary_ufunc_reduce, ufunc, axis, keepdims
@@ -489,7 +489,7 @@ def test_binary_ufuncs_reduce():
                 elif ufunc in ('equal', 'not_equal',
                                'greater', 'greater_equal',
                                'less', 'less_equal'):
-                    # Not reorderable
+                    # Not reorderable, thus only applicable along one axis
                     pass
                 else:
                     yield check_binary_ufunc_reduce, ufunc, axis, keepdims
@@ -517,6 +517,10 @@ def check_binary_ufunc_reduce(ufunc, axis, keepdims):
         with assert_raises(TypeError):
             gpuary_result = gpuary_ufunc.reduce(gpuary_arr, axis=axis,
                                                 keepdims=keepdims)
+            # Emulate the TypeError if there is no native implementation
+            # and Numpy raises
+            if gpuary_result is NotImplemented:
+                raise TypeError
         return
 
     gpuary_result = gpuary_ufunc.reduce(gpuary_arr, axis=axis,
