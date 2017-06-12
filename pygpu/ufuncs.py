@@ -13,6 +13,10 @@ from pygpu.gpuarray import GpuArray, array, empty, get_default_context
 
 PY3 = sys.version_info.major >= 3
 
+# Save for later use since the original names are used for reductions
+builtin_all = all
+builtin_any = any
+
 
 # --- Helper functions --- #
 
@@ -425,7 +429,6 @@ def ufunc_dtypes(ufunc_name, dtypes_in):
     >>> ufunc_dtypes('power', [numpy.dtype('int8'), numpy.dtype('float32')])
     ((dtype('float32'), dtype('float32')), (dtype('float32'),))
     """
-    from builtins import all, any
     npy_ufunc = getattr(numpy, ufunc_name)
     supported_dtypes = set(NAME_TO_DTYPE.values())
 
@@ -437,10 +440,11 @@ def ufunc_dtypes(ufunc_name, dtypes_in):
         else:
             dts = tuple(numpy.dtype(c) for c in from_part)
             # Currently unsupported, filtering out
-            if any(dt not in supported_dtypes for dt in dts):
+            if builtin_any(dt not in supported_dtypes for dt in dts):
                 return False
             else:
-                return all(dt >= dt_in for dt, dt_in in zip(dts, dtypes_in))
+                return builtin_all(dt >= dt_in
+                                   for dt, dt_in in zip(dts, dtypes_in))
 
     # List of ufunc signatures that are "larger" than our input dtypes
     larger_sig_list = list(filter(larger_eq_than_dtypes, npy_ufunc.types))
@@ -464,8 +468,8 @@ def ufunc_dtypes(ufunc_name, dtypes_in):
     result_dtypes = tuple(numpy.dtype(c) for c in smallest_str_out)
 
     # Quad precision unsupported also on output side
-    if any(dt in result_dtypes for dt in (numpy.dtype('float16'),
-                                          numpy.dtype('float128'))):
+    if builtin_any(dt in result_dtypes for dt in (numpy.dtype('float16'),
+                                                  numpy.dtype('float128'))):
         # TODO: Numpy raises TypeError for bad data types, which is wrong,
         # but we mirror that behavior
         raise TypeError('data types {} not supported for ufunc {}'
@@ -734,8 +738,6 @@ def binary_ufunc(a, b, ufunc_name, out=None):
     --------
     pygpu.gpuarray.set_default_context
     """
-    from builtins import any
-
     # Lazy import to avoid circular dependency
     from pygpu._array import ndgpuarray
 
@@ -789,7 +791,7 @@ def binary_ufunc(a, b, ufunc_name, out=None):
         b = array(b, dtype=b.dtype, copy=False, order=order, context=ctx,
                   cls=cls)
 
-    if any(ary.dtype == numpy.dtype('float16') for ary in (a, b)):
+    if builtin_any(ary.dtype == numpy.dtype('float16') for ary in (a, b)):
         # Gives wrong results currently, see
         # https://github.com/Theano/libgpuarray/issues/316
         raise NotImplementedError('float16 currently broken')
@@ -800,7 +802,7 @@ def binary_ufunc(a, b, ufunc_name, out=None):
     result_dtype = result_dtypes[0]
 
     # This is the "fallback signature" case, for us it signals failure
-    if any(dt == numpy.dtype(object) for dt in prom_dtypes_in):
+    if builtin_any(dt == numpy.dtype(object) for dt in prom_dtypes_in):
         raise TypeError('input dtypes {} invalid for ufunc {!r}'
                         ''.format((a.dtype.name, b.dtype.name), ufunc_name))
 
