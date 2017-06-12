@@ -3,7 +3,6 @@
 import mako
 import numpy
 from pkg_resources import parse_version
-import re
 import sys
 import warnings
 from pygpu.dtypes import dtype_to_ctype, NAME_TO_DTYPE
@@ -47,7 +46,7 @@ def reduce_dims(shape, red_axes):
 # --- Reductions with arithmetic operators --- #
 
 
-def _prepare_array_for_reduction(a, out):
+def _prepare_array_for_reduction(a, out, context=None):
     """Return input array ready for usage in a reduction kernel."""
     # Lazy import to avoid circular dependency
     from pygpu._array import ndgpuarray
@@ -55,19 +54,18 @@ def _prepare_array_for_reduction(a, out):
     # Get a context and an array class to work with. Use the "highest"
     # class present in the inputs.
     need_context = True
-    ctx = None
     cls = None
     for ary in (a, out):
         if isinstance(ary, GpuArray):
-            if ctx is not None and ary.context != ctx:
+            if context is not None and ary.context != context:
                 raise ValueError('cannot mix contexts')
-            ctx = ary.context
+            context = ary.context
             if cls is None or cls == GpuArray:
                 cls = ary.__class__
             need_context = False
 
-    if need_context:
-        ctx = get_default_context()
+    if need_context and context is None:
+        context = get_default_context()
         cls = ndgpuarray
 
     if not isinstance(a, GpuArray):
@@ -76,14 +74,14 @@ def _prepare_array_for_reduction(a, out):
             order = 'F'
         else:
             order = 'C'
-        a = array(a, dtype=a.dtype, copy=False, order=order, context=ctx,
+        a = array(a, dtype=a.dtype, copy=False, order=order, context=context,
                   cls=cls)
 
     return a
 
 
 def reduce_with_op(a, op, neutral, axis=None, dtype=None, out=None,
-                   keepdims=False):
+                   keepdims=False, context=None):
     """Reduce ``a`` using the operation ``op``.
 
     This is a wrapper around `pygpu.reduction.reduce1` with signature
@@ -104,6 +102,10 @@ def reduce_with_op(a, op, neutral, axis=None, dtype=None, out=None,
 
     axis, dtype, out, keepdims :
         Arguments as in NumPy reductions. See e.g. `numpy.sum`.
+    context : `pygpu.gpuarray.GpuContext`, optional
+        Use this GPU context to evaluate the GPU kernel. For ``None``,
+        and if neither ``out`` nor ``a`` are GPU arrays, a default
+        GPU context must have been set.
 
     Returns
     -------
@@ -113,7 +115,7 @@ def reduce_with_op(a, op, neutral, axis=None, dtype=None, out=None,
         reductions along all axes without ``out`` parameter, the result
         is a scalar.
     """
-    a = _prepare_array_for_reduction(a, out)
+    a = _prepare_array_for_reduction(a, out, context)
 
     if dtype is None:
         if numpy.issubsctype(a.dtype, numpy.unsignedinteger):
@@ -145,7 +147,7 @@ def reduce_with_op(a, op, neutral, axis=None, dtype=None, out=None,
         return r
 
 
-def sum(a, axis=None, dtype=None, out=None, keepdims=False):
+def sum(a, axis=None, dtype=None, out=None, keepdims=False, context=None):
     """Sum of array elements over a given axis.
 
     See Also
@@ -155,10 +157,10 @@ def sum(a, axis=None, dtype=None, out=None, keepdims=False):
     # Do what Numpy does with booleans, sensible or not
     if a.dtype == bool and dtype is None:
         dtype = int
-    return reduce_with_op(a, '+', 0, axis, dtype, out, keepdims)
+    return reduce_with_op(a, '+', 0, axis, dtype, out, keepdims, context)
 
 
-def prod(a, axis=None, dtype=None, out=None, keepdims=False):
+def prod(a, axis=None, dtype=None, out=None, keepdims=False, context=None):
     """Return the product of array elements over a given axis.
 
     See Also
@@ -168,33 +170,34 @@ def prod(a, axis=None, dtype=None, out=None, keepdims=False):
     # Do what Numpy does with booleans, sensible or not
     if a.dtype == bool and dtype is None:
         dtype = int
-    return reduce_with_op(a, '*', 1, axis, dtype, out, keepdims)
+    return reduce_with_op(a, '*', 1, axis, dtype, out, keepdims, context)
 
 
-def all(a, axis=None, out=None, keepdims=False):
+def all(a, axis=None, out=None, keepdims=False, context=None):
     """Test whether all array elements along a given axis evaluate to True.
 
     See Also
     --------
     numpy.all
     """
-    return reduce_with_op(a, '&&', 1, axis, numpy.bool, out, keepdims)
+    return reduce_with_op(a, '&&', 1, axis, numpy.bool, out, keepdims, context)
 
 
-def any(a, axis=None, out=None, keepdims=False):
+def any(a, axis=None, out=None, keepdims=False, context=None):
     """Test whether all array elements along a given axis evaluate to True.
 
     See Also
     --------
     numpy.all
     """
-    return reduce_with_op(a, '||', 0, axis, numpy.bool, out, keepdims)
+    return reduce_with_op(a, '||', 0, axis, numpy.bool, out, keepdims, context)
 
 
 # --- Reductions with comparison operators --- #
 
 
-def reduce_with_cmp(a, cmp, neutral, axis=None, out=None, keepdims=False):
+def reduce_with_cmp(a, cmp, neutral, axis=None, out=None, keepdims=False,
+                    context=None):
     """Reduce ``a`` by comparison using ``cmp``.
 
     This is a wrapper around `pygpu.reduction.reduce1` with signature
@@ -216,6 +219,10 @@ def reduce_with_cmp(a, cmp, neutral, axis=None, out=None, keepdims=False):
 
     axis, out, keepdims :
         Arguments as in NumPy reductions. See e.g. `numpy.amax`.
+    context : `pygpu.gpuarray.GpuContext`, optional
+        Use this GPU context to evaluate the GPU kernel. For ``None``,
+        and if neither ``out`` nor ``a`` are GPU arrays, a default
+        GPU context must have been set.
 
     Returns
     -------
@@ -225,7 +232,7 @@ def reduce_with_cmp(a, cmp, neutral, axis=None, out=None, keepdims=False):
         reductions along all axes without ``out`` parameter, the result
         is a scalar.
     """
-    a = _prepare_array_for_reduction(a, out)
+    a = _prepare_array_for_reduction(a, out, context)
 
     axes = axis if axis is not None else tuple(range(a.ndim))
     if out is not None:
@@ -248,7 +255,7 @@ def reduce_with_cmp(a, cmp, neutral, axis=None, out=None, keepdims=False):
         return r
 
 
-def amin(a, axis=None, out=None, keepdims=False):
+def amin(a, axis=None, out=None, keepdims=False, context=None):
     """Return the minimum of an array or minimum along an axis.
 
     See Also
@@ -268,10 +275,10 @@ def amin(a, axis=None, out=None, keepdims=False):
     else:
         raise ValueError('array dtype {!r} not supported'
                          ''.format(a.dtype.name))
-    return reduce_with_cmp(a, '<', neutral, axis, out, keepdims)
+    return reduce_with_cmp(a, '<', neutral, axis, out, keepdims, context)
 
 
-def amax(a, axis=None, out=None, keepdims=False):
+def amax(a, axis=None, out=None, keepdims=False, context=None):
     """Return the maximum of an array or minimum along an axis.
 
     See Also
@@ -291,7 +298,7 @@ def amax(a, axis=None, out=None, keepdims=False):
     else:
         raise ValueError('array dtype {!r} not supported'
                          ''.format(a.dtype.name))
-    return reduce_with_cmp(a, '>', neutral, axis, out, keepdims)
+    return reduce_with_cmp(a, '>', neutral, axis, out, keepdims, context)
 
 
 # --- Elementwise ufuncs --- #
@@ -540,7 +547,7 @@ def ufunc_c_fname(ufunc_name, dtypes_in):
     return prefix + c_base_name
 
 
-def unary_ufunc(a, ufunc_name, out=None):
+def unary_ufunc(a, ufunc_name, out=None, context=None):
     """Call a unary ufunc on an array ``a``.
 
     Parameters
@@ -553,7 +560,9 @@ def unary_ufunc(a, ufunc_name, out=None):
         Array in which to store the result. Its shape must be equal to
         ``a.shape`` and its dtype must be the result dtype of the called
         function.
-        If ``out=None`` and ``a`` is not a GPU array, a default
+    context : `pygpu.gpuarray.GpuContext`, optional
+        Use this GPU context to evaluate the GPU kernel. For ``None``,
+        and if neither ``out`` nor ``a`` are GPU arrays, a default
         GPU context must have been set.
 
     Returns
@@ -574,19 +583,18 @@ def unary_ufunc(a, ufunc_name, out=None):
     # Get a context and an array class to work with. Use the "highest"
     # class present in the inputs.
     need_context = True
-    ctx = None
     cls = None
     for ary in (a, out):
         if isinstance(ary, GpuArray):
-            if ctx is not None and ary.context != ctx:
+            if context is not None and ary.context != context:
                 raise ValueError('cannot mix contexts')
-            ctx = ary.context
+            context = ary.context
             if cls is None or cls == GpuArray:
                 cls = ary.__class__
             need_context = False
 
-    if need_context:
-        ctx = get_default_context()
+    if need_context and context is None:
+        context = get_default_context()
         cls = ndgpuarray
 
     if not isinstance(a, GpuArray):
@@ -595,7 +603,7 @@ def unary_ufunc(a, ufunc_name, out=None):
             order = 'F'
         else:
             order = 'C'
-        a = array(a, dtype=a.dtype, copy=False, order=order, context=ctx,
+        a = array(a, dtype=a.dtype, copy=False, order=order, context=context,
                   cls=cls)
 
     if a.dtype == numpy.dtype('float16'):
@@ -618,7 +626,7 @@ def unary_ufunc(a, ufunc_name, out=None):
     a = a.astype(prom_dtype_in, copy=False)
 
     if out is None:
-        out = empty(a.shape, dtype=result_dtype, context=ctx, cls=cls)
+        out = empty(a.shape, dtype=result_dtype, context=context, cls=cls)
     else:
         # TODO: allow larger dtype
         if out.dtype != result_dtype:
@@ -714,12 +722,12 @@ def unary_ufunc(a, ufunc_name, out=None):
     a_arg = as_argument(a, 'a', read=True)
     args = [arg('res', out.dtype, write=True), a_arg]
 
-    ker = GpuElemwise(ctx, oper, args, convert_f16=True)
+    ker = GpuElemwise(context, oper, args, convert_f16=True)
     ker(out, a)
     return out
 
 
-def binary_ufunc(a, b, ufunc_name, out=None):
+def binary_ufunc(a, b, ufunc_name, out=None, context=None):
     """Call binary ufunc on ``a`` and ``b``.
 
     Parameters
@@ -732,7 +740,9 @@ def binary_ufunc(a, b, ufunc_name, out=None):
         Array in which to store the result. Its shape must be equal to
         ``a.shape`` and its dtype must be the result dtype of the called
         function.
-        If ``out=None`` and ``a, b`` are both not GPU arrays, a default
+    context : `pygpu.gpuarray.GpuContext`, optional
+        Use this GPU context to evaluate the GPU kernel. For ``None``,
+        and if neither ``out`` nor ``a`` are GPU arrays, a default
         GPU context must have been set.
 
     Returns
@@ -750,15 +760,17 @@ def binary_ufunc(a, b, ufunc_name, out=None):
     from pygpu._array import ndgpuarray
 
     # Get a context and an array class to work with
+    cls = None
     need_context = True
     for ary in (a, b, out):
         if isinstance(a, GpuArray):
-            ctx = ary.context
+            context = ary.context
             cls = ary.__class__
             need_context = False
             break
-    if need_context:
-        ctx = get_default_context()
+
+    if need_context and context is None:
+        context = get_default_context()
         cls = ndgpuarray
 
     if not isinstance(a, GpuArray):
@@ -767,6 +779,8 @@ def binary_ufunc(a, b, ufunc_name, out=None):
             # should be handled in ufunc_dtypes?
             if ufunc_name == 'ldexp':
                 # Want signed type
+                # TODO: this upcasts to a larger dtype than Numpy in
+                # some cases (mostly unsigned int)
                 a = numpy.asarray(a, dtype=numpy.min_scalar_type(-abs(a)))
             else:
                 a = numpy.asarray(a, dtype=numpy.result_type(a, b))
@@ -775,7 +789,7 @@ def binary_ufunc(a, b, ufunc_name, out=None):
             order = 'F'
         else:
             order = 'C'
-        a = array(a, dtype=a.dtype, copy=False, order=order, context=ctx,
+        a = array(a, dtype=a.dtype, copy=False, order=order, context=context,
                   cls=cls)
 
     if not isinstance(b, GpuArray):
@@ -796,7 +810,7 @@ def binary_ufunc(a, b, ufunc_name, out=None):
         else:
             b = numpy.asarray(b)
             order = 'C'
-        b = array(b, dtype=b.dtype, copy=False, order=order, context=ctx,
+        b = array(b, dtype=b.dtype, copy=False, order=order, context=context,
                   cls=cls)
 
     if builtin_any(ary.dtype == numpy.dtype('float16') for ary in (a, b)):
@@ -828,7 +842,7 @@ def binary_ufunc(a, b, ufunc_name, out=None):
     result_shape = tuple(max(sa, sb) for sa, sb in zip(a.shape, b.shape))
 
     if out is None:
-        out = empty(result_shape, dtype=result_dtype, context=ctx, cls=cls)
+        out = empty(result_shape, dtype=result_dtype, context=context, cls=cls)
     else:
         if out.shape != result_shape:
             raise ValueError('`out.shape` != result shape ({} != {})'
@@ -967,7 +981,7 @@ def binary_ufunc(a, b, ufunc_name, out=None):
     return out
 
 
-def unary_ufunc_two_out(a, ufunc_name, out1=None, out2=None):
+def unary_ufunc_two_out(a, ufunc_name, out1=None, out2=None, context=None):
     """Call a unary ufunc with two outputs on an array ``a``.
 
     Parameters
@@ -981,8 +995,11 @@ def unary_ufunc_two_out(a, ufunc_name, out1=None, out2=None):
         ``a.shape`` and their dtype must be the result dtypes of the
         called function.
         The arrays ``out1`` and ``out2`` must either both be provided,
-        or none of them. If both are ``None`` and ``a`` is not a
-        GPU array, a default GPU context must have been set.
+        or none of them.
+    context : `pygpu.gpuarray.GpuContext`, optional
+        Use this GPU context to evaluate the GPU kernel. For ``None``,
+        and if neither ``out1`` nor ``out2`` nor ``a`` are GPU arrays,
+        a default GPU context must have been set.
 
     Returns
     -------
@@ -1004,19 +1021,18 @@ def unary_ufunc_two_out(a, ufunc_name, out1=None, out2=None):
     # Get a context and an array class to work with. Use the "highest"
     # class present in the inputs.
     need_context = True
-    ctx = None
     cls = None
     for ary in (a, out1, out2):
         if isinstance(ary, GpuArray):
-            if ctx is not None and ary.context != ctx:
+            if context is not None and ary.context != context:
                 raise ValueError('cannot mix contexts')
-            ctx = ary.context
+            context = ary.context
             if cls is None or cls == GpuArray:
                 cls = ary.__class__
             need_context = False
 
-    if need_context:
-        ctx = get_default_context()
+    if need_context and context is None:
+        context = get_default_context()
         cls = ndgpuarray
 
     if not isinstance(a, GpuArray):
@@ -1025,7 +1041,7 @@ def unary_ufunc_two_out(a, ufunc_name, out1=None, out2=None):
             order = 'F'
         else:
             order = 'C'
-        a = array(a, dtype=a.dtype, copy=False, order=order, context=ctx,
+        a = array(a, dtype=a.dtype, copy=False, order=order, context=context,
                   cls=cls)
 
     if a.dtype == numpy.dtype('float16'):
@@ -1048,14 +1064,14 @@ def unary_ufunc_two_out(a, ufunc_name, out1=None, out2=None):
     a = a.astype(prom_dtype_in, copy=False)
 
     if out1 is None:
-        out1 = empty(a.shape, dtype=result_dtype1, context=ctx, cls=cls)
+        out1 = empty(a.shape, dtype=result_dtype1, context=context, cls=cls)
     else:
         # TODO: allow larger dtype
         if out1.dtype != result_dtype1:
             raise ValueError('`out1.dtype` != result dtype: {!r} != {!r}'
                              ''.format(out1.dtype.name, result_dtype1.name))
     if out2 is None:
-        out2 = empty(a.shape, dtype=result_dtype2, context=ctx, cls=cls)
+        out2 = empty(a.shape, dtype=result_dtype2, context=context, cls=cls)
     else:
         if out2.dtype != result_dtype2:
             raise ValueError('`out2.dtype` != result dtype: {!r} != {!r}'
@@ -1080,7 +1096,7 @@ def unary_ufunc_two_out(a, ufunc_name, out1=None, out2=None):
             arg('out2', out2.dtype, write=True),
             a_arg]
 
-    ker = GpuElemwise(ctx, oper, args, convert_f16=True)
+    ker = GpuElemwise(context, oper, args, convert_f16=True)
     ker(out1, out2, a)
     return out1, out2
 
@@ -1117,18 +1133,20 @@ def make_binary_ufunc_reduce(name):
     binop = BINARY_UFUNC_TO_C_BINOP.get(name, None)
     if binop is not None:
 
-        def reduce_wrapper(a, axis=0, dtype=None, out=None, keepdims=False):
+        def reduce_wrapper(a, axis=0, dtype=None, out=None, keepdims=False,
+                           context=None):
             return reduce_with_op(a, binop, npy_ufunc.identity, axis, dtype,
-                                  out, keepdims)
+                                  out, keepdims, context)
 
         return reduce_wrapper
 
     cmp = BINARY_UFUNC_TO_C_CMP.get(name, None)
     if cmp is not None:
 
-        def reduce_wrapper(a, axis=0, dtype=None, out=None, keepdims=False):
+        def reduce_wrapper(a, axis=0, dtype=None, out=None, keepdims=False,
+                           context=None):
             return reduce_with_cmp(a, cmp, npy_ufunc.identity, axis, dtype,
-                                   out, keepdims)
+                                   out, keepdims, context)
 
         return reduce_wrapper
 
@@ -1158,7 +1176,7 @@ def make_binary_ufunc_reduce(name):
 class UfuncBase(object):
 
     def __init__(self, name, nin, nout, call, **kwargs):
-        self.name = name
+        self.__name__ = name
         self.nin = nin
         self.nout = nout
         self.nargs = self.nin + self.nout
@@ -1168,21 +1186,22 @@ class UfuncBase(object):
 
         # Wrappers for unimplemented stuff
 
-        def _at_not_impl(a, indices, b=None):
+        def _at_not_impl(a, indices, b=None, context=None):
             return NotImplemented
 
         def _accumulate_not_impl(array, axis=0, dtype=None, out=None,
-                                 keepdims=None):
+                                 keepdims=None, context=None):
             return NotImplemented
 
-        def _outer_not_impl(A, B, **kwargs):
+        def _outer_not_impl(A, B, context=None, **kwargs):
             return NotImplemented
 
         def _reduce_not_impl(a, axis=0, dtype=None, out=None,
-                             keepdims=False):
+                             keepdims=False, context=None):
             return NotImplemented
 
-        def _reduceat_not_impl(a, indices, axis=0, dtype=None, out=None):
+        def _reduceat_not_impl(a, indices, axis=0, dtype=None, out=None,
+                               context=None):
             return NotImplemented
 
         self.accumulate = kwargs.pop('accumulate', _accumulate_not_impl)
@@ -1215,108 +1234,80 @@ class UfuncBase(object):
             self.reduceat.__qualname__ = name + '.reduceat'
 
     def __repr__(self):
-        return '<ufunc {}>'.format(self.name)
+        return '<ufunc {}>'.format(self.__name__)
 
 
 class Ufunc01(UfuncBase):
 
-    def __call__(self, out=None):
-        return self._call(out=out)
+    def __call__(self, out=None, context=None):
+        return self._call(out=out, context=context)
 
 
 class Ufunc11(UfuncBase):
 
-    def __call__(self, x, out=None):
-        return self._call(x, out=out)
+    def __call__(self, x, out=None, context=None):
+        return self._call(x, out=out, context=context)
 
 
 class Ufunc12(UfuncBase):
 
-    def __call__(self, x, out1=None, out2=None):
-        return self._call(x, out1=out1, out2=out2)
+    def __call__(self, x, out1=None, out2=None, context=None):
+        return self._call(x, out1=out1, out2=out2, context=context)
 
 
 class Ufunc21(UfuncBase):
 
-    def __call__(self, x1, x2, out=None):
-        return self._call(x1, x2, out=out)
+    def __call__(self, x1, x2, out=None, context=None):
+        return self._call(x1, x2, out=out, context=context)
 
 
 # --- Add ufuncs to global namespace --- #
 
 
-def make_unary_ufunc(name, doc):
+def make_ufunc(name):
+    npy_ufunc = getattr(numpy, name)
+    nin = npy_ufunc.nin
+    nout = npy_ufunc.nout
 
-    def wrapper(a, out=None):
-        return unary_ufunc(a, name, out)
+    if nin == 1 and nout == 1:
+        cls = Ufunc11
 
-    wrapper.__name__ = name
+        def call(a, out=None, context=None):
+            return unary_ufunc(a, name, out, context)
+
+    elif nin == 1 and nout == 2:
+        cls = Ufunc12
+
+        def call(a, out1=None, out2=None, context=None):
+            return unary_ufunc_two_out(a, name, out1, out2, context)
+
+    elif nin == 2 and nout == 1:
+        cls = Ufunc21
+
+        def call(a, b, out=None, context=None):
+            return binary_ufunc(a, b, name, out, context)
+
+    else:
+        raise NotImplementedError('nin = {}, nout = {} not supported'
+                                  ''.format(nin, nout))
+
+    call.__name__ = name
     if PY3:
-        wrapper.__qualname__ = name
-    wrapper.__doc__ = doc
-    return wrapper
+        call.__qualname__ = name
+    # TODO: add docstring
+
+    if nin == 1:
+        ufunc = cls(name, nin, nout, call, identity=npy_ufunc.identity)
+    else:
+        ufunc = cls(name, nin, nout, call, identity=npy_ufunc.identity,
+                    reduce=make_binary_ufunc_reduce(name))
+
+    return ufunc
 
 
 # Add the ufuncs to the module dictionary
-for ufunc_name in UNARY_UFUNCS:
-    npy_ufunc = getattr(numpy, ufunc_name)
-    assert npy_ufunc.nin == 1
-    assert npy_ufunc.nout == 1
-    descr = npy_ufunc.__doc__.splitlines()[2]
-    # Numpy occasionally uses single ticks for doc, we only use them for links
-    doc = re.sub('`+', '``', descr)
-    ufunc = Ufunc11(ufunc_name, nin=1, nout=1,
-                    call=make_unary_ufunc(ufunc_name, doc),
-                    identity=npy_ufunc.identity)
-    globals()[ufunc_name] = ufunc
-
-
-def make_unary_ufunc_two_out(name, doc):
-
-    def wrapper(a, out1=None, out2=None):
-        return unary_ufunc_two_out(a, name, out1, out2)
-
-    wrapper.__name__ = name
-    if PY3:
-        wrapper.__qualname__ = name
-    wrapper.__doc__ = doc
-    return wrapper
-
-
-# Add the ufuncs to the module dictionary
-for ufunc_name in UNARY_UFUNCS_TWO_OUT:
-    npy_ufunc = getattr(numpy, ufunc_name)
-    descr = npy_ufunc.__doc__.splitlines()[2]
-    # Numpy occasionally uses single ticks for doc, we only use them for links
-    doc = re.sub('`+', '``', descr)
-    ufunc = Ufunc12(ufunc_name, nin=1, nout=2,
-                    call=make_unary_ufunc_two_out(ufunc_name, doc),
-                    identity=npy_ufunc.identity)
-    globals()[ufunc_name] = ufunc
-
-
-def make_binary_ufunc(name, doc):
-
-    def wrapper(a, b, out=None):
-        return binary_ufunc(a, b, name, out)
-
-    wrapper.__name__ = name
-    if PY3:
-        wrapper.__qualname__ = name
-    wrapper.__doc__ = doc
-    return wrapper
-
-
-for ufunc_name in BINARY_UFUNCS:
-    npy_ufunc = getattr(numpy, ufunc_name)
-    descr = npy_ufunc.__doc__.splitlines()[2]
-    # Numpy occasionally uses single ticks for doc, we only use them for links
-    doc = re.sub('`+', '``', descr)
-    ufunc = Ufunc21(ufunc_name, nin=2, nout=1,
-                    call=make_binary_ufunc(ufunc_name, doc),
-                    identity=npy_ufunc.identity,
-                    reduce=make_binary_ufunc_reduce(ufunc_name))
-    globals()[ufunc_name] = ufunc
+for name in UNARY_UFUNCS + UNARY_UFUNCS_TWO_OUT + BINARY_UFUNCS:
+    globals()[name] = make_ufunc(name)
 
 
 for name, alt_name in UFUNC_SYNONYMS:
@@ -1325,6 +1316,5 @@ for name, alt_name in UFUNC_SYNONYMS:
 
 if __name__ == '__main__':
     from doctest import testmod, NORMALIZE_WHITESPACE
-    import numpy
     optionflags = NORMALIZE_WHITESPACE
     testmod(optionflags=NORMALIZE_WHITESPACE, extraglobs={'np': numpy})
