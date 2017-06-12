@@ -2,6 +2,7 @@
 
 import mako
 import numpy
+from pkg_resources import parse_version
 import re
 import sys
 import warnings
@@ -645,11 +646,18 @@ def unary_ufunc(a, ufunc_name, out=None):
     unop = UNARY_UFUNC_TO_C_OP.get(ufunc_name, None)
     if unop is not None:
         if a.dtype == numpy.bool and unop == '-':
-            warnings.warn('using negation (`-`) with boolean arrays is '
-                          'deprecated, use logical not (`~`) instead; '
-                          'the current behavior will be changed along with '
-                          "NumPy's", FutureWarning)
-            unop = '!'
+            if parse_version(numpy.__version__) >= parse_version('1.13'):
+                # Numpy >= 1.13 raises a TypeError
+                raise TypeError(
+                    'negation of boolean arrays is not supported, use '
+                    '`logical_not` instead')
+            else:
+                # Warn and remap to logical not
+                warnings.warn('using negation (`-`) with boolean arrays is '
+                              'deprecated, use `logical_not` (`~`) instead; '
+                              'the current behavior will be changed along '
+                              "with NumPy's", FutureWarning)
+                unop = '!'
         oper = 'res = ({}) {}a'.format(c_res_dtype, unop)
 
     # Other cases: specific functions
@@ -867,6 +875,21 @@ def binary_ufunc(a, b, ufunc_name, out=None):
     # Case 2: binary operator
     binop = BINARY_UFUNC_TO_C_OP.get(ufunc_name, None)
     if binop is not None:
+        if b.dtype == numpy.bool and binop == '-':
+            if parse_version(numpy.__version__) >= parse_version('1.13'):
+                # Numpy >= 1.13 raises a TypeError
+                raise TypeError(
+                    'subtraction of boolean arrays is not supported, use '
+                    '`logical_not` instead')
+            else:
+                # Warn and remap to logical not
+                warnings.warn('using subtraction (`-`) with boolean arrays is '
+                              'deprecated, use `bitwise_xor` (`^`) or '
+                              '`logical_xor` instead; '
+                              'the current behavior will be changed along '
+                              "with NumPy's", FutureWarning)
+                binop = '^'
+
         oper = 'res = ({}) (a {} b)'.format(c_res_dtype, binop)
     else:
         # Other cases: specific functions
@@ -887,7 +910,7 @@ def binary_ufunc(a, b, ufunc_name, out=None):
             oper = 'res = ({}) floor_div_dbl((double) a, (double) b)'.format(
                 c_res_dtype)
 
-        if ufunc_name == 'true_divide':
+        elif ufunc_name == 'true_divide':
             if result_dtype == numpy.dtype('float64'):
                 flt = 'double'
             else:

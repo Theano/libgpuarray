@@ -521,6 +521,10 @@ def check_binary_ufunc_reduce(ufunc, axis, keepdims):
 
     gpuary_result = gpuary_ufunc.reduce(gpuary_arr, axis=axis,
                                         keepdims=keepdims)
+    if gpuary_result is NotImplemented:
+        # Nothing to check
+        return
+
     if numpy.isscalar(npy_result):
         assert numpy.isscalar(gpuary_result)
         assert numpy.isclose(gpuary_result, npy_result, rtol=rtol,
