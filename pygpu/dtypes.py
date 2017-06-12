@@ -71,18 +71,20 @@ def register_dtype(dtype, c_names):
 
 
 def _fill_dtype_registry():
-    from sys import platform
-
     register_dtype(np.bool, ["ga_bool", "bool"])
     register_dtype(np.int8, ["ga_byte", "char", "signed char"])
     register_dtype(np.uint8, ["ga_ubyte", "unsigned char"])
-    register_dtype(np.int16, ["ga_short", "short", "signed short", "signed short int", "short signed int"])
-    register_dtype(np.uint16, ["ga_ushort", "unsigned short", "unsigned short int", "short unsigned int"])
+    register_dtype(np.int16, ["ga_short", "short", "signed short",
+                              "signed short int", "short signed int"])
+    register_dtype(np.uint16, ["ga_ushort", "unsigned short",
+                               "unsigned short int", "short unsigned int"])
     register_dtype(np.int32, ["ga_int", "int", "signed int"])
     register_dtype(np.uint32, ["ga_uint", "unsigned", "unsigned int"])
 
-    register_dtype(np.int64, ["ga_long", "long int", "signed long int", "long signed int"])
-    register_dtype(np.uint64, ["ga_ulong", "unsigned long", "unsigned long int", "long unsigned int"])
+    register_dtype(np.int64, ["ga_long", "long int", "signed long int",
+                              "long signed int"])
+    register_dtype(np.uint64, ["ga_ulong", "unsigned long",
+                               "unsigned long int", "long unsigned int"])
 
     register_dtype(np.intp, ["ga_ssize", "ssize_t"])
     register_dtype(np.uintp, ["ga_size", "size_t"])

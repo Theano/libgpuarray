@@ -29,6 +29,7 @@ def _ceil_log2(x):
     else:
         return 0
 
+
 basic_kernel = Template("""
 ${preamble}
 
@@ -141,14 +142,16 @@ class ReductionKernel(object):
         if isinstance(arguments, str):
             self.arguments = parse_c_args(arguments)
         elif arguments is None:
-            self.arguments = [ArrayArg(numpy.dtype(self.dtype_out), '_reduce_input')]
+            self.arguments = [ArrayArg(numpy.dtype(self.dtype_out),
+                                       '_reduce_input')]
         else:
             self.arguments = arguments
 
         if (self.dtype_out == numpy.dtype('float16') or
                 any(ar.dtype == numpy.dtype('float16')
                     for ar in self.arguments)):
-            raise NotImplementedError('float16 not supported for the reduction interface')
+            raise NotImplementedError('float16 not supported for the '
+                                      'reduction interface')
 
         self.reduce_expr = reduce_expr
         if map_expr is None:

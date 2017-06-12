@@ -2,7 +2,7 @@ from six.moves import range
 
 from .gpuarray import _split, _concatenate, dtype_to_typecode
 from .dtypes import upcast
-from . import array, asarray
+from . import asarray
 
 
 def atleast_1d(*arys):
@@ -82,7 +82,8 @@ def array_split(ary, indices_or_sections, axis=0):
         # this madness is to support the numpy interface
         # it is supported by tests, but little else
         divs = (list(range(neach + 1, (neach + 1) * extra + 1, neach + 1)) +
-                list(range((neach + 1) * extra + neach, ary.shape[axis], neach)))
+                list(range((neach + 1) * extra + neach,
+                           ary.shape[axis], neach)))
         res = _split(ary, divs, axis)
     return res
 
