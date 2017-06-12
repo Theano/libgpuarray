@@ -1163,7 +1163,7 @@ class UfuncBase(object):
         self.accumulate = kwargs.pop('accumulate', _accumulate_not_impl)
         self.accumulate.__name__ = 'accumulate'
         if PY3:
-            self.accumulate.__qualname__ = 'accumulate'
+            self.accumulate.__qualname__ = name + '.accumulate'
 
         self.at = kwargs.pop('at', _at_not_impl)
         self.at.__name__ = 'at'
