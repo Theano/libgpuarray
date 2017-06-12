@@ -1,27 +1,9 @@
 from pygpu.tools import (as_argument, Argument, ArrayArg, ScalarArg,
-                         check_contig, check_args, Counter, lfu_cache)
+                         check_args, Counter, lfu_cache)
 
 
 from .support import (guard_devsup, rand, check_flags, check_meta, check_all,
                       context, gen_gpuarray, dtypes_no_complex)
-
-
-def test_check_contig_1():
-    ac, ag = gen_gpuarray((50, 1, 20), 'float32', ctx=context)
-    bc, bg = gen_gpuarray((50, 1, 20), 'float32', ctx=context)
-    n, offsets, contig = check_contig((ag, bg))
-    assert n == 1000
-    assert offsets == (0, 0)
-    assert contig
-
-
-def test_check_contig_2():
-    ac, ag = gen_gpuarray((50, 1, 20), 'float32', ctx=context)
-    bc, bg = gen_gpuarray((50, 1, 20), 'float32', ctx=context, sliced=2)
-    n, offsets, contig = check_contig((ag, bg))
-    assert n == None
-    assert offsets == None
-    assert not contig
 
 
 def test_check_args_simple():

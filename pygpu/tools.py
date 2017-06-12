@@ -65,29 +65,6 @@ class ScalarArg(Argument):
         return self.dtype
 
 
-def check_contig(args):
-    dims = None
-    c_contig = f_contig = True
-    offsets = []
-    for arg in args:
-        if not isinstance(arg, GpuArray):
-            offsets.append(None)
-            continue
-
-        if dims is None:
-            dims = arg.shape
-            n = arg.size
-        elif arg.shape != dims:
-            return None, None, False
-        offsets.append(arg.offset)
-        fl = arg.flags
-        c_contig = c_contig and fl['C_CONTIGUOUS']
-        f_contig = f_contig and fl['F_CONTIGUOUS']
-    if not (c_contig or f_contig):
-        return None, None, False
-    return n, tuple(offsets), True
-
-
 def check_args(args, collapse=False, broadcast=False):
     """
     Returns the properties of arguments and checks if they all match
