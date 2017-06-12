@@ -5,7 +5,6 @@ import numpy
 import re
 import sys
 import warnings
-from pygpu._array import ndgpuarray
 from pygpu.dtypes import dtype_to_ctype, NAME_TO_DTYPE
 from pygpu._elemwise import arg
 from pygpu.elemwise import as_argument, GpuElemwise
@@ -45,6 +44,9 @@ def reduce_dims(shape, red_axes):
 
 def _prepare_array_for_reduction(a, out):
     """Return input array ready for usage in a reduction kernel."""
+    # Lazy import to avoid circular dependency
+    from pygpu._array import ndgpuarray
+
     # Get a context and an array class to work with. Use the "highest"
     # class present in the inputs.
     need_context = True
@@ -561,6 +563,9 @@ def unary_ufunc(a, ufunc_name, out=None):
     ufunc_result_dtype : Get dtype of a ufunc result.
     ufunc_c_funcname : Get C name for math ufuncs.
     """
+    # Lazy import to avoid circular dependency
+    from pygpu._array import ndgpuarray
+
     # Get a context and an array class to work with. Use the "highest"
     # class present in the inputs.
     need_context = True
@@ -730,6 +735,10 @@ def binary_ufunc(a, b, ufunc_name, out=None):
     pygpu.gpuarray.set_default_context
     """
     from builtins import any
+
+    # Lazy import to avoid circular dependency
+    from pygpu._array import ndgpuarray
+
     # Get a context and an array class to work with
     need_context = True
     for ary in (a, b, out):
@@ -964,6 +973,9 @@ def unary_ufunc_two_out(a, ufunc_name, out1=None, out2=None):
     ufunc_result_dtype : Get dtype of a ufunc result.
     ufunc_c_funcname : Get C name for math ufuncs.
     """
+    # Lazy import to avoid circular dependency
+    from pygpu._array import ndgpuarray
+
     # Get a context and an array class to work with. Use the "highest"
     # class present in the inputs.
     need_context = True
