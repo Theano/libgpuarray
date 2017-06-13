@@ -41,10 +41,7 @@
 struct axis_desc{
 	int      reduxNum;
 	unsigned isReduced     : 1;
-	unsigned isHW          : 1;
-	unsigned isSW          : 1;
-	size_t   warpLen;
-	size_t   len;
+	size_t   len, warpLen, sliceLen;
 	ssize_t  srcStride,       srcOffset;
 	ssize_t  dstStride,       dstOffset;
 	ssize_t  dstArgStride,    dstArgOffset;
@@ -392,6 +389,7 @@ static int        axisIsPartialWarp             (const axis_desc* axis);
 
 /* Reduction Context API */
 /*     Utilities */
+static size_t     reduxEstimateParallelism      (const redux_ctx*  ctx);
 static int        reduxRequiresDst              (const redux_ctx*  ctx);
 static int        reduxRequiresDstArg           (const redux_ctx*  ctx);
 static int        reduxKernelRequiresDst        (const redux_ctx*  ctx);
@@ -417,6 +415,8 @@ static int        reduxInferProperties          (redux_ctx*  ctx);
 static int        reduxFlattenSource            (redux_ctx*  ctx);
 static int        reduxSelectWarpAxes           (redux_ctx*  ctx);
 static int        reduxSelectNumStages          (redux_ctx*  ctx);
+static int        reduxPlan1Stage               (redux_ctx*  ctx);
+static int        reduxPlan2Stage               (redux_ctx*  ctx);
 static int        reduxSelectHwAxes             (redux_ctx*  ctx);
 static int        reduxComputeAxisList          (redux_ctx*  ctx);
 static int        reduxGenSource                (redux_ctx*  ctx);
@@ -1011,6 +1011,28 @@ static int        axisIsPartialWarp             (const axis_desc* axis){
 }
 
 /**
+ * @brief Estimate the level of parallelism in the device.
+ * 
+ * This is a rough target number of threads.  It would definitely fill the
+ * device, plus some substantial margin.
+ */
+
+static size_t     reduxEstimateParallelism      (const redux_ctx*  ctx){
+	/**
+	 * An arbitrary margin factor ensuring there will be a few thread blocks
+	 * per SMX.
+	 * 
+	 * E.g. on Kepler, each SMX can handle up to two 1024-thread blocks
+	 * simultaneously, so a margin of 6/SMX should ensure with very high
+	 * likelyhood that all SMXes will be fed and kept busy.
+	 */
+	
+	size_t marginFactor = 6;
+	
+	return marginFactor*ctx->numProcs*ctx->maxLg;
+}
+
+/**
  * @brief Returns whether the reduction interface requires a dst argument.
  */
 
@@ -1582,10 +1604,10 @@ static int        reduxInferProperties          (redux_ctx*  ctx){
 	 *      the reduction axes.
 	 */
 
-	ctx->xdSrc     = calloc(ctx->nds, sizeof(*ctx->xdSrc));
-	ctx->xdSrcPtrs = calloc(ctx->nds, sizeof(*ctx->xdSrcPtrs));
-	ctx->xdSrcFlat = calloc(ctx->nds, sizeof(*ctx->xdSrcFlat));
-	ctx->xdTmp     = calloc(ctx->ndt, sizeof(*ctx->xdTmp));
+	ctx->xdSrc     = calloc(ctx->nds,   sizeof(*ctx->xdSrc));
+	ctx->xdSrcPtrs = calloc(ctx->nds+1, sizeof(*ctx->xdSrcPtrs));
+	ctx->xdSrcFlat = calloc(ctx->nds+1, sizeof(*ctx->xdSrcFlat));
+	ctx->xdTmp     = calloc(ctx->ndt,   sizeof(*ctx->xdTmp));
 	if (!ctx->xdSrc || !ctx->xdSrcPtrs || !ctx->xdSrcFlat || !ctx->xdTmp){
 		return reduxCleanup(ctx, GA_MEMORY_ERROR);
 	}
@@ -1814,15 +1836,62 @@ static int        reduxSelectWarpAxes           (redux_ctx*  ctx){
  */
 
 static int        reduxSelectNumStages          (redux_ctx*  ctx){
-	size_t parallelism = 2 * ctx->numProcs * ctx->maxLg;
+	size_t parallelism  = reduxEstimateParallelism(ctx);
 	
-	if(ctx->zeroRdxAxes                     || /* Reduction is empty? */
-	   ctx->prodFreeAxes > ctx->prodRdxAxes || /* Large # of destination elements? */
-	   ctx->prodFreeAxes > parallelism      ){ /* # of destination elements large enough to fill available parallelism? */
-		ctx->numStages = 1;
+	if (ctx->zeroRdxAxes                      || /* Reduction over  0  elements? */
+	    ctx->prodAllAxes  <= ctx->maxLg       || /* Reduction over few elements? */
+	    ctx->prodFreeAxes >= ctx->prodRdxAxes || /* More destinations than reductions? */
+	    ctx->prodFreeAxes >= parallelism      ){ /* Destination very large? */
+		return reduxPlan1Stage(ctx);
 	}else{
-		ctx->numStages = 2;
+		return reduxPlan2Stage(ctx);
 	}
+}
+
+/**
+ * @brief Plan a 1-stage reduction.
+ * 
+ * Inputs: ctx->xdSrcFlat[0...ctx->ndf-1]
+ * 
+ * This plan involves a direct write to the destinations, and does not require
+ * working space.
+ * 
+ * Because the reduction is deterministic, all reductions required for any
+ * destination element must be performed within a single thread block.
+ * 
+ * In this implementation we choose to perform only intra-warp reductions,
+ * insulating ourselves from having to worry about the interplay between block
+ * size and kernel source code (A kernel's max block size is limited by
+ * numerous factors including its own source code, but the specific kernel we
+ * pick and generate requires foreknowledge of its block size. Chicken or egg).
+ */
+
+static int        reduxPlan1Stage               (redux_ctx*  ctx){
+	ctx->numStages = 1;
+	
+	
+	
+	return reduxSelectHwAxes(ctx);
+}
+
+/**
+ * @brief Plan a 2-stage reduction.
+ * 
+ * Inputs: ctx->xdSrcFlat[0...ctx->ndf-1]
+ * 
+ * This plan involves splitting the reduction into two stages:
+ * 
+ *    Stage 1:  A reduction by approximately R = sqrt(prodRdxAxes) elements per
+ *              destination elements into allocated temporary workspace(s)
+ *              of approximate size dst.shape + (prodRdxAxes/R,)
+ *    Stage 2:  A reduction by approximately prodRdxAxes/R elements into the
+ *              final destination.
+ */
+
+static int        reduxPlan2Stage               (redux_ctx*  ctx){
+	ctx->numStages = 2;
+	
+	/* NOTE: Use gpuarray_get_elsize(typecode) */
 	
 	return reduxSelectHwAxes(ctx);
 }
@@ -1941,7 +2010,7 @@ static int        reduxSelectHwAxes             (redux_ctx*  ctx){
  * loops that iterate over the dimensions of elements that are to be reduced.
  */
 
-static int   reduxComputeAxisList          (redux_ctx*  ctx){
+static int        reduxComputeAxisList          (redux_ctx*  ctx){
 	int i, f=0;
 
 	for (i=0;i<ctx->nds;i++){
@@ -1961,7 +2030,7 @@ static int   reduxComputeAxisList          (redux_ctx*  ctx){
  * @return GA_MEMORY_ERROR if not enough memory left; GA_NO_ERROR otherwise.
  */
 
-static int   reduxGenSource                (redux_ctx*  ctx){
+static int        reduxGenSource                (redux_ctx*  ctx){
 	reduxAppendSource(ctx);
 	ctx->sourceCodeLen = ctx->s.l;
 	ctx->sourceCode    = strb_cstr(&ctx->s);
@@ -1971,7 +2040,7 @@ static int   reduxGenSource                (redux_ctx*  ctx){
 
 	return reduxCompile(ctx);
 }
-static void  reduxAppendSource             (redux_ctx*  ctx){
+static void       reduxAppendSource             (redux_ctx*  ctx){
 	reduxAppendIncludes         (ctx);
 	reduxAppendMacroDefs        (ctx);
 	reduxAppendTypedefs         (ctx);
@@ -1983,21 +2052,21 @@ static void  reduxAppendSource             (redux_ctx*  ctx){
 		reduxAppendPostKernel   (ctx);
 	}
 }
-static void  reduxAppendTensorDeclArgs     (redux_ctx*  ctx,
-                                            const char* type,
-                                            const char* baseName){
+static void       reduxAppendTensorDeclArgs     (redux_ctx*  ctx,
+                                                 const char* type,
+                                                 const char* baseName){
 	srcbAppendElemf(&ctx->srcGen, "%s* %sPtr",             type, baseName);
 	srcbAppendElemf(&ctx->srcGen, "const X %sOff",               baseName);
 	srcbAppendElemf(&ctx->srcGen, "const GLOBAL_MEM X* %sSteps", baseName);
 	(void)reduxAppendTensorCallArgs;/* Silence unused warning */
 }
-static void  reduxAppendTensorCallArgs     (redux_ctx*  ctx,
-                                            const char* baseName){
+static void       reduxAppendTensorCallArgs     (redux_ctx*  ctx,
+                                                 const char* baseName){
 	srcbAppendElemf(&ctx->srcGen, "%sPtr",   baseName);
 	srcbAppendElemf(&ctx->srcGen, "%sOff",   baseName);
 	srcbAppendElemf(&ctx->srcGen, "%sSteps", baseName);
 }
-static void  reduxAppendMacroDefs          (redux_ctx*  ctx){
+static void       reduxAppendMacroDefs          (redux_ctx*  ctx){
 	int i;
 
 	srcbAppends    (&ctx->srcGen, "#define FOROVER(idx)    for (i##idx = i##idx##Start; i##idx < i##idx##End; i##idx++)\n");
@@ -2049,21 +2118,21 @@ static void  reduxAppendMacroDefs          (redux_ctx*  ctx){
 	srcbEndList    (&ctx->srcGen);
 	srcbAppends    (&ctx->srcGen, ")\n");
 }
-static void  reduxAppendIncludes           (redux_ctx*  ctx){
+static void       reduxAppendIncludes           (redux_ctx*  ctx){
 	strb_appends(&ctx->s, "/* Includes */\n");
 	strb_appends(&ctx->s, "#include \"cluda.h\"\n");
 	strb_appends(&ctx->s, "\n");
 	strb_appends(&ctx->s, "\n");
 	strb_appends(&ctx->s, "\n");
 }
-static void  reduxAppendTypedefs           (redux_ctx*  ctx){
+static void       reduxAppendTypedefs           (redux_ctx*  ctx){
 	strb_appendf(&ctx->s, "typedef %s S;\n", ctx->srcTypeStr);   /* The type of the source array. */
 	strb_appendf(&ctx->s, "typedef %s T;\n", ctx->dstTypeStr);   /* The type of the destination array. */
 	strb_appendf(&ctx->s, "typedef %s A;\n", ctx->dstArgTypeStr);/* The type of the destination argument array. */
 	strb_appendf(&ctx->s, "typedef %s X;\n", ctx->idxTypeStr);   /* The type of the indices: signed 32/64-bit. */
 	strb_appendf(&ctx->s, "typedef %s K;\n", ctx->accTypeStr);   /* The type of the accumulator variable. */
 }
-static void  reduxAppendGetInitValFns      (redux_ctx*  ctx){
+static void       reduxAppendGetInitValFns      (redux_ctx*  ctx){
 	/**
 	 * Initial value functions.
 	 */
@@ -2075,7 +2144,7 @@ static void  reduxAppendGetInitValFns      (redux_ctx*  ctx){
 	                      "\treturn (%s);\n"
 	                      "}\n\n\n\n", ctx->initValT, ctx->initValK);
 }
-static void  reduxAppendWriteBackFn        (redux_ctx*  ctx){
+static void       reduxAppendWriteBackFn        (redux_ctx*  ctx){
 	/**
 	 * Global memory value reduction function.
 	 *
@@ -2118,7 +2187,7 @@ static void  reduxAppendWriteBackFn        (redux_ctx*  ctx){
 	/* Close off function. */
 	strb_appends(&ctx->s, "}\n\n\n\n");
 }
-static void  reduxAppendReduxKernel        (redux_ctx*  ctx){
+static void       reduxAppendReduxKernel        (redux_ctx*  ctx){
 	reduxAppendPrototype        (ctx);
 	strb_appends                (&ctx->s, "{\n");
 	reduxAppendIndexDeclarations(ctx);
@@ -2126,7 +2195,7 @@ static void  reduxAppendReduxKernel        (redux_ctx*  ctx){
 	reduxAppendLoops            (ctx);
 	strb_appends                (&ctx->s, "}\n");
 }
-static void  reduxAppendPrototype          (redux_ctx*  ctx){
+static void       reduxAppendPrototype          (redux_ctx*  ctx){
 	srcbAppends    (&ctx->srcGen, "KERNEL void reduxKer(");
 	srcbBeginList  (&ctx->srcGen, ", ", "void");
 	reduxAppendTensorDeclArgs(ctx, "S", "src");
@@ -2141,7 +2210,7 @@ static void  reduxAppendPrototype          (redux_ctx*  ctx){
 	srcbEndList    (&ctx->srcGen);
 	srcbAppends    (&ctx->srcGen, ")");
 }
-static void  reduxAppendIndexDeclarations  (redux_ctx*  ctx){
+static void       reduxAppendIndexDeclarations  (redux_ctx*  ctx){
 	int i;
 	strb_appends(&ctx->s, "\t/* GPU kernel coordinates. Always 3D in OpenCL/CUDA. */\n");
 
@@ -2168,7 +2237,7 @@ static void  reduxAppendIndexDeclarations  (redux_ctx*  ctx){
 	if (ctx->nds > ctx->ndd){appendIdxes (&ctx->s, "\tX ", "i", ctx->ndd, ctx->nds, "PDim",    ";\n");}
 	strb_appends(&ctx->s, "\t\n\t\n");
 }
-static void  reduxAppendRangeCalculations  (redux_ctx*  ctx){
+static void       reduxAppendRangeCalculations  (redux_ctx*  ctx){
 	size_t hwDim;
 	int    i;
 
@@ -2229,7 +2298,7 @@ static void  reduxAppendRangeCalculations  (redux_ctx*  ctx){
 
 	strb_appends(&ctx->s, "\t\n\t\n");
 }
-static void  reduxAppendLoops              (redux_ctx*  ctx){
+static void       reduxAppendLoops              (redux_ctx*  ctx){
 	int i;
 
 	for (i=0;i<ctx->ndd;i++){
@@ -2333,10 +2402,10 @@ static void  reduxAppendLoops              (redux_ctx*  ctx){
 		srcbAppends(&ctx->srcGen, "\t}\n");
 	}
 }
-static void  reduxAppendInitKernel         (redux_ctx*  ctx){
+static void       reduxAppendInitKernel         (redux_ctx*  ctx){
 	/* BUG: Implement this for small code model. */
 }
-static void  reduxAppendPostKernel         (redux_ctx*  ctx){
+static void       reduxAppendPostKernel         (redux_ctx*  ctx){
 	/* BUG: Implement this for small code model. */
 }
 
@@ -2344,7 +2413,7 @@ static void  reduxAppendPostKernel         (redux_ctx*  ctx){
  * @brief Compile the kernel from source code.
  */
 
-static int   reduxCompile                  (redux_ctx*  ctx){
+static int        reduxCompile                  (redux_ctx*  ctx){
 	int    ret, i = 0;
 	int    PRI_TYPECODES[11];
 	size_t PRI_TYPECODES_LEN;
@@ -2432,7 +2501,7 @@ static int   reduxCompile                  (redux_ctx*  ctx){
  *        for the primary/auxilliary kernels.
  */
 
-static int   reduxSchedule                 (redux_ctx*  ctx){
+static int        reduxSchedule                 (redux_ctx*  ctx){
 	int      i, priNdims = 0, auxNdims = 0;
 	uint64_t maxLgRdx = 0, maxLgPre = 0, maxLgPost = 0;
 	uint64_t maxLgPri = 0, maxLgAux = 0;
@@ -2539,16 +2608,16 @@ static int   reduxSchedule                 (redux_ctx*  ctx){
  *     anything to do with the integer factorization APIs.
  */
 
-static void  reduxScheduleKernel           (int         ndims,
-                                            uint64_t*   dims,
-                                            uint64_t    warpSize,
-                                            uint64_t    maxLg,
-                                            uint64_t*   maxLs,
-                                            uint64_t    maxGg,
-                                            uint64_t*   maxGs,
-                                            uint64_t*   bs,
-                                            uint64_t*   gs,
-                                            uint64_t*   cs){
+static void       reduxScheduleKernel           (int         ndims,
+                                                 uint64_t*   dims,
+                                                 uint64_t    warpSize,
+                                                 uint64_t    maxLg,
+                                                 uint64_t*   maxLs,
+                                                 uint64_t    maxGg,
+                                                 uint64_t*   maxGs,
+                                                 uint64_t*   bs,
+                                                 uint64_t*   gs,
+                                                 uint64_t*   cs){
 	uint64_t       warpMod, bestWarpMod  = 1;
 	int            i,       bestWarpAxis = 0;
 	uint64_t       roundedDims[MAX_HW_DIMS];
@@ -2634,7 +2703,7 @@ static void  reduxScheduleKernel           (int         ndims,
  * Invoke the kernel.
  */
 
-static int   reduxInvoke                   (redux_ctx*  ctx){
+static int        reduxInvoke                   (redux_ctx*  ctx){
 	void* priArgs[11];
 	void* auxArgs[ 8];
 	int   ret, i = 0;
@@ -2790,8 +2859,8 @@ static int        reduxCleanup                  (redux_ctx*  ctx, int ret){
 	return ret;
 }
 
-static int   reduxCleanupMsg               (redux_ctx*  ctx, int ret,
-                                            const char* fmt, ...){
+static int        reduxCleanupMsg               (redux_ctx*  ctx, int ret,
+                                                 const char* fmt, ...){
 #if DEBUG
 	FILE* fp = stderr;
 	
