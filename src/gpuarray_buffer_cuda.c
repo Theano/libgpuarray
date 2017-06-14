@@ -444,7 +444,6 @@ static const char CUDA_PREAMBLE[] =
     "#define GLOBAL_MEM /* empty */\n"
     "#define LOCAL_MEM __shared__\n"
     "#define LOCAL_MEM_ARG /* empty */\n"
-    "#define REQD_WG_SIZE(X,Y,Z) __launch_bounds__(X*Y, Z)\n"
     "#ifdef NAN\n"
     "#undef NAN\n"
     "#endif\n"

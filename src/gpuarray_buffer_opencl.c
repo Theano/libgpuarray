@@ -288,7 +288,6 @@ static const char CL_PREAMBLE[] =
   "#define GLOBAL_MEM __global\n"
   "#define LOCAL_MEM __local\n"
   "#define LOCAL_MEM_ARG __local\n"
-  "#define REQD_WG_SIZE(x, y, z) __attribute__((reqd_work_group_size(x, y, z)))\n"
   "#ifndef NULL\n"
   "  #define NULL ((void*)0)\n"
   "#endif\n"
