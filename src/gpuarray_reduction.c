@@ -250,8 +250,6 @@ struct redux_ctx{
 	int             nds;          /* # Source              dimensions */
 	int             ndr;          /* # Reduced             dimensions */
 	int             ndd;          /* # Destination         dimensions */
-	int             ndw;          /* # Warp                dimensions */
-	int             ndp;          /* # Partial warp        dimensions */
 	int             ndf;          /* # Flattened source    dimensions */
 	int             ndt;          /* # Temporary workspace dimensions */
 	int             zeroAllAxes;  /* # of zero-length                   axes in source tensor */
@@ -259,8 +257,6 @@ struct redux_ctx{
 	size_t          prodAllAxes;  /* Product of length of all           axes in source tensor */
 	size_t          prodRdxAxes;  /* Product of length of all reduction axes in source tensor */
 	size_t          prodFreeAxes; /* Product of length of all free      axes in source tensor */
-	size_t          prodWarpAxes; /* Number of active threads per warp. Strictly <= warpSize. */
-	int             splitWarpAxis;/* Index of the split warp axis within the source tensor's shape; -1 otherwise. */
 	
 	gpucontext*     gpuCtx;
 	unsigned        numProcs;
@@ -353,7 +349,6 @@ static int        reduxGetAndInit               (int typecode, const char** prop
 static int        reduxGetOrInit                (int typecode, const char** property);
 static int        reduxSortFlatSensitive        (const void* a, const void* b);
 static int        reduxSortFlatInsensitive      (const void* a, const void* b);
-static int        reduxSortWarp                 (const void* a, const void* b);
 static int        axisInSet                     (int         v,
                                                  const int*  set,
                                                  size_t      setLen,
@@ -371,7 +366,6 @@ static void       axisInit                      (axis_desc*       axis,
                                                  ssize_t          len,
                                                  ssize_t          srcStride);
 static void       axisMarkReduced               (axis_desc*       axis, int    reduxNum);
-static void       axisMarkWarp                  (axis_desc*       axis, size_t partialSlice);
 static int        axisGetReduxNum               (const axis_desc* axis);
 static size_t     axisGetLen                    (const axis_desc* axis);
 static ssize_t    axisGetSrcStride              (const axis_desc* axis);
@@ -384,8 +378,6 @@ static ssize_t    axisGetDstArgStride           (const axis_desc* axis);
 static size_t     axisGetDstArgAbsStride        (const axis_desc* axis);
 static ssize_t    axisGetDstArgOffset           (const axis_desc* axis);
 static int        axisIsReduced                 (const axis_desc* axis);
-static int        axisIsWarp                    (const axis_desc* axis);
-static int        axisIsPartialWarp             (const axis_desc* axis);
 
 /* Reduction Context API */
 /*     Utilities */
@@ -413,7 +405,6 @@ static void       reduxAppendLargestAxisToHwList(redux_ctx*  ctx,
 static int        reduxInit                     (redux_ctx*  ctx);
 static int        reduxInferProperties          (redux_ctx*  ctx);
 static int        reduxFlattenSource            (redux_ctx*  ctx);
-static int        reduxSelectWarpAxes           (redux_ctx*  ctx);
 static int        reduxSelectNumStages          (redux_ctx*  ctx);
 static int        reduxPlan1Stage               (redux_ctx*  ctx);
 static int        reduxPlan2Stage               (redux_ctx*  ctx);
@@ -809,47 +800,6 @@ static int        reduxSortFlatSensitive        (const void* a, const void* b){
 }
 
 /**
- * @brief Sort axes in preferred order for integration into warp.
- * 
- * The axes with stride != 0 are sorted by lowest absolute
- * stride. Picking the few axes with the lowest absolute stride (while
- * keeping the product of their dimensions <= warpSize) should maximize
- * memory bandwidth of the warp.
- * 
- * The restriction stride != 0 is intended to avoid waste of memory
- * bandwidth. Once a memory transaction is necessary, it typically operates at
- * far greater granularity than just 32 bits (4 bytes).
- * 
- * Sorting by absolute stride should result, in the case of a packed tensor, in
- * the memory accesses being close to perfectly contiguous.
- */
-
-static int        reduxSortWarp                 (const void* a, const void* b){
-	const axis_desc* xda  = *(const axis_desc* const *)a;
-	const axis_desc* xdb  = *(const axis_desc* const *)b;
-
-	if       ( axisGetSrcStride(xda)   && !axisGetSrcStride(xdb)){
-		return -1;
-	}else if (!axisGetSrcStride(xda)   &&  axisGetSrcStride(xdb)){
-		return +1;
-	}
-	
-	if       (axisGetSrcAbsStride(xda)    <   axisGetSrcAbsStride(xdb)){
-		return -1;
-	}else if (axisGetSrcAbsStride(xda)    >   axisGetSrcAbsStride(xdb)){
-		return +1;
-	}
-
-	if       ( axisIsReduced(xda)      && !axisIsReduced(xdb)){
-		return -1;
-	}else if (!axisIsReduced(xda)      &&  axisIsReduced(xdb)){
-		return +1;
-	}
-
-	return 0;
-}
-
-/**
  * @brief Check whether axis numbered v is already in the given set of axes.
  *
  * @param [in]  v
@@ -953,14 +903,6 @@ static void       axisMarkReduced               (axis_desc*       axis, int    r
 }
 
 /**
- * @brief Mark axis as warp axis.
- */
-
-static void       axisMarkWarp                  (axis_desc*       axis, size_t warpLen){
-	axis->warpLen = warpLen;
-}
-
-/**
  * @brief Get properties of an axis.
  */
 
@@ -1002,12 +944,6 @@ static ssize_t    axisGetDstArgOffset           (const axis_desc* axis){
 }
 static int        axisIsReduced                 (const axis_desc* axis){
 	return axis->isReduced;
-}
-static int        axisIsWarp                    (const axis_desc* axis){
-	return !!axis->warpLen;
-}
-static int        axisIsPartialWarp             (const axis_desc* axis){
-	return axis->warpLen > 0 && axis->warpLen != axis->len;
 }
 
 /**
@@ -1367,9 +1303,7 @@ static int        reduxInit                     (redux_ctx*  ctx){
 	ctx->errorString1  = NULL;
 	ctx->errorString2  = NULL;
 
-	ctx->splitWarpAxis = -1;
 	ctx->numStages     =  1;
-	ctx->prodWarpAxes  =  1;
 	ctx->prodAllAxes   = ctx->prodRdxAxes   = ctx->prodFreeAxes  = 1;
 	strb_init(&ctx->s);
 	srcbInit (&ctx->srcGen, &ctx->s);
@@ -1434,8 +1368,6 @@ static int        reduxInferProperties          (redux_ctx*  ctx){
 	ctx->nds = ctx->src->nd;
 	ctx->ndr = ctx->reduxLen;
 	ctx->ndd = ctx->nds - ctx->ndr;
-	ctx->ndw = 0;
-	ctx->ndp = 0;
 	ctx->ndf = 0;
 	ctx->ndt = ctx->ndd + 1;
 	
@@ -1749,18 +1681,6 @@ static int        reduxFlattenSource            (redux_ctx*  ctx){
 	}
 	ctx->ndf = j;
 
-	return reduxSelectWarpAxes(ctx);
-}
-
-/**
- * @brief Select the warp axes in such a way as to maximize memory bandwidth.
- */
-
-static int        reduxSelectWarpAxes           (redux_ctx*  ctx){
-	axis_desc* a;
-	int        i;
-	size_t     aL;
-
 
 	/**
 	 * NOTE: At this point it is possible for there to be no axes
@@ -1776,55 +1696,6 @@ static int        reduxSelectWarpAxes           (redux_ctx*  ctx){
 		axisMarkReduced(reduxGetSrcFlatAxis(ctx, ctx->ndf), 0);
 		ctx->ndf = 1;
 	}
-
-
-	/**
-	 * Select Warp Axes.
-	 * 
-	 * Using a particular heuristic order (*), sort the axis list by
-	 * suitability for belonging to the warp. Then, pick the first few axes,
-	 * until the product of their lengths exceeds the warp size.
-	 * 
-	 * (*) See documentation of value-comparison function.
-	 */
-
-	for(i=0;i<ctx->ndf;i++){
-		ctx->xdSrcPtrs[i] = reduxGetSrcFlatAxis(ctx, i);
-	}
-
-	qsort(ctx->xdSrcPtrs, ctx->ndf, sizeof(*ctx->xdSrcPtrs), reduxSortWarp);
-
-	for (i=0;i<ctx->ndf;i++){
-		a  = reduxGetSrcSortAxis(ctx, i);
-		aL = axisGetLen(a);
-		if (aL <= 1){break;}
-		
-		ctx->prodWarpAxes *= aL;
-		if (ctx->prodWarpAxes <= ctx->warpSize){
-			axisMarkWarp(a, aL);
-			ctx->ndw++;
-		}else{
-			/**
-			 * The product of warp lengths just exceeded warpSize. We backtrack
-			 * by undoing the multiplication by aL. We then check whether we
-			 * can "split" this axis by extracting at least a factor of 2 into
-			 * warpLen. If yes, we mark is as the (only) warp axis that is
-			 * split by setting its warpLen to something neither 0 nor len.
-			 */
-			
-			ctx->prodWarpAxes /= aL;
-			aL = ctx->warpSize/ctx->prodWarpAxes;
-			if (aL >= 2){
-				axisMarkWarp(a, aL);
-				ctx->prodWarpAxes  *= aL;
-				ctx->splitWarpAxis  = i;
-				ctx->ndw++;
-				ctx->ndp++;
-			}
-			break;
-		}
-	}
-
 
 	return reduxSelectNumStages(ctx);
 }
