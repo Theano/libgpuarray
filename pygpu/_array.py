@@ -143,11 +143,11 @@ class ndgpuarray(gpuarray.GpuArray):
         mod = self._empty_like_me(dtype=odtype)
 
         if odtype.kind == 'f':
-            tmpl = "div = floor((%(out_t)s)a / (%(out_t)s)b)," \
-                "mod = fmod((%(out_t)s)a, (%(out_t)s)b)"
+            tmpl = ("div = floor((%(out_t)s)a / (%(out_t)s)b),"
+                    "mod = fmod((%(out_t)s)a, (%(out_t)s)b)")
         else:
-            tmpl = "div = (%(out_t)s)a / (%(out_t)s)b," \
-                "mod = a %% b"
+            tmpl = ("div = (%(out_t)s)a / (%(out_t)s)b,"
+                    "mod = a %% b")
 
         ksrc = tmpl % {'out_t': dtype_to_ctype(odtype)}
 
@@ -168,11 +168,11 @@ class ndgpuarray(gpuarray.GpuArray):
         mod = self._empty_like_me(dtype=odtype)
 
         if odtype.kind == 'f':
-            tmpl = "div = floor((%(out_t)s)a / (%(out_t)s)b)," \
-                "mod = fmod((%(out_t)s)a, (%(out_t)s)b)"
+            tmpl = ("div = floor((%(out_t)s)a / (%(out_t)s)b),"
+                    "mod = fmod((%(out_t)s)a, (%(out_t)s)b)")
         else:
-            tmpl = "div = (%(out_t)s)a / (%(out_t)s)b," \
-                "mod = a %% b"
+            tmpl = ("div = (%(out_t)s)a / (%(out_t)s)b,"
+                    "mod = a %% b")
 
         ksrc = tmpl % {'out_t': dtype_to_ctype(odtype)}
 

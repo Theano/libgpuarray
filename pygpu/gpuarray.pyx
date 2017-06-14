@@ -1374,8 +1374,8 @@ cdef GpuArray pygpu_empty_like(GpuArray a, ga_order ord, int typecode):
     cdef GpuArray res
 
     if ord == GA_ANY_ORDER:
-        if py_CHKFLAGS(a, GA_F_CONTIGUOUS) and \
-                not py_CHKFLAGS(a, GA_C_CONTIGUOUS):
+        if (py_CHKFLAGS(a, GA_F_CONTIGUOUS) and
+                not py_CHKFLAGS(a, GA_C_CONTIGUOUS)):
             ord = GA_F_ORDER
         else:
             ord = GA_C_ORDER
@@ -1688,8 +1688,10 @@ cdef class GpuArray:
         """
         if not np.PyArray_ISBEHAVED(dst):
             raise ValueError, "Destination Numpy array is not well behaved: aligned and writeable"
-        if not ((self.flags.c_contiguous and self.flags.aligned and dst.flags['C_CONTIGUOUS']) or \
-                (self.flags.f_contiguous and self.flags.aligned and dst.flags['F_CONTIGUOUS'])):
+        if (not ((self.flags.c_contiguous and self.flags.aligned and
+                  dst.flags['C_CONTIGUOUS']) or
+                (self.flags.f_contiguous and self.flags.aligned and
+                 dst.flags['F_CONTIGUOUS']))):
             raise ValueError, "GpuArray and Numpy array do not match in contiguity or GpuArray is not aligned"
         if self.dtype != dst.dtype:
             raise ValueError, "GpuArray and Numpy array do not have matching data types"
@@ -2033,13 +2035,13 @@ cdef class GpuArray:
                     # is also required for numpy compat.
                     el = key.index(Ellipsis)
                     if isinstance(key, tuple):
-                        key = key[:el] + \
-                              (Ellipsis,)*(self.ga.nd - (len(key) - 1)) + \
-                              key[el+1:]
+                        key = (key[:el] +
+                               (Ellipsis,)*(self.ga.nd - (len(key) - 1)) +
+                               key[el+1:])
                     else:
-                        key = key[:el] + \
-                              [Ellipsis,]*(self.ga.nd - (len(key) - 1)) + \
-                              key[el+1:]
+                        key = (key[:el] +
+                               [Ellipsis,]*(self.ga.nd - (len(key) - 1)) +
+                               key[el+1:])
                 if len(key) > self.ga.nd:
                     raise IndexError, "too many indices"
                 for i in range(0, len(key)):

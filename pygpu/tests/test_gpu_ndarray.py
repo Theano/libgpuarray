@@ -49,8 +49,8 @@ def test_hash():
 
 def test_bool():
     for data in [numpy.empty((0, 33)), [[1]], [[0]], [], [0], [1], 0, 1]:
-        assert bool(pygpu.asarray(data, context=ctx)) == \
-            bool(numpy.asarray(data))
+        assert (bool(pygpu.asarray(data, context=ctx)) ==
+                bool(numpy.asarray(data)))
 
 
 def test_transfer():
@@ -143,8 +143,8 @@ def test_ascontiguousarray():
                 for offseted_i in [True, True]:
                     for sliced in [1, 2, -1, -2]:
                         for order in ['f', 'c']:
-                            yield ascontiguousarray, shp, dtype, offseted_o, \
-                                offseted_i, sliced, order
+                            yield (ascontiguousarray, shp, dtype, offseted_o,
+                                   offseted_i, sliced, order)
 
 
 @guard_devsup
@@ -179,8 +179,8 @@ def test_asfortranarray():
                 for offseted_inner in [True, False]:
                     for sliced in [1, 2, -1, -2]:
                         for order in ['f', 'c']:
-                            yield asfortranarray, shp, dtype, offseted_outer, \
-                                offseted_inner, sliced, order
+                            yield (asfortranarray, shp, dtype, offseted_outer,
+                                   offseted_inner, sliced, order)
 
 
 @guard_devsup
@@ -416,8 +416,8 @@ def test_copy_view():
 
 
 def check_memory_region(a, a_op, b, b_op):
-    assert numpy.may_share_memory(a, a_op) == \
-        pygpu.gpuarray.may_share_memory(b, b_op)
+    assert (numpy.may_share_memory(a, a_op) ==
+            pygpu.gpuarray.may_share_memory(b, b_op))
 
 
 @guard_devsup
@@ -527,8 +527,8 @@ def test_transpose():
                 for sliced in [1, 2, -2, -1]:
                     yield transpose, shp, offseted, sliced, order
                     for perm in permutations(list(range(len(shp)))):
-                        yield transpose_perm, shp, perm, offseted, sliced, \
-                            order
+                        yield (transpose_perm, shp, perm, offseted, sliced,
+                               order)
 
 
 def transpose(shp, offseted, sliced, order):

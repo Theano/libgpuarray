@@ -49,16 +49,16 @@ def test_gemv():
     bools = [False, True]
     for shape, order, trans, offseted_i, sliced in product(
             [(100, 128), (128, 50)], 'fc', bools, bools, [1, 2, -1, -2]):
-        yield gemv, shape, 'float32', order, trans, \
-            offseted_i, sliced, True, False
+        yield (gemv, shape, 'float32', order, trans,
+               offseted_i, sliced, True, False)
     for overwrite, init_y in product(bools, bools):
-        yield gemv, (4, 3), 'float32', 'f', False, False, 1, \
-            overwrite, init_y
+        yield (gemv, (4, 3), 'float32', 'f', False, False, 1,
+               overwrite, init_y)
     yield gemv, (32, 32), 'float64', 'f', False, False, 1, True, False
     for alpha, beta, overwrite in product(
             [0, 1, -1, 0.6], [0, 1, -1, 0.6], bools):
-        yield gemv, (32, 32), 'float32', 'f', False, False, 1, \
-            overwrite, True, alpha, beta
+        yield (gemv, (32, 32), 'float32', 'f', False, False, 1,
+               overwrite, True, alpha, beta)
 
 
 @guard_devsup
@@ -96,17 +96,17 @@ def test_gemm():
     for (m, n, k), order, trans, offseted_o in product(
         [(48, 15, 32), (15, 32, 48)], list(product(*['fc']*3)),
             list(product(bools, bools)), bools):
-        yield gemm, m, n, k, 'float32', order, trans, \
-            offseted_o, 1, False, False
+        yield (gemm, m, n, k, 'float32', order, trans,
+               offseted_o, 1, False, False)
     for sliced, overwrite, init_res in product([1, 2, -1, -2], bools, bools):
-        yield gemm, 4, 3, 2, 'float32', ('f', 'f', 'f'), \
-            (False, False), False, sliced, overwrite, init_res
-    yield gemm, 32, 32, 32, 'float64', ('f', 'f', 'f'), (False, False), \
-        False, 1, False, False
+        yield (gemm, 4, 3, 2, 'float32', ('f', 'f', 'f'),
+               (False, False), False, sliced, overwrite, init_res)
+    yield (gemm, 32, 32, 32, 'float64', ('f', 'f', 'f'), (False, False),
+           False, 1, False, False)
     for alpha, beta, overwrite in product(
             [0, 1, -1, 0.6], [0, 1, -1, 0.6], bools):
-        yield gemm, 32, 23, 32, 'float32', ('f', 'f', 'f'), \
-            (False, False), False, 1, overwrite, True, alpha, beta
+        yield (gemm, 32, 23, 32, 'float32', ('f', 'f', 'f'),
+               (False, False), False, 1, overwrite, True, alpha, beta)
 
 
 @guard_devsup
@@ -179,17 +179,17 @@ def test_rgemmBatch_3d():
         [1, 17, 31], [(24, 7, 16), (7, 16, 24)],
         list(product('fc', 'fc', 'c')),
             list(product(bools, bools)), bools):
-        yield rgemmBatch_3d, b, m, n, k, 'float32', order, trans, \
-            offseted_o, 1, False, False
+        yield (rgemmBatch_3d, b, m, n, k, 'float32', order, trans,
+               offseted_o, 1, False, False)
     for sliced, overwrite, init_res in product([1, 2, -1, -2], bools, bools):
-        yield rgemmBatch_3d, 5, 4, 3, 2, 'float32', ('f', 'f', 'c'), \
-            (False, False), False, sliced, overwrite, init_res
-    yield rgemmBatch_3d, 16, 16, 16, 16, 'float64', ('f', 'f', 'c'), \
-        (False, False), False, 1, False, False
+        yield (rgemmBatch_3d, 5, 4, 3, 2, 'float32', ('f', 'f', 'c'),
+               (False, False), False, sliced, overwrite, init_res)
+    yield (rgemmBatch_3d, 16, 16, 16, 16, 'float64', ('f', 'f', 'c'),
+           (False, False), False, 1, False, False)
     for alpha, beta, overwrite in product(
             [0, 1, -1, 0.6], [0, 1, -1, 0.6], bools):
-        yield rgemmBatch_3d, 16, 16, 9, 16, 'float32', ('f', 'f', 'c'), \
-            (False, False), False, 1, overwrite, True, alpha, beta
+        yield (rgemmBatch_3d, 16, 16, 9, 16, 'float32', ('f', 'f', 'c'),
+               (False, False), False, 1, overwrite, True, alpha, beta)
 
 
 @guard_devsup
