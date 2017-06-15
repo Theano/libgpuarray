@@ -72,9 +72,12 @@ def test_red_broadcast():
         nz = numpy.apply_along_axis(sum, ax, nz).astype(dtype)
 
     args = [as_argument(gx, 'a'), as_argument(gy, 'b')]
-    gz = ReductionKernel(context, dtype, "0", "a+b", redux, map_expr="a[i]*b[i]", arguments=args)(gx, gy, broadcast=True)
+    gz = ReductionKernel(context, dtype, "0", "a+b", redux,
+                         map_expr="a[i]*b[i]", arguments=args)(
+        gx, gy, broadcast=True)
 
     assert numpy.allclose(nz, numpy.asarray(gz))
+
 
 def test_reduction_ops():
     for axis in [None, 0, 1]:

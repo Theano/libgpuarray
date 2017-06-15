@@ -15,13 +15,15 @@ except ImportError as e:
 
 import pygpu.blas as gblas
 
+
 def test_dot():
     bools = [True, False]
     for N, dtype, offseted_i, sliced in product(
-        [1, 256, 1337], ['float32', 'float64'], bools, bools):
+            [1, 256, 1337], ['float32', 'float64'], bools, bools):
         yield dot, N, dtype, offseted_i, sliced, True, False
     for overwrite, init_z in product(bools, bools):
         yield dot, 666, 'float32', False, False, overwrite, init_z
+
 
 @guard_devsup
 def dot(N, dtype, offseted_i, sliced, overwrite, init_z):
@@ -30,10 +32,10 @@ def dot(N, dtype, offseted_i, sliced, overwrite, init_z):
     cY, gY = gen_gpuarray((N,), dtype, offseted_inner=offseted_i,
                           sliced=sliced, ctx=context)
     if init_z:
-        _, gZ = gen_gpuarray((), dtype, offseted_inner=offseted_i,
-            sliced=sliced, ctx=context)
+        gZ = gen_gpuarray((), dtype, offseted_inner=offseted_i,
+                          sliced=sliced, ctx=context)[1]
     else:
-        _, gZ = None, None
+        gZ = None
 
     if dtype == 'float32':
         cr = fblas.sdot(cX, cY)
@@ -46,21 +48,22 @@ def dot(N, dtype, offseted_i, sliced, overwrite, init_z):
 def test_gemv():
     bools = [False, True]
     for shape, order, trans, offseted_i, sliced in product(
-        [(100, 128), (128, 50)], 'fc', bools, bools, [1, 2, -1, -2]):
-        yield gemv, shape, 'float32', order, trans, \
-            offseted_i, sliced, True, False
+            [(100, 128), (128, 50)], 'fc', bools, bools, [1, 2, -1, -2]):
+        yield (gemv, shape, 'float32', order, trans,
+               offseted_i, sliced, True, False)
     for overwrite, init_y in product(bools, bools):
-        yield gemv, (4, 3), 'float32', 'f', False, False, 1, \
-            overwrite, init_y
+        yield (gemv, (4, 3), 'float32', 'f', False, False, 1,
+               overwrite, init_y)
     yield gemv, (32, 32), 'float64', 'f', False, False, 1, True, False
     for alpha, beta, overwrite in product(
-        [0, 1, -1, 0.6], [0, 1, -1, 0.6], bools):
-        yield gemv, (32, 32), 'float32', 'f', False, False, 1, \
-            overwrite, True, alpha, beta
+            [0, 1, -1, 0.6], [0, 1, -1, 0.6], bools):
+        yield (gemv, (32, 32), 'float32', 'f', False, False, 1,
+               overwrite, True, alpha, beta)
+
 
 @guard_devsup
 def gemv(shp, dtype, order, trans, offseted_i, sliced,
-          overwrite, init_y, alpha=1.0, beta=0.0):
+         overwrite, init_y, alpha=1.0, beta=0.0):
     cA, gA = gen_gpuarray(shp, dtype, order=order, offseted_inner=offseted_i,
                           sliced=sliced, ctx=context)
     if trans:
@@ -92,31 +95,31 @@ def test_gemm():
     bools = [False, True]
     for (m, n, k), order, trans, offseted_o in product(
         [(48, 15, 32), (15, 32, 48)], list(product(*['fc']*3)),
-        list(product(bools, bools)), bools):
-        yield gemm, m, n, k, 'float32', order, trans, \
-            offseted_o, 1, False, False
-    for sliced, overwrite, init_res in product(
-        [1, 2, -1, -2], bools, bools):
-        yield gemm, 4, 3, 2, 'float32', ('f', 'f', 'f'), \
-            (False, False), False, sliced, overwrite, init_res
-    yield gemm, 32, 32, 32, 'float64', ('f', 'f', 'f'), (False, False), \
-        False, 1, False, False
+            list(product(bools, bools)), bools):
+        yield (gemm, m, n, k, 'float32', order, trans,
+               offseted_o, 1, False, False)
+    for sliced, overwrite, init_res in product([1, 2, -1, -2], bools, bools):
+        yield (gemm, 4, 3, 2, 'float32', ('f', 'f', 'f'),
+               (False, False), False, sliced, overwrite, init_res)
+    yield (gemm, 32, 32, 32, 'float64', ('f', 'f', 'f'), (False, False),
+           False, 1, False, False)
     for alpha, beta, overwrite in product(
-        [0, 1, -1, 0.6], [0, 1, -1, 0.6], bools):
-        yield gemm, 32, 23, 32, 'float32', ('f', 'f', 'f'), \
-            (False, False), False, 1, overwrite, True, alpha, beta
+            [0, 1, -1, 0.6], [0, 1, -1, 0.6], bools):
+        yield (gemm, 32, 23, 32, 'float32', ('f', 'f', 'f'),
+               (False, False), False, 1, overwrite, True, alpha, beta)
+
 
 @guard_devsup
 def gemm(m, n, k, dtype, order, trans, offseted_o, sliced, overwrite,
          init_res, alpha=1.0, beta=0.0):
     if trans[0]:
-        shpA = (k,m)
+        shpA = (k, m)
     else:
-        shpA = (m,k)
+        shpA = (m, k)
     if trans[1]:
-        shpB = (n,k)
+        shpB = (n, k)
     else:
-        shpB = (k,n)
+        shpB = (k, n)
 
     cA, gA = gen_gpuarray(shpA, dtype, order=order[0],
                           offseted_outer=offseted_o,
@@ -125,7 +128,7 @@ def gemm(m, n, k, dtype, order, trans, offseted_o, sliced, overwrite,
                           offseted_outer=offseted_o,
                           sliced=sliced, ctx=context)
     if init_res:
-        cC, gC = gen_gpuarray((m,n), dtype, order=order[2], ctx=context)
+        cC, gC = gen_gpuarray((m, n), dtype, order=order[2], ctx=context)
     else:
         cC, gC = None, None
 
@@ -143,12 +146,13 @@ def gemm(m, n, k, dtype, order, trans, offseted_o, sliced, overwrite,
 
 def test_ger():
     bools = [False, True]
-    for (m,n), order, sliced_x, sliced_y in product(
-        [(4,5)], 'fc', [1, 2, -2, -1], [1, 2, -2, -1]):
+    for (m, n), order, sliced_x, sliced_y in product(
+            [(4, 5)], 'fc', [1, 2, -2, -1], [1, 2, -2, -1]):
         yield ger, m, n, 'float32', order, sliced_x, sliced_y, False
     yield ger, 4, 5, 'float64', 'f', 1, 1, False
     for init_res, overwrite in product(bools, bools):
         yield ger, 4, 5, 'float32', 'f', 1, 1, init_res, overwrite
+
 
 def ger(m, n, dtype, order, sliced_x, sliced_y, init_res, overwrite=False):
     cX, gX = gen_gpuarray((m,), dtype, order, sliced=sliced_x, ctx=context)
@@ -168,35 +172,37 @@ def ger(m, n, dtype, order, sliced_x, sliced_y, init_res, overwrite=False):
 
     numpy.testing.assert_allclose(cr, numpy.asarray(gr), rtol=1e-6)
 
+
 def test_rgemmBatch_3d():
     bools = [False, True]
     for b, (m, n, k), order, trans, offseted_o in product(
-        [1, 17, 31], [(24, 7, 16), (7, 16, 24)], list(product('fc', 'fc', 'c')),
-        list(product(bools, bools)), bools):
-        yield rgemmBatch_3d, b, m, n, k, 'float32', order, trans, \
-            offseted_o, 1, False, False
-    for sliced, overwrite, init_res in product(
-        [1, 2, -1, -2], bools, bools):
-        yield rgemmBatch_3d, 5, 4, 3, 2, 'float32', ('f', 'f', 'c'), \
-            (False, False), False, sliced, overwrite, init_res
-    yield rgemmBatch_3d, 16, 16, 16, 16, 'float64', ('f', 'f', 'c'), (False, False), \
-        False, 1, False, False
+        [1, 17, 31], [(24, 7, 16), (7, 16, 24)],
+        list(product('fc', 'fc', 'c')),
+            list(product(bools, bools)), bools):
+        yield (rgemmBatch_3d, b, m, n, k, 'float32', order, trans,
+               offseted_o, 1, False, False)
+    for sliced, overwrite, init_res in product([1, 2, -1, -2], bools, bools):
+        yield (rgemmBatch_3d, 5, 4, 3, 2, 'float32', ('f', 'f', 'c'),
+               (False, False), False, sliced, overwrite, init_res)
+    yield (rgemmBatch_3d, 16, 16, 16, 16, 'float64', ('f', 'f', 'c'),
+           (False, False), False, 1, False, False)
     for alpha, beta, overwrite in product(
-        [0, 1, -1, 0.6], [0, 1, -1, 0.6], bools):
-        yield rgemmBatch_3d, 16, 16, 9, 16, 'float32', ('f', 'f', 'c'), \
-            (False, False), False, 1, overwrite, True, alpha, beta
+            [0, 1, -1, 0.6], [0, 1, -1, 0.6], bools):
+        yield (rgemmBatch_3d, 16, 16, 9, 16, 'float32', ('f', 'f', 'c'),
+               (False, False), False, 1, overwrite, True, alpha, beta)
+
 
 @guard_devsup
-def rgemmBatch_3d(b, m, n, k, dtype, order, trans, offseted_o, sliced, overwrite,
-         init_res, alpha=1.0, beta=0.0):
+def rgemmBatch_3d(b, m, n, k, dtype, order, trans, offseted_o, sliced,
+                  overwrite, init_res, alpha=1.0, beta=0.0):
     if trans[0]:
-        shpA = (b,k,m)
+        shpA = (b, k, m)
     else:
-        shpA = (b,m,k)
+        shpA = (b, m, k)
     if trans[1]:
-        shpB = (b,n,k)
+        shpB = (b, n, k)
     else:
-        shpB = (b,k,n)
+        shpB = (b, k, n)
 
     cA, gA = gen_gpuarray(shpA, dtype, order=order[0],
                           offseted_outer=offseted_o,
@@ -205,11 +211,11 @@ def rgemmBatch_3d(b, m, n, k, dtype, order, trans, offseted_o, sliced, overwrite
                           offseted_outer=offseted_o,
                           sliced=sliced, ctx=context)
     if init_res:
-        cC, gC = gen_gpuarray((b,m,n), dtype, order=order[2], ctx=context)
+        cC, gC = gen_gpuarray((b, m, n), dtype, order=order[2], ctx=context)
     else:
         cC, gC = None, None
 
-    cr = numpy.empty((b,m,n), dtype=dtype)
+    cr = numpy.empty((b, m, n), dtype=dtype)
     if dtype == 'float32':
         fn_gemm_c = fblas.sgemm
     else:
@@ -217,9 +223,9 @@ def rgemmBatch_3d(b, m, n, k, dtype, order, trans, offseted_o, sliced, overwrite
     for i in range(b):
         cCi = cC if cC is None else cC[i]
         cr[i] = fn_gemm_c(alpha, cA[i], cB[i], beta, cCi, trans_a=trans[0],
-                         trans_b=trans[1], overwrite_c=overwrite)
+                          trans_b=trans[1], overwrite_c=overwrite)
 
     gr = gblas.gemmBatch_3d(alpha, gA, gB, beta, gC, trans_a=trans[0],
-                    trans_b=trans[1], overwrite_c=overwrite)
+                            trans_b=trans[1], overwrite_c=overwrite)
 
     numpy.testing.assert_allclose(cr, numpy.asarray(gr), rtol=1e-5)

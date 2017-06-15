@@ -10,7 +10,7 @@ import numpy
 
 from nose.tools import assert_raises
 import pygpu
-from pygpu.gpuarray import GpuArray, GpuContext, GpuKernel
+from pygpu.gpuarray import GpuArray, GpuKernel
 
 from .support import (guard_devsup, check_meta, check_flags, check_all,
                       check_content, gen_gpuarray, context as ctx, dtypes_all,
@@ -41,7 +41,7 @@ def test_hash():
     g = pygpu.empty((2, 3), context=ctx)
     exc = None
     try:
-        h = hash(g)
+        hash(g)
     except TypeError as e:
         exc = e
     assert exc is not None
@@ -49,7 +49,8 @@ def test_hash():
 
 def test_bool():
     for data in [numpy.empty((0, 33)), [[1]], [[0]], [], [0], [1], 0, 1]:
-        assert bool(pygpu.asarray(data, context=ctx)) == bool(numpy.asarray(data))
+        assert (bool(pygpu.asarray(data, context=ctx)) ==
+                bool(numpy.asarray(data)))
 
 
 def test_transfer():
@@ -71,11 +72,13 @@ def transfer(shp, dtype, offseted):
     assert a.dtype == b.dtype == c.dtype == dtype
     assert c.flags.c_contiguous
 
+
 def test_cast():
     for shp in [(), (5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype1 in dtypes_no_complex:
             for dtype2 in dtypes_no_complex:
                     yield cast, shp, dtype1, dtype2
+
 
 @guard_devsup
 def cast(shp, dtype1, dtype2):
@@ -140,8 +143,8 @@ def test_ascontiguousarray():
                 for offseted_i in [True, True]:
                     for sliced in [1, 2, -1, -2]:
                         for order in ['f', 'c']:
-                            yield ascontiguousarray, shp, dtype, offseted_o, \
-                                offseted_i, sliced, order
+                            yield (ascontiguousarray, shp, dtype, offseted_o,
+                                   offseted_i, sliced, order)
 
 
 @guard_devsup
@@ -153,8 +156,7 @@ def ascontiguousarray(shp, dtype, offseted_o, offseted_i, sliced, order):
     b = pygpu.ascontiguousarray(gpu)
 
     # numpy upcast with a view to 1d scalar.
-    if (sliced != 1 or shp == () or
-        (offseted_i and len(shp) > 1)):
+    if (sliced != 1 or shp == () or (offseted_i and len(shp) > 1)):
         assert b is not gpu
         if sliced == 1 and not offseted_i:
             assert (a.data is cpu.data) == (b.bytes is gpu.bytes)
@@ -177,8 +179,8 @@ def test_asfortranarray():
                 for offseted_inner in [True, False]:
                     for sliced in [1, 2, -1, -2]:
                         for order in ['f', 'c']:
-                            yield asfortranarray, shp, dtype, offseted_outer, \
-                                offseted_inner, sliced, order
+                            yield (asfortranarray, shp, dtype, offseted_outer,
+                                   offseted_inner, sliced, order)
 
 
 @guard_devsup
@@ -193,7 +195,7 @@ def asfortranarray(shp, dtype, offseted_outer, offseted_inner, sliced, order):
     if gpu.flags['F_CONTIGUOUS']:
         assert b.gpudata == gpu.gpudata
     elif (sliced != 1 or shp == () or (offseted_outer and len(shp) > 1) or
-        (order != 'f' and len(shp) > 1)):
+          (order != 'f' and len(shp) > 1)):
         assert b is not gpu
     else:
         assert b is gpu
@@ -259,7 +261,7 @@ def empty(shp, order, dtype):
 
 
 def test_empty_no_dtype():
-    x = pygpu.empty((), context=ctx)# no dtype and order param
+    x = pygpu.empty((), context=ctx)  # no dtype and order param
     y = numpy.empty(())
     check_meta(x, y)
 
@@ -401,6 +403,7 @@ class WriteReadTest(unittest.TestCase):
         self.cpu = numpy.ndarray((3, 4, 2, 5), dtype="float32", order='C')
         self.assertRaises(ValueError, self.gpu.read, self.cpu[:, :, 0, :])
 
+
 def test_copy_view():
     for shp in [(5,), (6, 7), (4, 8, 9), (1, 8, 9)]:
         for dtype in dtypes_all:
@@ -413,12 +416,13 @@ def test_copy_view():
 
 
 def check_memory_region(a, a_op, b, b_op):
-    assert numpy.may_share_memory(a, a_op) == \
-        pygpu.gpuarray.may_share_memory(b, b_op)
+    assert (numpy.may_share_memory(a, a_op) ==
+            pygpu.gpuarray.may_share_memory(b, b_op))
+
 
 @guard_devsup
 def copy_view(shp, dtype, offseted, order1, order2):
-    #TODO test copy unbroadcast!
+    # TODO test copy unbroadcast!
     a, b = gen_gpuarray(shp, dtype, offseted, order=order1, ctx=ctx)
 
     assert numpy.allclose(a, numpy.asarray(b))
@@ -458,10 +462,10 @@ def test_shape():
                  ((4, 3), (12, -1)), ((4, 3), (-1, 12)),
                  ((5, 4, 3, 2), (2, -1, 12)), ((4, 2), (2, 2, -1)),
                  # ((4, 3), (13, -1)),
-    ]:
+                 ]:
         for offseted in [True, False]:
             for order1 in ['c', 'f']:
-                if not -1 in shps[1]:
+                if -1 not in shps[1]:
                     yield shape_, shps, offseted, order1
                 for order2 in ['a', 'c', 'f']:
                     yield reshape, shps, offseted, order1, order2
@@ -523,7 +527,8 @@ def test_transpose():
                 for sliced in [1, 2, -2, -1]:
                     yield transpose, shp, offseted, sliced, order
                     for perm in permutations(list(range(len(shp)))):
-                        yield transpose_perm, shp, perm, offseted, sliced, order
+                        yield (transpose_perm, shp, perm, offseted, sliced,
+                               order)
 
 
 def transpose(shp, offseted, sliced, order):
@@ -595,8 +600,6 @@ def mapping_getitem_w_int(dtype, offseted):
     dim = (2,)
     a, _a = gen_gpuarray(dim, dtype, offseted, ctx=ctx)
 
-    import sys
-    init_ref_count = sys.getrefcount(_a)
     _cmp(_a[...], a[...])
     _cmp(_a[...], a[...])
     _cmp(_a[...], a[...])
@@ -628,19 +631,19 @@ def mapping_getitem_w_int(dtype, offseted):
     _cmpf(_a, (10, 0, 0, 0))
     _cmpf(_a, -10)
 
-    #test with integer
+    # test with integer
     _cmp(_a[1], a[1])
     _cmp(_a[-1], a[-1])
     _cmp(_a[numpy.int64(1)], a[numpy.int64(1)])
     _cmp(_a[numpy.int64(-1)], a[numpy.int64(-1)])
 
-    #test with slice
+    # test with slice
     _cmp(_a[1:], a[1:])
     _cmp(_a[1:2], a[1:2])
     _cmp(_a[-1:1], a[-1:1])
     _cmp(_a[6:7:], a[6:7:])
 
-    #test with tuple (mix slice, integer, numpy.int64)
+    # test with tuple (mix slice, integer, numpy.int64)
     _cmpNs(_a[0, 0, ::numpy.int64(-1), ::-1], a[0, 0, ::-1, ::-1])
     _cmpNs(_a[:, :, ::numpy.int64(-1), ::-1], a[:, :, ::-1, ::-1])
     _cmpNs(_a[:, :, numpy.int64(1), -1], a[:, :, 1, -1])
@@ -654,11 +657,11 @@ def mapping_getitem_w_int(dtype, offseted):
     _cmpNs(_a[0, ::-2, -1], a[0, ::-2, -1])
     _cmp(_a[-1, -1, -1, -2], a[-1, -1, -1, -2])
 
-    #test ellipse
+    # test ellipse
     _cmp(_a[...], a[...])
 
 
-def _cmp(x,y):
+def _cmp(x, y):
     assert isinstance(x, GpuArray)
     assert x.shape == y.shape
     assert x.dtype == y.dtype
@@ -759,12 +762,14 @@ def test_flags():
               'carray', 'forc', 'fnc', 'farray']:
         yield flag_prop, p
 
+
 def flag_dict(fl):
     c2, g2 = gen_gpuarray((2, 3), dtype='float32', ctx=ctx, order='c')
     c3, g3 = gen_gpuarray((2, 3), dtype='float32', ctx=ctx, order='f')
 
     assert c2.flags[fl] == g2.flags[fl]
     assert c3.flags[fl] == g3.flags[fl]
+
 
 def flag_prop(p):
     c2, g2 = gen_gpuarray((2, 3), dtype='float32', ctx=ctx, order='c')
@@ -806,7 +811,8 @@ class TestPickle(unittest.TestCase):
             pickle.dumps(ctx, protocol=-1)
 
     def test_GpuKernel(self):
-        k = GpuKernel("KERNEL void nothing(GLOBAL_MEM ga_float *in) {in[0] = 0;}", "nothing", [], context=ctx)
+        k = GpuKernel("KERNEL void nothing(GLOBAL_MEM ga_float *in) "
+                      "{in[0] = 0;}", "nothing", [], context=ctx)
         with self.assertRaises(RuntimeError):
             pickle.dumps(k)
         with self.assertRaises(RuntimeError):

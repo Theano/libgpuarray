@@ -65,29 +65,6 @@ class ScalarArg(Argument):
         return self.dtype
 
 
-def check_contig(args):
-    dims = None
-    c_contig = f_contig = True
-    offsets = []
-    for arg in args:
-        if not isinstance(arg, GpuArray):
-            offsets.append(None)
-            continue
-
-        if dims is None:
-            dims = arg.shape
-            n = arg.size
-        elif arg.shape != dims:
-            return None, None, False
-        offsets.append(arg.offset)
-        fl = arg.flags
-        c_contig = c_contig and fl['C_CONTIGUOUS']
-        f_contig = f_contig and fl['F_CONTIGUOUS']
-    if not (c_contig or f_contig):
-        return None, None, False
-    return n, tuple(offsets), True
-
-
 def check_args(args, collapse=False, broadcast=False):
     """
     Returns the properties of arguments and checks if they all match
@@ -189,58 +166,6 @@ def check_args(args, collapse=False, broadcast=False):
         strs = [tuple(str) if str is not None else None for str in strs]
 
     return n, nd, dims, tuple(strs), tuple(offsets)
-
-
-class Counter(dict):
-    'Mapping where default values are zero'
-    def __missing__(self, key):
-        return 0
-
-
-def lfu_cache(maxsize=20):
-    def decorating_function(user_function):
-        cache = {}
-        use_count = Counter()
-
-        @functools.wraps(user_function)
-        def wrapper(*key):
-            use_count[key] += 1
-
-            try:
-                result = cache[key]
-                wrapper.hits += 1
-            except KeyError:
-                result = user_function(*key)
-                cache[key] = result
-                wrapper.misses += 1
-
-                # purge least frequently used cache entry
-                if len(cache) > wrapper.maxsize:
-                    for key, _ in nsmallest(wrapper.maxsize // 10,
-                                            six.iteritems(use_count),
-                                            key=itemgetter(1)):
-                        del cache[key], use_count[key]
-
-            return result
-
-        def clear():
-            cache.clear()
-            use_count.clear()
-            wrapper.hits = wrapper.misses = 0
-
-        @functools.wraps(user_function)
-        def get(*key):
-            result = cache[key]
-            use_count[key] += 1
-            wrapper.hits += 1
-            return result
-
-        wrapper.hits = wrapper.misses = 0
-        wrapper.maxsize = maxsize
-        wrapper.clear = clear
-        wrapper.get = get
-        return wrapper
-    return decorating_function
 
 
 def lru_cache(maxsize=20):

@@ -1,6 +1,8 @@
 from __future__ import print_function
 
-import os, sys
+import os
+import sys
+
 import numpy
 from nose.plugins.skip import SkipTest
 
@@ -22,11 +24,14 @@ dtypes_no_complex = dtypes_all
 dtypes_no_complex_big = ["float32", "float64", "int16", "uint16",
                          "int32", "int64", "uint32", "uint64"]
 
+
 def get_env_dev():
     for name in ['GPUARRAY_TEST_DEVICE', 'DEVICE']:
         if name in os.environ:
             return os.environ[name]
-    raise RuntimeError("No test device specified.  Specify one using the DEVICE or GPUARRAY_TEST_DEVICE environment variables.")
+    raise RuntimeError(
+        "No test device specified.  Specify one using the DEVICE "
+        "or GPUARRAY_TEST_DEVICE environment variables.")
 
 
 context = gpuarray.init(get_env_dev())

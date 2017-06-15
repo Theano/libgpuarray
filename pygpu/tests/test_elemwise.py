@@ -69,13 +69,17 @@ class test_elemwise_output_not_broadcasted(TestCase):
         test_values = [((1, 4), (6, 4)), ((2, 1, 8, 7), (2, 2, 8, 7))]
         for shapea, shapeb in test_values:
             # Sould fail: dimensions are not all equal.
-            self.assertRaises(ValueError, self.run_ielemwise2, shapea, shapeb, False)
+            self.assertRaises(ValueError, self.run_ielemwise2, shapea, shapeb,
+                              False)
             # Should fail: broascast should not be done on output.
-            self.assertRaises(ValueError, self.run_ielemwise2, shapea, shapeb, True)
+            self.assertRaises(ValueError, self.run_ielemwise2, shapea, shapeb,
+                              True)
             # Should fail: dimensions are not all equal.
-            self.assertRaises(ValueError, self.check_elemwise2, shapeb, shapeb, shapea, False)
+            self.assertRaises(ValueError, self.check_elemwise2, shapeb, shapeb,
+                              shapea, False)
             # Should fail: broadcast should not be done on output.
-            self.assertRaises(ValueError, self.check_elemwise2, shapeb, shapeb, shapea, True)
+            self.assertRaises(ValueError, self.check_elemwise2, shapeb, shapeb,
+                              shapea, True)
             # Should pass: output would be done on read-only input.
             self.run_ielemwise2(shapeb, shapea, broadcast=True)
             # Should pass: output would be done on read-only inputs.
@@ -98,12 +102,14 @@ class test_elemwise_output_not_broadcasted(TestCase):
         na, ga = gen_gpuarray(shapea, ctx=context, cls=elemary)
         nb, gb = gen_gpuarray(shapeb, ctx=context, cls=elemary)
         odtype = get_common_dtype(ga, gb, True)
-        res = gpuarray.empty(output_shape, dtype=odtype, context=ga.context, cls=ga.__class__)
+        res = gpuarray.empty(output_shape, dtype=odtype, context=ga.context,
+                             cls=ga.__class__)
         a_arg = as_argument(ga, 'a', read=True)
         b_arg = as_argument(gb, 'b', read=True)
         res_arg = as_argument(res, 'res', write=True)
         args = [res_arg, a_arg, b_arg]
-        oper = "res = (%(out_t)s)a %(op)s (%(out_t)s)b" % {'op': '+', 'out_t': dtype_to_ctype(odtype)}
+        oper = "res = (%(out_t)s)a %(op)s (%(out_t)s)b" % {
+            'op': '+', 'out_t': dtype_to_ctype(odtype)}
         k = GpuElemwise(ga.context, oper, args, convert_f16=True)
         k(res, ga, gb, broadcast=broadcast)
         nres = na + nb
@@ -113,7 +119,8 @@ class test_elemwise_output_not_broadcasted(TestCase):
 @guard_devsup
 def elemwise2_ops_array(op, dtype1, dtype2, shape):
     ac, ag = gen_gpuarray(shape, dtype1, ctx=context, cls=elemary)
-    bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, ctx=context, cls=elemary)
+    bc, bg = gen_gpuarray(shape, dtype2, nozeros=True, ctx=context,
+                          cls=elemary)
 
     out_c = op(ac, bc)
     out_g = op(ag, bg)
