@@ -34,6 +34,7 @@ GPUARRAY_PUBLIC int GpuArray_rger(double alpha, GpuArray *X, GpuArray *Y,
 GPUARRAY_PUBLIC int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB,
                                            double alpha, GpuArray *A, GpuArray *B,
                                            double beta, GpuArray *C, int nocopy);
+#define GpuArray_hgemmBatch_3d GpuArray_rgemmBatch_3d
 #define GpuArray_sgemmBatch_3d GpuArray_rgemmBatch_3d
 #define GpuArray_dgemmBatch_3d GpuArray_rgemmBatch_3d
 

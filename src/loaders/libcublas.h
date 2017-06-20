@@ -2,6 +2,11 @@
 #define LOADER_LIBCUBLAS_H
 
 #include "util/error.h"
+//TODO: how to have it work with align?
+typedef struct {//__align__(2) {
+  unsigned short x;
+} __half;
+
 
 /** @cond NEVER */
 
