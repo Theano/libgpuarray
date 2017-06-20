@@ -4,6 +4,7 @@ from nose.config import Config
 from nose.plugins.manager import PluginManager
 from numpy.testing.nosetester import import_nose, NoseTester
 from numpy.testing.noseclasses import KnownFailure, NumpyTestProgram
+import nose.plugins.builtin
 
 
 class NoseTester(NoseTester):
