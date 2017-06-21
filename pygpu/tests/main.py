@@ -1,8 +1,9 @@
 import os
+import nose.plugins.builtin
 
 from nose.config import Config
 from nose.plugins.manager import PluginManager
-from numpy.testing.nosetester import import_nose, NoseTester
+from numpy.testing.nosetester import NoseTester
 from numpy.testing.noseclasses import KnownFailure, NumpyTestProgram
 
 
@@ -50,9 +51,6 @@ class NoseTester(NoseTester):
 
         Takes the same arguments as `test`.
         """
-        # fail with nice error message if nose is not present
-        nose = import_nose()
-
         # compile argv
         argv = self._test_argv(verbose, extra_argv)
 
