@@ -15,6 +15,13 @@ extern "C" {
 #include <gpuarray/elemwise.h>
 #include <gpuarray/types.h>
 
+/* MSVC 2008 does not support "inline". */
+#ifdef _MSC_VER
+#ifndef inline
+#define inline __inline
+#endif
+#endif
+
 /**
  * Registers a type with the kernel machinery.
  *
