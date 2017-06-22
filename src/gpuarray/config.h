@@ -32,6 +32,7 @@
 #endif
 #define ssize_t intptr_t
 #define SSIZE_MAX INTPTR_MAX
+#include <gpuarray/wincompat/util.h>
 #else
 #include <sys/types.h>
 #include <stdint.h>

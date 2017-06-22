@@ -8,12 +8,6 @@
 #include <gpuarray/buffer.h>
 #include <gpuarray/util.h>
 
-#ifdef _MSC_VER
-#ifndef inline
-#define inline __inline
-#endif
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
