@@ -2,6 +2,7 @@ Release process:
 - Make sure you are on the proper release branch
 - Update the version in setup.py
 - Update the version in doc/conf.py
+- Update the version in .appveyor.yml
 - Commit the changes with message "Changes for release X.Y.Z"
   git commit -m "Changes for release X.Y.Z"
 - Make a git tag
