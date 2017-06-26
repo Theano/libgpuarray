@@ -15,10 +15,6 @@
 #include "loaders/libclblas.h"
 #include "loaders/libclblast.h"
 
-#ifdef _MSC_VER
-#define strdup _strdup
-#endif
-
 #define _unused(x) ((void)x)
 #define SSIZE_MIN (-(SSIZE_MAX-1))
 

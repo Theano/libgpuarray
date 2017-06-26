@@ -25,6 +25,9 @@
 
 #ifdef _MSC_VER
 #include <stddef.h>
+#ifndef inline
+#define inline __inline
+#endif
 #if _MSC_VER < 1600
 #include <gpuarray/wincompat/stdint.h>
 #else
