@@ -1,0 +1,39 @@
+version: '0.6.7.{build}'
+
+image: Visual Studio 2015
+
+init:
+  - git config --global core.autocrlf input
+  - cmd: cmake --version
+  - cmd: msbuild /version
+
+platform:
+  - x64
+
+clone_folder: C:\projects\libgpuarray
+
+configuration:
+  - Release
+  - Debug
+
+environment:
+  matrix:
+    - PYTHON: "C:\\Python27"
+      VS_PATH: "C:\\Users\\appveyor\\AppData\\Local\\Programs\\Common\\Microsoft\\Visual C++ for Python\\9.0"
+    - PYTHON: "C:\\Python35"
+      VS_PATH: "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC"
+
+build_script:
+  - echo "Python:" "%PYTHON%"
+  - echo "Config:" "%CONFIGURATION%"
+  - echo "VS path:" "%VS_PATH%"
+  - cd "%VS_PATH%"
+  - vcvarsall x64
+  - set
+  - cd C:\projects\libgpuarray
+  - md %CONFIGURATION%
+  - cd %CONFIGURATION%
+  - cmake .. -DCMAKE_BUILD_TYPE=%CONFIGURATION% -G "NMake Makefiles"
+  - cmake --build . --config %CONFIGURATION%
+
+build: script
