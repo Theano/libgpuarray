@@ -132,7 +132,6 @@ install(FILES ${headers} DESTINATION include/gpuarray)
 
 if(NOT UNIX)
   install(FILES gpuarray/wincompat/stdint.h DESTINATION include/gpuarray/wincompat)
-  install(FILES gpuarray/wincompat/util.h DESTINATION include/gpuarray/wincompat)
 endif()
 
 install(TARGETS gpuarray gpuarray-static

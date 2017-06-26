@@ -20,6 +20,13 @@ extern "C" {
 #endif
 
 #ifdef _MSC_VER
+/* God damn Microsoft ... */
+#define snprintf _snprintf
+#define strdup _strdup
+#define alloca _alloca
+#endif
+
+#ifdef _MSC_VER
 #define SPREFIX "I"
 #else
 #define SPREFIX "z"
