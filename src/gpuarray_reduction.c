@@ -261,6 +261,15 @@ struct GpuReduction{
 };
 
 
+/* Typedefs */
+typedef void (*GpuReductionIterFn)(GpuReduction* gr,
+                                   int           typecode,
+                                   const char*   typeName,
+                                   const char*   baseName,
+                                   int           num,
+                                   void*         user);
+
+
 /* Static Function prototypes */
 /* Utilities */
 static int        reduxGetSumInit               (int typecode, const char** property);
@@ -276,7 +285,7 @@ static int        reduxSortPtrIBSrcRdSelect     (const void* a, const void* b);
 static int        reduxSortPtrByReduxNum        (const void* a, const void* b);
 static int        reduxSortPtrIBDstWrSelect     (const void* a, const void* b);
 static int        reduxSortPtrIBDstArgWrSelect  (const void* a, const void* b);
-static int        reduxSortPtrFinalOrder        (const void* a, const void* b);
+static int        reduxSortPtrInsertFinalOrder  (const void* a, const void* b);
 
 /* Axis Description API */
 static void       axisInit                      (axis_desc*           axis,
@@ -290,6 +299,7 @@ static int        axisGetReduxNum               (const axis_desc*     axis);
 static size_t     axisGetLen                    (const axis_desc*     axis);
 static size_t     axisGetIntraLen               (const axis_desc*     axis);
 static size_t     axisGetInterLen               (const axis_desc*     axis);
+static size_t     axisGetIntraInterLen          (const axis_desc*     axis);
 static ssize_t    axisGetSrcStride              (const axis_desc*     axis);
 static size_t     axisGetSrcAbsStride           (const axis_desc*     axis);
 static ssize_t    axisGetDstStride              (const axis_desc*     axis);
@@ -312,6 +322,9 @@ static int        axisIsSplit                   (const axis_desc*     axis);
 /*     Generator Control Flow */
 static int        reduxGenInit                  (GpuReduction*        gr);
 static int        reduxGenInferProperties       (GpuReduction*        gr);
+static void       reduxGenIterArgs              (GpuReduction*        gr,
+                                                 GpuReductionIterFn   fn,
+                                                 void*                user);
 static int        reduxGenSrc                   (GpuReduction*        gr);
 static void       reduxGenSrcAppend             (GpuReduction*        gr);
 static void       reduxGenSrcAppendIncludes     (GpuReduction*        gr);
@@ -350,6 +363,30 @@ static int        reduxGenCleanupMsg            (GpuReduction*        gr,  int r
                                                  const char*          fmt, ...);
 
 /*     Generator Utilities */
+static void       reduxGenCountArgs             (GpuReduction*        gr,
+                                                 int                  typecode,
+                                                 const char*          typeName,
+                                                 const char*          baseName,
+                                                 int                  num,
+                                                 void*                user);
+static void       reduxGenSaveArgTypecodes      (GpuReduction*        gr,
+                                                 int                  typecode,
+                                                 const char*          typeName,
+                                                 const char*          baseName,
+                                                 int                  num,
+                                                 void*                user);
+static void       reduxGenAppendArg             (GpuReduction*        gr,
+                                                 int                  typecode,
+                                                 const char*          typeName,
+                                                 const char*          baseName,
+                                                 int                  num,
+                                                 void*                user);
+static void       reduxInvMarshalArg            (GpuReduction*        gr,
+                                                 int                  typecode,
+                                                 const char*          typeName,
+                                                 const char*          baseName,
+                                                 int                  num,
+                                                 void*                user);
 static size_t     reduxGenEstimateParallelism   (const GpuReduction*  gr);
 static int        reduxGenRequiresDst           (const GpuReduction*  gr);
 static int        reduxGenRequiresDstArg        (const GpuReduction*  gr);
@@ -361,6 +398,9 @@ static size_t     reduxGenGetMaxLocalSize       (const GpuReduction*  gr);
 static size_t     reduxGenGetSHMEMSize          (const GpuReduction*  gr, size_t bs);
 static size_t     reduxGenGetSHMEMDstOff        (const GpuReduction*  gr, size_t bs);
 static size_t     reduxGenGetSHMEMDstArgOff     (const GpuReduction*  gr, size_t bs);
+static size_t     reduxGenGetWMEMSize           (const GpuReduction*  gr, size_t bs);
+static size_t     reduxGenGetWMEMDstOff         (const GpuReduction*  gr, size_t bs);
+static size_t     reduxGenGetWMEMDstArgOff      (const GpuReduction*  gr, size_t bs);
 
 /*     Invoker Control Flow */
 static int        reduxInvInit                  (redux_ctx*           ctx);
@@ -922,23 +962,21 @@ static int        reduxSortPtrIBDstArgWrSelect  (const void* a, const void* b){
 
 	return 0;
 }
-static int        reduxSortPtrFinalOrder        (const void* a, const void* b){
+static int        reduxSortPtrInsertFinalOrder  (const void* a, const void* b){
 	const axis_desc* xda  = *(const axis_desc* const*)a;
 	const axis_desc* xdb  = *(const axis_desc* const*)b;
 	
-	/* All intra axes go last. */
-	if       (axisIsIntra(xda)  &&  axisIsInter(xdb)){
-		return +1;
-	}else if (axisIsInter(xda)  &&  axisIsIntra(xdb)){
-		return -1;
-	}
 	
+	/* All intra axes go first. */
+	if       (axisIsIntra(xda)  &&  axisIsInter(xdb)){
+		return -1;
+	}else if (axisIsInter(xda)  &&  axisIsIntra(xdb)){
+		return +1;
+	}
 	
 	if(axisIsIntra(xda)){
 		/**
 		 * Intra axes sort between themselves by descending intra axis number.
-		 * The split axis is always intra, and since it has the highest intra
-		 * axis number it will always sort first.
 		 */
 		
 		if       (axisGetIBNum(xda)  <  axisGetIBNum(xdb)){
@@ -949,18 +987,23 @@ static int        reduxSortPtrFinalOrder        (const void* a, const void* b){
 		
 		return 0;
 	}else{
-		/* All free inter axes go first (i{0..3}) */
+		/**
+		 * Inter axes sort between themselves
+		 * 
+		 *   - Reduced axes first
+		 *   - Then by ascending source tensor stride
+		 */
+		
 		if       ( axisIsReduced(xda)  && !axisIsReduced(xdb)){
-			return +1;
-		}else if (!axisIsReduced(xda)  &&  axisIsReduced(xdb)){
 			return -1;
+		}else if (!axisIsReduced(xda)  &&  axisIsReduced(xdb)){
+			return +1;
 		}
 		
-		/* Otherwise it's sort by descending source argument absolute stride. */
 		if       (axisGetSrcAbsStride(xda)  <  axisGetSrcAbsStride(xdb)){
-			return +1;
-		}else if (axisGetSrcAbsStride(xda)  >  axisGetSrcAbsStride(xdb)){
 			return -1;
+		}else if (axisGetSrcAbsStride(xda)  >  axisGetSrcAbsStride(xdb)){
+			return +1;
 		}
 	}
 
@@ -1039,6 +1082,9 @@ static size_t     axisGetInterLen               (const axis_desc* axis){
 	}else{
 		return axis->len;
 	}
+}
+static size_t     axisGetIntraInterLen          (const axis_desc* axis){
+	return axisGetIntraLen(axis)*axisGetInterLen(axis);
 }
 static ssize_t    axisGetSrcStride              (const axis_desc* axis){
 	return axisGetLen(axis) > 1 ? axis->srcStride : 0;
@@ -1275,6 +1321,7 @@ static int        reduxGenInit                  (GpuReduction*     gr){
 	gr->kArgTypeCodes = NULL;
 	gr->kSourceCode   = NULL;
 	gr->kErrorString  = NULL;
+	gr->kNumArgs      = 0;
 	
 	return reduxGenInferProperties(gr);
 }
@@ -1285,7 +1332,6 @@ static int        reduxGenInit                  (GpuReduction*     gr){
 
 static int        reduxGenInferProperties       (GpuReduction*     gr){
 	int i, ret;
-	int k;
 	
 	
 	/**
@@ -1412,6 +1458,7 @@ static int        reduxGenInferProperties       (GpuReduction*     gr){
 		       "Problem selecting types to be used in reduction!\n");
 	}
 	
+	
 	/* Compute floor(log2(gr->log2MaxL)). */
 	gr->log2MaxL = gr->maxLg-1;
 	for(i=1;gr->log2MaxL & (gr->log2MaxL+1);i*=2){
@@ -1420,104 +1467,98 @@ static int        reduxGenInferProperties       (GpuReduction*     gr){
 	for(i=0;gr->log2MaxL;i++){
 		gr->log2MaxL >>= 1;
 	}
-	gr->log2MaxL = i;
-	
-	/* Compute number of kernel arguments. */
-	gr->kNumArgs  = 6                                       /* phase, U, V, B, D, H   */
-	              + 2                                       /* splitFree, splitReduce */
-	              + gr->nds                                 /* l{0..n}                */
-	              + reduxGenRequiresDstArg(gr)*gr->ndr      /* l{m..n}PDim            */
-	              + 1                                       /* s                      */
-	              + 1                                       /* sOff                   */
-	              + gr->nds                                 /* sJ{0..n}               */
-	              + reduxGenRequiresDst   (gr)              /* d                      */
-	              + reduxGenRequiresDst   (gr)              /* dOff                   */
-	              + reduxGenRequiresDst   (gr)*gr->ndd      /* dJ{0..m}               */
-	              + reduxGenRequiresDstArg(gr)              /* a                      */
-	              + reduxGenRequiresDstArg(gr)              /* aOff                   */
-	              + reduxGenRequiresDstArg(gr)*gr->ndd      /* aJ{0..m}               */
-	              + 1                                       /* w                      */
-	              + reduxGenKernelRequiresDst   (gr)*2      /* wdOff, pdOff           */
-	              + reduxGenKernelRequiresDstArg(gr)*2      /* waOff, paOff           */
-	              + gr->log2MaxL                            /* bs{0..p}               */
-	              + gr->log2MaxL                            /* bp{0..p}               */
-	              + reduxGenRequiresDstArg(gr)*gr->log2MaxL /* bi{0..p}               */
-	              + gr->log2MaxL                            /* bsOff{0..p}            */
-	              + reduxGenRequiresDst   (gr)*gr->log2MaxL /* bdOff{0..p}            */
-	              + reduxGenRequiresDstArg(gr)*gr->log2MaxL;/* baOff{0..p}            */
+	gr->log2MaxL = i?i:1;
 	
 	
-	/* Construct kernel argument typecode list */
+	/**
+	 * Compute number of kernel arguments and construct kernel argument
+	 * typecode list.
+	 */
+	
+	reduxGenIterArgs(gr, reduxGenCountArgs, 0);
 	gr->kArgTypeCodes = calloc(gr->kNumArgs, sizeof(*gr->kArgTypeCodes));
 	if(!gr->kArgTypeCodes){
 		return reduxGenCleanupMsg(gr, GA_MEMORY_ERROR,
 		                          "Failed to allocate memory for kernel arguments "
 		                          "typecode list!\n");
 	}
-	
 	i = 0;
-	gr->kArgTypeCodes[i++] =           GA_INT;   /* phase */
-	gr->kArgTypeCodes[i++] =           GA_SIZE;  /* U */
-	gr->kArgTypeCodes[i++] =           GA_SIZE;  /* V */
-	gr->kArgTypeCodes[i++] =           GA_SIZE;  /* B */
-	gr->kArgTypeCodes[i++] =           GA_UINT;  /* D */
-	gr->kArgTypeCodes[i++] =           GA_UINT;  /* H */
-	gr->kArgTypeCodes[i++] =           GA_UINT;  /* splitFree */
-	gr->kArgTypeCodes[i++] =           GA_UINT;  /* splitReduce */
+	reduxGenIterArgs(gr, reduxGenSaveArgTypecodes, &i);
+	
+	
+	/* Generate source code. */
+	return reduxGenSrc(gr);
+}
+
+/**
+ * Iterate over the arguments of the reduction operator.
+ */
+
+static void       reduxGenIterArgs              (GpuReduction*        gr,
+                                                 GpuReductionIterFn   fn,
+                                                 void*                user){
+	int k;
+	
+	fn(gr, GA_INT,    "int",                      "phase",       0, user);
+	fn(gr, GA_SIZE,   "TX",                       "U",           0, user);
+	fn(gr, GA_SIZE,   "TX",                       "V",           0, user);
+	fn(gr, GA_SIZE,   "TX",                       "B",           0, user);
+	fn(gr, GA_UINT,   "unsigned",                 "D",           0, user);
+	fn(gr, GA_UINT,   "unsigned",                 "H",           0, user);
+	fn(gr, GA_UINT,   "unsigned",                 "splitFree",   0, user);
+	fn(gr, GA_UINT,   "unsigned",                 "splitReduce", 0, user);
 	for(k=0;k < gr->nds;k++){
-		gr->kArgTypeCodes[i++] =       GA_SIZE;  /* lN */
+		fn(gr, GA_SIZE,   "TX",                       "l%d",         k, user);
 	}
-	for(k=0;k < gr->ndr && reduxGenRequiresDstArg(gr);k++){
-		gr->kArgTypeCodes[i++] =       GA_SIZE;  /* lNPDim */
+	for(k=gr->ndd;k < gr->nds && reduxGenRequiresDstArg(gr);k++){
+		fn(gr, GA_SIZE,   "TX",                       "l%dPDim",     k, user);
 	}
-	gr->kArgTypeCodes[i++] =           GA_BUFFER;/* s */
-	gr->kArgTypeCodes[i++] =           GA_SSIZE; /* sOff */
+	fn(gr, GA_BUFFER, "const GLOBAL_MEM char*",   "s",           0, user);
+	fn(gr, GA_SSIZE,  "TX",                       "sOff",        0, user);
 	for(k=0;k < gr->nds;k++){
-		gr->kArgTypeCodes[i++] =       GA_SSIZE; /* sJN */
+		fn(gr, GA_SIZE,   "TX",                       "sJ%d",        k, user);
 	}
 	if(reduxGenRequiresDst   (gr)){
-		gr->kArgTypeCodes[i++] =       GA_BUFFER;/* d */
-		gr->kArgTypeCodes[i++] =       GA_SSIZE; /* dOff */
+		fn(gr, GA_BUFFER, "GLOBAL_MEM char*",         "d",           0, user);
+		fn(gr, GA_SSIZE,  "TX",                       "dOff",        0, user);
 		for(k=0;k < gr->ndd;k++){
-			gr->kArgTypeCodes[i++] =   GA_SSIZE; /* dJN */
+			fn(gr, GA_SIZE,   "TX",                       "dJ%d",        k, user);
 		}
 	}
 	if(reduxGenRequiresDstArg(gr)){
-		gr->kArgTypeCodes[i++] =       GA_BUFFER;/* a */
-		gr->kArgTypeCodes[i++] =       GA_SSIZE; /* aOff */
+		fn(gr, GA_BUFFER, "GLOBAL_MEM char*",         "a",           0, user);
+		fn(gr, GA_SSIZE,  "TX",                       "aOff",        0, user);
 		for(k=0;k < gr->ndd;k++){
-			gr->kArgTypeCodes[i++] =   GA_SSIZE; /* aJN */
+			fn(gr, GA_SIZE,   "TX",                       "aJ%d",        k, user);
 		}
 	}
-	gr->kArgTypeCodes[i++] =           GA_BUFFER;/* w */
+	fn(gr, GA_BUFFER, "GLOBAL_MEM char*",         "w",           0, user);
 	if(reduxGenKernelRequiresDst   (gr)){
-		gr->kArgTypeCodes[i++] =       GA_SSIZE; /* wdOff */
-		gr->kArgTypeCodes[i++] =       GA_SSIZE; /* pdOff */
+		fn(gr, GA_SSIZE,  "TX",                       "wdOff",       0, user);
+		fn(gr, GA_SSIZE,  "TX",                       "pdOff",       0, user);
 	}
 	if(reduxGenKernelRequiresDstArg(gr)){
-		gr->kArgTypeCodes[i++] =       GA_SSIZE; /* waOff */
-		gr->kArgTypeCodes[i++] =       GA_SSIZE; /* paOff */
+		fn(gr, GA_SSIZE,  "TX",                       "waOff",       0, user);
+		fn(gr, GA_SSIZE,  "TX",                       "paOff",       0, user);
 	}
 	for(k=0;k < gr->log2MaxL;k++){
-		gr->kArgTypeCodes[i++] =       GA_UINT;  /* ibsN */
+		fn(gr, GA_UINT,   "unsigned",                 "ibs%d",       k, user);
 	}
 	for(k=0;k < gr->log2MaxL;k++){
-		gr->kArgTypeCodes[i++] =       GA_UINT;  /* ibpN */
+		fn(gr, GA_UINT,   "unsigned",                 "ibp%d",       k, user);
 	}
 	for(k=0;k < gr->log2MaxL && reduxGenRequiresDstArg(gr);k++){
-		gr->kArgTypeCodes[i++] =       GA_SIZE;  /* iblNPDim */
+		fn(gr, GA_SIZE,   "TX",                       "ibl%dPDim",   k, user);
 	}
 	for(k=0;k < gr->log2MaxL;k++){
-		gr->kArgTypeCodes[i++] =       GA_SSIZE; /* ibsOffN */
+		fn(gr, GA_SSIZE,  "TX",                       "ibsOff%d",    k, user);
 	}
 	for(k=0;k < gr->log2MaxL && reduxGenRequiresDst   (gr);k++){
-		gr->kArgTypeCodes[i++] =       GA_SSIZE; /* ibdOffN */
+		fn(gr, GA_SSIZE,  "TX",                       "ibdOff%d",    k, user);
 	}
 	for(k=0;k < gr->log2MaxL && reduxGenRequiresDstArg(gr);k++){
-		gr->kArgTypeCodes[i++] =       GA_SSIZE; /* ibaOffN */
+		fn(gr, GA_SSIZE,  "TX",                       "ibaOff%d",    k, user);
 	}
-	
-	return reduxGenSrc(gr);
 }
 
 /**
@@ -1769,70 +1810,10 @@ static void       reduxGenSrcAppendReduxKernel  (GpuReduction*     gr){
 	srcbAppends                  (&gr->srcGen, "}\n");
 }
 static void       reduxGenSrcAppendPrototype    (GpuReduction*     gr){
-	int i;
+	int i=0;
 	
-	srcbAppends            (&gr->srcGen, "KERNEL void redux(int                      phase,\n"
-	                                     "                  TX                       U,\n"
-	                                     "                  TX                       V,\n"
-	                                     "                  TX                       B,\n"
-	                                     "                  unsigned                 D,\n"
-	                                     "                  unsigned                 H,\n"
-	                                     "                  unsigned                 splitFree,\n"
-	                                     "                  unsigned                 splitReduce,\n");
-	srcbBeginList          (&gr->srcGen, ",\n", "void");
-	for(i=0;i<(int)(gr->ndd+gr->ndr);i++){
-		srcbAppendElemf    (&gr->srcGen, "                  TX                       l%d", i);
-	}
-	for(i=gr->ndd;i<(int)(gr->ndd+gr->ndr);i++){
-		srcbAppendElemf    (&gr->srcGen, "                  TX                       l%dPDim", i);
-	}
-	srcbAppendElemf        (&gr->srcGen, "                  const GLOBAL_MEM char*   s");
-	srcbAppendElemf        (&gr->srcGen, "                  TX                       sOff");
-	for(i=0;i<(int)(gr->ndd+gr->ndr);i++){
-		srcbAppendElemf    (&gr->srcGen, "                  TX                       sJ%d", i);
-	}
-	if (reduxGenRequiresDst(gr)){
-		srcbAppendElemf    (&gr->srcGen, "                  GLOBAL_MEM char*         d");
-		srcbAppendElemf    (&gr->srcGen, "                  TX                       dOff");
-		for(i=0;i<(int)(gr->ndd);i++){
-			srcbAppendElemf(&gr->srcGen, "                  TX                       dJ%d", i);
-		}
-	}
-	if (reduxGenRequiresDstArg(gr)){
-		srcbAppendElemf    (&gr->srcGen, "                  GLOBAL_MEM char*         a");
-		srcbAppendElemf    (&gr->srcGen, "                  TX                       aOff");
-		for(i=0;i<(int)(gr->ndd);i++){
-			srcbAppendElemf(&gr->srcGen, "                  TX                       aJ%d", i);
-		}
-	}
-	srcbAppendElemf        (&gr->srcGen, "                  GLOBAL_MEM char*         w");
-	if (reduxGenKernelRequiresDst(gr)){
-		srcbAppendElemf    (&gr->srcGen, "                  TX                       wdOff");
-		srcbAppendElemf    (&gr->srcGen, "                  TX                       pdOff");
-	}
-	if (reduxGenKernelRequiresDstArg(gr)){
-		srcbAppendElemf    (&gr->srcGen, "                  TX                       waOff");
-		srcbAppendElemf    (&gr->srcGen, "                  TX                       paOff");
-	}
-	for(i=0;i<(int)(gr->log2MaxL);i++){
-		srcbAppendElemf    (&gr->srcGen, "                  unsigned                 ibs%d", i);
-	}
-	for(i=0;i<(int)(gr->log2MaxL);i++){
-		srcbAppendElemf    (&gr->srcGen, "                  unsigned                 ibp%d", i);
-	}
-	for(i=0;i<(int)(gr->log2MaxL) && reduxGenRequiresDstArg(gr);i++){
-		srcbAppendElemf    (&gr->srcGen, "                  TX                       ibl%dPDim", i);
-	}
-	for(i=0;i<(int)(gr->log2MaxL);i++){
-		srcbAppendElemf    (&gr->srcGen, "                  TX                       ibsOff%d", i);
-	}
-	for(i=0;i<(int)(gr->log2MaxL) && reduxGenRequiresDst   (gr);i++){
-		srcbAppendElemf    (&gr->srcGen, "                  TX                       ibdOff%d", i);
-	}
-	for(i=0;i<(int)(gr->log2MaxL) && reduxGenRequiresDstArg(gr);i++){
-		srcbAppendElemf    (&gr->srcGen, "                  TX                       ibaOff%d", i);
-	}
-	srcbEndList    (&gr->srcGen);
+	srcbAppends            (&gr->srcGen, "KERNEL void redux(");
+	reduxGenIterArgs(gr, reduxGenAppendArg, &i);
 	srcbAppends    (&gr->srcGen, ")");
 }
 static void       reduxGenSrcAppendBlockDecode  (GpuReduction*     gr){
@@ -2004,56 +1985,43 @@ static void       reduxGenSrcAppendBlockDecode  (GpuReduction*     gr){
 	"     * base pointers to their starting point.\n"
 	"     */\n"
 	"    \n"
+	"    TX          z, h, k;\n"
 	"    unsigned    Dunit    = D/splitFree;\n");
 	if(gr->ndd > 0){
 		srcbAppendf(&gr->srcGen,
-		"    TX          l%dMul    = DIVIDECEIL(l%d, splitFree);\n",
+		"    TX          l%dDiv    = DIVIDECEIL(l%d, splitFree);\n",
 		            gr->ndd-1, gr->ndd-1);
 	}
 	if(gr->ndr > 0){
 		srcbAppendf(&gr->srcGen,
-		"    TX          l%dMul    = DIVIDECEIL(l%d, splitReduce);\n",
+		"    TX          l%dDiv    = DIVIDECEIL(l%d, splitReduce);\n",
 		            gr->nds-1, gr->nds-1);
 	}
-	srcbAppends(&gr->srcGen, "    \n");
+	srcbAppends(&gr->srcGen,
+	"    \n"
+	"    z                    = start;\n");
 	for(i=gr->nds-1;i>=0;i--){
-		if(i == gr->nds-1){
+		if(i == gr->nds-1 || i == gr->ndd-1){
 			srcbAppendf(&gr->srcGen,
-			"    TX          i%d       = start %% l%dMul;\n",
-			            i, i);
-			
+			"    TX          i%d       = z %% l%dDiv;z /= l%dDiv;\n",
+			            i, i, i);
 		}else{
 			srcbAppendf(&gr->srcGen,
-			"    TX          i%d       = i%d    / l%d%s %% l%d%s;\n",
-			            i, i+1,
-			            i+1,
-			            reduxGenAxisMaybeSplit(gr, i+1) ? "Mul" : "",
-			            i,
-			            reduxGenAxisMaybeSplit(gr, i)   ? "Mul" : "");
+			"    TX          i%d       = z %% l%d;   z /= l%d;\n",
+			            i, i, i);
 		}
 	}
 	srcbAppends(&gr->srcGen, "    \n");
-	if(gr->ndd > 0){
-		srcbAppendf(&gr->srcGen,
-		"    i%d                  *= splitFree;\n",
-		            gr->ndd-1);
-	}
-	if(gr->ndr > 0){
-		srcbAppendf(&gr->srcGen,
-		"    i%d                  *= splitReduce;\n",
-	                gr->nds-1);
-	}
-	srcbAppends(&gr->srcGen, "    \n");
 	for(i=gr->nds-1;i>=0;i--){
 		if(i == gr->nds-1){
 			srcbAppendf(&gr->srcGen,
-			"    TX          sS%d      = (sJ%d             ) / splitReduce;\n",
+			"    TX          sS%d      = sJ%d;\n",
 			            i, i);
 		}else{
 			srcbAppendf(&gr->srcGen,
-			"    TX          sS%d      = (sJ%d + (TX)l%d*sS%d)%s;\n",
-			            i, i, i+1, i+1,
-			            i == gr->ndd-1 ? " / splitFree" : "");
+			"    TX          sS%d      = sJ%d + l%d%s*sS%d;\n",
+			            i, i, i+1,
+			            reduxGenAxisMaybeSplit(gr, i+1) ? "Div" : "   ", i+1);
 		}
 	}
 	if (reduxGenRequiresDst(gr)){
@@ -2061,12 +2029,13 @@ static void       reduxGenSrcAppendBlockDecode  (GpuReduction*     gr){
 		for(i=gr->ndd-1;i>=0;i--){
 			if(i == gr->ndd-1){
 				srcbAppendf(&gr->srcGen,
-				"    TX          dS%d      = (dJ%d             ) / splitFree;\n",
+				"    TX          dS%d      = dJ%d;\n",
 				            i, i);
 			}else{
 				srcbAppendf(&gr->srcGen,
-				"    TX          dS%d      = (dJ%d + (TX)l%d*dS%d);\n",
-				            i, i, i+1, i+1);
+				"    TX          dS%d      = dJ%d + l%d%s*dS%d;\n",
+				            i, i, i+1,
+				            reduxGenAxisMaybeSplit(gr, i+1) ? "Div" : "   ", i+1);
 			}
 		}
 	}
@@ -2075,12 +2044,13 @@ static void       reduxGenSrcAppendBlockDecode  (GpuReduction*     gr){
 		for(i=gr->ndd-1;i>=0;i--){
 			if(i == gr->ndd-1){
 				srcbAppendf(&gr->srcGen,
-				"    TX          aS%d      = (aJ%d             ) / splitFree;\n",
+				"    TX          aS%d      = aJ%d;\n",
 				            i, i);
 			}else{
 				srcbAppendf(&gr->srcGen,
-				"    TX          aS%d      = (aJ%d + (TX)l%d*aS%d);\n",
-				            i, i, i+1, i+1);
+				"    TX          aS%d      = aJ%d + l%d%s*aS%d;\n",
+				            i, i, i+1,
+				            reduxGenAxisMaybeSplit(gr, i+1) ? "Div" : "   ", i+1);
 			}
 		}
 	}
@@ -2111,6 +2081,17 @@ static void       reduxGenSrcAppendBlockDecode  (GpuReduction*     gr){
 		srcbAppends(&gr->srcGen, ";\n");
 	}
 	srcbAppends(&gr->srcGen, "    \n");
+	if(gr->ndd > 0){
+		srcbAppendf(&gr->srcGen,
+		"    i%d                  *= splitFree;\n",
+		            gr->ndd-1);
+	}
+	if(gr->ndr > 0){
+		srcbAppendf(&gr->srcGen,
+		"    i%d                  *= splitReduce;\n",
+	                gr->nds-1);
+	}
+	srcbAppends(&gr->srcGen, "    \n");
 	if(reduxGenKernelRequiresDst(gr)){
 		srcbAppends(&gr->srcGen,
 		"    TK*         wd       = (TK*)(w     + wdOff);\n"
@@ -2125,10 +2106,7 @@ static void       reduxGenSrcAppendBlockDecode  (GpuReduction*     gr){
 		"    TA*         waR      = &wa[GDIM_0*D];\n"
 		"    TA*         pa       = (TA*)(SHMEM + paOff);\n");
 	}
-	srcbAppends(&gr->srcGen,
-	    "    \n"
-	    "    TX          h, k;\n"
-	    "    \n");
+	srcbAppends(&gr->srcGen, "    \n");
 }
 static void       reduxGenSrcAppendThreadDecode (GpuReduction*     gr){
 	int i;
@@ -2143,18 +2121,13 @@ static void       reduxGenSrcAppendThreadDecode (GpuReduction*     gr){
 	"     * argument pointers, argument indices and permute targets.\n"
 	"     */\n"
 	"    \n"
-	"    unsigned    iSplit   = LID_0/(LDIM_0/(splitFree*splitReduce));\n");
+	"    unsigned    iSplit   = LID_0/(LDIM_0/(splitFree*splitReduce));\n"
+	"    z                    = LID_0;\n");
 	
 	for(i=gr->log2MaxL-1;i>=0;i--){
-		if(i == gr->log2MaxL-1){
-			srcbAppendf(&gr->srcGen,
-			"    int         t%d       = (unsigned)LID_0 %% ibs%d;\n",
-			            i, i);
-		}else{
-			srcbAppendf(&gr->srcGen,
-			"    int         t%d       = (unsigned)t%d    / ibs%d %% ibs%d;\n",
-			            i, i+1, i+1, i);
-		}
+		srcbAppendf(&gr->srcGen,
+		"    int         t%d       = z %% ibs%d;z /= ibs%d;\n",
+		            i, i, i);
 	}
 	if(reduxGenRequiresDstArg(gr)){
 		srcbAppends(&gr->srcGen, "    TX          ti       = ");
@@ -2172,10 +2145,6 @@ static void       reduxGenSrcAppendThreadDecode (GpuReduction*     gr){
 	}
 	srcbEndList(&gr->srcGen);
 	srcbAppends(&gr->srcGen, ";\n");
-	
-	
-	
-	
 	srcbAppends(&gr->srcGen, "    \n"
 	                         "    sOff                += ");
 	srcbBeginList(&gr->srcGen, " + ", "0");
@@ -2562,6 +2531,146 @@ static int        reduxGenCleanupMsg            (GpuReduction*     gr,  int ret,
 }
 
 /**
+ * Count # of arguments as determined by iterator.
+ */
+
+static void       reduxGenCountArgs             (GpuReduction*        gr,
+                                                 int                  typecode,
+                                                 const char*          typeName,
+                                                 const char*          baseName,
+                                                 int                  num,
+                                                 void*                user){
+	(void)typecode;
+	(void)typeName;
+	(void)baseName;
+	(void)num;
+	(void)user;
+	
+	gr->kNumArgs++;
+}
+
+/**
+ * Record the typecodes in the arguments typecode array.
+ */
+
+static void       reduxGenSaveArgTypecodes      (GpuReduction*        gr,
+                                                 int                  typecode,
+                                                 const char*          typeName,
+                                                 const char*          baseName,
+                                                 int                  num,
+                                                 void*                user){
+	(void)typeName;
+	(void)baseName;
+	(void)num;
+	(void)user;
+	
+	gr->kArgTypeCodes[(*(int*)user)++] = typecode;
+}
+
+/**
+ * Append an argument declaration to prototype.
+ */
+
+static void       reduxGenAppendArg             (GpuReduction*        gr,
+                                                 int                  typecode,
+                                                 const char*          typeName,
+                                                 const char*          baseName,
+                                                 int                  num,
+                                                 void*                user){
+	(void)user;
+	(void)typecode;
+	
+	if((*(int*)user)++ > 0){
+		srcbAppends(&gr->srcGen, ",\n                  ");
+	}
+	srcbAppendf(&gr->srcGen, "%-25s ", typeName);
+	srcbAppendf(&gr->srcGen, baseName, num);
+}
+
+/**
+ * Marshall argument declaration during invocation.
+ */
+
+static void       reduxInvMarshalArg            (GpuReduction*        gr,
+                                                 int                  typecode,
+                                                 const char*          typeName,
+                                                 const char*          baseName,
+                                                 int                  k,
+                                                 void*                user){
+	redux_ctx* ctx;
+	int*       i;
+	
+	(void)typecode;
+	(void)typeName;
+	
+	ctx = (redux_ctx*)(((void**)user)[0]);
+	i   = (int      *)(((void**)user)[1]);
+	
+	if       (strcmp(baseName, "phase") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->phase;
+	}else if (strcmp(baseName, "U") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->U;
+	}else if (strcmp(baseName, "V") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->V;
+	}else if (strcmp(baseName, "B") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->B;
+	}else if (strcmp(baseName, "D") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->D;
+	}else if (strcmp(baseName, "H") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->H;
+	}else if (strcmp(baseName, "splitFree") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->splitFree;
+	}else if (strcmp(baseName, "splitReduce") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->splitReduce;
+	}else if (strcmp(baseName, "l%d") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->l[k];
+	}else if (strcmp(baseName, "l%dPDim") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->lPDim[k-gr->ndd];
+	}else if (strcmp(baseName, "s") == 0){
+		ctx->kArgs[(*i)++] = (void*) ctx->flatSrcData;
+	}else if (strcmp(baseName, "sOff") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->flatSrcOffset;
+	}else if (strcmp(baseName, "sJ%d") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->sJ[k];
+	}else if (strcmp(baseName, "d") == 0){
+		ctx->kArgs[(*i)++] = (void*) ctx->flatDstData;
+	}else if (strcmp(baseName, "dOff") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->flatDstOffset;
+	}else if (strcmp(baseName, "dJ%d") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->dJ[k];
+	}else if (strcmp(baseName, "a") == 0){
+		ctx->kArgs[(*i)++] = (void*) ctx->flatDstArgData;
+	}else if (strcmp(baseName, "aOff") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->flatDstArgOffset;
+	}else if (strcmp(baseName, "aJ%d") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->aJ[k];
+	}else if (strcmp(baseName, "w") == 0){
+		ctx->kArgs[(*i)++] = (void*) ctx->w;
+	}else if (strcmp(baseName, "wdOff") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->wdOff;
+	}else if (strcmp(baseName, "pdOff") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->pdOff;
+	}else if (strcmp(baseName, "waOff") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->waOff;
+	}else if (strcmp(baseName, "paOff") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->paOff;
+	}else if (strcmp(baseName, "ibs%d") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->ibs[k];
+	}else if (strcmp(baseName, "ibp%d") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->ibp[k];
+	}else if (strcmp(baseName, "ibl%dPDim") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->iblPDim[k];
+	}else if (strcmp(baseName, "ibsOff%d") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->ibsOff[k];
+	}else if (strcmp(baseName, "ibdOff%d") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->ibdOff[k];
+	}else if (strcmp(baseName, "ibaOff%d") == 0){
+		ctx->kArgs[(*i)++] = (void*)&ctx->ibaOff[k];
+	}
+}
+
+
+/**
  * @brief Estimate the level of parallelism available in the GPU context of
  *        this reduction operator.
  * 
@@ -2695,7 +2804,7 @@ static size_t     reduxGenGetMaxLocalSize       (const GpuReduction*  gr){
 
 static size_t     reduxGenGetSHMEMSize          (const GpuReduction*  gr, size_t bs){
 	const gpuarray_type* type;
-	size_t               total = 0;
+	size_t               total = 0, permuteSpace;
 	
 	if(reduxGenKernelRequiresDst(gr)){
 		type   = gpuarray_get_type(gr->accTypeCode);
@@ -2706,6 +2815,12 @@ static size_t     reduxGenGetSHMEMSize          (const GpuReduction*  gr, size_t
 		type   = gpuarray_get_type(gr->idxTypeCode);
 		total  = DIVIDECEIL(total, type->align)*type->align;
 		total += bs*type->size;
+	}
+	
+	/* Ensure space for pointer permute. */
+	permuteSpace = gpuarray_get_type(gr->idxTypeCode)->size * bs;
+	if(total < permuteSpace){
+		total = permuteSpace;
 	}
 	
 	return total;
@@ -2738,6 +2853,47 @@ static size_t     reduxGenGetSHMEMDstArgOff     (const GpuReduction*  gr, size_t
 	}else{
 		return 0;
 	}
+}
+
+/**
+ * Get the amount of Workspace memory required.
+ * 
+ * NOT necessarily the same as amount of SHMEM! The workspace is NOT used for
+ * intrablock offset permutes, for instance.
+ */
+
+static size_t     reduxGenGetWMEMSize           (const GpuReduction*  gr, size_t bs){
+	const gpuarray_type* type;
+	size_t               total = 0;
+	
+	if(reduxGenKernelRequiresDst(gr)){
+		type   = gpuarray_get_type(gr->accTypeCode);
+		total  = DIVIDECEIL(total, type->align)*type->align;
+		total += bs*type->size;
+	}
+	if(reduxGenKernelRequiresDstArg(gr)){
+		type   = gpuarray_get_type(gr->idxTypeCode);
+		total  = DIVIDECEIL(total, type->align)*type->align;
+		total += bs*type->size;
+	}
+	
+	return total;
+}
+
+/**
+ * @brief Get the workspace memory byte offset for dst.
+ */
+
+static size_t     reduxGenGetWMEMDstOff         (const GpuReduction*  gr, size_t bs){
+	return reduxGenGetSHMEMDstOff(gr, bs);
+}
+
+/**
+ * @brief Get the workspace memory byte offset for dstArg.
+ */
+
+static size_t     reduxGenGetWMEMDstArgOff      (const GpuReduction*  gr, size_t bs){
+	return reduxGenGetSHMEMDstArgOff(gr, bs);
 }
 
 /**
@@ -3039,7 +3195,7 @@ static int        reduxInvFlattenSource         (redux_ctx*  ctx){
 static int        reduxInvComputeKArgs          (redux_ctx*  ctx){
 	axis_desc* axis, *prevAxis;
 	size_t     target, aL, aLS;
-	int        i, j;
+	int        i, j, k, haveSplitFreeAxis, haveSplitReducedAxis;
 
 
 	/**
@@ -3086,9 +3242,6 @@ static int        reduxInvComputeKArgs          (redux_ctx*  ctx){
 	for(i=0;i<ctx->gr->nds;i++){
 		ctx->l[i] = 1;
 	}
-	for(i=0;i<ctx->gr->ndr;i++){
-		ctx->lPDim[i] = 1;
-	}
 	for(i=0;i<ctx->gr->log2MaxL;i++){
 		ctx->ibs[i] = 1;
 	}
@@ -3117,8 +3270,9 @@ static int        reduxInvComputeKArgs          (redux_ctx*  ctx){
 			if(target/ctx->bs >= 2){
 				aLS          = target/ctx->bs;
 				ctx->bs     *= aLS;
-				axisMarkIntraBlock(axis, i++, aLS);
+				axisMarkIntraBlock(axis, i, aLS);
 				ctx->xdSplit = axis;
+				i++;
 			}
 			break;
 		}
@@ -3172,7 +3326,7 @@ static int        reduxInvComputeKArgs          (redux_ctx*  ctx){
 				axisSetPDim(axis, 1);
 			}else{
 				prevAxis = reduxInvGetSrcSortAxis(ctx, i-1);
-				axisSetPDim(prevAxis, axisGetPDim(axis)*axisGetLen(prevAxis));
+				axisSetPDim(axis, axisGetPDim(prevAxis)*axisGetLen(prevAxis));
 			}
 		}
 	}
@@ -3199,73 +3353,134 @@ static int        reduxInvComputeKArgs          (redux_ctx*  ctx){
 				axisSetIBP(axis, 1);
 			}else{
 				prevAxis = reduxInvGetSrcSortAxis(ctx, i-1);
-				axisSetIBP(axis, axisGetIBP(prevAxis)*axisGetLen(prevAxis));
+				axisSetIBP(axis, axisGetIBP(prevAxis)*axisGetIntraLen(prevAxis));
 			}
 		}
 	}
 	
 	/**
-	 * STEP 6. Place the axes in final loop order and perform final placement
-	 *         of:
-	 *              lN, lPDim, sJN, dJN, aJN,
+	 * STEP 6. Place the intra axis arguments
+	 * 
 	 *              ibs, ibp, iblPDim, ibsOff, ibdOff, ibaOff
+	 * 
+	 * For this we need the axes in final order of insertion.
 	 */
 	
 	reduxSortAxisPtrsBy(ctx->xdSrcPtrs, ctx->xdSrc, ctx->ndfs,
-	                    reduxSortPtrFinalOrder);
-	for(i=0,j=0;i<ctx->ndfs;i++){
-		axis = reduxInvGetSrcSortAxis(ctx, i);
+	                    reduxSortPtrInsertFinalOrder);
+	for(i=0;i<ctx->ndib;i++){
+		axis = reduxInvGetSrcSortAxis(ctx,  i);
 		
-		if       (axisIsSplit(axis) && !axisIsReduced(axis)){
-			/* Split Free Axis? */
-			ctx->ibs    [             0] = axisGetIntraLen(axis);
-			ctx->ibp    [             0] = axisGetIntraLen(axis);
-			ctx->iblPDim[             0] = axisGetIntraLen(axis);
-			ctx->ibsOff [             0] = axisGetSrcStride(axis);
-			ctx->ibdOff [             0] = axisGetDstStride(axis);
-			ctx->ibaOff [             0] = axisGetDstArgStride(axis);
-			
-			ctx->l      [ctx->gr->ndd-1] = axisGetInterLen(axis);
-			ctx->lPDim  [ctx->gr->ndd-1] = axisGetPDim    (axis);
-			ctx->sJ     [ctx->gr->ndd-1] = 0;
-			ctx->dJ     [ctx->gr->ndd-1] = 0;
-			ctx->aJ     [ctx->gr->ndd-1] = 0;
-		}else if (axisIsSplit(axis) &&  axisIsReduced(axis)){
-			/* Split Reduced Axis? */
-			ctx->ibs    [             0] = axisGetIntraLen(axis);
-			ctx->ibp    [             0] = axisGetIntraLen(axis);
-			ctx->iblPDim[             0] = axisGetIntraLen(axis);
-			ctx->ibsOff [             0] = axisGetSrcStride(axis);
-			ctx->ibdOff [             0] = axisGetDstStride(axis);
-			ctx->ibaOff [             0] = axisGetDstArgStride(axis);
-			
-			ctx->l      [ctx->gr->nds-1] = axisGetInterLen(axis);
-			ctx->lPDim  [ctx->gr->nds-1] = axisGetPDim    (axis);
-			ctx->sJ     [ctx->gr->nds-1] = 0;
-			ctx->dJ     [ctx->gr->nds-1] = 0;
-			ctx->aJ     [ctx->gr->nds-1] = 0;
-		}else if (axisIsInter(axis) && !axisIsReduced(axis)){
-			/* Inter Free Axis? */
-			ctx->l      [             j] = axisGetInterLen(axis);
-			ctx->lPDim  [             j] = axisGetPDim    (axis);
-			ctx->sJ     [             j] = 0;
-			ctx->dJ     [             j] = 0;
-			ctx->aJ     [             j] = 0;
-		}else if (axisIsInter(axis) &&  axisIsReduced(axis)){
-			/* Inter Reduced Axis? */
-			ctx->l      [             j] = axisGetInterLen(axis);
-			ctx->lPDim  [             j] = axisGetPDim    (axis);
-			ctx->sJ     [             j] = 0;
-			ctx->dJ     [             j] = 0;
-			ctx->aJ     [             j] = 0;
-		}else{
-			/* Intra Axis? */
-			ctx->ibs    [             0] = axisGetIntraLen(axis);
-			ctx->ibp    [             0] = axisGetIntraLen(axis);
-			ctx->iblPDim[             0] = axisGetIntraLen(axis);
-			ctx->ibsOff [             0] = axisGetSrcStride(axis);
-			ctx->ibdOff [             0] = axisGetDstStride(axis);
-			ctx->ibaOff [             0] = axisGetDstArgStride(axis);
+		ctx->ibs    [i] = axisGetIntraLen    (axis);
+		ctx->ibp    [i] = axisGetIBP         (axis);
+		ctx->iblPDim[i] = axisGetPDim        (axis);
+		ctx->ibsOff [i] = axisGetSrcStride   (axis);
+		ctx->ibdOff [i] = axisGetDstStride   (axis);
+		ctx->ibaOff [i] = axisGetDstArgStride(axis);
+	}
+	
+	/**
+	 * STEP 7. Place the inter axis arguments
+	 * 
+	 *              lN, lNPDim, sJN, dJN, aJN
+	 * 
+	 * , where N in [0, ctx->gr->ndd) are free axes,
+	 *         N in [ctx->gr->ndd, ctx->gr->nds) are reduced axes,
+	 * and ctx->xdSrcPtr[...] are sorted in the reverse of that order for
+	 * insertion, and excludes any split axis.
+	 * 
+	 * How precisely the insertion is done depends closely on whether there is
+	 * a split axis and if so whether it is free or reduced.
+	 * 
+	 * - If there is a split axis and it is free, then it should be inserted as
+	 *   the first free axis. Its jumps should be
+	 *             sJN = -sSM*intrainterLenM + sSN*splitFree
+	 *             dJN = -dSM*intrainterLenM + dSN*splitFree
+	 *             aJN = -aSM*intrainterLenM + aSN*splitFree
+	 * - If there is a split axis and it is reduced, then it should be inserted
+	 *   as the first reduced axis. Its jump should be
+	 *             sJN = -sSM*intrainterLenM + sSN*splitReduced
+	 * - If there is no split axis, proceed normally in filling the axes.
+	 */
+	
+	haveSplitFreeAxis    = ctx->xdSplit && !axisIsReduced(ctx->xdSplit);
+	haveSplitReducedAxis = ctx->xdSplit &&  axisIsReduced(ctx->xdSplit);
+	
+	/* If we have a reduced split axis, insert it before any other reduced axis. */
+	j  = ctx->gr->nds-1;
+	k  = ctx->gr->ndr-1;
+	if(haveSplitReducedAxis && k>=0){
+		ctx->l      [j]  =           axisGetLen          (ctx->xdSplit);
+		ctx->lPDim  [k]  =           axisGetPDim         (ctx->xdSplit);
+		ctx->sJ     [j] +=  (ssize_t)axisGetSrcStride    (ctx->xdSplit)*
+		                    (ssize_t)axisGetIntraLen     (ctx->xdSplit);
+		if(j>0){
+			ctx->sJ   [j-1] -=  (ssize_t)axisGetSrcStride    (ctx->xdSplit)*
+			                    (ssize_t)axisGetIntraInterLen(ctx->xdSplit);
+		}
+		j--;
+		k--;
+	}
+	
+	/* Insert rest of reduced axes. */
+	for(;i<ctx->ndfs && k>=0;i++,j--,k--){
+		axis = reduxInvGetSrcSortAxis(ctx, i);
+		if(!axisIsReduced(axis)){
+			break;
+		}
+		
+		ctx->l      [j]  =           axisGetLen          (axis);
+		ctx->lPDim  [k]  =           axisGetPDim         (axis);
+		ctx->sJ     [j] +=  (ssize_t)axisGetSrcStride    (axis)*
+		                    (ssize_t)axisGetIntraLen     (axis);
+		if(j>0){
+			ctx->sJ   [j-1] -=  (ssize_t)axisGetSrcStride    (axis)*
+			                    (ssize_t)axisGetIntraInterLen(axis);
+		}
+	}
+	
+	/* If we have a free split axis, insert it before any other free axis. */
+	k = ctx->gr->ndd-1;
+	if(haveSplitFreeAxis && k>=0){
+		ctx->l      [k]  =           axisGetLen          (ctx->xdSplit);
+		ctx->sJ     [k] +=  (ssize_t)axisGetSrcStride    (ctx->xdSplit)*
+		                    (ssize_t)axisGetIntraLen     (ctx->xdSplit);
+		ctx->dJ     [k] +=  (ssize_t)axisGetDstStride    (ctx->xdSplit)*
+		                    (ssize_t)axisGetIntraLen     (ctx->xdSplit);
+		ctx->aJ     [k] +=  (ssize_t)axisGetDstArgStride (ctx->xdSplit)*
+		                    (ssize_t)axisGetIntraLen     (ctx->xdSplit);
+		if(k>0){
+			ctx->sJ  [k-1] -=  (ssize_t)axisGetSrcStride    (ctx->xdSplit)*
+			                   (ssize_t)axisGetIntraInterLen(ctx->xdSplit);
+			ctx->dJ  [k-1] -=  (ssize_t)axisGetDstStride    (ctx->xdSplit)*
+			                   (ssize_t)axisGetIntraInterLen(ctx->xdSplit);
+			ctx->aJ  [k-1] -=  (ssize_t)axisGetDstArgStride (ctx->xdSplit)*
+			                   (ssize_t)axisGetIntraInterLen(ctx->xdSplit);
+		}
+		k--;
+	}
+	
+	/* Insert rest of free axes. */
+	for(;i<ctx->ndfs && k>=0;i++,k--){
+		axis = reduxInvGetSrcSortAxis(ctx, i);
+		if(axisIsReduced(axis)){
+			break;
+		}
+		
+		ctx->l      [k]  =           axisGetLen          (axis);
+		ctx->sJ     [k] +=  (ssize_t)axisGetSrcStride    (axis)*
+		                    (ssize_t)axisGetIntraLen     (axis);
+		ctx->dJ     [k] +=  (ssize_t)axisGetDstStride    (axis)*
+		                    (ssize_t)axisGetIntraLen     (axis);
+		ctx->aJ     [k] +=  (ssize_t)axisGetDstArgStride (axis)*
+		                    (ssize_t)axisGetIntraLen     (axis);
+		if(k>0){
+			ctx->sJ  [k-1] -=  (ssize_t)axisGetSrcStride    (axis)*
+			                   (ssize_t)axisGetIntraInterLen(axis);
+			ctx->dJ  [k-1] -=  (ssize_t)axisGetDstStride    (axis)*
+			                   (ssize_t)axisGetIntraInterLen(axis);
+			ctx->aJ  [k-1] -=  (ssize_t)axisGetDstArgStride (axis)*
+			                   (ssize_t)axisGetIntraInterLen(axis);
 		}
 	}
 
@@ -3421,9 +3636,9 @@ static int        reduxInvSchedule              (redux_ctx*           ctx){
 	 * Allocate required workspace.
 	 */
 	
-	ctx->wdOff = reduxGenGetSHMEMDstOff   (ctx->gr, 2*ctx->gs*ctx->D);
-	ctx->waOff = reduxGenGetSHMEMDstArgOff(ctx->gr, 2*ctx->gs*ctx->D);
-	WSPACESIZE = reduxGenGetSHMEMSize     (ctx->gr, 2*ctx->gs*ctx->D);
+	ctx->wdOff = reduxGenGetWMEMDstOff   (ctx->gr, 2*ctx->gs*ctx->D);
+	ctx->waOff = reduxGenGetWMEMDstArgOff(ctx->gr, 2*ctx->gs*ctx->D);
+	WSPACESIZE = reduxGenGetWMEMSize     (ctx->gr, 2*ctx->gs*ctx->D);
 	ctx->w     = gpudata_alloc(ctx->gr->gpuCtx, WSPACESIZE, 0, flags, 0);
 	if(!ctx->w){
 		return reduxInvCleanupMsg(ctx, GA_MEMORY_ERROR,
@@ -3439,73 +3654,14 @@ static int        reduxInvSchedule              (redux_ctx*           ctx){
  */
 
 static int        reduxInvoke                   (redux_ctx*           ctx){
-	int   ret, i, k;
+	int   ret, i=0;
+	void* ptrs[2] = {ctx, &i};
 	
 	/**
 	 * Argument Marshalling.
 	 */
 	
-	i = 0;
-	ctx->kArgs[i++] =           (void*)&ctx->phase;
-	ctx->kArgs[i++] =           (void*)&ctx->U;
-	ctx->kArgs[i++] =           (void*)&ctx->V;
-	ctx->kArgs[i++] =           (void*)&ctx->B;
-	ctx->kArgs[i++] =           (void*)&ctx->D;
-	ctx->kArgs[i++] =           (void*)&ctx->H;
-	ctx->kArgs[i++] =           (void*)&ctx->splitFree;
-	ctx->kArgs[i++] =           (void*)&ctx->splitReduce;
-	for(k=0;k < ctx->gr->nds;k++){
-		ctx->kArgs[i++] =       (void*)&ctx->l[k];
-	}
-	for(k=0;k < ctx->gr->ndr && reduxInvRequiresDstArg(ctx);k++){
-		ctx->kArgs[i++] =       (void*)&ctx->lPDim[k];
-	}
-	ctx->kArgs[i++] =           (void*) ctx->flatSrcData;
-	ctx->kArgs[i++] =           (void*)&ctx->flatSrcOffset;
-	for(k=0;k < ctx->gr->nds;k++){
-		ctx->kArgs[i++] =       (void*)&ctx->sJ[k];
-	}
-	if(reduxInvRequiresDst   (ctx)){
-		ctx->kArgs[i++] =       (void*) ctx->flatDstData;
-		ctx->kArgs[i++] =       (void*)&ctx->flatDstOffset;
-		for(k=0;k < ctx->gr->ndd;k++){
-			ctx->kArgs[i++] =   (void*)&ctx->dJ[k];
-		}
-	}
-	if(reduxInvRequiresDstArg(ctx)){
-		ctx->kArgs[i++] =       (void*) ctx->flatDstArgData;
-		ctx->kArgs[i++] =       (void*)&ctx->flatDstArgOffset;
-		for(k=0;k < ctx->gr->ndd;k++){
-			ctx->kArgs[i++] =   (void*)&ctx->aJ[k];
-		}
-	}
-	ctx->kArgs[i++] =           (void*) ctx->w;
-	if(reduxInvKernelRequiresDst   (ctx)){
-		ctx->kArgs[i++] =       (void*)&ctx->wdOff;
-		ctx->kArgs[i++] =       (void*)&ctx->pdOff;
-	}
-	if(reduxInvKernelRequiresDstArg(ctx)){
-		ctx->kArgs[i++] =       (void*)&ctx->waOff;
-		ctx->kArgs[i++] =       (void*)&ctx->paOff;
-	}
-	for(k=0;k < ctx->gr->log2MaxL;k++){
-		ctx->kArgs[i++] =       (void*)&ctx->ibs[k];
-	}
-	for(k=0;k < ctx->gr->log2MaxL;k++){
-		ctx->kArgs[i++] =       (void*)&ctx->ibp[k];
-	}
-	for(k=0;k < ctx->gr->log2MaxL && reduxInvRequiresDstArg(ctx);k++){
-		ctx->kArgs[i++] =       (void*)&ctx->iblPDim[k];
-	}
-	for(k=0;k < ctx->gr->log2MaxL;k++){
-		ctx->kArgs[i++] =       (void*)&ctx->ibsOff[k];
-	}
-	for(k=0;k < ctx->gr->log2MaxL && reduxInvRequiresDst   (ctx);k++){
-		ctx->kArgs[i++] =       (void*)&ctx->ibdOff[k];
-	}
-	for(k=0;k < ctx->gr->log2MaxL && reduxInvRequiresDstArg(ctx);k++){
-		ctx->kArgs[i++] =       (void*)&ctx->ibaOff[k];
-	}
+	reduxGenIterArgs(ctx->gr, reduxInvMarshalArg, ptrs);
 
 
 

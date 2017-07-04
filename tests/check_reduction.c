@@ -3909,11 +3909,11 @@ Suite *get_suite(void) {
 	TCase *tc = tcase_create("basic");
 	tcase_add_checked_fixture(tc, setup, teardown);
 	tcase_set_timeout(tc, 120.0);
-	
-	tcase_add_test(tc, test_maxandargmax_veryhighrank);
-	tcase_add_test(tc, test_maxandargmax_alldimsreduced);
+
 	tcase_add_test(tc, test_maxandargmax_reduction);
 	tcase_add_test(tc, test_maxandargmax_idxtranspose);
+	tcase_add_test(tc, test_maxandargmax_veryhighrank);
+	tcase_add_test(tc, test_maxandargmax_alldimsreduced);
 
 	tcase_add_test(tc, test_minandargmin_reduction);
 	tcase_add_test(tc, test_minandargmin_veryhighrank);
