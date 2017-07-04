@@ -60,6 +60,7 @@
 #define GA_DECL_SHARED_PARAM(type, name)
 #define GA_DECL_SHARED_BODY(type, name) extern __shared__ type name[];
 #define GA_WARP_SIZE warpSize
+#define restrict __restrict__
 
 struct ga_half {
   ga_ushort data;

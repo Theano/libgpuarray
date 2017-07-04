@@ -2054,6 +2054,79 @@ START_TEST(test_sum_alldimsreduced){
 	GpuArray_clear(&gaD);
 }END_TEST
 
+START_TEST(test_sum_huge){
+	pcgSeed(1);
+
+	/**
+	 * We test here a reduction of a huge 1D tensor on all dimensions.
+	 */
+
+	size_t i;
+	size_t dims[1]  = {100000000};
+	size_t prodDims = dims[0];
+	const int reduxList[] = {0};
+	const float TOL = 1e-2;
+
+	float*  pS = calloc(1, sizeof(*pS) * dims[0]);
+	float*  pD = calloc(1, sizeof(*pD));
+
+	ck_assert_ptr_ne(pS,    NULL);
+	ck_assert_ptr_ne(pD,    NULL);
+
+
+	/**
+	 * Initialize source data.
+	 */
+
+	for(i=0;i<prodDims;i++){
+		pS[i] = pcgRand01()-0.5;
+	}
+
+
+	/**
+	 * Run the kernel.
+	 */
+
+	GpuArray gaS;
+	GpuArray gaD;
+
+	ga_assert_ok(GpuArray_empty (&gaS, ctx, GA_FLOAT, 1, &dims[0], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty (&gaD, ctx, GA_FLOAT, 0, NULL, GA_C_ORDER));
+
+	ga_assert_ok(GpuArray_write (&gaS, pS, sizeof(*pS)*prodDims));
+	ga_assert_ok(GpuArray_memset(&gaD, -1));  /* 0xFFFFFFFF is a qNaN. */
+
+	GpuReduction* gr;
+	GpuReduction_new(&gr, GpuArray_context(&gaS),
+	                 GA_REDUCE_SUM, 0, 1, gaS.typecode, 0);
+	ck_assert_ptr_nonnull(gr);
+	ga_assert_ok(GpuReduction_call(gr, &gaD, NULL, &gaS, 1, reduxList, 0));
+	GpuReduction_free(gr);
+
+	ga_assert_ok(GpuArray_read  (pD,   sizeof(*pD), &gaD));
+
+
+	/**
+	 * Check that the destination tensors are correct.
+	 */
+	
+	double  gtD = 0;
+	for(i=0;i<dims[0];i++){
+		double  v   = pS[i];
+		gtD += v;
+	}
+	ck_assert_double_eq_tol(gtD, pD[0], TOL);
+
+	/**
+	 * Deallocate.
+	 */
+
+	free(pS);
+	free(pD);
+	GpuArray_clear(&gaS);
+	GpuArray_clear(&gaD);
+}END_TEST
+
 START_TEST(test_prod_reduction){
 	pcgSeed(1);
 
@@ -3938,6 +4011,7 @@ Suite *get_suite(void) {
 	tcase_add_test(tc, test_sum_reduction);
 	tcase_add_test(tc, test_sum_veryhighrank);
 	tcase_add_test(tc, test_sum_alldimsreduced);
+	tcase_add_test(tc, test_sum_huge);
 
 	tcase_add_test(tc, test_prod_reduction);
 	tcase_add_test(tc, test_prod_veryhighrank);

@@ -417,7 +417,6 @@ static int        reduxInvCleanupMsg            (redux_ctx*           ctx, int r
 static size_t     reduxInvEstimateParallelism   (const redux_ctx*  ctx);
 static int        reduxInvRequiresDst           (const redux_ctx*  ctx);
 static int        reduxInvRequiresDstArg        (const redux_ctx*  ctx);
-static int        reduxInvKernelRequiresDst     (const redux_ctx*  ctx);
 static unsigned   reduxInvGetSplitFree          (const redux_ctx*  ctx);
 static unsigned   reduxInvGetSplitReduce        (const redux_ctx*  ctx);
 static axis_desc* reduxInvGetSrcAxis            (const redux_ctx*  ctx, int i);
@@ -1145,12 +1144,6 @@ static int        reduxInvRequiresDst           (const redux_ctx*  ctx){
 static int        reduxInvRequiresDstArg        (const redux_ctx*  ctx){
 	return reduxGenRequiresDstArg(ctx->gr);
 }
-static int        reduxInvKernelRequiresDst     (const redux_ctx*  ctx){
-	return reduxGenKernelRequiresDst(ctx->gr);
-}
-static int        reduxInvKernelRequiresDstArg  (const redux_ctx*  ctx){
-	return reduxGenKernelRequiresDstArg(ctx->gr);
-}
 static unsigned   reduxInvGetSplitFree          (const redux_ctx*  ctx){
 	if(ctx->xdSplit && !axisIsReduced(ctx->xdSplit)){
 		return axisGetIntraLen(ctx->xdSplit);
@@ -1513,26 +1506,26 @@ static void       reduxGenIterArgs              (GpuReduction*        gr,
 	for(k=gr->ndd;k < gr->nds && reduxGenRequiresDstArg(gr);k++){
 		fn(gr, GA_SIZE,   "TX",                       "l%dPDim",     k, user);
 	}
-	fn(gr, GA_BUFFER, "const GLOBAL_MEM char*",   "s",           0, user);
+	fn(gr, GA_BUFFER, "const GLOBAL_MEM char* restrict",   "s",           0, user);
 	fn(gr, GA_SSIZE,  "TX",                       "sOff",        0, user);
 	for(k=0;k < gr->nds;k++){
 		fn(gr, GA_SIZE,   "TX",                       "sJ%d",        k, user);
 	}
 	if(reduxGenRequiresDst   (gr)){
-		fn(gr, GA_BUFFER, "GLOBAL_MEM char*",         "d",           0, user);
+		fn(gr, GA_BUFFER, "GLOBAL_MEM char* restrict",         "d",           0, user);
 		fn(gr, GA_SSIZE,  "TX",                       "dOff",        0, user);
 		for(k=0;k < gr->ndd;k++){
 			fn(gr, GA_SIZE,   "TX",                       "dJ%d",        k, user);
 		}
 	}
 	if(reduxGenRequiresDstArg(gr)){
-		fn(gr, GA_BUFFER, "GLOBAL_MEM char*",         "a",           0, user);
+		fn(gr, GA_BUFFER, "GLOBAL_MEM char* restrict",         "a",           0, user);
 		fn(gr, GA_SSIZE,  "TX",                       "aOff",        0, user);
 		for(k=0;k < gr->ndd;k++){
 			fn(gr, GA_SIZE,   "TX",                       "aJ%d",        k, user);
 		}
 	}
-	fn(gr, GA_BUFFER, "GLOBAL_MEM char*",         "w",           0, user);
+	fn(gr, GA_BUFFER, "GLOBAL_MEM char* restrict",         "w",           0, user);
 	if(reduxGenKernelRequiresDst   (gr)){
 		fn(gr, GA_SSIZE,  "TX",                       "wdOff",       0, user);
 		fn(gr, GA_SSIZE,  "TX",                       "pdOff",       0, user);
@@ -1633,9 +1626,9 @@ static void       reduxGenSrcAppendMacroDefs    (GpuReduction*     gr){
 	 */
 	
 	if (gr->srcTypeCode == GA_HALF && gr->accTypeCode == GA_FLOAT){
-		srcbAppends(&gr->srcGen, "#define LOADS(v, p) do{(v) = (TK)load_half((TS*)(p));}while(0)\n");
+		srcbAppends(&gr->srcGen, "#define LOADS(v, p) do{(v) = (TK)load_half((const TS* restrict)(p));}while(0)\n");
 	}else{
-		srcbAppends(&gr->srcGen, "#define LOADS(v, p) do{(v) = (TK)*(TS*)(p);}while(0)\n");
+		srcbAppends(&gr->srcGen, "#define LOADS(v, p) do{(v) = (TK)*(const TS* restrict)(p);}while(0)\n");
 	}
 	
 	
@@ -1746,9 +1739,9 @@ static void       reduxGenSrcAppendMacroDefs    (GpuReduction*     gr){
 	
 	if (reduxGenRequiresDst(gr)){
 		if (gr->dstTypeCode == GA_HALF && gr->accTypeCode == GA_FLOAT){
-			srcbAppends(&gr->srcGen, "#define STORED(p, v) do{store_half((TD*)(p), (v));}while(0)\n");
+			srcbAppends(&gr->srcGen, "#define STORED(p, v) do{store_half((TD* restrict)(p), (v));}while(0)\n");
 		}else{
-			srcbAppends(&gr->srcGen, "#define STORED(p, v) do{*(TD*)(p) = (v);}while(0)\n");
+			srcbAppends(&gr->srcGen, "#define STORED(p, v) do{*(TD* restrict)(p) = (v);}while(0)\n");
 		}
 	}else{
 		srcbAppends(&gr->srcGen, "#define STORED(p, v) do{}while(0)\n");
@@ -1762,7 +1755,7 @@ static void       reduxGenSrcAppendMacroDefs    (GpuReduction*     gr){
 	 */
 	
 	if (reduxGenRequiresDstArg(gr)){
-		srcbAppends(&gr->srcGen, "#define STOREA(p, v) do{*(TA*)(p) = (v);}while(0)\n");
+		srcbAppends(&gr->srcGen, "#define STOREA(p, v) do{*(TA* restrict)(p) = (v);}while(0)\n");
 	}else{
 		srcbAppends(&gr->srcGen, "#define STOREA(p, v) do{}while(0)\n");
 	}
@@ -2094,17 +2087,17 @@ static void       reduxGenSrcAppendBlockDecode  (GpuReduction*     gr){
 	srcbAppends(&gr->srcGen, "    \n");
 	if(reduxGenKernelRequiresDst(gr)){
 		srcbAppends(&gr->srcGen,
-		"    TK*         wd       = (TK*)(w     + wdOff);\n"
-		"    TK*         wdL      = &wd[0];\n"
-		"    TK*         wdR      = &wd[GDIM_0*D];\n"
-		"    TK*         pd       = (TK*)(SHMEM + pdOff);\n");
+		"    TK* restrict wd       = (TK* restrict)(w     + wdOff);\n"
+		"    TK* restrict wdL      = &wd[0];\n"
+		"    TK* restrict wdR      = &wd[GDIM_0*D];\n"
+		"    TK* restrict pd       = (TK* restrict)(SHMEM + pdOff);\n");
 	}
 	if(reduxGenKernelRequiresDstArg(gr)){
 		srcbAppends(&gr->srcGen,
-		"    TA*         wa       = (TA*)(w     + waOff);\n"
-		"    TA*         waL      = &wa[0];\n"
-		"    TA*         waR      = &wa[GDIM_0*D];\n"
-		"    TA*         pa       = (TA*)(SHMEM + paOff);\n");
+		"    TA* restrict wa       = (TA* restrict)(w     + waOff);\n"
+		"    TA* restrict waL      = &wa[0];\n"
+		"    TA* restrict waR      = &wa[GDIM_0*D];\n"
+		"    TA* restrict pa       = (TA* restrict)(SHMEM + paOff);\n");
 	}
 	srcbAppends(&gr->srcGen, "    \n");
 }
@@ -2182,12 +2175,12 @@ static void       reduxGenSrcAppendThreadDecode (GpuReduction*     gr){
 		                         "    local_barrier();\n");
 	}
 	srcbAppends(&gr->srcGen, "    \n"
-	                         "    const char* ts       = s + sOff;\n");
+	                         "    const char* restrict ts       = s + sOff;\n");
 	if(reduxGenRequiresDst(gr)){
-		srcbAppends(&gr->srcGen, "    char*       td       = d + dOff;\n");
+		srcbAppends(&gr->srcGen, "    char* restrict       td       = d + dOff;\n");
 	}
 	if(reduxGenRequiresDstArg(gr)){
-		srcbAppends(&gr->srcGen, "    char*       ta       = a + aOff;\n");
+		srcbAppends(&gr->srcGen, "    char* restrict       ta       = a + aOff;\n");
 	}
 	srcbAppends(&gr->srcGen, "    \n"
 	                         "    \n");
