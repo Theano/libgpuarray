@@ -1814,7 +1814,7 @@ START_TEST(test_sum_reduction){
 	size_t dims[3]  = {32,50,79};
 	size_t prodDims = dims[0]*dims[1]*dims[2];
 	const int reduxList[] = {0,2};
-	const float TOL = 1e-5;
+	const float TOL = 1e-4;
 
 	float*  pS = calloc(1, sizeof(*pS)    * dims[0]*dims[1]*dims[2]);
 	float*  pD = calloc(1, sizeof(*pD)    *         dims[1]        );
@@ -1828,7 +1828,7 @@ START_TEST(test_sum_reduction){
 	 */
 
 	for(i=0;i<prodDims;i++){
-		pS[i] = pcgRand01();
+		pS[i] = pcgRand01()-0.5;
 	}
 
 
@@ -1895,7 +1895,7 @@ START_TEST(test_sum_veryhighrank){
 	size_t rdxDims[4]  = {1171,373,1,2};
 	size_t rdxProdDims = rdxDims[0]*rdxDims[1]*rdxDims[2]*rdxDims[3];
 	const int reduxList[] = {2,4,7,5};
-	const float TOL    = 1e-5;
+	const float TOL    = 1e-4;
 
 	float*  pS = calloc(1, sizeof(*pS) * prodDims);
 	float*  pD = calloc(1, sizeof(*pD) * rdxProdDims);
@@ -1909,7 +1909,7 @@ START_TEST(test_sum_veryhighrank){
 	 */
 
 	for(i=0;i<prodDims;i++){
-		pS[i] = pcgRand01();
+		pS[i] = pcgRand01()-0.5;
 	}
 
 
@@ -1986,7 +1986,7 @@ START_TEST(test_sum_alldimsreduced){
 	size_t dims[3]  = {32,50,79};
 	size_t prodDims = dims[0]*dims[1]*dims[2];
 	const int reduxList[] = {0,1,2};
-	const float TOL = 1e-5;
+	const float TOL = 1e-4;
 
 	float*  pS = calloc(1, sizeof(*pS)    * dims[0]*dims[1]*dims[2]);
 	float*  pD = calloc(1, sizeof(*pD)                             );
@@ -2000,7 +2000,7 @@ START_TEST(test_sum_alldimsreduced){
 	 */
 
 	for(i=0;i<prodDims;i++){
-		pS[i] = pcgRand01();
+		pS[i] = pcgRand01()-0.5;
 	}
 
 
