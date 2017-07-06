@@ -1,33 +1,47 @@
 include(CheckCSourceCompiles)
+include(CheckLibraryExists)
 find_package(PkgConfig)
 
 pkg_search_module(CHECK check)
 
-if(NOT CHECK_FOUND)
-
+if(CHECK_FOUND)
+ if(CHECK_VERSION VERSION_LESS 0.10.0)
+        MESSAGE( "Check version older than 0.10.0" )
+        set(CHECK_FOUND 0)
+ endif()
+else()
   find_path(CHECK_INCLUDE_DIRS check.h)
   find_library(CHECK_LIBRARIES NAMES check)
-
   if(CHECK_INCLUDE_DIRS AND CHECK_LIBRARIES)
     set(CHECK_CFLAGS)
     set(CHECK_LIBRARY_DIRS)
     set(CHECK_FOUND 1)
   endif()
-
-endif()
-
-if(CHECK_FOUND)
-  set(CMAKE_REQUIRED_FLAGS ${CHECK_C_FLAGS} ${CHECK_LDFLAGS_OTHERS})
-  set(CMAKE_REQUIRED_INCLUDES ${CHECK_INCLUDE_DIRS})
-  set(CMAKE_REQUIRED_LIBRARIES ${CHECK_LIBRARIES})
-  CHECK_C_SOURCE_COMPILES(
-    "#include <check.h>
-     int main() {
-       ck_assert_ptr_ne(NULL, NULL);
-     }"
-    CHECK_FUNCS)
-  if (NOT CHECK_FUNCS)
-    set(CHECK_FOUND 0)
+  if(CHECK_FOUND)
+    set(CMAKE_REQUIRED_FLAGS ${CHECK_C_FLAGS} ${CHECK_LDFLAGS_OTHERS})
+    set(CMAKE_REQUIRED_INCLUDES ${CHECK_INCLUDE_DIRS})
+    CHECK_LIBRARY_EXISTS(pthread pthread_create "" HAVE_PTHREAD)
+    if (HAVE_PTHREAD)
+      set(CHECK_LIBRARIES ${CHECK_LIBRARIES} pthread)
+    endif (HAVE_PTHREAD)
+    CHECK_LIBRARY_EXISTS(rt nanosleep "" HAVE_LIBRT)
+    if (HAVE_LIBRT)
+      set(CHECK_LIBRARIES ${CHECK_LIBRARIES} rt)
+    endif (HAVE_LIBRT)
+    CHECK_LIBRARY_EXISTS(m cos "" HAVE_LIBM)
+    if (HAVE_LIBM)
+      set(CHECK_LIBRARIES ${CHECK_LIBRARIES} m)
+    endif (HAVE_LIBM)
+    set(CMAKE_REQUIRED_LIBRARIES ${CHECK_LIBRARIES})
+    CHECK_C_SOURCE_COMPILES(
+      "#include <check.h>
+       int main() {
+         ck_assert_ptr_ne(NULL, NULL);
+       }"
+      CHECK_FUNCS)
+    if (NOT CHECK_FUNCS)
+      set(CHECK_FOUND 0)
+    endif()
   endif()
 endif()
 
