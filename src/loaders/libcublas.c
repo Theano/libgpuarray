@@ -44,6 +44,9 @@ int load_libcublas(int major, int minor, error *e) {
     static const char DIGITS[] = "0123456789";
     char libname[] = "cublas64_??.dll";
 
+    #ifdef DEBUG
+    fprintf(stderr, "Loading cuBLAS %d.%d.\n", major, minor);
+    #endif
     libname[9] = DIGITS[major];
     libname[10] = DIGITS[minor];
 
