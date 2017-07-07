@@ -1,4 +1,8 @@
 #include <stdlib.h>
+#ifdef DEBUG
+/* For fprintf and stderr. */
+#include <stdio.h>
+#endif
 
 #include "libcublas.h"
 #include "dyn_load.h"
