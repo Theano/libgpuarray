@@ -33,24 +33,23 @@ int load_libnvrtc(int major, int minor, error *e) {
     #ifdef DEBUG
     fprintf(stderr, "Loading nvrtc %d.%d.\n", major, minor);
     #endif
-    n = snprintf(libname, 64, "nvrtc64_%d%d.dll", major, minor);
-    if (n < 0 || n >= 64)
-      return error_set(e, GA_SYS_ERROR, "nvrtc library name too long.");
+    n = snprintf(libname, sizeof(libname), "nvrtc64_%d%d.dll", major, minor);
+    if (n < 0 || n >= sizeof(libname))
+      return error_set(e, GA_SYS_ERROR, "snprintf");
 
     lib = ga_load_library(libname, e);
   }
 #else /* Unix */
 #ifdef __APPLE__
   {
-    /* Try the usual fullpath first */
     char libname[128];
     int n;
     #ifdef DEBUG
     fprintf(stderr, "Loading nvrtc %d.%d.\n", major, minor);
     #endif
-    n = snprintf(libname, 128, "/Developer/NVIDIA/CUDA-%d.%d/lib/libnvrtc.dylib", major, minor);
-    if (n < 0 || n >= 128)
-      return error_set(e, GA_SYS_ERROR, "nvrtc library path too long.");
+    n = snprintf(libname, sizeof(libname), "/Developer/NVIDIA/CUDA-%d.%d/lib/libnvrtc.dylib", major, minor);
+    if (n < 0 || n >= sizeof(libname))
+      return error_set(e, GA_SYS_ERROR, "snprintf");
     lib = ga_load_library(libname, e);
   }
 #else

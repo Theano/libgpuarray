@@ -47,9 +47,9 @@ int load_libcublas(int major, int minor, error *e) {
     #ifdef DEBUG
     fprintf(stderr, "Loading cuBLAS %d.%d.\n", major, minor);
     #endif
-    n = snprintf(libname, 64, "cublas64_%d%d.dll", major, minor);
-    if (n < 0 || n >= 64)
-      return error_set(e, GA_SYS_ERROR, "cublas library name too long.");
+    n = snprintf(libname, sizeof(libname), "cublas64_%d%d.dll", major, minor);
+    if (n < 0 || n >= sizeof(libname))
+      return error_set(e, GA_SYS_ERROR, "snprintf");
     lib = ga_load_library(libname, e);
   }
 #else /* Unix */
@@ -60,9 +60,9 @@ int load_libcublas(int major, int minor, error *e) {
     #ifdef DEBUG
     fprintf(stderr, "Loading cuBLAS %d.%d.\n", major, minor);
     #endif
-    n = snprintf(libname, 128, "/Developer/NVIDIA/CUDA-%d.%d/lib/libcublas.dylib", major, minor);
-    if (n < 0 || n >= 128)
-      return error_set(e, GA_SYS_ERROR, "cublas library path too long.");
+    n = snprintf(libname, sizeof(libname), "/Developer/NVIDIA/CUDA-%d.%d/lib/libcublas.dylib", major, minor);
+    if (n < 0 || n >= sizeof(libname))
+      return error_set(e, GA_SYS_ERROR, "snprintf");
     lib = ga_load_library(libname, e);
   }
 #else

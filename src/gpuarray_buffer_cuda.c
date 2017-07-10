@@ -129,7 +129,6 @@ static int setup_done = 0;
 static int major = -1;
 static int minor = -1;
 static int setup_lib(void) {
-  const char *ver;
   CUresult err;
   int res, tmp;
 
@@ -152,12 +151,15 @@ static int setup_lib(void) {
       int versions[][2] = {{8, 0}, {7, 5}, {7, 0}};
       int versions_length = sizeof(versions) / sizeof(versions[0]);
       int i = 0;
+      /* Skip versions that are higher or equal to the driver version */
+      while (versions[i][0] > major ||
+             (versions[i][0] == major && versions[i][1] >= minor)) i++;
       do {
         major = versions[i][0];
         minor = versions[i][1];
         res = load_libnvrtc(major, minor, global_err);
-        ++i;
-      } while(res != GA_NO_ERROR && i < versions_length);
+        i++;
+      } while (res != GA_NO_ERROR && i < versions_length);
     }
     if (res != GA_NO_ERROR)
       return res;
