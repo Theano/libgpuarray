@@ -132,7 +132,6 @@ static int setup_lib(void) {
   const char *ver;
   CUresult err;
   int res, tmp;
-  int search_version = 0;
 
   if (!setup_done) {
     res = load_libcuda(global_err);
@@ -141,55 +140,24 @@ static int setup_lib(void) {
     err = cuInit(0);
     if (err != CUDA_SUCCESS)
       return error_cuda(global_err, "cuInit", err);
-    ver = getenv("GPUARRAY_CUDA_VERSION");
-    if (ver == NULL || strlen(ver) != 2) {
-      err = cuDriverGetVersion(&tmp);
-      if (err != CUDA_SUCCESS)
-        return error_set(global_err, GA_IMPL_ERROR, "cuDriverGetVersion failed");
-      major = tmp / 1000;
-      minor = (tmp / 10) % 10;
-      #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64) || defined(__APPLE__)
-      /* We will dynamically search the right CUDA version only on Windows and Macintosh systems,
-      and only if user has not explicitely specified GPUARRAY_CUDA_VERSION. */
-      search_version = 1;
-      #endif
-    } else {
-      major = ver[0] - '0';
-      minor = ver[1] - '0';
-    }
-    /* NB: next line will cause problems if a CUDA 10.0 (or 9.11) is released in the future. */
-    if (major > 9 || major < 0 || minor > 9 || minor < 0)
-      return error_fmt(global_err, GA_VALUE_ERROR, "Invalid cuda version: %d.%d", major, minor);
-    if (!search_version) {
-      res = load_libnvrtc(major, minor, global_err);
-    } else {
-      /* First case in next array is reserved to eventually receive the version returned by cuDriverGetVersion(). */
-      int versions[] = {-1, 80, 75};
-      int versions_length = sizeof(versions) / sizeof(int);
-      int current_version = major * 10 + minor;
+    err = cuDriverGetVersion(&tmp);
+    if (err != CUDA_SUCCESS)
+      return error_set(global_err, GA_IMPL_ERROR, "cuDriverGetVersion failed");
+    major = tmp / 1000;
+    minor = (tmp / 10) % 10;
+    /* Let's try to load a nvrtc corresponding to detected CUDA version. */
+    res = load_libnvrtc(major, minor, global_err);
+    if (res != GA_NO_ERROR) {
+      /* Else, let's try to find a nvrtc corresponding to supported CUDA versions. */
+      int versions[][2] = {{8, 0}, {7, 5}, {7, 0}};
+      int versions_length = sizeof(versions) / (2 * sizeof(int));
       int i = 0;
-      for (i = 1; i < versions_length && versions[i] != current_version; ++i);
-      if (i == versions_length) {
-        /* Current version not found in the list of versions. We add it at top of the list. */
-        versions[0] = current_version;
-        /* We will iterate on versions from the first. */
-        i = 0;
-      } else {
-        /* Current version found in the list of known versions. No need to add it to the list. */
-        i = 1;
-      };
       do {
-        major = versions[i] / 10;
-        minor = versions[i] % 10;
+        major = versions[i][0];
+        minor = versions[i][1];
         res = load_libnvrtc(major, minor, global_err);
         ++i;
       } while(res != GA_NO_ERROR && i < versions_length);
-      #ifdef DEBUG
-      if (res == GA_NO_ERROR)
-        fprintf(stderr, "Detected CUDA %d.%d.\n", major, minor);
-      else
-        fprintf(stderr, "Unable to detect a CUDA version.\n");
-      #endif
     }
     if (res != GA_NO_ERROR)
       return res;

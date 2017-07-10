@@ -45,24 +45,22 @@ int load_libcublas(int major, int minor, error *e) {
 
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
   {
-    static const char DIGITS[] = "0123456789";
-    char libname[] = "cublas64_??.dll";
+    const char* libname_pattern = "cublas64_%d%d.dll";
+    char libname[64];
 
     #ifdef DEBUG
     fprintf(stderr, "Loading cuBLAS %d.%d.\n", major, minor);
     #endif
-    libname[9] = DIGITS[major];
-    libname[10] = DIGITS[minor];
+    sprintf(libname, libname_pattern, major, minor);
 
     lib = ga_load_library(libname, e);
   }
 #else /* Unix */
 #ifdef __APPLE__
   {
-    static const char DIGITS[] = "0123456789";
-    char libname[] = "/Developer/NVIDIA/CUDA-?.?/lib/libcublas.dylib";
-    libname[23] = DIGITS[major];
-    libname[25] = DIGITS[minor];
+    const char* libname_pattern = "/Developer/NVIDIA/CUDA-%d.%d/lib/libcublas.dylib";
+    char libname[128];
+    sprintf(libname, libname_pattern, major, minor);
     lib = ga_load_library(libname, e);
   }
 #else

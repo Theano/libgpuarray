@@ -1,4 +1,8 @@
 #include <stdlib.h>
+#ifdef DEBUG
+/* For fprintf and stderr. */
+#include <stdio.h>
+#endif
 
 #include "libcuda.h"
 #include "libnvrtc.h"
@@ -27,22 +31,23 @@ int load_libnvrtc(int major, int minor, error *e) {
 
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
   {
-    static const char DIGITS[] = "0123456789";
-    char libname[] = "nvrtc64_??.dll";
+    const char* libname_pattern = "nvrtc64_%d%d.dll";
+    char libname[64];
 
-    libname[8] = DIGITS[major];
-    libname[9] = DIGITS[minor];
+    #ifdef DEBUG
+    fprintf(stderr, "Loading nvrtc %d.%d.\n", major, minor);
+    #endif
+    sprintf(libname, libname_pattern, major, minor);
 
     lib = ga_load_library(libname, e);
   }
 #else /* Unix */
 #ifdef __APPLE__
   {
-    static const char DIGITS[] = "0123456789";
     /* Try the usual fullpath first */
-    char libname[] = "/Developer/NVIDIA/CUDA-?.?/lib/libnvrtc.dylib";
-    libname[23] = DIGITS[major];
-    libname[25] = DIGITS[minor];
+    const char* libname_pattern = "/Developer/NVIDIA/CUDA-%d.%d/lib/libnvrtc.dylib";
+    char libname[128];
+    sprintf(libname, libname_pattern, major, minor);
     lib = ga_load_library(libname, e);
   }
 #else
