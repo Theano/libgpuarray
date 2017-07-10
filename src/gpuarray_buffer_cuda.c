@@ -150,7 +150,7 @@ static int setup_lib(void) {
     if (res != GA_NO_ERROR) {
       /* Else, let's try to find a nvrtc corresponding to supported CUDA versions. */
       int versions[][2] = {{8, 0}, {7, 5}, {7, 0}};
-      int versions_length = sizeof(versions) / (2 * sizeof(int));
+      int versions_length = sizeof(versions) / sizeof(versions[0]);
       int i = 0;
       do {
         major = versions[i][0];

@@ -1,8 +1,5 @@
-#include <stdlib.h>
-#ifdef DEBUG
-/* For fprintf and stderr. */
-#include <stdio.h>
-#endif
+/* To be able to use snprintf with any compiler including MSVC2008. */
+#include <private_config.h>
 
 #include "libcublas.h"
 #include "dyn_load.h"
@@ -45,22 +42,27 @@ int load_libcublas(int major, int minor, error *e) {
 
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
   {
-    const char* libname_pattern = "cublas64_%d%d.dll";
     char libname[64];
-
+    int n;
     #ifdef DEBUG
     fprintf(stderr, "Loading cuBLAS %d.%d.\n", major, minor);
     #endif
-    sprintf(libname, libname_pattern, major, minor);
-
+    n = snprintf(libname, 64, "cublas64_%d%d.dll", major, minor);
+    if (n < 0 || n >= 64)
+      return error_set(e, GA_SYS_ERROR, "cublas library name too long.");
     lib = ga_load_library(libname, e);
   }
 #else /* Unix */
 #ifdef __APPLE__
   {
-    const char* libname_pattern = "/Developer/NVIDIA/CUDA-%d.%d/lib/libcublas.dylib";
     char libname[128];
-    sprintf(libname, libname_pattern, major, minor);
+    int n;
+    #ifdef DEBUG
+    fprintf(stderr, "Loading cuBLAS %d.%d.\n", major, minor);
+    #endif
+    n = snprintf(libname, 128, "/Developer/NVIDIA/CUDA-%d.%d/lib/libcublas.dylib", major, minor);
+    if (n < 0 || n >= 128)
+      return error_set(e, GA_SYS_ERROR, "cublas library path too long.");
     lib = ga_load_library(libname, e);
   }
 #else

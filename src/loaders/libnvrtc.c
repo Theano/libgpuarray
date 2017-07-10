@@ -1,8 +1,5 @@
-#include <stdlib.h>
-#ifdef DEBUG
-/* For fprintf and stderr. */
-#include <stdio.h>
-#endif
+/* To be able to use snprintf with any compiler including MSVC2008. */
+#include <private_config.h>
 
 #include "libcuda.h"
 #include "libnvrtc.h"
@@ -31,13 +28,14 @@ int load_libnvrtc(int major, int minor, error *e) {
 
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
   {
-    const char* libname_pattern = "nvrtc64_%d%d.dll";
     char libname[64];
-
+    int n;
     #ifdef DEBUG
     fprintf(stderr, "Loading nvrtc %d.%d.\n", major, minor);
     #endif
-    sprintf(libname, libname_pattern, major, minor);
+    n = snprintf(libname, 64, "nvrtc64_%d%d.dll", major, minor);
+    if (n < 0 || n >= 64)
+      return error_set(e, GA_SYS_ERROR, "nvrtc library name too long.");
 
     lib = ga_load_library(libname, e);
   }
@@ -45,9 +43,14 @@ int load_libnvrtc(int major, int minor, error *e) {
 #ifdef __APPLE__
   {
     /* Try the usual fullpath first */
-    const char* libname_pattern = "/Developer/NVIDIA/CUDA-%d.%d/lib/libnvrtc.dylib";
     char libname[128];
-    sprintf(libname, libname_pattern, major, minor);
+    int n;
+    #ifdef DEBUG
+    fprintf(stderr, "Loading nvrtc %d.%d.\n", major, minor);
+    #endif
+    n = snprintf(libname, 128, "/Developer/NVIDIA/CUDA-%d.%d/lib/libnvrtc.dylib", major, minor);
+    if (n < 0 || n >= 128)
+      return error_set(e, GA_SYS_ERROR, "nvrtc library path too long.");
     lib = ga_load_library(libname, e);
   }
 #else
