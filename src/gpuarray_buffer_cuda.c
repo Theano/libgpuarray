@@ -129,7 +129,6 @@ static int setup_done = 0;
 static int major = -1;
 static int minor = -1;
 static int setup_lib(void) {
-  const char *ver;
   CUresult err;
   int res, tmp;
 
@@ -140,20 +139,28 @@ static int setup_lib(void) {
     err = cuInit(0);
     if (err != CUDA_SUCCESS)
       return error_cuda(global_err, "cuInit", err);
-    ver = getenv("GPUARRAY_CUDA_VERSION");
-    if (ver == NULL || strlen(ver) != 2) {
-      err = cuDriverGetVersion(&tmp);
-      if (err != CUDA_SUCCESS)
-        return error_set(global_err, GA_IMPL_ERROR, "cuDriverGetVersion failed");
-      major = tmp / 1000;
-      minor = (tmp / 10) % 10;
-    } else {
-      major = ver[0] - '0';
-      minor = ver[1] - '0';
-    }
-    if (major > 9 || major < 0 || minor > 9 || minor < 0)
-      return error_fmt(global_err, GA_VALUE_ERROR, "Invalid cuda version: %d.%d", major, minor);
+    err = cuDriverGetVersion(&tmp);
+    if (err != CUDA_SUCCESS)
+      return error_set(global_err, GA_IMPL_ERROR, "cuDriverGetVersion failed");
+    major = tmp / 1000;
+    minor = (tmp / 10) % 10;
+    /* Let's try to load a nvrtc corresponding to detected CUDA version. */
     res = load_libnvrtc(major, minor, global_err);
+    if (res != GA_NO_ERROR) {
+      /* Else, let's try to find a nvrtc corresponding to supported CUDA versions. */
+      int versions[][2] = {{8, 0}, {7, 5}, {7, 0}};
+      int versions_length = sizeof(versions) / sizeof(versions[0]);
+      int i = 0;
+      /* Skip versions that are higher or equal to the driver version */
+      while (versions[i][0] > major ||
+             (versions[i][0] == major && versions[i][1] >= minor)) i++;
+      do {
+        major = versions[i][0];
+        minor = versions[i][1];
+        res = load_libnvrtc(major, minor, global_err);
+        i++;
+      } while (res != GA_NO_ERROR && i < versions_length);
+    }
     if (res != GA_NO_ERROR)
       return res;
     setup_done = 1;

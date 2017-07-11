@@ -1,4 +1,5 @@
-#include <stdlib.h>
+/* To be able to use snprintf with any compiler including MSVC2008. */
+#include <private_config.h>
 
 #include "libcuda.h"
 #include "libnvrtc.h"
@@ -27,22 +28,28 @@ int load_libnvrtc(int major, int minor, error *e) {
 
 #if defined(WIN32) || defined(_WIN32) || defined(WIN64) || defined(_WIN64)
   {
-    static const char DIGITS[] = "0123456789";
-    char libname[] = "nvrtc64_??.dll";
-
-    libname[8] = DIGITS[major];
-    libname[9] = DIGITS[minor];
+    char libname[64];
+    int n;
+    #ifdef DEBUG
+    fprintf(stderr, "Loading nvrtc %d.%d.\n", major, minor);
+    #endif
+    n = snprintf(libname, sizeof(libname), "nvrtc64_%d%d.dll", major, minor);
+    if (n < 0 || n >= sizeof(libname))
+      return error_set(e, GA_SYS_ERROR, "snprintf");
 
     lib = ga_load_library(libname, e);
   }
 #else /* Unix */
 #ifdef __APPLE__
   {
-    static const char DIGITS[] = "0123456789";
-    /* Try the usual fullpath first */
-    char libname[] = "/Developer/NVIDIA/CUDA-?.?/lib/libnvrtc.dylib";
-    libname[23] = DIGITS[major];
-    libname[25] = DIGITS[minor];
+    char libname[128];
+    int n;
+    #ifdef DEBUG
+    fprintf(stderr, "Loading nvrtc %d.%d.\n", major, minor);
+    #endif
+    n = snprintf(libname, sizeof(libname), "/Developer/NVIDIA/CUDA-%d.%d/lib/libnvrtc.dylib", major, minor);
+    if (n < 0 || n >= sizeof(libname))
+      return error_set(e, GA_SYS_ERROR, "snprintf");
     lib = ga_load_library(libname, e);
   }
 #else
