@@ -142,7 +142,17 @@ START_TEST(test_maxandargmax_reduction){
 				}
 			}
 		}
-
+		
+		if(gtMax    != pMax[j]){
+			fprintf(stderr, "Mismatch GT %f != %f UUT @ %zu!\n",
+			        gtMax, pMax[j], j);
+			fflush(stderr);
+		}
+		if(gtArgmax != pArgmax[j]){
+			fprintf(stderr, "Mismatch GT %zu != %zu UUT @ %zu!\n",
+			        gtArgmax, pArgmax[j], j);
+			fflush(stderr);
+		}
 		ck_assert_msg(gtMax    == pMax[j],    "Max value mismatch!");
 		ck_assert_msg(gtArgmax == pArgmax[j], "Argmax value mismatch!");
 	}
@@ -240,6 +250,107 @@ START_TEST(test_maxandargmax_idxtranspose){
 			}
 		}
 
+		ck_assert_msg(gtMax    == pMax[j],    "Max value mismatch!");
+		ck_assert_msg(gtArgmax == pArgmax[j], "Argmax value mismatch!");
+	}
+
+	/**
+	 * Deallocate.
+	 */
+
+	free(pSrc);
+	free(pMax);
+	free(pArgmax);
+	GpuArray_clear(&gaSrc);
+	GpuArray_clear(&gaMax);
+	GpuArray_clear(&gaArgmax);
+}END_TEST
+
+START_TEST(test_maxandargmax_bigdestination){
+	pcgSeed(1);
+
+	/**
+	 * We test here a reduction of some random 3D tensor on the first and
+	 * third dimensions.
+	 */
+
+	size_t i,j;
+	size_t dims[2]  = {2,131072};
+	size_t prodDims = dims[0]*dims[1];
+	const int reduxList[] = {0};
+
+	float*  pSrc    = calloc(1, sizeof(*pSrc)    * dims[0]*dims[1]);
+	float*  pMax    = calloc(1, sizeof(*pMax)    *         dims[1]);
+	size_t* pArgmax = calloc(1, sizeof(*pArgmax) *         dims[1]);
+
+	ck_assert_ptr_ne(pSrc,    NULL);
+	ck_assert_ptr_ne(pMax,    NULL);
+	ck_assert_ptr_ne(pArgmax, NULL);
+
+
+	/**
+	 * Initialize source data.
+	 */
+
+	for(i=0;i<prodDims;i++){
+		pSrc[i] = pcgRand01();
+	}
+
+
+	/**
+	 * Run the kernel.
+	 */
+
+	GpuArray gaSrc;
+	GpuArray gaMax;
+	GpuArray gaArgmax;
+
+	ga_assert_ok(GpuArray_empty(&gaSrc,    ctx, GA_FLOAT, 2, &dims[0], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaMax,    ctx, GA_FLOAT, 1, &dims[1], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaArgmax, ctx, GA_SIZE,  1, &dims[1], GA_C_ORDER));
+
+	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
+	ga_assert_ok(GpuArray_memset(&gaMax,    -1));  /* 0xFFFFFFFF is a qNaN. */
+	ga_assert_ok(GpuArray_memset(&gaArgmax, -1));
+
+	GpuReduction* gr;
+	GpuReduction_new(&gr, GpuArray_context(&gaSrc),
+	                 GA_REDUCE_MAXANDARGMAX, 1, 1, gaSrc.typecode, 0);
+	ck_assert_ptr_nonnull(gr);
+	ga_assert_ok(GpuReduction_call(gr, &gaMax, &gaArgmax, &gaSrc, 1, reduxList, 0));
+	GpuReduction_free(gr);
+
+	ga_assert_ok(GpuArray_read(pMax,    sizeof(*pMax)   *dims[1], &gaMax));
+	ga_assert_ok(GpuArray_read(pArgmax, sizeof(*pArgmax)*dims[1], &gaArgmax));
+
+
+	/**
+	 * Check that the destination tensors are correct.
+	 */
+
+	for(j=0;j<dims[1];j++){
+		size_t gtArgmax = 0;
+		float  gtMax    = pSrc[0*dims[1] + j];
+
+		for(i=0;i<dims[0];i++){
+			float v = pSrc[i*dims[1] + j];
+
+			if(v > gtMax){
+				gtMax    = v;
+				gtArgmax = i;
+			}
+		}
+		
+		if(gtMax    != pMax[j]){
+			fprintf(stderr, "Mismatch GT %f != %f UUT @ %zu!\n",
+			        gtMax, pMax[j], j);
+			fflush(stderr);
+		}
+		if(gtArgmax != pArgmax[j]){
+			fprintf(stderr, "Mismatch GT %zu != %zu UUT @ %zu!\n",
+			        gtArgmax, pArgmax[j], j);
+			fflush(stderr);
+		}
 		ck_assert_msg(gtMax    == pMax[j],    "Max value mismatch!");
 		ck_assert_msg(gtArgmax == pArgmax[j], "Argmax value mismatch!");
 	}
@@ -2138,7 +2249,7 @@ START_TEST(test_prod_reduction){
 	size_t dims[3]  = {32,50,79};
 	size_t prodDims = dims[0]*dims[1]*dims[2];
 	const int reduxList[] = {0,2};
-	const float TOL = 1e-5;
+	const float TOL = 1e-4;
 
 	float*  pS = calloc(1, sizeof(*pS)    * dims[0]*dims[1]*dims[2]);
 	float*  pD = calloc(1, sizeof(*pD)    *         dims[1]        );
@@ -2219,7 +2330,7 @@ START_TEST(test_prod_veryhighrank){
 	size_t rdxDims[4]  = {1171,373,1,2};
 	size_t rdxProdDims = rdxDims[0]*rdxDims[1]*rdxDims[2]*rdxDims[3];
 	const int reduxList[] = {2,4,7,5};
-	const float TOL    = 1e-5;
+	const float TOL    = 1e-4;
 
 	float*  pS = calloc(1, sizeof(*pS) * prodDims);
 	float*  pD = calloc(1, sizeof(*pD) * rdxProdDims);
@@ -2310,7 +2421,7 @@ START_TEST(test_prod_alldimsreduced){
 	size_t dims[3]  = {32,50,79};
 	size_t prodDims = dims[0]*dims[1]*dims[2];
 	const int reduxList[] = {0,1,2};
-	const float TOL = 1e-5;
+	const float TOL = 1e-4;
 
 	float*  pS = calloc(1, sizeof(*pS)    * dims[0]*dims[1]*dims[2]);
 	float*  pD = calloc(1, sizeof(*pD)                             );
@@ -2389,7 +2500,7 @@ START_TEST(test_prodnz_reduction){
 	size_t dims[3]  = {32,50,79};
 	size_t prodDims = dims[0]*dims[1]*dims[2];
 	const int reduxList[] = {0,2};
-	const float TOL = 1e-5;
+	const float TOL = 1e-4;
 
 	float*  pS = calloc(1, sizeof(*pS)    * dims[0]*dims[1]*dims[2]);
 	float*  pD = calloc(1, sizeof(*pD)    *         dims[1]        );
@@ -2473,7 +2584,7 @@ START_TEST(test_prodnz_veryhighrank){
 	size_t rdxDims[4]  = {1171,373,1,2};
 	size_t rdxProdDims = rdxDims[0]*rdxDims[1]*rdxDims[2]*rdxDims[3];
 	const int reduxList[] = {2,4,7,5};
-	const float TOL    = 1e-5;
+	const float TOL    = 1e-4;
 
 	float*  pS = calloc(1, sizeof(*pS) * prodDims);
 	float*  pD = calloc(1, sizeof(*pD) * rdxProdDims);
@@ -2567,7 +2678,7 @@ START_TEST(test_prodnz_alldimsreduced){
 	size_t dims[3]  = {32,50,79};
 	size_t prodDims = dims[0]*dims[1]*dims[2];
 	const int reduxList[] = {0,1,2};
-	const float TOL = 1e-5;
+	const float TOL = 1e-4;
 
 	float*  pS = calloc(1, sizeof(*pS)    * dims[0]*dims[1]*dims[2]);
 	float*  pD = calloc(1, sizeof(*pD)                             );
@@ -3982,9 +4093,10 @@ Suite *get_suite(void) {
 	TCase *tc = tcase_create("basic");
 	tcase_add_checked_fixture(tc, setup, teardown);
 	tcase_set_timeout(tc, 120.0);
-
+	
 	tcase_add_test(tc, test_maxandargmax_reduction);
 	tcase_add_test(tc, test_maxandargmax_idxtranspose);
+	tcase_add_test(tc, test_maxandargmax_bigdestination);
 	tcase_add_test(tc, test_maxandargmax_veryhighrank);
 	tcase_add_test(tc, test_maxandargmax_alldimsreduced);
 
