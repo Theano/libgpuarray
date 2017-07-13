@@ -55,6 +55,7 @@ gpuarray_collectives_cuda_nccl.c
 gpuarray_buffer_opencl.c
 gpuarray_blas_opencl_clblas.c
 gpuarray_blas_opencl_clblast.c
+gpuarray_sort.c
 )
 
 check_function_exists(strlcat HAVE_STRL)
@@ -126,6 +127,7 @@ set(headers
   gpuarray/kernel.h
   gpuarray/types.h
   gpuarray/util.h
+  gpuarray/sort.h
 )
 
 install(FILES ${headers} DESTINATION include/gpuarray)
