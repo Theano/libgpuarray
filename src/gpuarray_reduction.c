@@ -112,7 +112,8 @@ struct redux_ctx{
 	
 	uint32_t            LSlice;
 	uint64_t            LPadded;
-	uint64_t*           L,   *Li;
+	uint64_t*           L;
+	uint32_t*           Li;
 	gpudata*            S0Data;
 	int64_t             S0Off;
 	int64_t*            S0J, *S0Si;
@@ -2607,13 +2608,6 @@ static void       reduxGenSrcAppendDecode       (GpuReduction*     gr){
 			"    TK1* restrict const W1R     = &W1[GDIM_0*D];\n"
 			"    TK1* restrict const SHMEMK1 = (TK1*)(SHMEM + SHMEMK1Off);\n");
 		}
-		srcbAppends(&gr->srcGen,
-		"    INITREDUXSTATE(W0L[LID_0], W1L[LID_0]);\n"
-		"    INITREDUXSTATE(W0R[LID_0], W1R[LID_0]);\n"
-		"    if(D < LDIM_0 && LID_0+D<H){\n"
-		"        INITREDUXSTATE(W0L[LID_0+D], W1L[LID_0+D]);\n"
-		"        INITREDUXSTATE(W0R[LID_0+D], W1R[LID_0+D]);\n"
-		"    }\n");
 	}
 
 
@@ -3322,7 +3316,8 @@ static size_t      reduxGenGetWMEMK1Off           (const GpuReduction*  gr, size
  */
 
 static int         reduxInvInit                   (redux_ctx*  ctx){
-	ctx->L           = ctx->Li        = NULL;
+	ctx->L           = NULL;
+	ctx->Li          = NULL;
 	ctx->S0J         = ctx->S0Si      = NULL;
 	ctx->D0J         = ctx->D0Si      = NULL;
 	ctx->D1J         = ctx->D1Si      = NULL;
