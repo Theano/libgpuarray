@@ -77,7 +77,6 @@ typedef struct axis_desc axis_desc;
 struct redux_ctx{
 	/* Function Arguments. */
 	const GpuReduction* gr;
-	ga_reduce_op        op;
 	GpuArray*           d0;
 	GpuArray*           d1;
 	const GpuArray*     s0;
@@ -90,8 +89,6 @@ struct redux_ctx{
 	int                 nds0r;        /* # Reduced                          axes */
 	int                 ndd0;         /* # Destination                      axes */
 	int                 ndfs0;        /* # Flattened source                 axes */
-	int                 ndfs0r;       /* # Flattened source                 axes */
-	int                 ndfd0;        /* # Flattened source                 axes */
 	int                 ndib;         /* # Intra-block                      axes */
 	int                 zeroAllAxes;  /* # of zero-length                   axes in source tensor */
 	int                 zeroRdxAxes;  /* # of zero-length         reduction axes in source tensor */
@@ -143,6 +140,23 @@ struct redux_ctx{
 	size_t              gs;
 };
 typedef struct redux_ctx redux_ctx;
+
+
+
+/**
+ *                    Reduction Operator Attributes.
+ */
+
+struct GpuReductionAttr{
+	gpucontext*   gpuCtx;
+	unsigned      numProcs;
+	size_t        maxLg, maxL0, maxGg, maxG0, maxLM;
+	
+	ga_reduce_op  op;
+	int           maxSrcDims;
+	int           maxDstDims;
+	int           s0Typecode, d0Typecode, d1Typecode, i0Typecode;
+};
 
 
 /**
@@ -232,15 +246,12 @@ typedef struct redux_ctx redux_ctx;
 
 struct GpuReduction{
 	/* Function Arguments. */
+	GpuReductionAttr grAttr;
 	gpucontext*      gpuCtx;
 	ga_reduce_op     op;
+	int              nds;
 	int              ndd;
 	int              ndr;
-	int              TS0tc;
-	int              flags;
-	
-	/* Misc */
-	int              nds;
 	
 	/* Source code Generator. */
 	strb             s;
@@ -248,9 +259,11 @@ struct GpuReduction{
 	char             kName[256];
 	char*            kSourceCode;
 	size_t           kSourceCodeLen;
+	int              TS0tc;
 	int              TPS0tc;
 	int              TD0tc;
 	int              TD1tc;
+	int              TI0tc;
 	int              TS32tc;
 	int              TU32tc;
 	int              TS64tc;
@@ -275,12 +288,6 @@ struct GpuReduction{
 	GpuKernel        k;
 	
 	/* Scheduling */
-	unsigned         numProcs;
-	size_t           maxLg;
-	size_t           maxL0;
-	size_t           maxGg;
-	size_t           maxG0;
-	size_t           maxLM;
 	size_t           maxLK;
 	size_t           maxBS;
 	int              log2MaxBS;
@@ -304,8 +311,6 @@ static int         reduxGetMinInit                (int typecode, const char** pr
 static int         reduxGetMaxInit                (int typecode, const char** property);
 static int         reduxGetAndInit                (int typecode, const char** property);
 static int         reduxGetOrInit                 (int typecode, const char** property);
-static int         reduxIsSensitive               (int op);
-static const char* reduxGetOpName                 (int op);
 static int         reduxIsFloatingPoint           (int typecode);
 static unsigned    reduxCeilLog2                  (uint64_t x);
 static uint64_t    reduxNextPow2                  (uint64_t x);
@@ -471,41 +476,213 @@ static void        reduxSortAxisPtrsBy            (axis_desc**       ptrs,
 
 /* Function Implementations */
 /* Extern Functions */
-GPUARRAY_PUBLIC int   GpuReduction_new           (GpuReduction**       grOut,
-                                                  gpucontext*          gpuCtx,
-                                                  ga_reduce_op         op,
-                                                  unsigned             ndf,
-                                                  unsigned             ndr,
-                                                  int                  s0TypeCode,
-                                                  int                  flags){
-	if (!grOut){
+GPUARRAY_PUBLIC int   GpuReductionAttr_new          (GpuReductionAttr**         grAttr,
+                                                     gpucontext*                gpuCtx){
+	if(!grAttr){
+		return GA_INVALID_ERROR;
+	}
+	if(!gpuCtx){
+		*grAttr = NULL;
+		return GA_INVALID_ERROR;
+	}
+	*grAttr = calloc(1, sizeof(**grAttr));
+	if(!*grAttr){
+		return GA_MEMORY_ERROR;
+	}
+	
+	(*grAttr)->gpuCtx     = gpuCtx;
+	if (gpucontext_property(gpuCtx, GA_CTX_PROP_NUMPROCS,  &(*grAttr)->numProcs) != GA_NO_ERROR ||
+	    gpucontext_property(gpuCtx, GA_CTX_PROP_MAXLSIZE,  &(*grAttr)->maxLg)    != GA_NO_ERROR ||
+	    gpucontext_property(gpuCtx, GA_CTX_PROP_MAXLSIZE0, &(*grAttr)->maxL0)    != GA_NO_ERROR ||
+	    gpucontext_property(gpuCtx, GA_CTX_PROP_MAXGSIZE,  &(*grAttr)->maxGg)    != GA_NO_ERROR ||
+	    gpucontext_property(gpuCtx, GA_CTX_PROP_MAXGSIZE0, &(*grAttr)->maxG0)    != GA_NO_ERROR ||
+	    gpucontext_property(gpuCtx, GA_CTX_PROP_LMEMSIZE,  &(*grAttr)->maxLM)    != GA_NO_ERROR ){
+		free(*grAttr);
+		return GA_INVALID_ERROR;
+	}
+	(*grAttr)->op         = GA_REDUCE_SUM;
+	(*grAttr)->maxSrcDims = 1;
+	(*grAttr)->maxDstDims = 1;
+	(*grAttr)->s0Typecode = GA_FLOAT;
+	(*grAttr)->d0Typecode = GA_FLOAT;
+	(*grAttr)->d1Typecode = GA_ULONG;
+	(*grAttr)->i0Typecode = GA_ULONG;
+	
+	return GA_NO_ERROR;
+}
+GPUARRAY_PUBLIC int   GpuReductionAttr_setop        (GpuReductionAttr*          grAttr,
+                                                     ga_reduce_op               op){
+	grAttr->op = op;
+	
+	return GA_NO_ERROR;
+}
+GPUARRAY_PUBLIC int   GpuReductionAttr_setdims      (GpuReductionAttr*          grAttr,
+                                                     unsigned                   maxSrcDims,
+                                                     unsigned                   maxDstDims){
+	grAttr->maxSrcDims = maxSrcDims;
+	grAttr->maxDstDims = maxDstDims;
+	
+	return GA_NO_ERROR;
+}
+GPUARRAY_PUBLIC int   GpuReductionAttr_sets0type    (GpuReductionAttr*          grAttr,
+                                                     int                        s0Typecode){
+	switch(grAttr->op){
+		case GA_REDUCE_AND:
+		case GA_REDUCE_OR:
+		case GA_REDUCE_XOR:
+			if (reduxIsFloatingPoint(s0Typecode)){
+				/* Bitwise operations not applicable to floating-point datatypes! */
+				return GA_INVALID_ERROR;
+			}
+		break;
+		default:
+		break;
+	}
+	
+	grAttr->s0Typecode = s0Typecode;
+	
+	return GA_NO_ERROR;
+}
+GPUARRAY_PUBLIC int   GpuReductionAttr_setd0type    (GpuReductionAttr*          grAttr,
+                                                     int                        d0Typecode){
+	grAttr->d0Typecode = d0Typecode;
+	
+	return GA_NO_ERROR;
+}
+GPUARRAY_PUBLIC int   GpuReductionAttr_setd1type    (GpuReductionAttr*          grAttr,
+                                                     int                        d1Typecode){
+	grAttr->d1Typecode = d1Typecode;
+	
+	return GA_NO_ERROR;
+}
+GPUARRAY_PUBLIC int   GpuReductionAttr_seti0type    (GpuReductionAttr*          grAttr,
+                                                     int                        i0Typecode){
+	grAttr->i0Typecode = i0Typecode;
+	
+	return GA_NO_ERROR;
+}
+GPUARRAY_PUBLIC int   GpuReductionAttr_appendopname (GpuReductionAttr*          grAttr,
+                                                     size_t                     n,
+                                                     char*                      name){
+	switch(grAttr->op){
+		case GA_REDUCE_COPY:         return snprintf(name, n, "Copy_%d",            grAttr->maxSrcDims);
+		case GA_REDUCE_SUM:          return snprintf(name, n, "Sum_%d_%d",          grAttr->maxSrcDims, grAttr->maxDstDims);
+		case GA_REDUCE_PROD:         return snprintf(name, n, "Prod_%d_%d",         grAttr->maxSrcDims, grAttr->maxDstDims);
+		case GA_REDUCE_PRODNZ:       return snprintf(name, n, "ProdNonZero_%d_%d",  grAttr->maxSrcDims, grAttr->maxDstDims);
+		case GA_REDUCE_MIN:          return snprintf(name, n, "Min_%d_%d",          grAttr->maxSrcDims, grAttr->maxDstDims);
+		case GA_REDUCE_MAX:          return snprintf(name, n, "Max_%d_%d",          grAttr->maxSrcDims, grAttr->maxDstDims);
+		case GA_REDUCE_ARGMIN:       return snprintf(name, n, "Argmin_%d_%d",       grAttr->maxSrcDims, grAttr->maxDstDims);
+		case GA_REDUCE_ARGMAX:       return snprintf(name, n, "Argmax_%d_%d",       grAttr->maxSrcDims, grAttr->maxDstDims);
+		case GA_REDUCE_MINANDARGMIN: return snprintf(name, n, "MinAndArgmin_%d_%d", grAttr->maxSrcDims, grAttr->maxDstDims);
+		case GA_REDUCE_MAXANDARGMAX: return snprintf(name, n, "MaxAndArgmax_%d_%d", grAttr->maxSrcDims, grAttr->maxDstDims);
+		case GA_REDUCE_AND:          return snprintf(name, n, "And_%d_%d",          grAttr->maxSrcDims, grAttr->maxDstDims);
+		case GA_REDUCE_OR:           return snprintf(name, n, "Or_%d_%d",           grAttr->maxSrcDims, grAttr->maxDstDims);
+		case GA_REDUCE_XOR:          return snprintf(name, n, "Xor_%d_%d",          grAttr->maxSrcDims, grAttr->maxDstDims);
+		case GA_REDUCE_ALL:          return snprintf(name, n, "All_%d_%d",          grAttr->maxSrcDims, grAttr->maxDstDims);
+		case GA_REDUCE_ANY:          return snprintf(name, n, "Any_%d_%d",          grAttr->maxSrcDims, grAttr->maxDstDims);
+		default:                     if(name && n>0){*name = '\0';} return GA_INVALID_ERROR;
+	}
+}
+GPUARRAY_PUBLIC int   GpuReductionAttr_issensitive  (const GpuReductionAttr*    grAttr){
+	/**
+	 * @brief Returns whether the reduction is "sensitive".
+	 * 
+	 * A reduction is sensitive when its output satisfies at least one of the
+	 * following conditions:
+	 * 
+	 *   - It depends on the exact order of axes in the reduxList
+	 *   - It depends on exact signs of the strides of axes in the reduxList
+	 * 
+	 * Such sensitivity may prevent a flattening of contiguous axes even when it
+	 * would have been otherwise permitted.
+	 * 
+	 * For instance, ARGMIN/ARGMAX have this sensitivity, because the dstArg
+	 * tensor's contents are flattened coordinates into the source tensor, and
+	 * the flattening order is precisely reduxList. Permuting it would thus produce
+	 * incorrect output. Moreover, if the strides of a reduction axis were to be
+	 * reversed for the purpose of flattening the axis into another, the computed
+	 * coordinate would again be incorrect.
+	 * 
+	 * 
+	 * TL;DR: Reduction is sensitive if
+	 *   reduce(x, axis=axisList) != reduce(x, axis=axisList[::-1])
+	 * or
+	 *   reduce(x) != reduce(x[::-1])
+	 * .
+	 */
+	
+	switch (grAttr->op){
+		case GA_REDUCE_MINANDARGMIN:
+		case GA_REDUCE_MAXANDARGMAX:
+		case GA_REDUCE_ARGMIN:
+		case GA_REDUCE_ARGMAX:
+		  return 1;
+		default:
+		  return 0;
+	}
+}
+GPUARRAY_PUBLIC int   GpuReductionAttr_requiresS0   (const GpuReductionAttr*    grAttr){
+	switch(grAttr->op){
+		default: return 1;
+	}
+}
+GPUARRAY_PUBLIC int   GpuReductionAttr_requiresD0   (const GpuReductionAttr*    grAttr){
+	switch (grAttr->op){
+		case GA_REDUCE_ARGMIN:
+		case GA_REDUCE_ARGMAX:
+		  return 0;
+		default:
+		  return 1;
+	}
+}
+GPUARRAY_PUBLIC int   GpuReductionAttr_requiresD1   (const GpuReductionAttr*    grAttr){
+	switch (grAttr->op){
+		case GA_REDUCE_MINANDARGMIN:
+		case GA_REDUCE_MAXANDARGMAX:
+		case GA_REDUCE_ARGMIN:
+		case GA_REDUCE_ARGMAX:
+		  return 1;
+		default:
+		  return 0;
+	}
+}
+GPUARRAY_PUBLIC void  GpuReductionAttr_free         (GpuReductionAttr*          grAttr){
+	free(grAttr);
+}
+GPUARRAY_PUBLIC int   GpuReduction_new              (GpuReduction**             gr,
+                                                     const GpuReductionAttr*    grAttr){
+	if (!gr){
+		return GA_INVALID_ERROR;
+	}
+	if (!grAttr){
+		*gr = NULL;
 		return GA_INVALID_ERROR;
 	}
 	
-	*grOut = calloc(1, sizeof(**grOut));
-	if (*grOut){
-		(*grOut)->gpuCtx = gpuCtx;
-		(*grOut)->op     = op;
-		(*grOut)->ndd    = (int)ndf;
-		(*grOut)->ndr    = (int)ndr;
-		(*grOut)->TS0tc  = s0TypeCode;
-		(*grOut)->flags  = flags;
+	*gr = calloc(1, sizeof(**gr));
+	if (*gr){
+		(*gr)->grAttr = *grAttr;
+		(*gr)->gpuCtx = grAttr->gpuCtx;
+		(*gr)->op     = grAttr->op;
+		(*gr)->nds    = (int)grAttr->maxSrcDims;
+		(*gr)->ndd    = (int)grAttr->maxDstDims;
+		(*gr)->ndr    = (int)(grAttr->maxSrcDims-grAttr->maxDstDims);
 		
-		return reduxGenInit(*grOut);
+		return reduxGenInit(*gr);
 	}else{
 		return GA_MEMORY_ERROR;
 	}
 }
-GPUARRAY_PUBLIC void  GpuReduction_free          (GpuReduction*        gr){
+GPUARRAY_PUBLIC void  GpuReduction_free             (GpuReduction*              gr){
 	reduxGenCleanup(gr, !GA_NO_ERROR);
 }
-GPUARRAY_PUBLIC int   GpuReduction_call          (const GpuReduction*  gr,
-                                                  GpuArray*            d0,
-                                                  GpuArray*            d1,
-                                                  const GpuArray*      s0,
-                                                  unsigned             reduxLen,
-                                                  const int*           reduxList,
-                                                  int                  flags){
+GPUARRAY_PUBLIC int   GpuReduction_call             (const GpuReduction*        gr,
+                                                     GpuArray*                  d0,
+                                                     GpuArray*                  d1,
+                                                     const GpuArray*            s0,
+                                                     unsigned                   reduxLen,
+                                                     const int*                 reduxList,
+                                                     int                        flags){
 	redux_ctx ctxSTACK, *ctx = &ctxSTACK;
 	memset(ctx, 0, sizeof(*ctx));
 
@@ -790,69 +967,6 @@ static int         reduxGetOrInit                (int typecode, const char** pro
 	}
 	*property = "0";
 	return GA_NO_ERROR;
-}
-
-/**
- * @brief Returns whether the reduction is "sensitive".
- * 
- * A reduction is sensitive when its output satisfies at least one of the
- * following conditions:
- * 
- *   - It depends on the exact order of axes in the reduxList
- *   - It depends on exact signs of the strides of axes in the reduxList
- * 
- * Such sensitivity may prevent a flattening of contiguous axes even when it
- * would have been otherwise permitted.
- * 
- * For instance, ARGMIN/ARGMAX have this sensitivity, because the dstArg
- * tensor's contents are flattened coordinates into the source tensor, and
- * the flattening order is precisely reduxList. Permuting it would thus produce
- * incorrect output. Moreover, if the strides of a reduction axis were to be
- * reversed for the purpose of flattening the axis into another, the computed
- * coordinate would again be incorrect.
- * 
- * 
- * TL;DR: Reduction is sensitive if
- *   reduce(x, axis=axisList) != reduce(x, axis=axisList[::-1])
- * or
- *   reduce(x) != reduce(x[::-1])
- * .
- */
-
-static int         reduxIsSensitive               (int op){
-	switch (op){
-		case GA_REDUCE_MINANDARGMIN:
-		case GA_REDUCE_MAXANDARGMAX:
-		case GA_REDUCE_ARGMIN:
-		case GA_REDUCE_ARGMAX:
-		  return 1;
-		default:
-		  return 0;
-	}
-}
-
-/**
- * Get a name for the op, usable within a C identifier.
- */
-
-static const char* reduxGetOpName                 (int op){
-	switch (op){
-		case GA_REDUCE_SUM:          return "Sum";
-		case GA_REDUCE_PROD:         return "Prod";
-		case GA_REDUCE_PRODNZ:       return "ProdNonZero";
-		case GA_REDUCE_MIN:          return "Min";
-		case GA_REDUCE_MAX:          return "Max";
-		case GA_REDUCE_ARGMIN:       return "Argmin";
-		case GA_REDUCE_ARGMAX:       return "Argmax";
-		case GA_REDUCE_MINANDARGMIN: return "MinAndArgmin";
-		case GA_REDUCE_MAXANDARGMAX: return "MaxAndArgmax";
-		case GA_REDUCE_AND:          return "And";
-		case GA_REDUCE_OR:           return "Or";
-		case GA_REDUCE_XOR:          return "Xor";
-		case GA_REDUCE_ALL:          return "All";
-		case GA_REDUCE_ANY:          return "Any";
-		default:                     return NULL;
-	}
 }
 
 /**
@@ -1361,7 +1475,7 @@ static int         reduxTryFlattenInto           (redux_ctx*        ctx,
 	reverseD0 = signD0 && reduxInvRequiresD0(ctx);
 	reverseD1 = signD1 && reduxInvRequiresD1(ctx);
 	
-	if (reduxIsSensitive(ctx->op)){
+	if (GpuReductionAttr_issensitive(&ctx->gr->grAttr)){
 		if (reverseS0 || reverseD0 || reverseD1){
 			return 0;
 		}
@@ -1441,30 +1555,6 @@ static int         reduxGenInit                  (GpuReduction*     gr){
 static int         reduxGenInferProperties       (GpuReduction*     gr){
 	int i;
 	
-	
-	/**
-	 * Insane arguments?
-	 */
-	
-	if (gr->op < 0 || gr->op >= GA_REDUCE_ENDSUPPORTED){
-		return reduxGenCleanupMsg(gr, GA_INVALID_ERROR,
-		       "Unknown reduction operation!\n");
-	}
-	if (gr->ndr <= 0){
-		return reduxGenCleanupMsg(gr, GA_INVALID_ERROR,
-		       "No reduction axes!\n");
-	}
-	if (gr->ndd <  0){
-		return reduxGenCleanupMsg(gr, GA_INVALID_ERROR,
-		       "Destination tensor has less than 0 rank!\n");
-	}
-	if (gr->flags != 0){
-		return reduxGenCleanupMsg(gr, GA_INVALID_ERROR,
-		       "\"flags\" must be set to 0!\n");
-	}
-	gr->nds = gr->ndr+gr->ndd;
-	
-	
 	/**
 	 * Source code buffer preallocation failed?
 	 */
@@ -1477,45 +1567,19 @@ static int         reduxGenInferProperties       (GpuReduction*     gr){
 	
 	
 	/**
-	 * GPU context non-existent, or cannot read its properties?
-	 */
-	
-	if (!gr->gpuCtx                                                                          ||
-	    gpucontext_property(gr->gpuCtx, GA_CTX_PROP_NUMPROCS,  &gr->numProcs) != GA_NO_ERROR ||
-	    gpucontext_property(gr->gpuCtx, GA_CTX_PROP_MAXLSIZE,  &gr->maxLg)    != GA_NO_ERROR ||
-	    gpucontext_property(gr->gpuCtx, GA_CTX_PROP_MAXLSIZE0, &gr->maxL0)    != GA_NO_ERROR ||
-	    gpucontext_property(gr->gpuCtx, GA_CTX_PROP_MAXGSIZE,  &gr->maxGg)    != GA_NO_ERROR ||
-	    gpucontext_property(gr->gpuCtx, GA_CTX_PROP_MAXGSIZE0, &gr->maxG0)    != GA_NO_ERROR ||
-	    gpucontext_property(gr->gpuCtx, GA_CTX_PROP_LMEMSIZE,  &gr->maxLM)    != GA_NO_ERROR ){
-		return reduxGenCleanupMsg(gr, GA_INVALID_ERROR,
-		       "Error obtaining one or more properties from GPU context!\n");
-	}
-	
-	
-	/**
 	 * Type management.
 	 * 
-	 * - Deal with the various typecodes.
+	 * Read out the various typecodes from the attributes.
 	 */
-
-	gr->TD0tc  = gr->TS0tc;
-	gr->TD1tc  = GA_SSIZE;
+	
+	gr->TS0tc  = gr->grAttr.s0Typecode;
+	gr->TD0tc  = gr->grAttr.d0Typecode;
+	gr->TD1tc  = gr->grAttr.d1Typecode;
+	gr->TI0tc  = gr->grAttr.i0Typecode;
 	gr->TS32tc = GA_INT;
 	gr->TU32tc = GA_UINT;
 	gr->TS64tc = GA_LONG;
 	gr->TU64tc = GA_ULONG;
-	switch(gr->op){
-		case GA_REDUCE_AND:
-		case GA_REDUCE_OR:
-		case GA_REDUCE_XOR:
-			if (reduxIsFloatingPoint(gr->TS0tc)){
-				return reduxGenCleanupMsg(gr, GA_INVALID_ERROR,
-				    "Bitwise operations not applicable to floating-point datatypes!\n");
-			}
-		break;
-		default:
-		break;
-	}
 	reduxGenSetKTypes(gr);
 	
 	
@@ -1545,9 +1609,9 @@ static int         reduxGenInferProperties       (GpuReduction*     gr){
  */
 
 static void        reduxGenSetMaxBS              (GpuReduction*        gr){
-	gr->maxBS = gr->maxLM/reduxGenGetReduxStateSize(gr);
-	gr->maxBS = gr->maxBS < gr->maxLg ? gr->maxBS : gr->maxLg;
-	gr->maxBS = gr->maxBS < gr->maxL0 ? gr->maxBS : gr->maxL0;
+	gr->maxBS = gr->grAttr.maxLM/reduxGenGetReduxStateSize(gr);
+	gr->maxBS = gr->maxBS < gr->grAttr.maxLg ? gr->maxBS : gr->grAttr.maxLg;
+	gr->maxBS = gr->maxBS < gr->grAttr.maxL0 ? gr->maxBS : gr->grAttr.maxL0;
 	
 	/**
 	 * In practice we want a moderate amount of blocks, not just one monolith
@@ -1588,8 +1652,9 @@ static void        reduxGenSetMaxBS              (GpuReduction*        gr){
  * In the future this might become wierder when the accumulator is a Kahan
  * summation, for instance, and then TK0 != promoted(TS0).
  * 
- * If the user guaranteed to us that TK1 can be made narrower than 64-bit
- * unsigned through, perhaps, a flag, this is also where we set it.
+ * If the user guaranteed to us through gr->grAttr that TK1 can be made
+ * narrower than 64-bit, this is also where we'd take this into account.
+ * For now we default TK1 to exactly TI0.
  */
 
 static void        reduxGenSetKTypes             (GpuReduction*        gr){
@@ -1627,7 +1692,7 @@ static void        reduxGenSetKTypes             (GpuReduction*        gr){
 	 * they want.
 	 */
 	
-	switch (gr->op){
+	switch (gr->grAttr.op){
 		case GA_REDUCE_SUM:
 		  TK0 = TPS0;
 		  reduxGetSumInit (TK0->typecode, &TK0init);
@@ -1649,7 +1714,7 @@ static void        reduxGenSetKTypes             (GpuReduction*        gr){
 		case GA_REDUCE_ARGMIN:
 		case GA_REDUCE_MIN:
 		  TK0 = TPS0;
-		  TK1 = gpuarray_get_type(GA_SIZE);
+		  TK1 = gpuarray_get_type(gr->TI0tc);
 		  reduxGetMinInit (TK0->typecode, &TK0init);
 		  gr->TK0.align = TK0->align;
 		  gr->TK0.size  = TK0->size;
@@ -1664,7 +1729,7 @@ static void        reduxGenSetKTypes             (GpuReduction*        gr){
 		case GA_REDUCE_ARGMAX:
 		case GA_REDUCE_MAX:
 		  TK0 = TPS0;
-		  TK1 = gpuarray_get_type(GA_SIZE);
+		  TK1 = gpuarray_get_type(gr->TI0tc);
 		  reduxGetMaxInit (TK0->typecode, &TK0init);
 		  gr->TK0.align = TK0->align;
 		  gr->TK0.size  = TK0->size;
@@ -1807,8 +1872,7 @@ static void        reduxGenIterArgs              (const GpuReduction*  gr,
  */
 
 static int        reduxGenSrc                   (GpuReduction*     gr){
-	sprintf(gr->kName, "reduxKernel%s_f%d_r%d",
-	        reduxGetOpName(gr->op), gr->ndd, gr->ndr);
+	GpuReductionAttr_appendopname(&gr->grAttr, sizeof(gr->kName), gr->kName);
 	
 	reduxGenSrcAppend(gr);
 
@@ -1854,6 +1918,9 @@ static void       reduxGenSrcAppendMacroTypedefs(GpuReduction*     gr){
 	}
 	if (reduxGenRequiresD1(gr)){
 		srcbAppendf(&gr->srcGen, "typedef %-20s TD1;\n",  gpuarray_get_type(gr->TD1tc )->cluda_name);
+	}
+	if (reduxGenKernelRequiresLatticeI0(gr)){
+		srcbAppendf(&gr->srcGen, "typedef %-20s TI0;\n",  gpuarray_get_type(gr->TI0tc )->cluda_name);
 	}
 	srcbAppendf(&gr->srcGen, "typedef %-20s TS32;\n", gpuarray_get_type(gr->TS32tc)->cluda_name);
 	srcbAppendf(&gr->srcGen, "typedef %-20s TU32;\n", gpuarray_get_type(gr->TU32tc)->cluda_name);
@@ -1921,7 +1988,7 @@ static void       reduxGenSrcAppendMacroTypedefs(GpuReduction*     gr){
 	 * flattened index i into reduction states V and I respectively.
 	 */
 	
-	switch (gr->op){
+	switch (gr->grAttr.op){
 		case GA_REDUCE_SUM:
 		  srcbAppendf(&gr->srcGen, "#define REDUX(V, I, v, i) do{           \\\n"
 		                           "        (V) += (v);                     \\\n"
@@ -2180,8 +2247,13 @@ static void       reduxGenSrcAppendDecode       (GpuReduction*     gr){
 	int i;
 
 	srcbAppends(&gr->srcGen,
-	"    GA_DECL_SHARED_BODY(char, SHMEM)\n"
-	"    DECLREDUXSTATE(tmpK0, I0)\n"
+	"    GA_DECL_SHARED_BODY(char, SHMEM)\n");
+	if (reduxGenKernelRequiresLatticeI0(gr)){
+		srcbAppends(&gr->srcGen,
+		"    TI0 I0;\n");
+	}
+	srcbAppends(&gr->srcGen,
+	"    TK0 tmpK0;\n"
 	"    DECLREDUXSTATE(K0,    K1)\n"
 	"    INITREDUXSTATE(K0,    K1);\n"
 	"    \n"
@@ -2443,15 +2515,17 @@ static void       reduxGenSrcAppendDecode       (GpuReduction*     gr){
 		}
 		srcbEndList(&gr->srcGen);
 		srcbAppends(&gr->srcGen, ";\n"
+		                         "    local_barrier();\n"
 		                         "    if(perm < D){\n"
-		                         "        ((TS64*)SHMEM)[perm] = D0Off;\n"
+		                         "        ((TS64*)SHMEM)[perm]  = D0Off;\n"
+		                         "    }\n"
+		                         "    if(LID_0 >= D){\n"
+		                         "        ((TS64*)SHMEM)[LID_0] = 0;\n"
 		                         "    }\n"
 		                         "    local_barrier();\n"
-		                         "    if(LID_0 < D){\n"
-		                         "        D0Off                = ((TS64*)SHMEM)[LID_0];\n"
-		                         "    }\n"
-		                         "    local_barrier();\n"
-		                         "    D0                      += D0Off;\n");
+		                         "    D0Off                     = ((TS64*)SHMEM)[LID_0];\n"
+		                         "    D0                       += D0Off;\n"
+		                         "    local_barrier();\n");
 	}
 
 
@@ -2477,15 +2551,17 @@ static void       reduxGenSrcAppendDecode       (GpuReduction*     gr){
 		}
 		srcbEndList(&gr->srcGen);
 		srcbAppends(&gr->srcGen, ";\n"
+		                         "    local_barrier();\n"
 		                         "    if(perm < D){\n"
-		                         "        ((TS64*)SHMEM)[perm] = D1Off;\n"
+		                         "        ((TS64*)SHMEM)[perm]  = D1Off;\n"
+		                         "    }\n"
+		                         "    if(LID_0 >= D){\n"
+		                         "        ((TS64*)SHMEM)[LID_0] = 0;\n"
 		                         "    }\n"
 		                         "    local_barrier();\n"
-		                         "    if(LID_0 < D){\n"
-		                         "        D1Off                = ((TS64*)SHMEM)[LID_0];\n"
-		                         "    }\n"
-		                         "    local_barrier();\n"
-		                         "    D1                      += D1Off;\n");
+		                         "    D1Off                     = ((TS64*)SHMEM)[LID_0];\n"
+		                         "    D1                       += D1Off;\n"
+		                         "    local_barrier();\n");
 	}
 
 
@@ -2531,6 +2607,13 @@ static void       reduxGenSrcAppendDecode       (GpuReduction*     gr){
 			"    TK1* restrict const W1R     = &W1[GDIM_0*D];\n"
 			"    TK1* restrict const SHMEMK1 = (TK1*)(SHMEM + SHMEMK1Off);\n");
 		}
+		srcbAppends(&gr->srcGen,
+		"    INITREDUXSTATE(W0L[LID_0], W1L[LID_0]);\n"
+		"    INITREDUXSTATE(W0R[LID_0], W1R[LID_0]);\n"
+		"    if(D < LDIM_0 && LID_0+D<H){\n"
+		"        INITREDUXSTATE(W0L[LID_0+D], W1L[LID_0+D]);\n"
+		"        INITREDUXSTATE(W0R[LID_0+D], W1R[LID_0+D]);\n"
+		"    }\n");
 	}
 
 
@@ -2625,7 +2708,7 @@ static void        reduxGenSrcAppendIncrement     (GpuReduction*        gr,
                                                    int                  initial,
                                                    int                  axis){
 	const char* cast        = reduxGenSrcAxisIsHuge(gr, selector, axis) ? "TS64" : "TS32";
-	const char* breakOrCont = (initial) && (axis < gr->ndd) ? "break" : "continue";
+	const char* breakOrCont = (initial) && (axis < gr->ndd) ? "break   " : "continue";
 
 	/* Pointer bumps */
 	srcbAppends(&gr->srcGen, "                ");
@@ -3023,7 +3106,7 @@ static size_t     reduxGenEstimateParallelism   (const GpuReduction*  gr){
 	 */
 
 	size_t marginFactor = 16;
-	return marginFactor * gr->numProcs * gr->maxLg;
+	return marginFactor * gr->grAttr.numProcs * gr->grAttr.maxLg;
 }
 
 /**
@@ -3081,28 +3164,13 @@ static size_t     reduxGenEstimateParallelism   (const GpuReduction*  gr){
  */
 
 static int        reduxGenRequiresS0             (const GpuReduction*  gr){
-	(void)gr;
-	return 1;
+	return GpuReductionAttr_requiresS0(&gr->grAttr);
 }
 static int        reduxGenRequiresD0             (const GpuReduction*  gr){
-	switch (gr->op){
-		case GA_REDUCE_ARGMIN:
-		case GA_REDUCE_ARGMAX:
-		  return 0;
-		default:
-		  return 1;
-	}
+	return GpuReductionAttr_requiresD0(&gr->grAttr);
 }
 static int        reduxGenRequiresD1             (const GpuReduction*  gr){
-	switch (gr->op){
-		case GA_REDUCE_MINANDARGMIN:
-		case GA_REDUCE_MAXANDARGMAX:
-		case GA_REDUCE_ARGMIN:
-		case GA_REDUCE_ARGMAX:
-		  return 1;
-		default:
-		  return 0;
-	}
+	return GpuReductionAttr_requiresD1(&gr->grAttr);
 }
 static int        reduxGenKernelRequiresLatticeS0(const GpuReduction*  gr){
 	return reduxGenRequiresS0(gr);
@@ -3254,10 +3322,6 @@ static size_t      reduxGenGetWMEMK1Off           (const GpuReduction*  gr, size
  */
 
 static int         reduxInvInit                   (redux_ctx*  ctx){
-	/**
-	 * We initialize certain parts of the context.
-	 */
-
 	ctx->L           = ctx->Li        = NULL;
 	ctx->S0J         = ctx->S0Si      = NULL;
 	ctx->D0J         = ctx->D0Si      = NULL;
@@ -3281,7 +3345,7 @@ static int         reduxInvInit                   (redux_ctx*  ctx){
  * @brief Begin inferring the properties of the reduction invocation.
  */
 
-static int        reduxInvInferProperties       (redux_ctx*  ctx){
+static int         reduxInvInferProperties        (redux_ctx*  ctx){
 	axis_desc* a;
 	int        i, j;
 	size_t     d;
@@ -3320,7 +3384,8 @@ static int        reduxInvInferProperties       (redux_ctx*  ctx){
 	ctx->nds0  = reduxInvRequiresS0(ctx) ? ctx->s0->nd : 0;
 	ctx->nds0r = ctx->reduxLen;
 	ctx->ndd0  = ctx->nds0   - ctx->nds0r;
-	ctx->ndfs0 = ctx->ndfs0r = ctx->ndfd0 = 0;
+	ctx->ndfs0 = ctx->nds0;
+
 
 	/* Insane reduxList? */
 	for (i=0;i<ctx->nds0r;i++){
@@ -3450,7 +3515,10 @@ static int        reduxInvInferProperties       (redux_ctx*  ctx){
 		ctx->D1Off  = ctx->d1->offset;
 	}
 
-	return reduxInvFlattenSource(ctx);
+
+	return ctx->flags & 0                ? //FIXME: Delete this hack after debugging.
+	       reduxInvFlattenSource    (ctx):
+	       reduxInvComputeKernelArgs(ctx);
 }
 
 /**
@@ -3463,8 +3531,6 @@ static int        reduxInvInferProperties       (redux_ctx*  ctx){
 static int        reduxInvFlattenSource         (redux_ctx*  ctx){
 	axis_desc* axis, *flatAxis, *sortAxis;
 	int        i, j, k, isSensitive;
-
-	ctx->ndfs0 = ctx->nds0;
 
 	/**
 	 * Pass 1: Flatten out 0- and 1-length axes. We already know that
@@ -3502,7 +3568,7 @@ static int        reduxInvFlattenSource         (redux_ctx*  ctx){
 	 */
 
 	k           = ctx->ndfs0;
-	isSensitive = reduxIsSensitive(ctx->op);
+	isSensitive = GpuReductionAttr_issensitive(&ctx->gr->grAttr);
 	qsort(ctx->xdSrc, ctx->ndfs0, sizeof(*ctx->xdSrc),
 	      isSensitive ? reduxSortFlatSensitive : reduxSortFlatInsensitive);
 	for (i=j=1;i<ctx->ndfs0;i++){
@@ -3516,19 +3582,6 @@ static int        reduxInvFlattenSource         (redux_ctx*  ctx){
 		}
 	}
 	ctx->ndfs0 = k;
-
-
-	/**
-	 * Compute number of flattened free and reduced axes.
-	 */
-
-	for (ctx->ndfs0r=ctx->ndfd0=i=0;i<ctx->ndfs0;i++){
-		if (axisIsReduced(reduxInvGetSrcAxis(ctx, i))){
-			ctx->ndfs0r++;
-		}else{
-			ctx->ndfd0++;
-		}
-	}
 
 	return reduxInvComputeKernelArgs(ctx);
 }

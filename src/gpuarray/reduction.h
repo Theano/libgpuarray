@@ -22,8 +22,10 @@ extern "C" {
 
 
 /* Data Structures */
+struct         GpuReductionAttr;
 struct         GpuReduction;
-typedef struct GpuReduction GpuReduction;
+typedef struct GpuReductionAttr GpuReductionAttr;
+typedef struct GpuReduction     GpuReduction;
 
 
 /**
@@ -31,59 +33,87 @@ typedef struct GpuReduction GpuReduction;
  */
 
 typedef enum _ga_reduce_op {
-	                           /*    dst   ,  dstArg  */
-	GA_REDUCE_SUM,             /*     +               */
-	GA_REDUCE_PROD,            /*     *               */
-	GA_REDUCE_PRODNZ,          /*     * (!=0)         */
-	GA_REDUCE_MIN,             /*   min()             */
-	GA_REDUCE_MAX,             /*   max()             */
-	GA_REDUCE_ARGMIN,          /*            argmin() */
-	GA_REDUCE_ARGMAX,          /*            argmax() */
-	GA_REDUCE_MINANDARGMIN,    /*   min()  , argmin() */
-	GA_REDUCE_MAXANDARGMAX,    /*   max()  , argmax() */
-	GA_REDUCE_AND,             /*     &               */
-	GA_REDUCE_OR,              /*     |               */
-	GA_REDUCE_XOR,             /*     ^               */
-	GA_REDUCE_ALL,             /*  &&/all()           */
-	GA_REDUCE_ANY,             /*  ||/any()           */
+	                              /*     d0   ,    d1    */
+	GA_ELEMWISE,
+	GA_REDUCE_COPY=GA_ELEMWISE,   /*   (copy)            */
+	GA_REDUCE_SUM,                /*     +               */
+	GA_REDUCE_PROD,               /*     *               */
+	GA_REDUCE_PRODNZ,             /*     * (!=0)         */
+	GA_REDUCE_MIN,                /*   min()             */
+	GA_REDUCE_MAX,                /*   max()             */
+	GA_REDUCE_ARGMIN,             /*            argmin() */
+	GA_REDUCE_ARGMAX,             /*            argmax() */
+	GA_REDUCE_MINANDARGMIN,       /*   min()  , argmin() */
+	GA_REDUCE_MAXANDARGMAX,       /*   max()  , argmax() */
+	GA_REDUCE_AND,                /*     &               */
+	GA_REDUCE_OR,                 /*     |               */
+	GA_REDUCE_XOR,                /*     ^               */
+	GA_REDUCE_ALL,                /*  &&/all()           */
+	GA_REDUCE_ANY,                /*  ||/any()           */
 	
-	GA_REDUCE_ENDSUPPORTED     /* Must be last element in enum */
+	GA_REDUCE_ENDSUPPORTED        /* Must be last element in enum */
 } ga_reduce_op;
 
 
 /* External Functions */
 
 /**
- * @brief Create a new GPU reduction operator over a list of axes to reduce.
+ * @brief Create, modify and free the attributes of a reduction operator.
+ * 
+ * @param [out] grAttr      The reduction operator attributes object.
+ * @param [in]  op          The reduction operation.
+ * @param [in]  maxSrcDims  The maximum number of supported source dimensions.
+ * @param [in]  maxDstDims  The maximum number of supported destination dimensions.
+ * @param [in]  s0Typecode  The typecode of the source tensor.
+ * @param [in]  d0Typecode  The typecode of the first destination tensor.
+ * @param [in]  d1Typecode  The typecode of the second destination tensor.
+ * @param [in]  i0Typecode  The typecode of the indices.
+ */
+
+GPUARRAY_PUBLIC int   GpuReductionAttr_new          (GpuReductionAttr**         grAttr,
+                                                     gpucontext*                gpuCtx);
+GPUARRAY_PUBLIC int   GpuReductionAttr_setop        (GpuReductionAttr*          grAttr,
+                                                     ga_reduce_op               op);
+GPUARRAY_PUBLIC int   GpuReductionAttr_setdims      (GpuReductionAttr*          grAttr,
+                                                     unsigned                   maxSrcDims,
+                                                     unsigned                   maxDstDims);
+GPUARRAY_PUBLIC int   GpuReductionAttr_sets0type    (GpuReductionAttr*          grAttr,
+                                                     int                        s0Typecode);
+GPUARRAY_PUBLIC int   GpuReductionAttr_setd0type    (GpuReductionAttr*          grAttr,
+                                                     int                        d0Typecode);
+GPUARRAY_PUBLIC int   GpuReductionAttr_setd1type    (GpuReductionAttr*          grAttr,
+                                                     int                        d1Typecode);
+GPUARRAY_PUBLIC int   GpuReductionAttr_seti0type    (GpuReductionAttr*          grAttr,
+                                                     int                        i0Typecode);
+GPUARRAY_PUBLIC int   GpuReductionAttr_appendopname (GpuReductionAttr*          grAttr,
+                                                     size_t                     n,
+                                                     char*                      name);
+GPUARRAY_PUBLIC int   GpuReductionAttr_issensitive  (const GpuReductionAttr*    grAttr);
+GPUARRAY_PUBLIC int   GpuReductionAttr_requiresS0   (const GpuReductionAttr*    grAttr);
+GPUARRAY_PUBLIC int   GpuReductionAttr_requiresD0   (const GpuReductionAttr*    grAttr);
+GPUARRAY_PUBLIC int   GpuReductionAttr_requiresD1   (const GpuReductionAttr*    grAttr);
+GPUARRAY_PUBLIC void  GpuReductionAttr_free         (GpuReductionAttr*          grAttr);
+
+/**
+ * @brief Create a new GPU reduction operator with the given attributes.
  *
  * @param [out] gr           The reduction operator.
- * @param [in]  gpuCtx       The GPU context.
- * @param [in]  op           The reduction operation to perform.
- * @param [in]  ndf          The minimum number of free (destination) dimensions to support.
- * @param [in]  ndr          The minimum number of reduction (source) dimensions to support.
- * @param [in]  s0TypeCode   The data type of the source operand.
- * @param [in]  flags        Reduction operator creation flags. Currently must be
- *                           set to 0.
+ * @param [in]  grAttr       The GPU context.
  *
  * @return GA_NO_ERROR      if the operator was created successfully
- *         GA_INVALID_ERROR if grOut is NULL, or some other argument was invalid
+ *         GA_INVALID_ERROR if some argument was invalid
  *         GA_NO_MEMORY     if memory allocation failed anytime during creation
  *         or other non-zero error codes otherwise.
  */
 
-GPUARRAY_PUBLIC int   GpuReduction_new   (GpuReduction**       grOut,
-                                          gpucontext*          gpuCtx,
-                                          ga_reduce_op         op,
-                                          unsigned             ndf,
-                                          unsigned             ndr,
-                                          int                  s0TypeCode,
-                                          int                  flags);
+GPUARRAY_PUBLIC int   GpuReduction_new              (GpuReduction**             gr,
+                                                     const GpuReductionAttr*    grAttr);
 
 /**
  * @brief Deallocate an operator allocated by GpuReduction_new().
  */
 
-GPUARRAY_PUBLIC void  GpuReduction_free  (GpuReduction*        gr);
+GPUARRAY_PUBLIC void  GpuReduction_free             (GpuReduction*              gr);
 
 /**
  * @brief Invoke an operator allocated by GpuReduction_new() on a source tensor.
@@ -123,13 +153,13 @@ GPUARRAY_PUBLIC void  GpuReduction_free  (GpuReduction*        gr);
  *         error code otherwise.
  */
 
-GPUARRAY_PUBLIC int   GpuReduction_call  (const GpuReduction*  gr,
-                                          GpuArray*            d0,
-                                          GpuArray*            d1,
-                                          const GpuArray*      s0,
-                                          unsigned             reduxLen,
-                                          const int*           reduxList,
-                                          int                  flags);
+GPUARRAY_PUBLIC int   GpuReduction_call            (const GpuReduction*        gr,
+                                                    GpuArray*                  d0,
+                                                    GpuArray*                  d1,
+                                                    const GpuArray*            s0,
+                                                    unsigned                   reduxLen,
+                                                    const int*                 reduxList,
+                                                    int                        flags);
 
 
 #ifdef __cplusplus
