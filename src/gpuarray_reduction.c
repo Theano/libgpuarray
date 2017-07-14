@@ -2609,6 +2609,7 @@ static void       reduxGenSrcAppendDecode       (GpuReduction*     gr){
 			"    TK1* restrict const SHMEMK1 = (TK1*)(SHMEM + SHMEMK1Off);\n");
 		}
 		srcbAppends(&gr->srcGen,
+		"    local_barrier();\n"
 		"    INITREDUXSTATE(SHMEMK0[LID_0], SHMEMK1[LID_0]);\n"
 		"    if(D<LDIM_0 && LID_0+LDIM_0<H){\n"
 		"        INITREDUXSTATE(SHMEMK0[LID_0+LDIM_0], SHMEMK1[LID_0+LDIM_0]);\n"
@@ -2745,6 +2746,7 @@ static void        reduxGenSrcAppendIncrement     (GpuReduction*        gr,
 static void        reduxGenSrcAppendDstWrite      (GpuReduction*        gr,
                                                    uint32_t             selector,
                                                    int                  initial){
+	srcbAppends(&gr->srcGen, "                local_barrier();\n");
 	if (initial){
 		srcbAppends(&gr->srcGen, "                if(LID_0 < D){\n"
 		                         "                    SETREDUXSTATE(W0R[GID_0*D + LID_0],\n"
@@ -2771,6 +2773,7 @@ static void        reduxGenSrcAppendDstWrite      (GpuReduction*        gr,
 			                         "                }\n");
 		}
 	}
+	srcbAppends(&gr->srcGen, "                local_barrier();\n");
 }
 static void        reduxGenSrcAppendPhase1        (GpuReduction*        gr){
 	/**

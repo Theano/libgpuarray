@@ -16,7 +16,7 @@ void teardown(void);
 
 
 /* Defines */
-#define MAXERRPRINT  2
+#define MAXERRPRINT  16
 #define ga_assert_ok(e) ck_assert_int_eq(e, GA_NO_ERROR)
 
 
@@ -155,7 +155,7 @@ START_TEST(test_maxandargmax_reduction){
 		
 		if(gtD0 != pD0[j] || gtD1 != pD1[j]){
 			errCnt++;
-			if(errCnt < MAXERRPRINT){
+			if(errCnt <= MAXERRPRINT){
 				fprintf(stderr, "%s:%d: Mismatch GT %f[%zu] != %f[%zu] UUT @ %zu!\n",
 				        __func__, __LINE__, gtD0, gtD1, pD0[j], pD1[j], j);
 				fflush (stderr);
@@ -268,7 +268,7 @@ START_TEST(test_maxandargmax_idxtranspose){
 
 		if(gtD0 != pD0[j] || gtD1 != pD1[j]){
 			errCnt++;
-			if(errCnt < MAXERRPRINT){
+			if(errCnt <= MAXERRPRINT){
 				fprintf(stderr, "%s:%d: Mismatch GT %f[%zu] != %f[%zu] UUT @ %zu!\n",
 				__func__, __LINE__, gtD0, gtD1, pD0[j], pD1[j], j);
 				fflush (stderr);
@@ -375,7 +375,7 @@ START_TEST(test_maxandargmax_bigdestination){
 		
 		if(gtD0 != pD0[j] || gtD1 != pD1[j]){
 			errCnt++;
-			if(errCnt < MAXERRPRINT){
+			if(errCnt <= MAXERRPRINT){
 				fprintf(stderr, "%s:%d: Mismatch GT %f[%zu] != %f[%zu] UUT @ %zu!\n",
 				__func__, __LINE__, gtD0, gtD1, pD0[j], pD1[j], j);
 				fflush (stderr);
@@ -493,7 +493,7 @@ START_TEST(test_maxandargmax_veryhighrank){
 					size_t dstIdx = (((i)*dims[1] + j)*dims[3] + l)*dims[6] + o;
 					if(gtD0 != pD0[dstIdx] || gtD1 != pD1[dstIdx]){
 						errCnt++;
-						if(errCnt < MAXERRPRINT){
+						if(errCnt <= MAXERRPRINT){
 							fprintf(stderr, "%s:%d: Mismatch GT %f[%zu] != %f[%zu] UUT @ %zu!\n",
 							__func__, __LINE__, gtD0, gtD1, pD0[dstIdx], pD1[dstIdx], dstIdx);
 							fflush (stderr);
@@ -605,7 +605,7 @@ START_TEST(test_maxandargmax_alldimsreduced){
 	}
 	if(gtD0 != pD0[0] || gtD1 != pD1[0]){
 		errCnt++;
-		if(errCnt < MAXERRPRINT){
+		if(errCnt <= MAXERRPRINT){
 			fprintf(stderr, "%s:%d: Mismatch GT %f[%zu] != %f[%zu] UUT @ %zu!\n",
 			__func__, __LINE__, gtD0, gtD1, pD0[0], pD1[0], (size_t)0);
 			fflush (stderr);
@@ -713,7 +713,7 @@ START_TEST(test_minandargmin_reduction){
 		
 		if(gtD0 != pD0[j] || gtD1 != pD1[j]){
 			errCnt++;
-			if(errCnt < MAXERRPRINT){
+			if(errCnt <= MAXERRPRINT){
 				fprintf(stderr, "%s:%d: Mismatch GT %f[%zu] != %f[%zu] UUT @ %zu!\n",
 				__func__, __LINE__, gtD0, gtD1, pD0[j], pD1[j], j);
 				fflush (stderr);
@@ -831,7 +831,7 @@ START_TEST(test_minandargmin_veryhighrank){
 					size_t dstIdx = (((i)*dims[1] + j)*dims[3] + l)*dims[6] + o;
 					if(gtD0 != pD0[dstIdx] || gtD1 != pD1[dstIdx]){
 						errCnt++;
-						if(errCnt < MAXERRPRINT){
+						if(errCnt <= MAXERRPRINT){
 							fprintf(stderr, "%s:%d: Mismatch GT %f[%zu] != %f[%zu] UUT @ %zu!\n",
 							__func__, __LINE__, gtD0, gtD1, pD0[dstIdx], pD1[dstIdx], dstIdx);
 							fflush (stderr);
@@ -943,7 +943,7 @@ START_TEST(test_minandargmin_alldimsreduced){
 	}
 	if(gtD0 != pD0[0] || gtD1 != pD1[0]){
 		errCnt++;
-		if(errCnt < MAXERRPRINT){
+		if(errCnt <= MAXERRPRINT){
 			fprintf(stderr, "%s:%d: Mismatch GT %f[%zu] != %f[%zu] UUT @ %zu!\n",
 			__func__, __LINE__, gtD0, gtD1, pD0[0], pD1[0], (size_t)0);
 			fflush (stderr);
@@ -1046,7 +1046,7 @@ START_TEST(test_argmax_reduction){
 		
 		if(gtD1 != pD1[j]){
 			errCnt++;
-			if(errCnt < MAXERRPRINT){
+			if(errCnt <= MAXERRPRINT){
 				fprintf(stderr, "%s:%d: Mismatch GT [%zu] != [%zu] UUT @ %zu!\n",
 				__func__, __LINE__, gtD1, pD1[j], j);
 				fflush (stderr);
@@ -1157,7 +1157,7 @@ START_TEST(test_argmax_veryhighrank){
 					size_t dstIdx = (((i)*dims[1] + j)*dims[3] + l)*dims[6] + o;
 					if(gtD1 != pD1[dstIdx]){
 						errCnt++;
-						if(errCnt < MAXERRPRINT){
+						if(errCnt <= MAXERRPRINT){
 							fprintf(stderr, "%s:%d: Mismatch GT [%zu] != [%zu] UUT @ %zu!\n",
 							__func__, __LINE__, gtD1, pD1[dstIdx], dstIdx);
 							fflush (stderr);
@@ -1263,7 +1263,7 @@ START_TEST(test_argmax_alldimsreduced){
 	}
 	if(gtD1 != pD1[0]){
 		errCnt++;
-		if(errCnt < MAXERRPRINT){
+		if(errCnt <= MAXERRPRINT){
 			fprintf(stderr, "%s:%d: Mismatch GT [%zu] != [%zu] UUT @ %zu!\n",
 			__func__, __LINE__, gtD1, pD1[0], (size_t)0);
 			fflush (stderr);
@@ -1365,7 +1365,7 @@ START_TEST(test_argmin_reduction){
 		
 		if(gtD1 != pD1[j]){
 			errCnt++;
-			if(errCnt < MAXERRPRINT){
+			if(errCnt <= MAXERRPRINT){
 				fprintf(stderr, "%s:%d: Mismatch GT [%zu] != [%zu] UUT @ %zu!\n",
 				__func__, __LINE__, gtD1, pD1[j], j);
 				fflush (stderr);
@@ -1476,7 +1476,7 @@ START_TEST(test_argmin_veryhighrank){
 					size_t dstIdx = (((i)*dims[1] + j)*dims[3] + l)*dims[6] + o;
 					if(gtD1 != pD1[dstIdx]){
 						errCnt++;
-						if(errCnt < MAXERRPRINT){
+						if(errCnt <= MAXERRPRINT){
 							fprintf(stderr, "%s:%d: Mismatch GT [%zu] != [%zu] UUT @ %zu!\n",
 							__func__, __LINE__, gtD1, pD1[dstIdx], dstIdx);
 							fflush (stderr);
@@ -1582,7 +1582,7 @@ START_TEST(test_argmin_alldimsreduced){
 	}
 	if(gtD1 != pD1[0]){
 		errCnt++;
-		if(errCnt < MAXERRPRINT){
+		if(errCnt <= MAXERRPRINT){
 			fprintf(stderr, "%s:%d: Mismatch GT [%zu] != [%zu] UUT @ %zu!\n",
 			__func__, __LINE__, gtD1, pD1[0], (size_t)0);
 			fflush (stderr);
@@ -1679,7 +1679,7 @@ START_TEST(test_max_reduction){
 		
 		if(gtD0 != pD0[j]){
 			errCnt++;
-			if(errCnt < MAXERRPRINT){
+			if(errCnt <= MAXERRPRINT){
 				fprintf(stderr, "%s:%d: Mismatch GT %f != %f UUT @ %zu!\n",
 				__func__, __LINE__, gtD0, pD0[j], j);
 				fflush (stderr);
@@ -1786,7 +1786,7 @@ START_TEST(test_max_veryhighrank){
 					size_t dstIdx = (((i)*dims[1] + j)*dims[3] + l)*dims[6] + o;
 					if(gtD0 != pD0[dstIdx]){
 						errCnt++;
-						if(errCnt < MAXERRPRINT){
+						if(errCnt <= MAXERRPRINT){
 							fprintf(stderr, "%s:%d: Mismatch GT %f != %f UUT @ %zu!\n",
 							__func__, __LINE__, gtD0, pD0[dstIdx], dstIdx);
 							fflush (stderr);
@@ -1887,7 +1887,7 @@ START_TEST(test_max_alldimsreduced){
 	}
 	if(gtD0 != pD0[0]){
 		errCnt++;
-		if(errCnt < MAXERRPRINT){
+		if(errCnt <= MAXERRPRINT){
 			fprintf(stderr, "%s:%d: Mismatch GT %f != %f UUT @ %zu!\n",
 			__func__, __LINE__, gtD0, pD0[0], (size_t)0);
 			fflush (stderr);
@@ -1983,7 +1983,7 @@ START_TEST(test_min_reduction){
 		
 		if(gtD0 != pD0[j]){
 			errCnt++;
-			if(errCnt < MAXERRPRINT){
+			if(errCnt <= MAXERRPRINT){
 				fprintf(stderr, "%s:%d: Mismatch GT %f != %f UUT @ %zu!\n",
 				__func__, __LINE__, gtD0, pD0[j], j);
 				fflush (stderr);
@@ -2090,7 +2090,7 @@ START_TEST(test_min_veryhighrank){
 					size_t dstIdx = (((i)*dims[1] + j)*dims[3] + l)*dims[6] + o;
 					if(gtD0 != pD0[dstIdx]){
 						errCnt++;
-						if(errCnt < MAXERRPRINT){
+						if(errCnt <= MAXERRPRINT){
 							fprintf(stderr, "%s:%d: Mismatch GT %f != %f UUT @ %zu!\n",
 							__func__, __LINE__, gtD0, pD0[dstIdx], dstIdx);
 							fflush (stderr);
@@ -2191,7 +2191,7 @@ START_TEST(test_min_alldimsreduced){
 	}
 	if(gtD0 != pD0[0]){
 		errCnt++;
-		if(errCnt < MAXERRPRINT){
+		if(errCnt <= MAXERRPRINT){
 			fprintf(stderr, "%s:%d: Mismatch GT %f != %f UUT @ %zu!\n",
 			__func__, __LINE__, gtD0, pD0[0], (size_t)0);
 			fflush (stderr);
@@ -2285,7 +2285,7 @@ START_TEST(test_sum_reduction){
 		
 		if(fabs(gtD0-pD0[j]) >= TOL){
 			errCnt++;
-			if(errCnt < MAXERRPRINT){
+			if(errCnt <= MAXERRPRINT){
 				fprintf(stderr, "%s:%d: Mismatch GT %f != %f UUT @ %zu (TOL=%f)!\n",
 				__func__, __LINE__, gtD0, pD0[j], j, TOL);
 				fflush (stderr);
@@ -2390,7 +2390,7 @@ START_TEST(test_sum_veryhighrank){
 					size_t dstIdx = (((i)*dims[1] + j)*dims[3] + l)*dims[6] + o;
 					if(fabs(gtD0-pD0[dstIdx]) >= TOL){
 						errCnt++;
-						if(errCnt < MAXERRPRINT){
+						if(errCnt <= MAXERRPRINT){
 							fprintf(stderr, "%s:%d: Mismatch GT %f != %f UUT @ %zu (TOL=%f)!\n",
 							__func__, __LINE__, gtD0, pD0[dstIdx], dstIdx, TOL);
 							fflush (stderr);
@@ -2489,7 +2489,7 @@ START_TEST(test_sum_alldimsreduced){
 	}
 	if(fabs(gtD0-pD0[0]) >= TOL){
 		errCnt++;
-		if(errCnt < MAXERRPRINT){
+		if(errCnt <= MAXERRPRINT){
 			fprintf(stderr, "%s:%d: Mismatch GT %f != %f UUT @ %zu (TOL=%f)!\n",
 			__func__, __LINE__, gtD0, pD0[0], (size_t)0, TOL);
 			fflush (stderr);
@@ -2578,7 +2578,7 @@ START_TEST(test_sum_huge){
 	}
 	if(fabs(gtD0-pD0[0]) >= TOL){
 		errCnt++;
-		if(errCnt < MAXERRPRINT){
+		if(errCnt <= MAXERRPRINT){
 			fprintf(stderr, "%s:%d: Mismatch GT %f != %f UUT @ %zu (TOL=%f)!\n",
 			__func__, __LINE__, gtD0, pD0[0], (size_t)0, TOL);
 			fflush (stderr);
@@ -2672,7 +2672,7 @@ START_TEST(test_prod_reduction){
 		
 		if(fabs(gtD0-pD0[j]) >= TOL){
 			errCnt++;
-			if(errCnt < MAXERRPRINT){
+			if(errCnt <= MAXERRPRINT){
 				fprintf(stderr, "%s:%d: Mismatch GT %f != %f UUT @ %zu (TOL=%f)!\n",
 				__func__, __LINE__, gtD0, pD0[j], j, TOL);
 				fflush (stderr);
@@ -2777,7 +2777,7 @@ START_TEST(test_prod_veryhighrank){
 					size_t dstIdx = (((i)*dims[1] + j)*dims[3] + l)*dims[6] + o;
 					if(fabs(gtD0-pD0[dstIdx]) >= TOL){
 						errCnt++;
-						if(errCnt < MAXERRPRINT){
+						if(errCnt <= MAXERRPRINT){
 							fprintf(stderr, "%s:%d: Mismatch GT %f != %f UUT @ %zu (TOL=%f)!\n",
 							__func__, __LINE__, gtD0, pD0[dstIdx], dstIdx, TOL);
 							fflush (stderr);
@@ -2876,7 +2876,7 @@ START_TEST(test_prod_alldimsreduced){
 	}
 	if(fabs(gtD0-pD0[0]) >= TOL){
 		errCnt++;
-		if(errCnt < MAXERRPRINT){
+		if(errCnt <= MAXERRPRINT){
 			fprintf(stderr, "%s:%d: Mismatch GT %f != %f UUT @ %zu (TOL=%f)!\n",
 			__func__, __LINE__, gtD0, pD0[0], (size_t)0, TOL);
 			fflush (stderr);
@@ -2973,7 +2973,7 @@ START_TEST(test_prodnz_reduction){
 		
 		if(fabs(gtD0-pD0[j]) >= TOL){
 			errCnt++;
-			if(errCnt < MAXERRPRINT){
+			if(errCnt <= MAXERRPRINT){
 				fprintf(stderr, "%s:%d: Mismatch GT %f != %f UUT @ %zu (TOL=%f)!\n",
 				__func__, __LINE__, gtD0, pD0[j], j, TOL);
 				fflush (stderr);
@@ -3081,7 +3081,7 @@ START_TEST(test_prodnz_veryhighrank){
 					size_t dstIdx = (((i)*dims[1] + j)*dims[3] + l)*dims[6] + o;
 					if(fabs(gtD0-pD0[dstIdx]) >= TOL){
 						errCnt++;
-						if(errCnt < MAXERRPRINT){
+						if(errCnt <= MAXERRPRINT){
 							fprintf(stderr, "%s:%d: Mismatch GT %f != %f UUT @ %zu (TOL=%f)!\n",
 							__func__, __LINE__, gtD0, pD0[dstIdx], dstIdx, TOL);
 							fflush (stderr);
@@ -3183,7 +3183,7 @@ START_TEST(test_prodnz_alldimsreduced){
 	}
 	if(fabs(gtD0-pD0[0]) >= TOL){
 		errCnt++;
-		if(errCnt < MAXERRPRINT){
+		if(errCnt <= MAXERRPRINT){
 			fprintf(stderr, "%s:%d: Mismatch GT %f != %f UUT @ %zu (TOL=%f)!\n",
 			__func__, __LINE__, gtD0, pD0[0], (size_t)0, TOL);
 			fflush (stderr);
@@ -3285,7 +3285,7 @@ START_TEST(test_and_reduction){
 		
 		if(gtD0 != pD0[j]){
 			errCnt++;
-			if(errCnt < MAXERRPRINT){
+			if(errCnt <= MAXERRPRINT){
 				fprintf(stderr, "%s:%d: Mismatch GT %u != %u UUT @ %zu!\n",
 				__func__, __LINE__, gtD0, pD0[j], j);
 				fflush (stderr);
@@ -3398,7 +3398,7 @@ START_TEST(test_and_veryhighrank){
 					size_t dstIdx = (((i)*dims[1] + j)*dims[3] + l)*dims[6] + o;
 					if(gtD0 != pD0[dstIdx]){
 						errCnt++;
-						if(errCnt < MAXERRPRINT){
+						if(errCnt <= MAXERRPRINT){
 							fprintf(stderr, "%s:%d: Mismatch GT %u != %u UUT @ %zu!\n",
 							__func__, __LINE__, gtD0, pD0[dstIdx], dstIdx);
 							fflush (stderr);
@@ -3505,7 +3505,7 @@ START_TEST(test_and_alldimsreduced){
 	}
 	if(gtD0 != pD0[0]){
 		errCnt++;
-		if(errCnt < MAXERRPRINT){
+		if(errCnt <= MAXERRPRINT){
 			fprintf(stderr, "%s:%d: Mismatch GT %u != %u UUT @ %zu!\n",
 			__func__, __LINE__, gtD0, pD0[0], (size_t)0);
 			fflush (stderr);
@@ -3607,7 +3607,7 @@ START_TEST(test_or_reduction){
 
 		if(gtD0 != pD0[j]){
 			errCnt++;
-			if(errCnt < MAXERRPRINT){
+			if(errCnt <= MAXERRPRINT){
 				fprintf(stderr, "%s:%d: Mismatch GT %u != %u UUT @ %zu!\n",
 				__func__, __LINE__, gtD0, pD0[j], (size_t)j);
 				fflush (stderr);
@@ -3720,7 +3720,7 @@ START_TEST(test_or_veryhighrank){
 					size_t dstIdx = (((i)*dims[1] + j)*dims[3] + l)*dims[6] + o;
 					if(gtD0 != pD0[dstIdx]){
 						errCnt++;
-						if(errCnt < MAXERRPRINT){
+						if(errCnt <= MAXERRPRINT){
 							fprintf(stderr, "%s:%d: Mismatch GT %u != %u UUT @ %zu!\n",
 							__func__, __LINE__, gtD0, pD0[dstIdx], dstIdx);
 							fflush (stderr);
@@ -3827,7 +3827,7 @@ START_TEST(test_or_alldimsreduced){
 	}
 	if(gtD0 != pD0[0]){
 		errCnt++;
-		if(errCnt < MAXERRPRINT){
+		if(errCnt <= MAXERRPRINT){
 			fprintf(stderr, "%s:%d: Mismatch GT %u != %u UUT @ %zu!\n",
 			__func__, __LINE__, gtD0, pD0[0], (size_t)0);
 			fflush (stderr);
@@ -3925,7 +3925,7 @@ START_TEST(test_xor_reduction){
 
 		if(gtD0 != pD0[j]){
 			errCnt++;
-			if(errCnt < MAXERRPRINT){
+			if(errCnt <= MAXERRPRINT){
 				fprintf(stderr, "%s:%d: Mismatch GT %u != %u UUT @ %zu!\n",
 				__func__, __LINE__, gtD0, pD0[j], (size_t)j);
 				fflush (stderr);
@@ -4034,7 +4034,7 @@ START_TEST(test_xor_veryhighrank){
 					size_t dstIdx = (((i)*dims[1] + j)*dims[3] + l)*dims[6] + o;
 					if(gtD0 != pD0[dstIdx]){
 						errCnt++;
-						if(errCnt < MAXERRPRINT){
+						if(errCnt <= MAXERRPRINT){
 							fprintf(stderr, "%s:%d: Mismatch GT %u != %u UUT @ %zu!\n",
 							__func__, __LINE__, gtD0, pD0[dstIdx], dstIdx);
 							fflush (stderr);
@@ -4137,7 +4137,7 @@ START_TEST(test_xor_alldimsreduced){
 	}
 	if(gtD0 != pD0[0]){
 		errCnt++;
-		if(errCnt < MAXERRPRINT){
+		if(errCnt <= MAXERRPRINT){
 			fprintf(stderr, "%s:%d: Mismatch GT %u != %u UUT @ %zu!\n",
 			__func__, __LINE__, gtD0, pD0[0], (size_t)0);
 			fflush (stderr);
@@ -4235,7 +4235,7 @@ START_TEST(test_any_reduction){
 
 		if(gtD0 != pD0[j]){
 			errCnt++;
-			if(errCnt < MAXERRPRINT){
+			if(errCnt <= MAXERRPRINT){
 				fprintf(stderr, "%s:%d: Mismatch GT %u != %u UUT @ %zu!\n",
 				__func__, __LINE__, gtD0, pD0[j], (size_t)j);
 				fflush (stderr);
@@ -4344,7 +4344,7 @@ START_TEST(test_any_veryhighrank){
 					size_t dstIdx = (((i)*dims[1] + j)*dims[3] + l)*dims[6] + o;
 					if(gtD0 != pD0[dstIdx]){
 						errCnt++;
-						if(errCnt < MAXERRPRINT){
+						if(errCnt <= MAXERRPRINT){
 							fprintf(stderr, "%s:%d: Mismatch GT %u != %u UUT @ %zu!\n",
 							__func__, __LINE__, gtD0, pD0[dstIdx], dstIdx);
 							fflush (stderr);
@@ -4447,7 +4447,7 @@ START_TEST(test_any_alldimsreduced){
 	}
 	if(gtD0 != pD0[0]){
 		errCnt++;
-		if(errCnt < MAXERRPRINT){
+		if(errCnt <= MAXERRPRINT){
 			fprintf(stderr, "%s:%d: Mismatch GT %u != %u UUT @ %zu!\n",
 			__func__, __LINE__, gtD0, pD0[0], (size_t)0);
 			fflush (stderr);
@@ -4545,7 +4545,7 @@ START_TEST(test_all_reduction){
 
 		if(gtD0 != pD0[j]){
 			errCnt++;
-			if(errCnt < MAXERRPRINT){
+			if(errCnt <= MAXERRPRINT){
 				fprintf(stderr, "%s:%d: Mismatch GT %u != %u UUT @ %zu!\n",
 				__func__, __LINE__, gtD0, pD0[j], (size_t)j);
 				fflush (stderr);
@@ -4654,7 +4654,7 @@ START_TEST(test_all_veryhighrank){
 					size_t dstIdx = (((i)*dims[1] + j)*dims[3] + l)*dims[6] + o;
 					if(gtD0 != pD0[dstIdx]){
 						errCnt++;
-						if(errCnt < MAXERRPRINT){
+						if(errCnt <= MAXERRPRINT){
 							fprintf(stderr, "%s:%d: Mismatch GT %u != %u UUT @ %zu!\n",
 							__func__, __LINE__, gtD0, pD0[dstIdx], dstIdx);
 							fflush (stderr);
@@ -4757,7 +4757,7 @@ START_TEST(test_all_alldimsreduced){
 	}
 	if(gtD0 != pD0[0]){
 		errCnt++;
-		if(errCnt < MAXERRPRINT){
+		if(errCnt <= MAXERRPRINT){
 			fprintf(stderr, "%s:%d: Mismatch GT %u != %u UUT @ %zu!\n",
 			__func__, __LINE__, gtD0, pD0[0], (size_t)0);
 			fflush (stderr);
