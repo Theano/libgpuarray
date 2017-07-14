@@ -306,188 +306,188 @@ typedef void (*GpuReductionIterFn)(const GpuReduction* gr,
 
 /* Static Function prototypes */
 /* Utilities */
-static int         reduxGetSumInit                (int typecode, const char** property);
-static int         reduxGetProdInit               (int typecode, const char** property);
-static int         reduxGetMinInit                (int typecode, const char** property);
-static int         reduxGetMaxInit                (int typecode, const char** property);
-static int         reduxGetAndInit                (int typecode, const char** property);
-static int         reduxGetOrInit                 (int typecode, const char** property);
-static int         reduxIsFloatingPoint           (int typecode);
-static unsigned    reduxCeilLog2                  (uint64_t x);
-static uint64_t    reduxNextPow2                  (uint64_t x);
-static int         reduxSortFlatSensitive         (const void* a, const void* b);
-static int         reduxSortFlatInsensitive       (const void* a, const void* b);
-static int         reduxSortPtrS0AbsStride        (const void* a, const void* b);
-static int         reduxSortPtrByReduxNum         (const void* a, const void* b);
-static int         reduxSortPtrD0WrSelect         (const void* a, const void* b);
-static int         reduxSortPtrD1WrSelect         (const void* a, const void* b);
-static int         reduxSortPtrInsertFinalOrder   (const void* a, const void* b);
+static int         reduxGetSumInit                  (int typecode, const char** property);
+static int         reduxGetProdInit                 (int typecode, const char** property);
+static int         reduxGetMinInit                  (int typecode, const char** property);
+static int         reduxGetMaxInit                  (int typecode, const char** property);
+static int         reduxGetAndInit                  (int typecode, const char** property);
+static int         reduxGetOrInit                   (int typecode, const char** property);
+static int         reduxIsFloatingPoint             (int typecode);
+static unsigned    reduxCeilLog2                    (uint64_t x);
+static uint64_t    reduxNextPow2                    (uint64_t x);
+static int         reduxSortFlatInsensitive         (const void* a, const void* b);
+static int         reduxSortFlatSensitive           (const void* a, const void* b);
+static int         reduxSortPtrS0AbsStride          (const void* a, const void* b);
+static int         reduxSortPtrByReduxNum           (const void* a, const void* b);
+static int         reduxSortPtrD0WrSelect           (const void* a, const void* b);
+static int         reduxSortPtrD1WrSelect           (const void* a, const void* b);
+static int         reduxSortPtrInsertFinalOrder     (const void* a, const void* b);
 
 /* Axis Description API */
-static void        axisInit                       (axis_desc*           axis,
-                                                   ssize_t              len,
-                                                   ssize_t              s0S);
-static void        axisMarkReduced                (axis_desc*           axis, int    reduxNum);
-static void        axisMarkIntraBlock             (axis_desc*           axis,
-                                                   int                  ibNum,
-                                                   size_t               ibLen);
-static int         axisGetReduxNum                (const axis_desc*     axis);
-static size_t      axisGetLen                     (const axis_desc*     axis);
-static size_t      axisGetIntraLen                (const axis_desc*     axis);
-static size_t      axisGetInterLen                (const axis_desc*     axis);
-static size_t      axisGetIntraInterLen           (const axis_desc*     axis);
-static ssize_t     axisGetS0Stride                (const axis_desc*     axis);
-static size_t      axisGetS0AbsStride             (const axis_desc*     axis);
-static ssize_t     axisGetD0Stride                (const axis_desc*     axis);
-static size_t      axisGetD0AbsStride             (const axis_desc*     axis);
-static ssize_t     axisGetD1Stride                (const axis_desc*     axis);
-static size_t      axisGetD1AbsStride             (const axis_desc*     axis);
-static size_t      axisGetI0Stride                (const axis_desc*     axis);
-static void        axisSetI0Stride                (axis_desc*           axis,
-                                                   size_t               pdim);
-static unsigned    axisGetPerm                    (const axis_desc*     axis);
-static int         axisGetIBNum                   (const axis_desc*     axis);
-static void        axisSetPerm                    (axis_desc*           axis,
-                                                   unsigned             ibp);
-static int         axisIsReduced                  (const axis_desc*     axis);
-static int         axisIsIntra                    (const axis_desc*     axis);
-static int         axisIsInter                    (const axis_desc*     axis);
-static int         axisIsSplit                    (const axis_desc*     axis);
+static void        axisInit                         (axis_desc*           axis,
+                                                     ssize_t              len,
+                                                     ssize_t              s0S);
+static void        axisMarkReduced                  (axis_desc*           axis, int    reduxNum);
+static void        axisMarkIntraBlock               (axis_desc*           axis,
+                                                     int                  ibNum,
+                                                     size_t               ibLen);
+static int         axisGetReduxNum                  (const axis_desc*     axis);
+static size_t      axisGetLen                       (const axis_desc*     axis);
+static size_t      axisGetIntraLen                  (const axis_desc*     axis);
+static size_t      axisGetInterLen                  (const axis_desc*     axis);
+static size_t      axisGetIntraInterLen             (const axis_desc*     axis);
+static ssize_t     axisGetS0Stride                  (const axis_desc*     axis);
+static size_t      axisGetS0AbsStride               (const axis_desc*     axis);
+static ssize_t     axisGetD0Stride                  (const axis_desc*     axis);
+static size_t      axisGetD0AbsStride               (const axis_desc*     axis);
+static ssize_t     axisGetD1Stride                  (const axis_desc*     axis);
+static size_t      axisGetD1AbsStride               (const axis_desc*     axis);
+static size_t      axisGetI0Stride                  (const axis_desc*     axis);
+static void        axisSetI0Stride                  (axis_desc*           axis,
+                                                     size_t               pdim);
+static unsigned    axisGetPerm                      (const axis_desc*     axis);
+static int         axisGetIBNum                     (const axis_desc*     axis);
+static void        axisSetPerm                      (axis_desc*           axis,
+                                                     unsigned             ibp);
+static int         axisIsReduced                    (const axis_desc*     axis);
+static int         axisIsIntra                      (const axis_desc*     axis);
+static int         axisIsInter                      (const axis_desc*     axis);
+static int         axisIsSplit                      (const axis_desc*     axis);
 
 /* Reduction Context API */
 /*     Generator Control Flow */
-static int         reduxGenInit                   (GpuReduction*        gr);
-static int         reduxGenInferProperties        (GpuReduction*        gr);
-static void        reduxGenSetMaxBS               (GpuReduction*        gr);
-static void        reduxGenSetKTypes              (GpuReduction*        gr);
-static void        reduxGenIterArgs               (const GpuReduction*  gr,
-                                                   GpuReductionIterFn   fn,
-                                                   void*                user);
-static int         reduxGenSrc                    (GpuReduction*        gr);
-static void        reduxGenSrcAppend              (GpuReduction*        gr);
-static void        reduxGenSrcAppendIncludes      (GpuReduction*        gr);
-static void        reduxGenSrcAppendMacroTypedefs (GpuReduction*        gr);
-static void        reduxGenSrcAppendReduxKernel   (GpuReduction*        gr);
-static void        reduxGenSrcAppendPrototype     (GpuReduction*        gr);
-static void        reduxGenSrcAppendDecode        (GpuReduction*        gr);
-static void        reduxGenSrcAppendPhase0        (GpuReduction*        gr,
-                                                   uint32_t             selector);
-static void        reduxGenSrcAppendLoop          (GpuReduction*        gr,
-                                                   uint32_t             selector,
-                                                   int                  initial);
-static void        reduxGenSrcAppendVertical      (GpuReduction*        gr,
-                                                   uint32_t             selector);
-static void        reduxGenSrcAppendIncrement     (GpuReduction*        gr,
-                                                   uint32_t             selector,
-                                                   int                  initial,
-                                                   int                  axis);
-static void        reduxGenSrcAppendDstWrite      (GpuReduction*        gr,
-                                                   uint32_t             selector,
-                                                   int                  initial);
-static void        reduxGenSrcAppendPhase1        (GpuReduction*        gr);
-static int         reduxGenSrcAxisIsHuge          (GpuReduction*        gr,
-                                                   uint32_t             selector,
-                                                   int                  axis);
-static int         reduxGenSrcAxisIsSplit         (GpuReduction*        gr,
-                                                   uint32_t             selector,
-                                                   int                  axis);
-static int         reduxGenCompile                (GpuReduction*        gr);
-static int         reduxGenComputeLaunchBounds    (GpuReduction*        gr);
-static int         reduxGenCleanup                (GpuReduction*        gr,  int ret);
-static int         reduxGenCleanupMsg             (GpuReduction*        gr,  int ret,
-                                                   const char*          fmt, ...);
+static int         reduxGenInit                     (GpuReduction*        gr);
+static int         reduxGenInferProperties          (GpuReduction*        gr);
+static void        reduxGenSetMaxBS                 (GpuReduction*        gr);
+static void        reduxGenSetKTypes                (GpuReduction*        gr);
+static void        reduxGenIterArgs                 (const GpuReduction*  gr,
+                                                     GpuReductionIterFn   fn,
+                                                     void*                user);
+static int         reduxGenSrc                      (GpuReduction*        gr);
+static void        reduxGenSrcAppend                (GpuReduction*        gr);
+static void        reduxGenSrcAppendIncludes        (GpuReduction*        gr);
+static void        reduxGenSrcAppendMacroTypedefs   (GpuReduction*        gr);
+static void        reduxGenSrcAppendReduxKernel     (GpuReduction*        gr);
+static void        reduxGenSrcAppendPrototype       (GpuReduction*        gr);
+static void        reduxGenSrcAppendDecode          (GpuReduction*        gr);
+static void        reduxGenSrcAppendPhase0          (GpuReduction*        gr,
+                                                     uint32_t             selector);
+static void        reduxGenSrcAppendLoop            (GpuReduction*        gr,
+                                                     uint32_t             selector,
+                                                     int                  initial);
+static void        reduxGenSrcAppendVertical        (GpuReduction*        gr,
+                                                     uint32_t             selector);
+static void        reduxGenSrcAppendIncrement       (GpuReduction*        gr,
+                                                     uint32_t             selector,
+                                                     int                  initial,
+                                                     int                  axis);
+static void        reduxGenSrcAppendDstWrite        (GpuReduction*        gr,
+                                                     uint32_t             selector,
+                                                     int                  initial);
+static void        reduxGenSrcAppendPhase1          (GpuReduction*        gr);
+static int         reduxGenSrcAxisIsHuge            (GpuReduction*        gr,
+                                                     uint32_t             selector,
+                                                     int                  axis);
+static int         reduxGenSrcAxisIsSplit           (GpuReduction*        gr,
+                                                     uint32_t             selector,
+                                                     int                  axis);
+static int         reduxGenCompile                  (GpuReduction*        gr);
+static int         reduxGenComputeLaunchBounds      (GpuReduction*        gr);
+static int         reduxGenCleanup                  (GpuReduction*        gr,  int ret);
+static int         reduxGenCleanupMsg               (GpuReduction*        gr,  int ret,
+                                                     const char*          fmt, ...);
 
 /*     Generator Utilities */
-static void        reduxGenCountArgs              (const GpuReduction*  gr,
-                                                   int                  typecode,
-                                                   const char*          typeName,
-                                                   const char*          baseName,
-                                                   int                  num,
-                                                   void*                user);
-static void        reduxGenSaveArgTypecodes       (const GpuReduction*  gr,
-                                                   int                  typecode,
-                                                   const char*          typeName,
-                                                   const char*          baseName,
-                                                   int                  num,
-                                                   void*                user);
-static void        reduxGenAppendArg              (const GpuReduction*  gr,
-                                                   int                  typecode,
-                                                   const char*          typeName,
-                                                   const char*          baseName,
-                                                   int                  num,
-                                                   void*                user);
-static void        reduxInvMarshalArg             (const GpuReduction*  gr,
-                                                   int                  typecode,
-                                                   const char*          typeName,
-                                                   const char*          baseName,
-                                                   int                  num,
-                                                   void*                user);
-static size_t      reduxGenEstimateParallelism    (const GpuReduction*  gr);
-static int         reduxGenRequiresS0             (const GpuReduction*  gr);
-static int         reduxGenRequiresD0             (const GpuReduction*  gr);
-static int         reduxGenRequiresD1             (const GpuReduction*  gr);
-static int         reduxGenKernelRequiresLatticeS0(const GpuReduction*  gr);
-static int         reduxGenKernelRequiresLatticeD0(const GpuReduction*  gr);
-static int         reduxGenKernelRequiresLatticeD1(const GpuReduction*  gr);
-static int         reduxGenKernelRequiresLatticeI0(const GpuReduction*  gr);
-static int         reduxGenKernelRequiresStateK0  (const GpuReduction*  gr);
-static int         reduxGenKernelRequiresStateK1  (const GpuReduction*  gr);
-static int         reduxGenKernelRequiresWspace   (const GpuReduction*  gr);
-static size_t      reduxGenGetK0Size              (const GpuReduction*  gr);
-static size_t      reduxGenGetK0Align             (const GpuReduction*  gr);
-static size_t      reduxGenGetK1Size              (const GpuReduction*  gr);
-static size_t      reduxGenGetK1Align             (const GpuReduction*  gr);
-static size_t      reduxGenGetReduxStateSize      (const GpuReduction*  gr);
-static size_t      reduxGenGetMaxLocalSize        (const GpuReduction*  gr);
-static size_t      reduxGenGetSHMEMSize           (const GpuReduction*  gr, size_t cells);
-static size_t      reduxGenGetSHMEMK0Off          (const GpuReduction*  gr, size_t cells);
-static size_t      reduxGenGetSHMEMK1Off          (const GpuReduction*  gr, size_t cells);
-static size_t      reduxGenGetWMEMSize            (const GpuReduction*  gr, size_t cells);
-static size_t      reduxGenGetWMEMK0Off           (const GpuReduction*  gr, size_t cells);
-static size_t      reduxGenGetWMEMK1Off           (const GpuReduction*  gr, size_t cells);
+static void        reduxGenCountArgs                (const GpuReduction*  gr,
+                                                     int                  typecode,
+                                                     const char*          typeName,
+                                                     const char*          baseName,
+                                                     int                  num,
+                                                     void*                user);
+static void        reduxGenSaveArgTypecodes         (const GpuReduction*  gr,
+                                                     int                  typecode,
+                                                     const char*          typeName,
+                                                     const char*          baseName,
+                                                     int                  num,
+                                                     void*                user);
+static void        reduxGenAppendArg                (const GpuReduction*  gr,
+                                                     int                  typecode,
+                                                     const char*          typeName,
+                                                     const char*          baseName,
+                                                     int                  num,
+                                                     void*                user);
+static void        reduxInvMarshalArg               (const GpuReduction*  gr,
+                                                     int                  typecode,
+                                                     const char*          typeName,
+                                                     const char*          baseName,
+                                                     int                  num,
+                                                     void*                user);
+static size_t      reduxGenEstimateParallelism      (const GpuReduction*  gr);
+static int         reduxGenRequiresS0               (const GpuReduction*  gr);
+static int         reduxGenRequiresD0               (const GpuReduction*  gr);
+static int         reduxGenRequiresD1               (const GpuReduction*  gr);
+static int         reduxGenKernelRequiresLatticeS0  (const GpuReduction*  gr);
+static int         reduxGenKernelRequiresLatticeD0  (const GpuReduction*  gr);
+static int         reduxGenKernelRequiresLatticeD1  (const GpuReduction*  gr);
+static int         reduxGenKernelRequiresLatticeI0  (const GpuReduction*  gr);
+static int         reduxGenKernelRequiresStateK0    (const GpuReduction*  gr);
+static int         reduxGenKernelRequiresStateK1    (const GpuReduction*  gr);
+static int         reduxGenKernelRequiresWspace     (const GpuReduction*  gr);
+static size_t      reduxGenGetK0Size                (const GpuReduction*  gr);
+static size_t      reduxGenGetK0Align               (const GpuReduction*  gr);
+static size_t      reduxGenGetK1Size                (const GpuReduction*  gr);
+static size_t      reduxGenGetK1Align               (const GpuReduction*  gr);
+static size_t      reduxGenGetReduxStateSize        (const GpuReduction*  gr);
+static size_t      reduxGenGetMaxLocalSize          (const GpuReduction*  gr);
+static size_t      reduxGenGetSHMEMSize             (const GpuReduction*  gr, size_t cells);
+static size_t      reduxGenGetSHMEMK0Off            (const GpuReduction*  gr, size_t cells);
+static size_t      reduxGenGetSHMEMK1Off            (const GpuReduction*  gr, size_t cells);
+static size_t      reduxGenGetWMEMSize              (const GpuReduction*  gr, size_t cells);
+static size_t      reduxGenGetWMEMK0Off             (const GpuReduction*  gr, size_t cells);
+static size_t      reduxGenGetWMEMK1Off             (const GpuReduction*  gr, size_t cells);
 
 /*     Invoker Control Flow */
-static int         reduxInvInit                   (redux_ctx*           ctx);
-static int         reduxInvInferProperties        (redux_ctx*           ctx);
-static int         reduxInvFlattenSource          (redux_ctx*           ctx);
-static int         reduxInvComputeKernelArgs      (redux_ctx*           ctx);
-static int         reduxInvSchedule               (redux_ctx*           ctx);
-static int         reduxInvoke                    (redux_ctx*           ctx);
-static int         reduxInvCleanup                (redux_ctx*           ctx, int ret);
-static int         reduxInvCleanupMsg             (redux_ctx*           ctx, int ret,
-                                                   const char*          fmt, ...);
+static int         reduxInvInit                     (redux_ctx*           ctx);
+static int         reduxInvInferProperties          (redux_ctx*           ctx);
+static int         reduxInvFlattenSource            (redux_ctx*           ctx);
+static int         reduxInvComputeKernelArgs        (redux_ctx*           ctx);
+static int         reduxInvSchedule                 (redux_ctx*           ctx);
+static int         reduxInvoke                      (redux_ctx*           ctx);
+static int         reduxInvCleanup                  (redux_ctx*           ctx, int ret);
+static int         reduxInvCleanupMsg               (redux_ctx*           ctx, int ret,
+                                                     const char*          fmt, ...);
 
 /*     Invoker Utilities */
-static size_t      reduxInvEstimateParallelism    (const redux_ctx*  ctx);
-static int         reduxInvRequiresS0             (const redux_ctx*  ctx);
-static int         reduxInvRequiresD0             (const redux_ctx*  ctx);
-static int         reduxInvRequiresD1             (const redux_ctx*  ctx);
-static axis_desc*  reduxInvGetSrcAxis             (const redux_ctx*  ctx, int i);
-static axis_desc*  reduxInvGetSrcSortAxis         (const redux_ctx*  ctx, int i);
-static int         reduxTryFlattenOut             (const redux_ctx*  ctx,
-                                                   const axis_desc*  axis);
-static int         reduxTryFlattenInto            (redux_ctx*        ctx,
-                                                   axis_desc*        into,
-                                                   const axis_desc*  from);
-static void        reduxSortAxisPtrsBy            (axis_desc**       ptrs,
-                                                   axis_desc*        axes,
-                                                   size_t            numAxes,
-                                                   int(*fn)(const void*, const void*));
+static size_t      reduxInvEstimateParallelism      (const redux_ctx*       ctx);
+static int         reduxInvRequiresS0               (const redux_ctx*       ctx);
+static int         reduxInvRequiresD0               (const redux_ctx*       ctx);
+static int         reduxInvRequiresD1               (const redux_ctx*       ctx);
+static axis_desc*  reduxInvGetSrcAxis               (const redux_ctx*       ctx, int i);
+static axis_desc*  reduxInvGetSrcSortAxis           (const redux_ctx*       ctx, int i);
+static int         reduxTryFlattenOut               (const redux_ctx*       ctx,
+                                                     const axis_desc*       axis);
+static int         reduxTryFlattenInto              (redux_ctx*             ctx,
+                                                     axis_desc*             into,
+                                                     const axis_desc*       from);
+static void        reduxSortAxisPtrsBy              (axis_desc**            ptrs,
+                                                     axis_desc*             axes,
+                                                     size_t                 numAxes,
+                                                     int(*fn)(const void*, const void*));
 
 
 /* Function Implementations */
 /* Extern Functions */
 GPUARRAY_PUBLIC int   GpuReductionAttr_new          (GpuReductionAttr**         grAttr,
                                                      gpucontext*                gpuCtx){
-	if(!grAttr){
+	if (!grAttr){
 		return GA_INVALID_ERROR;
 	}
-	if(!gpuCtx){
+	if (!gpuCtx){
 		*grAttr = NULL;
 		return GA_INVALID_ERROR;
 	}
 	*grAttr = calloc(1, sizeof(**grAttr));
-	if(!*grAttr){
+	if (!*grAttr){
 		return GA_MEMORY_ERROR;
 	}
 	
@@ -527,7 +527,7 @@ GPUARRAY_PUBLIC int   GpuReductionAttr_setdims      (GpuReductionAttr*          
 }
 GPUARRAY_PUBLIC int   GpuReductionAttr_sets0type    (GpuReductionAttr*          grAttr,
                                                      int                        s0Typecode){
-	switch(grAttr->op){
+	switch (grAttr->op){
 		case GA_REDUCE_AND:
 		case GA_REDUCE_OR:
 		case GA_REDUCE_XOR:
@@ -565,7 +565,7 @@ GPUARRAY_PUBLIC int   GpuReductionAttr_seti0type    (GpuReductionAttr*          
 GPUARRAY_PUBLIC int   GpuReductionAttr_appendopname (GpuReductionAttr*          grAttr,
                                                      size_t                     n,
                                                      char*                      name){
-	switch(grAttr->op){
+	switch (grAttr->op){
 		case GA_REDUCE_COPY:         return snprintf(name, n, "Copy_%d",            grAttr->maxSrcDims);
 		case GA_REDUCE_SUM:          return snprintf(name, n, "Sum_%d_%d",          grAttr->maxSrcDims, grAttr->maxDstDims);
 		case GA_REDUCE_PROD:         return snprintf(name, n, "Prod_%d_%d",         grAttr->maxSrcDims, grAttr->maxDstDims);
@@ -581,7 +581,7 @@ GPUARRAY_PUBLIC int   GpuReductionAttr_appendopname (GpuReductionAttr*          
 		case GA_REDUCE_XOR:          return snprintf(name, n, "Xor_%d_%d",          grAttr->maxSrcDims, grAttr->maxDstDims);
 		case GA_REDUCE_ALL:          return snprintf(name, n, "All_%d_%d",          grAttr->maxSrcDims, grAttr->maxDstDims);
 		case GA_REDUCE_ANY:          return snprintf(name, n, "Any_%d_%d",          grAttr->maxSrcDims, grAttr->maxDstDims);
-		default:                     if(name && n>0){*name = '\0';} return GA_INVALID_ERROR;
+		default:                     if (name && n>0){*name = '\0';} return GA_INVALID_ERROR;
 	}
 }
 GPUARRAY_PUBLIC int   GpuReductionAttr_issensitive  (const GpuReductionAttr*    grAttr){
@@ -623,7 +623,7 @@ GPUARRAY_PUBLIC int   GpuReductionAttr_issensitive  (const GpuReductionAttr*    
 	}
 }
 GPUARRAY_PUBLIC int   GpuReductionAttr_requiresS0   (const GpuReductionAttr*    grAttr){
-	switch(grAttr->op){
+	switch (grAttr->op){
 		default: return 1;
 	}
 }
@@ -712,7 +712,7 @@ GPUARRAY_PUBLIC int   GpuReduction_call             (const GpuReduction*        
  * @return Zero if successful; Non-zero if the datatype is not supported.
  */
 
-static int         reduxGetSumInit               (int typecode, const char** property){
+static int         reduxGetSumInit                  (int typecode, const char** property){
 	if (typecode == GA_POINTER ||
 	    typecode == GA_BUFFER){
 		return GA_UNSUPPORTED_ERROR;
@@ -732,7 +732,7 @@ static int         reduxGetSumInit               (int typecode, const char** pro
  * @return Zero if successful; Non-zero if the datatype is not supported.
  */
 
-static int         reduxGetProdInit              (int typecode, const char** property){
+static int         reduxGetProdInit                 (int typecode, const char** property){
 	if (typecode == GA_POINTER ||
 	    typecode == GA_BUFFER){
 		return GA_UNSUPPORTED_ERROR;
@@ -752,7 +752,7 @@ static int         reduxGetProdInit              (int typecode, const char** pro
  * @return Zero if successful; Non-zero if the datatype is not supported.
  */
 
-static int         reduxGetMinInit               (int typecode, const char** property){
+static int         reduxGetMinInit                  (int typecode, const char** property){
 	switch (typecode){
 		case GA_BYTE2:
 		case GA_BYTE3:
@@ -842,7 +842,7 @@ static int         reduxGetMinInit               (int typecode, const char** pro
  * @return Zero if successful; Non-zero if the datatype is not supported.
  */
 
-static int         reduxGetMaxInit               (int typecode, const char** property){
+static int         reduxGetMaxInit                  (int typecode, const char** property){
 	switch (typecode){
 		case GA_BOOL:
 		  *property = "1";
@@ -941,7 +941,7 @@ static int         reduxGetMaxInit               (int typecode, const char** pro
  * @return Zero if successful; Non-zero if the datatype is not supported.
  */
 
-static int         reduxGetAndInit               (int typecode, const char** property){
+static int         reduxGetAndInit                  (int typecode, const char** property){
 	if (typecode == GA_POINTER ||
 	    typecode == GA_BUFFER){
 		return GA_UNSUPPORTED_ERROR;
@@ -961,7 +961,7 @@ static int         reduxGetAndInit               (int typecode, const char** pro
  * @return Zero if successful; Non-zero if the datatype is not supported.
  */
 
-static int         reduxGetOrInit                (int typecode, const char** property){
+static int         reduxGetOrInit                   (int typecode, const char** property){
 	if (typecode == GA_POINTER ||
 	    typecode == GA_BUFFER){
 		return GA_UNSUPPORTED_ERROR;
@@ -974,8 +974,8 @@ static int         reduxGetOrInit                (int typecode, const char** pro
  * Whether or not the typecode is a floating-point type.
  */
 
-static int         reduxIsFloatingPoint           (int typecode){
-	switch(typecode){
+static int         reduxIsFloatingPoint             (int typecode){
+	switch (typecode){
 		case GA_HALF:
 		case GA_HALF2:
 		case GA_HALF4:
@@ -1005,7 +1005,7 @@ static int         reduxIsFloatingPoint           (int typecode){
  * Compute ceil(log2(x)).
  */
 
-static unsigned    reduxCeilLog2                  (uint64_t x){
+static unsigned    reduxCeilLog2                    (uint64_t x){
 	int i;
 	
 	if (x <= 1){
@@ -1021,7 +1021,7 @@ static unsigned    reduxCeilLog2                  (uint64_t x){
  * If x is a power of two already, return x.
  */
 
-static uint64_t    reduxNextPow2                  (uint64_t x){
+static uint64_t    reduxNextPow2                    (uint64_t x){
 	if (x & (x-1)){
 		x |= x >>  1;
 		x |= x >>  2;
@@ -1057,7 +1057,7 @@ static uint64_t    reduxNextPow2                  (uint64_t x){
  *   5.                      then by increasing source axis number.
  */
 
-static int         reduxSortFlatInsensitive      (const void* a, const void* b){
+static int         reduxSortFlatInsensitive         (const void* a, const void* b){
 	const axis_desc* xda  = (const axis_desc*)a;
 	const axis_desc* xdb  = (const axis_desc*)b;
 
@@ -1075,7 +1075,7 @@ static int         reduxSortFlatInsensitive      (const void* a, const void* b){
 
 	return 0;
 }
-static int         reduxSortFlatSensitive        (const void* a, const void* b){
+static int         reduxSortFlatSensitive           (const void* a, const void* b){
 	const axis_desc* xda  = (const axis_desc*)a;
 	const axis_desc* xdb  = (const axis_desc*)b;
 
@@ -1104,7 +1104,7 @@ static int         reduxSortFlatSensitive        (const void* a, const void* b){
  * This means ascending order of absolute stride.
  */
 
-static int         reduxSortPtrS0AbsStride       (const void* a, const void* b){
+static int         reduxSortPtrS0AbsStride          (const void* a, const void* b){
 	const axis_desc* xda  = *(const axis_desc* const*)a;
 	const axis_desc* xdb  = *(const axis_desc* const*)b;
 	
@@ -1116,7 +1116,7 @@ static int         reduxSortPtrS0AbsStride       (const void* a, const void* b){
 
 	return 0;
 }
-static int         reduxSortPtrByReduxNum        (const void* a, const void* b){
+static int         reduxSortPtrByReduxNum           (const void* a, const void* b){
 	const axis_desc* xda  = *(const axis_desc* const*)a;
 	const axis_desc* xdb  = *(const axis_desc* const*)b;
 	
@@ -1134,7 +1134,7 @@ static int         reduxSortPtrByReduxNum        (const void* a, const void* b){
 
 	return 0;
 }
-static int         reduxSortPtrD0WrSelect        (const void* a, const void* b){
+static int         reduxSortPtrD0WrSelect           (const void* a, const void* b){
 	const axis_desc* xda  = *(const axis_desc* const*)a;
 	const axis_desc* xdb  = *(const axis_desc* const*)b;
 	
@@ -1168,7 +1168,7 @@ static int         reduxSortPtrD0WrSelect        (const void* a, const void* b){
 
 	return 0;
 }
-static int         reduxSortPtrD1WrSelect        (const void* a, const void* b){
+static int         reduxSortPtrD1WrSelect           (const void* a, const void* b){
 	const axis_desc* xda  = *(const axis_desc* const*)a;
 	const axis_desc* xdb  = *(const axis_desc* const*)b;
 	
@@ -1202,7 +1202,7 @@ static int         reduxSortPtrD1WrSelect        (const void* a, const void* b){
 
 	return 0;
 }
-static int         reduxSortPtrInsertFinalOrder  (const void* a, const void* b){
+static int         reduxSortPtrInsertFinalOrder     (const void* a, const void* b){
 	const axis_desc* xda  = *(const axis_desc* const*)a;
 	const axis_desc* xdb  = *(const axis_desc* const*)b;
 	
@@ -1257,9 +1257,9 @@ static int         reduxSortPtrInsertFinalOrder  (const void* a, const void* b){
  * @brief Initialize Axis Description.
  */
 
-static void        axisInit                      (axis_desc*       axis,
-                                                  ssize_t          len,
-                                                  ssize_t          s0S){
+static void        axisInit                         (axis_desc*           axis,
+                                                     ssize_t              len,
+                                                     ssize_t              s0S){
 	memset(axis, 0, sizeof(*axis));
 	
 	axis->reduxNum = -1;
@@ -1278,7 +1278,7 @@ static void        axisInit                      (axis_desc*       axis,
  * @brief Mark axis as reduction axis, with position reduxNum in the axis list.
  */
 
-static void        axisMarkReduced               (axis_desc*       axis, int    reduxNum){
+static void        axisMarkReduced                  (axis_desc*           axis, int    reduxNum){
 	axis->isReduced = 1;
 	axis->reduxNum  = reduxNum;
 }
@@ -1287,9 +1287,9 @@ static void        axisMarkReduced               (axis_desc*       axis, int    
  * @brief Mark axis as (split) intrablock axis.
  */
 
-static void        axisMarkIntraBlock            (axis_desc*       axis,
-                                                  int              ibNum,
-                                                  size_t           ibLen){
+static void        axisMarkIntraBlock               (axis_desc*           axis,
+                                                     int                  ibNum,
+                                                     size_t               ibLen){
 	axis->isIntra  = 1;
 	axis->ibNum    = ibNum;
 	axis->splitLen = ibLen;
@@ -1299,13 +1299,13 @@ static void        axisMarkIntraBlock            (axis_desc*       axis,
  * @brief Get properties of an axis.
  */
 
-static int         axisGetReduxNum               (const axis_desc* axis){
+static int         axisGetReduxNum                  (const axis_desc*     axis){
 	return axis->reduxNum;
 }
-static size_t      axisGetLen                    (const axis_desc* axis){
+static size_t      axisGetLen                       (const axis_desc*     axis){
 	return axis->len;
 }
-static size_t      axisGetIntraLen               (const axis_desc* axis){
+static size_t      axisGetIntraLen                  (const axis_desc*     axis){
 	if       (axisIsSplit(axis)){
 		return axis->splitLen;
 	}else if (axisIsIntra(axis)){
@@ -1314,7 +1314,7 @@ static size_t      axisGetIntraLen               (const axis_desc* axis){
 		return 1;
 	}
 }
-static size_t      axisGetInterLen               (const axis_desc* axis){
+static size_t      axisGetInterLen                  (const axis_desc*     axis){
 	if       (axisIsSplit(axis)){
 		return DIVIDECEIL(axis->len, axis->splitLen);
 	}else if (axisIsIntra(axis)){
@@ -1323,69 +1323,69 @@ static size_t      axisGetInterLen               (const axis_desc* axis){
 		return axis->len;
 	}
 }
-static size_t      axisGetIntraInterLen          (const axis_desc* axis){
+static size_t      axisGetIntraInterLen             (const axis_desc*     axis){
 	return axisGetIntraLen(axis)*axisGetInterLen(axis);
 }
-static ssize_t     axisGetS0Stride               (const axis_desc* axis){
+static ssize_t     axisGetS0Stride                  (const axis_desc*     axis){
 	return axisGetLen(axis) > 1 ? axis->s0S : 0;
 }
-static size_t      axisGetS0AbsStride            (const axis_desc* axis){
+static size_t      axisGetS0AbsStride               (const axis_desc*     axis){
 	return axisGetS0Stride(axis)<0 ? -(size_t)axisGetS0Stride(axis):
 	                                  +(size_t)axisGetS0Stride(axis);
 }
-static ssize_t     axisGetD0Stride               (const axis_desc* axis){
+static ssize_t     axisGetD0Stride                  (const axis_desc*     axis){
 	return axisGetLen(axis) > 1 ? axis->d0S : 0;
 }
-static size_t      axisGetD0AbsStride            (const axis_desc* axis){
+static size_t      axisGetD0AbsStride               (const axis_desc*     axis){
 	return axisGetD0Stride(axis)<0 ? -(size_t)axisGetD0Stride(axis):
 	                                  +(size_t)axisGetD0Stride(axis);
 }
-static ssize_t     axisGetD1Stride               (const axis_desc* axis){
+static ssize_t     axisGetD1Stride                  (const axis_desc*     axis){
 	return axisGetLen(axis) > 1 ? axis->d1S : 0;
 }
-static size_t      axisGetD1AbsStride            (const axis_desc* axis){
+static size_t      axisGetD1AbsStride               (const axis_desc*     axis){
 	return axisGetD1Stride(axis)<0 ? -(size_t)axisGetD1Stride(axis):
 	                                     +(size_t)axisGetD1Stride(axis);
 }
-static size_t      axisGetI0Stride               (const axis_desc*     axis){
+static size_t      axisGetI0Stride                  (const axis_desc*     axis){
 	return axis->i0S;
 }
-static void        axisSetI0Stride               (axis_desc*           axis,
-                                                  size_t               i0S){
+static void        axisSetI0Stride                  (axis_desc*           axis,
+                                                     size_t               i0S){
 	axis->i0S = i0S;
 }
-static unsigned    axisGetPerm                   (const axis_desc* axis){
+static unsigned    axisGetPerm                      (const axis_desc*     axis){
 	return axis->perm;
 }
-static int         axisGetIBNum                  (const axis_desc* axis){
+static int         axisGetIBNum                     (const axis_desc*     axis){
 	return axis->ibNum;
 }
-static void        axisSetPerm                   (axis_desc*       axis,
-                                                  unsigned         perm){
+static void        axisSetPerm                      (axis_desc*           axis,
+                                                     unsigned             perm){
 	axis->perm = perm;
 }
-static int         axisIsReduced                 (const axis_desc* axis){
+static int         axisIsReduced                    (const axis_desc*     axis){
 	return axis->isReduced;
 }
-static int         axisIsIntra                   (const axis_desc* axis){
+static int         axisIsIntra                      (const axis_desc*     axis){
 	return axis->isIntra;
 }
-static int         axisIsInter                   (const axis_desc* axis){
+static int         axisIsInter                      (const axis_desc*     axis){
 	return !axisIsIntra(axis);
 }
-static int         axisIsSplit                   (const axis_desc* axis){
+static int         axisIsSplit                      (const axis_desc*     axis){
 	return axisIsIntra(axis) && axis->splitLen != axis->len;
 }
-static size_t      reduxInvEstimateParallelism   (const redux_ctx*  ctx){
+static size_t      reduxInvEstimateParallelism      (const redux_ctx*     ctx){
 	return reduxGenEstimateParallelism(ctx->gr);
 }
-static int         reduxInvRequiresS0            (const redux_ctx*  ctx){
+static int         reduxInvRequiresS0               (const redux_ctx*     ctx){
 	return reduxGenRequiresS0(ctx->gr);
 }
-static int         reduxInvRequiresD0            (const redux_ctx*  ctx){
+static int         reduxInvRequiresD0               (const redux_ctx*     ctx){
 	return reduxGenRequiresD0(ctx->gr);
 }
-static int         reduxInvRequiresD1            (const redux_ctx*  ctx){
+static int         reduxInvRequiresD1               (const redux_ctx*     ctx){
 	return reduxGenRequiresD1(ctx->gr);
 }
 
@@ -1393,7 +1393,7 @@ static int         reduxInvRequiresD1            (const redux_ctx*  ctx){
  * @brief Get description of source axis with given number.
  */
 
-static axis_desc*  reduxInvGetSrcAxis            (const redux_ctx*  ctx, int i){
+static axis_desc*  reduxInvGetSrcAxis               (const redux_ctx*       ctx, int i){
 	return &ctx->xdSrc[i];
 }
 
@@ -1401,7 +1401,7 @@ static axis_desc*  reduxInvGetSrcAxis            (const redux_ctx*  ctx, int i){
  * @brief Get description of source axis with given number in sort-order.
  */
 
-static axis_desc*  reduxInvGetSrcSortAxis        (const redux_ctx*  ctx, int i){
+static axis_desc*  reduxInvGetSrcSortAxis           (const redux_ctx*       ctx, int i){
 	return ctx->xdSrcPtrs[i];
 }
 
@@ -1417,8 +1417,8 @@ static axis_desc*  reduxInvGetSrcSortAxis        (const redux_ctx*  ctx, int i){
  * @return Non-zero if flattening attempt successful; Zero otherwise.
  */
 
-static int         reduxTryFlattenOut            (const redux_ctx*  ctx,
-                                                  const axis_desc*  axis){
+static int         reduxTryFlattenOut               (const redux_ctx*       ctx,
+                                                     const axis_desc*       axis){
 	if ((axisGetLen   (axis) == 1                   )||
 	    (axisIsReduced(axis) && ctx->zeroRdxAxes > 0)){
 		return 1;
@@ -1448,9 +1448,9 @@ static int         reduxTryFlattenOut            (const redux_ctx*  ctx,
  * @return Non-zero if flattening attempt successful; Zero otherwise.
  */
 
-static int         reduxTryFlattenInto           (redux_ctx*        ctx,
-                                                  axis_desc*        into,
-                                                  const axis_desc*  from){
+static int         reduxTryFlattenInto              (redux_ctx*             ctx,
+                                                     axis_desc*             into,
+                                                     const axis_desc*       from){
 	int signS0    = 0, signD0    = 0, signD1    = 0,
 	    reverseS0 = 0, reverseD0 = 0, reverseD1 = 0;
 	
@@ -1520,10 +1520,10 @@ static int         reduxTryFlattenInto           (redux_ctx*        ctx,
  * not touching the axes themselves.
  */
 
-static void        reduxSortAxisPtrsBy           (axis_desc**       ptrs,
-                                                  axis_desc*        axes,
-                                                  size_t            numAxes,
-                                                  int(*fn)(const void*, const void*)){
+static void        reduxSortAxisPtrsBy              (axis_desc**            ptrs,
+                                                     axis_desc*             axes,
+                                                     size_t                 numAxes,
+                                                     int(*fn)(const void*, const void*)){
 	size_t i;
 	
 	for (i=0;i<numAxes;i++){
@@ -1540,7 +1540,7 @@ static void        reduxSortAxisPtrsBy           (axis_desc**       ptrs,
  * After this function, calling reduxGenCleanup*() becomes safe.
  */
 
-static int         reduxGenInit                  (GpuReduction*     gr){
+static int         reduxGenInit                     (GpuReduction*        gr){
 	gr->kArgTypeCodes = NULL;
 	gr->kSourceCode   = NULL;
 	gr->kErrorString  = NULL;
@@ -1553,7 +1553,7 @@ static int         reduxGenInit                  (GpuReduction*     gr){
  * @brief Begin inferring the properties of the reduction operator.
  */
 
-static int         reduxGenInferProperties       (GpuReduction*     gr){
+static int         reduxGenInferProperties          (GpuReduction*        gr){
 	int i;
 	
 	/**
@@ -1609,7 +1609,7 @@ static int         reduxGenInferProperties       (GpuReduction*     gr){
  * Compute maximum block size we shall support in generated kernels.
  */
 
-static void        reduxGenSetMaxBS              (GpuReduction*        gr){
+static void        reduxGenSetMaxBS                 (GpuReduction*        gr){
 	gr->maxBS = gr->grAttr.maxLM/reduxGenGetReduxStateSize(gr);
 	gr->maxBS = gr->maxBS < gr->grAttr.maxLg ? gr->maxBS : gr->grAttr.maxLg;
 	gr->maxBS = gr->maxBS < gr->grAttr.maxL0 ? gr->maxBS : gr->grAttr.maxL0;
@@ -1658,7 +1658,7 @@ static void        reduxGenSetMaxBS              (GpuReduction*        gr){
  * For now we default TK1 to exactly TI0.
  */
 
-static void        reduxGenSetKTypes             (GpuReduction*        gr){
+static void        reduxGenSetKTypes                (GpuReduction*        gr){
 	const gpuarray_type *TK0     = NULL, *TK1     = NULL, *TPS0    = NULL;
 	const char*          TK0init = NULL;
 	
@@ -1769,9 +1769,9 @@ static void        reduxGenSetKTypes             (GpuReduction*        gr){
  * Iterate over the arguments of the reduction operator.
  */
 
-static void        reduxGenIterArgs              (const GpuReduction*  gr,
-                                                  GpuReductionIterFn   fn,
-                                                  void*                user){
+static void        reduxGenIterArgs                 (const GpuReduction*  gr,
+                                                     GpuReductionIterFn   fn,
+                                                     void*                user){
 	int k;
 	
 	/**
@@ -1872,7 +1872,7 @@ static void        reduxGenIterArgs              (const GpuReduction*  gr,
  * @return GA_MEMORY_ERROR if not enough memory left; GA_NO_ERROR otherwise.
  */
 
-static int        reduxGenSrc                   (GpuReduction*     gr){
+static int         reduxGenSrc                      (GpuReduction*        gr){
 	GpuReductionAttr_appendopname(&gr->grAttr, sizeof(gr->kName), gr->kName);
 	
 	reduxGenSrcAppend(gr);
@@ -1893,19 +1893,19 @@ static int        reduxGenSrc                   (GpuReduction*     gr){
  * @brief Append source code to the string buffer.
  */
 
-static void       reduxGenSrcAppend             (GpuReduction*     gr){
+static void        reduxGenSrcAppend                (GpuReduction*        gr){
 	reduxGenSrcAppendIncludes     (gr);
 	reduxGenSrcAppendMacroTypedefs(gr);
 	reduxGenSrcAppendReduxKernel  (gr);
 }
-static void       reduxGenSrcAppendIncludes     (GpuReduction*     gr){
+static void        reduxGenSrcAppendIncludes        (GpuReduction*        gr){
 	srcbAppends(&gr->srcGen, "/* Includes */\n");
 	srcbAppends(&gr->srcGen, "#include \"cluda.h\"\n");
 	srcbAppends(&gr->srcGen, "\n");
 	srcbAppends(&gr->srcGen, "\n");
 	srcbAppends(&gr->srcGen, "\n");
 }
-static void       reduxGenSrcAppendMacroTypedefs(GpuReduction*     gr){
+static void        reduxGenSrcAppendMacroTypedefs   (GpuReduction*        gr){
 	/**
 	 * Typedefs of various types.
 	 */
@@ -2184,7 +2184,7 @@ static void       reduxGenSrcAppendMacroTypedefs(GpuReduction*     gr){
 	
 	srcbAppends(&gr->srcGen, "#define DIVIDECEIL(a,b) (((a)+(b)-1)/(b))\n\n\n\n\n");
 }
-static void       reduxGenSrcAppendReduxKernel  (GpuReduction*     gr){
+static void        reduxGenSrcAppendReduxKernel     (GpuReduction*        gr){
 	reduxGenSrcAppendPrototype   (gr);
 	srcbAppends                  (&gr->srcGen, "{\n");
 	reduxGenSrcAppendDecode      (gr);
@@ -2229,7 +2229,7 @@ static void       reduxGenSrcAppendReduxKernel  (GpuReduction*     gr){
 	srcbAppends                  (&gr->srcGen, "    }\n");
 	srcbAppends                  (&gr->srcGen, "}\n");
 }
-static void       reduxGenSrcAppendPrototype    (GpuReduction*     gr){
+static void        reduxGenSrcAppendPrototype       (GpuReduction*        gr){
 	int i=0;
 
 	srcbAppendf(&gr->srcGen,
@@ -2244,7 +2244,7 @@ static void       reduxGenSrcAppendPrototype    (GpuReduction*     gr){
 	reduxGenIterArgs(gr, reduxGenAppendArg, &i);
 	srcbAppends(&gr->srcGen, ")");
 }
-static void       reduxGenSrcAppendDecode       (GpuReduction*     gr){
+static void        reduxGenSrcAppendDecode          (GpuReduction*        gr){
 	int i;
 
 	srcbAppends(&gr->srcGen,
@@ -2635,8 +2635,8 @@ static void       reduxGenSrcAppendDecode       (GpuReduction*     gr){
 	"    \n"
 	"    \n");
 }
-static void        reduxGenSrcAppendPhase0        (GpuReduction*        gr,
-                                                   uint32_t             selector){
+static void        reduxGenSrcAppendPhase0          (GpuReduction*        gr,
+                                                     uint32_t             selector){
 	int         i;
 	const char* type;
 
@@ -2671,9 +2671,9 @@ static void        reduxGenSrcAppendPhase0        (GpuReduction*        gr,
 	                         "                }\n"
 	                         "            }\n");
 }
-static void        reduxGenSrcAppendLoop          (GpuReduction*        gr,
-                                                   uint32_t             selector,
-                                                   int                  initial){
+static void        reduxGenSrcAppendLoop            (GpuReduction*        gr,
+                                                     uint32_t             selector,
+                                                     int                  initial){
 	int i;
 
 	srcbAppends(&gr->srcGen, "            while(v > 0){v--;\n");
@@ -2690,8 +2690,8 @@ static void        reduxGenSrcAppendLoop          (GpuReduction*        gr,
 	srcbAppends(&gr->srcGen, "                break;\n"
 	                         "            }\n");
 }
-static void        reduxGenSrcAppendVertical      (GpuReduction*        gr,
-                                                   uint32_t             selector){
+static void        reduxGenSrcAppendVertical        (GpuReduction*        gr,
+                                                     uint32_t             selector){
 	int i = (selector&SELECTOR_SPLIT_FREE) ? gr->ndd-1 : gr->nds-1;
 
 	if (i >= 0){
@@ -2704,10 +2704,10 @@ static void        reduxGenSrcAppendVertical      (GpuReduction*        gr,
 		                         "                REDUX(K0, K1, tmpK0, I0);\n");
 	}
 }
-static void        reduxGenSrcAppendIncrement     (GpuReduction*        gr,
-                                                   uint32_t             selector,
-                                                   int                  initial,
-                                                   int                  axis){
+static void        reduxGenSrcAppendIncrement       (GpuReduction*        gr,
+                                                     uint32_t             selector,
+                                                     int                  initial,
+                                                     int                  axis){
 	const char* cast        = reduxGenSrcAxisIsHuge(gr, selector, axis) ? "TS64" : "TS32";
 	const char* breakOrCont = (initial) && (axis < gr->ndd) ? "break   " : "continue";
 
@@ -2743,9 +2743,9 @@ static void        reduxGenSrcAppendIncrement     (GpuReduction*        gr,
 		            axis, cast, axis, breakOrCont, axis, axis);
 	}
 }
-static void        reduxGenSrcAppendDstWrite      (GpuReduction*        gr,
-                                                   uint32_t             selector,
-                                                   int                  initial){
+static void        reduxGenSrcAppendDstWrite        (GpuReduction*        gr,
+                                                     uint32_t             selector,
+                                                     int                  initial){
 	srcbAppends(&gr->srcGen, "                local_barrier();\n");
 	if (initial){
 		srcbAppends(&gr->srcGen, "                if(LID_0 < D){\n"
@@ -2775,7 +2775,7 @@ static void        reduxGenSrcAppendDstWrite      (GpuReduction*        gr,
 	}
 	srcbAppends(&gr->srcGen, "                local_barrier();\n");
 }
-static void        reduxGenSrcAppendPhase1        (GpuReduction*        gr){
+static void        reduxGenSrcAppendPhase1          (GpuReduction*        gr){
 	/**
 	 * PHASE 1
 	 *
@@ -2814,9 +2814,9 @@ static void        reduxGenSrcAppendPhase1        (GpuReduction*        gr){
 		"        }\n");
 	}
 }
-static int         reduxGenSrcAxisIsHuge          (GpuReduction*        gr,
-                                                   uint32_t             selector,
-                                                   int                  axis){
+static int         reduxGenSrcAxisIsHuge            (GpuReduction*        gr,
+                                                     uint32_t             selector,
+                                                     int                  axis){
 	int hugeType    = selector & SELECTOR_HUGE_AXIS;
 	int isSplitFree = !!(selector & SELECTOR_SPLIT_FREE);
 	int isAxisFree  = axis < gr->ndd;
@@ -2847,9 +2847,9 @@ static int         reduxGenSrcAxisIsHuge          (GpuReduction*        gr,
 		return 0;
 	}
 }
-static int         reduxGenSrcAxisIsSplit         (GpuReduction*        gr,
-                                                   uint32_t             selector,
-                                                   int                  axis){
+static int         reduxGenSrcAxisIsSplit           (GpuReduction*        gr,
+                                                     uint32_t             selector,
+                                                     int                  axis){
 	return  ( (selector & SELECTOR_SPLIT_FREE) && axis == gr->ndd-1) ||
 	        (!(selector & SELECTOR_SPLIT_FREE) && axis == gr->nds-1);
 }
@@ -2858,7 +2858,7 @@ static int         reduxGenSrcAxisIsSplit         (GpuReduction*        gr,
  * @brief Compile the generated kernel.
  */
 
-static int        reduxGenCompile               (GpuReduction*        gr){
+static int         reduxGenCompile                  (GpuReduction*        gr){
 	int ret, flags = 0;
 
 	flags |= GA_USE_CLUDA;
@@ -2896,7 +2896,7 @@ static int        reduxGenCompile               (GpuReduction*        gr){
  *        support launching.
  */
 
-static int        reduxGenComputeLaunchBounds   (GpuReduction*        gr){
+static int         reduxGenComputeLaunchBounds      (GpuReduction*        gr){
 	int    ret;
 
 	/**
@@ -2919,7 +2919,7 @@ static int        reduxGenComputeLaunchBounds   (GpuReduction*        gr){
  * @brief Cleanup generator context.
  */
 
-static int        reduxGenCleanup               (GpuReduction*     gr,  int ret){
+static int         reduxGenCleanup                  (GpuReduction*        gr,  int ret){
 	if (ret != GA_NO_ERROR){
 		free(gr->kArgTypeCodes);
 		free(gr->kSourceCode);
@@ -2931,8 +2931,8 @@ static int        reduxGenCleanup               (GpuReduction*     gr,  int ret)
 
 	return ret;
 }
-static int        reduxGenCleanupMsg            (GpuReduction*     gr,  int ret,
-                                                 const char*       fmt, ...){
+static int         reduxGenCleanupMsg               (GpuReduction*        gr,  int ret,
+                                                     const char*          fmt, ...){
 #if DEBUG
 	FILE* fp = stderr;
 
@@ -2952,12 +2952,12 @@ static int        reduxGenCleanupMsg            (GpuReduction*     gr,  int ret,
  * Count # of arguments as determined by iterator.
  */
 
-static void       reduxGenCountArgs             (const GpuReduction*  gr,
-                                                 int                  typecode,
-                                                 const char*          typeName,
-                                                 const char*          baseName,
-                                                 int                  num,
-                                                 void*                user){
+static void        reduxGenCountArgs                (const GpuReduction*  gr,
+                                                     int                  typecode,
+                                                     const char*          typeName,
+                                                     const char*          baseName,
+                                                     int                  num,
+                                                     void*                user){
 	(void)gr;
 	(void)typecode;
 	(void)typeName;
@@ -2971,12 +2971,12 @@ static void       reduxGenCountArgs             (const GpuReduction*  gr,
  * Record the typecodes in the arguments typecode array.
  */
 
-static void       reduxGenSaveArgTypecodes      (const GpuReduction*  gr,
-                                                 int                  typecode,
-                                                 const char*          typeName,
-                                                 const char*          baseName,
-                                                 int                  num,
-                                                 void*                user){
+static void        reduxGenSaveArgTypecodes         (const GpuReduction*  gr,
+                                                     int                  typecode,
+                                                     const char*          typeName,
+                                                     const char*          baseName,
+                                                     int                  num,
+                                                     void*                user){
 	(void)typeName;
 	(void)baseName;
 	(void)num;
@@ -2989,12 +2989,12 @@ static void       reduxGenSaveArgTypecodes      (const GpuReduction*  gr,
  * Append an argument declaration to prototype.
  */
 
-static void       reduxGenAppendArg             (const GpuReduction*  gr,
-                                                 int                  typecode,
-                                                 const char*          typeName,
-                                                 const char*          baseName,
-                                                 int                  num,
-                                                 void*                user){
+static void        reduxGenAppendArg                (const GpuReduction*  gr,
+                                                     int                  typecode,
+                                                     const char*          typeName,
+                                                     const char*          baseName,
+                                                     int                  num,
+                                                     void*                user){
 	(void)user;
 	(void)typecode;
 
@@ -3009,12 +3009,12 @@ static void       reduxGenAppendArg             (const GpuReduction*  gr,
  * Marshall argument declaration during invocation.
  */
 
-static void       reduxInvMarshalArg            (const GpuReduction*  gr,
-                                                 int                  typecode,
-                                                 const char*          typeName,
-                                                 const char*          baseName,
-                                                 int                  num,
-                                                 void*                user){
+static void        reduxInvMarshalArg               (const GpuReduction*  gr,
+                                                     int                  typecode,
+                                                     const char*          typeName,
+                                                     const char*          baseName,
+                                                     int                  num,
+                                                     void*                user){
 	redux_ctx* ctx;
 	int*       i, k = num;
 
@@ -3098,7 +3098,7 @@ static void       reduxInvMarshalArg            (const GpuReduction*  gr,
  * device, plus some substantial margin.
  */
 
-static size_t     reduxGenEstimateParallelism   (const GpuReduction*  gr){
+static size_t      reduxGenEstimateParallelism      (const GpuReduction*  gr){
 	/**
 	 * An arbitrary margin factor ensuring there will be a few thread blocks
 	 * per SMX.
@@ -3166,34 +3166,34 @@ static size_t     reduxGenEstimateParallelism   (const GpuReduction*  gr){
  * initialization operations, the above might not necessarily hold anymore.
  */
 
-static int        reduxGenRequiresS0             (const GpuReduction*  gr){
+static int         reduxGenRequiresS0               (const GpuReduction*  gr){
 	return GpuReductionAttr_requiresS0(&gr->grAttr);
 }
-static int        reduxGenRequiresD0             (const GpuReduction*  gr){
+static int         reduxGenRequiresD0               (const GpuReduction*  gr){
 	return GpuReductionAttr_requiresD0(&gr->grAttr);
 }
-static int        reduxGenRequiresD1             (const GpuReduction*  gr){
+static int         reduxGenRequiresD1               (const GpuReduction*  gr){
 	return GpuReductionAttr_requiresD1(&gr->grAttr);
 }
-static int        reduxGenKernelRequiresLatticeS0(const GpuReduction*  gr){
+static int         reduxGenKernelRequiresLatticeS0  (const GpuReduction*  gr){
 	return reduxGenRequiresS0(gr);
 }
-static int        reduxGenKernelRequiresLatticeD0(const GpuReduction*  gr){
+static int         reduxGenKernelRequiresLatticeD0  (const GpuReduction*  gr){
 	return reduxGenRequiresD0(gr);
 }
-static int        reduxGenKernelRequiresLatticeD1(const GpuReduction*  gr){
+static int         reduxGenKernelRequiresLatticeD1  (const GpuReduction*  gr){
 	return reduxGenRequiresD1(gr);
 }
-static int        reduxGenKernelRequiresLatticeI0(const GpuReduction*  gr){
+static int         reduxGenKernelRequiresLatticeI0  (const GpuReduction*  gr){
 	return reduxGenRequiresD1(gr);
 }
-static int        reduxGenKernelRequiresStateK0  (const GpuReduction*  gr){
+static int         reduxGenKernelRequiresStateK0    (const GpuReduction*  gr){
 	return reduxGenKernelRequiresLatticeS0(gr);
 }
-static int        reduxGenKernelRequiresStateK1  (const GpuReduction*  gr){
+static int         reduxGenKernelRequiresStateK1    (const GpuReduction*  gr){
 	return reduxGenKernelRequiresLatticeI0(gr);
 }
-static int        reduxGenKernelRequiresWspace   (const GpuReduction*  gr){
+static int         reduxGenKernelRequiresWspace     (const GpuReduction*  gr){
 	(void)gr;
 	return 1;
 }
@@ -3203,16 +3203,16 @@ static int        reduxGenKernelRequiresWspace   (const GpuReduction*  gr){
  * Get size and alignment requirements of K0 and K1 states.
  */
 
-static size_t     reduxGenGetK0Size             (const GpuReduction*  gr){
+static size_t      reduxGenGetK0Size                (const GpuReduction*  gr){
 	return gr->TK0.size;
 }
-static size_t     reduxGenGetK0Align            (const GpuReduction*  gr){
+static size_t      reduxGenGetK0Align               (const GpuReduction*  gr){
 	return gr->TK0.align;
 }
-static size_t     reduxGenGetK1Size             (const GpuReduction*  gr){
+static size_t      reduxGenGetK1Size                (const GpuReduction*  gr){
 	return gr->TK1.size;
 }
-static size_t     reduxGenGetK1Align            (const GpuReduction*  gr){
+static size_t      reduxGenGetK1Align               (const GpuReduction*  gr){
 	return gr->TK1.align;
 }
 
@@ -3220,7 +3220,7 @@ static size_t     reduxGenGetK1Align            (const GpuReduction*  gr){
  * @brief Get the number of bytes of workspace per (partial) reduction per thread.
  */
 
-static size_t     reduxGenGetReduxStateSize     (const GpuReduction*  gr){
+static size_t      reduxGenGetReduxStateSize        (const GpuReduction*  gr){
 	size_t total = 0, idxSize = gpuarray_get_elsize(gr->TS64tc);
 
 	/* The accumulator and index types can be wider than dst/dstArg's types. */
@@ -3238,7 +3238,7 @@ static size_t     reduxGenGetReduxStateSize     (const GpuReduction*  gr){
  * @brief Get the maximum number of threads this operator's kernel can handle.
  */
 
-static size_t     reduxGenGetMaxLocalSize       (const GpuReduction*  gr){
+static size_t      reduxGenGetMaxLocalSize          (const GpuReduction*  gr){
 	return gr->maxLK;
 }
 
@@ -3246,7 +3246,7 @@ static size_t     reduxGenGetMaxLocalSize       (const GpuReduction*  gr){
  * @brief Get the shared memory consumption for a given block size.
  */
 
-static size_t      reduxGenGetSHMEMSize           (const GpuReduction*  gr, size_t cells){
+static size_t      reduxGenGetSHMEMSize             (const GpuReduction*  gr, size_t cells){
 	size_t               total = 0, totalPermute;
 
 	/* Compute size of SHMEM working space */
@@ -3264,7 +3264,7 @@ static size_t      reduxGenGetSHMEMSize           (const GpuReduction*  gr, size
  * @brief Get the shared memory byte offset for the k0 and k1 states.
  */
 
-static size_t      reduxGenGetSHMEMK0Off          (const GpuReduction*  gr, size_t cells){
+static size_t      reduxGenGetSHMEMK0Off            (const GpuReduction*  gr, size_t cells){
 	if (!reduxGenKernelRequiresWspace (gr)||
 	   !reduxGenKernelRequiresStateK0(gr)||
 	   !reduxGenKernelRequiresStateK1(gr)){
@@ -3277,7 +3277,7 @@ static size_t      reduxGenGetSHMEMK0Off          (const GpuReduction*  gr, size
 		return cells*reduxGenGetK1Size(gr);
 	}
 }
-static size_t      reduxGenGetSHMEMK1Off          (const GpuReduction*  gr, size_t cells){
+static size_t      reduxGenGetSHMEMK1Off            (const GpuReduction*  gr, size_t cells){
 	if (!reduxGenKernelRequiresWspace (gr)||
 	   !reduxGenKernelRequiresStateK0(gr)||
 	   !reduxGenKernelRequiresStateK1(gr)){
@@ -3298,7 +3298,7 @@ static size_t      reduxGenGetSHMEMK1Off          (const GpuReduction*  gr, size
  * intrablock offset permutes, for instance.
  */
 
-static size_t      reduxGenGetWMEMSize            (const GpuReduction*  gr, size_t cells){
+static size_t      reduxGenGetWMEMSize              (const GpuReduction*  gr, size_t cells){
 	size_t               total = 0;
 
 	total += reduxGenKernelRequiresStateK0(gr) ? cells*reduxGenGetK0Size(gr) : 0;
@@ -3311,10 +3311,10 @@ static size_t      reduxGenGetWMEMSize            (const GpuReduction*  gr, size
  * @brief Get the workspace memory byte offset for the k0 and k1 states.
  */
 
-static size_t      reduxGenGetWMEMK0Off           (const GpuReduction*  gr, size_t cells){
+static size_t      reduxGenGetWMEMK0Off             (const GpuReduction*  gr, size_t cells){
 	return reduxGenGetSHMEMK0Off(gr, cells);
 }
-static size_t      reduxGenGetWMEMK1Off           (const GpuReduction*  gr, size_t cells){
+static size_t      reduxGenGetWMEMK1Off             (const GpuReduction*  gr, size_t cells){
 	return reduxGenGetSHMEMK1Off(gr, cells);
 }
 
@@ -3324,7 +3324,7 @@ static size_t      reduxGenGetWMEMK1Off           (const GpuReduction*  gr, size
  * After this function, calling reduxInvCleanup*() becomes safe.
  */
 
-static int         reduxInvInit                   (redux_ctx*  ctx){
+static int         reduxInvInit                     (redux_ctx*           ctx){
 	ctx->L           = NULL;
 	ctx->Li          = NULL;
 	ctx->S0J         = ctx->S0Si      = NULL;
@@ -3349,7 +3349,7 @@ static int         reduxInvInit                   (redux_ctx*  ctx){
  * @brief Begin inferring the properties of the reduction invocation.
  */
 
-static int         reduxInvInferProperties        (redux_ctx*  ctx){
+static int         reduxInvInferProperties          (redux_ctx*           ctx){
 	axis_desc* a;
 	int        i, j;
 	size_t     d;
@@ -3530,7 +3530,7 @@ static int         reduxInvInferProperties        (redux_ctx*  ctx){
  * contiguous as possible.
  */
 
-static int        reduxInvFlattenSource         (redux_ctx*  ctx){
+static int         reduxInvFlattenSource            (redux_ctx*           ctx){
 	axis_desc* axis, *flatAxis, *sortAxis;
 	int        i, j, k, isSensitive;
 
@@ -3595,7 +3595,7 @@ static int        reduxInvFlattenSource         (redux_ctx*  ctx){
  * criteria.
  */
 
-static int        reduxInvComputeKernelArgs          (redux_ctx*  ctx){
+static int         reduxInvComputeKernelArgs        (redux_ctx*           ctx){
 	axis_desc* axis, *prevAxis;
 	size_t     target, aL, aLS, perm, i0S;
 	int        i, j, haveSplitFreeAxis, haveSplitReducedAxis;
@@ -4008,7 +4008,7 @@ static int        reduxInvSchedule              (redux_ctx*           ctx){
  * @brief Invoke the kernel.
  */
 
-static int        reduxInvoke                   (redux_ctx*           ctx){
+static int         reduxInvoke                      (redux_ctx*           ctx){
 	int   ret, i=0;
 	void* ptrs[2] = {ctx, &i};
 
@@ -4049,7 +4049,7 @@ static int        reduxInvoke                   (redux_ctx*           ctx){
  * Cleanup
  */
 
-static int        reduxInvCleanup               (redux_ctx*        ctx, int ret){
+static int         reduxInvCleanup                  (redux_ctx*           ctx, int ret){
 	ctx->gr                = NULL;
 	ctx->s0                = NULL;
 	ctx->d0                = NULL;
@@ -4090,8 +4090,8 @@ static int        reduxInvCleanup               (redux_ctx*        ctx, int ret)
 
 	return ret;
 }
-static int        reduxInvCleanupMsg            (redux_ctx*        ctx, int ret,
-                                                 const char*       fmt, ...){
+static int         reduxInvCleanupMsg               (redux_ctx*           ctx, int ret,
+                                                     const char*          fmt, ...){
 #if DEBUG
 	FILE* fp = stderr;
 
