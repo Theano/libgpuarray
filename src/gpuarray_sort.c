@@ -95,7 +95,18 @@ static const char *code_bitonic_smem =                                          
 "                ); "\
 "  }\n";
 
-
+#define NUMARGS_CODE_K 5
+const int type_args_code_k[NUMARGS_CODE_K] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_UINT};
+static const char *code_k =                                                                                                                  \
+" extern \"C\" __global__ void add( "\
+"      unsigned int *d_DstKey, size_t dstOff, unsigned int *d_SrcKey, size_t srcOff, unsigned int N "\
+"  ) "\
+"  { "\
+"    d_DstKey = (unsigned int*) (((char*)d_DstKey)+ dstOff);" \
+"    d_SrcKey = (unsigned int*) (((char*)d_SrcKey)+ srcOff);" \
+"    unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;" \
+"    if (i < N) d_DstKey[i] = d_SrcKey[i] + 1;" \
+"  }\n";
 static unsigned int iDivUp(unsigned int a, unsigned int b)
 {
     return ((a % b) == 0) ? (a / b) : (a / b + 1);
@@ -123,18 +134,20 @@ static void bitonicSortShared(
 {
 
   int errI;
-  size_t lens[1] = {strlen(code_bitonic_smem)};
+  size_t lens[1] = {strlen(code_k)};
   char *err_str = NULL;
   size_t ls, gs;
+  unsigned int p = 0;
+  int err;
 
-  void *arguments[NUMARGS_BITONIC_KERNEL]; // = (void**) malloc(sizeof(void *) * NUM_ARGS_KERNEL_1);
+  //void *arguments[NUMARGS_BITONIC_KERNEL]; // = (void**) malloc(sizeof(void *) * NUM_ARGS_KERNEL_1);
 
-  errI = GpuKernel_init( k_bitonic, ctx, 1, 
-                         &code_bitonic_smem, lens, "bitonicSortSharedKernel",
-                         NUMARGS_BITONIC_KERNEL, type_args_bitonic, flags, &err_str);
+  err = GpuKernel_init( k_bitonic, ctx, 1, 
+                         &code_k, lens, "add",
+                         NUMARGS_CODE_K, type_args_code_k, flags, &err_str);
 
-  printf("error kernel init: %s \n", gpuarray_error_str(errI));
-  printf("error backend: %s \n", err_str);
+  if (err != GA_NO_ERROR) printf("error kernel init: %s \n", gpuarray_error_str(errI));
+  if (err != GA_NO_ERROR)  printf("error backend: %s \n", err_str);
 
   //unsigned int blockCount = batchSize;
   //unsigned int blockDim = SHARED_SIZE_LIMIT / 2;
@@ -142,13 +155,34 @@ static void bitonicSortShared(
   gs = 1;
   GpuKernel_sched(k_bitonic, (size_t)arrayLength * batchSize, &gs, &ls);
 
-  arguments[0] = (void*)d_DstKey->data;
+  /*arguments[0] = (void*)d_DstKey->data;
   arguments[1] = (void*)d_SrcKey->data;
   arguments[2] = (void*)&batchSize;
   arguments[3] = (void*)&arrayLength;
   arguments[4] = (void*)&sortDir;
+*/
+  err = GpuKernel_setarg(k_bitonic, p++, d_DstKey->data);
+  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
 
-  GpuKernel_call(k_bitonic, 1, &gs, &ls, 0, arguments);
+  err = GpuKernel_setarg(k_bitonic, p++, &d_DstKey->offset);
+  
+  err = GpuKernel_setarg(k_bitonic, p++, d_SrcKey->data);
+  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+
+  err = GpuKernel_setarg(k_bitonic, p++, &d_SrcKey->offset);
+  
+  unsigned int sz = 16;
+  err = GpuKernel_setarg(k_bitonic, p++, &sz);
+  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  
+  /*err = GpuKernel_setarg(k_bitonic, p++, &arrayLength);
+  if (err != GA_NO_ERROR) printf("eror setting arg %d \n", p);
+  
+  err = GpuKernel_setarg(k_bitonic, p++, &sortDir);
+  if (err != GA_NO_ERROR) printf("eror setting arg %d \n", p);
+*/
+  err = GpuKernel_call(k_bitonic, 1, &gs, &ls, 0, NULL /*arguments*/);
+  if (err != GA_NO_ERROR) printf("error calling kernel %d \n", p);
 
   /*if (sortDir)
   {
@@ -324,8 +358,7 @@ static void sort(
     /////////////////////////////////////////////////////////////////////////
   
     if (N <= SHARED_SIZE_LIMIT)
-    {
-      
+    {  
       bitonicSortShared(d_DstKey, d_SrcKey, 1, N, sortDir, &k_bitonic, ctx); 
     }
     ///////////////////////////////////////////////////////////////////////////////
@@ -427,13 +460,16 @@ void initMergeSort(
     int res = GA_NO_ERROR;
 
     d_RanksA = gpudata_alloc(ctx, MAX_SAMPLE_COUNT * sizeof(unsigned int), NULL, 0, &res);
-    printf("error allocating aux structures %d\n", res);
+    if (res != GA_NO_ERROR) printf("error allocating aux structures %d\n", res);
+
     d_RanksB = gpudata_alloc(ctx, MAX_SAMPLE_COUNT * sizeof(unsigned int), NULL, 0, &res);
-    printf("error allocating aux structures %d\n", res);
+    if (res != GA_NO_ERROR) printf("error allocating aux structures %d\n", res);
+    
     d_LimitsA = gpudata_alloc(ctx, MAX_SAMPLE_COUNT * sizeof(unsigned int), NULL, 0, &res);
-    printf("error allocating aux structures %d\n", res);
+    if (res != GA_NO_ERROR) printf("error allocating aux structures %d\n", res);
+
     d_LimitsB = gpudata_alloc(ctx, MAX_SAMPLE_COUNT * sizeof(unsigned int), NULL, 0, &res);
-    printf("error allocating aux structures %d\n", res);
+    if (res != GA_NO_ERROR) printf("error allocating aux structures %d\n", res);
 }
 
 
