@@ -47,7 +47,7 @@ static int cuda_records(gpudata *, int, CUstream);
 static int detect_arch(const char *prefix, char *ret, error *e);
 static gpudata *new_gpudata(cuda_context *ctx, CUdeviceptr ptr, size_t size);
 
-typedef struct _kernel_key {
+typedef struct _disk_key {
   uint8_t version;
   uint8_t debug;
   uint8_t major;
@@ -55,13 +55,13 @@ typedef struct _kernel_key {
   uint32_t reserved;
   char bin_id[64];
   strb src;
-} kernel_key;
+} disk_key;
 
-/* Size of the kernel_key that we can memcopy to duplicate */
-#define KERNEL_KEY_MM (sizeof(kernel_key) - sizeof(strb))
+/* Size of the disk_key that we can memcopy to duplicate */
+#define DISK_KEY_MM (sizeof(disk_key) - sizeof(strb))
 
 static void key_free(cache_key_t _k) {
-  kernel_key *k = (kernel_key *)_k;
+  disk_key *k = (disk_key *)_k;
   strb_clear(&k->src);
   free(k);
 }
@@ -75,41 +75,41 @@ static uint32_t strb_hash(strb *k) {
   return XXH32(k->s, k->l, 42);
 }
 
-static int key_eq(kernel_key *k1, kernel_key *k2) {
-  return (memcmp(k1, k2, KERNEL_KEY_MM) == 0 &&
+static int key_eq(disk_key *k1, disk_key *k2) {
+  return (memcmp(k1, k2, DISK_KEY_MM) == 0 &&
           strb_eq(&k1->src, &k2->src));
 }
 
-static int key_hash(kernel_key *k) {
+static int key_hash(disk_key *k) {
   XXH32_state_t state;
   XXH32_reset(&state, 42);
-  XXH32_update(&state, k, KERNEL_KEY_MM);
+  XXH32_update(&state, k, DISK_KEY_MM);
   XXH32_update(&state, k->src.s, k->src.l);
   return XXH32_digest(&state);
 }
 
-static int key_write(strb *res, kernel_key *k) {
-  strb_appendn(res, (const char *)k, KERNEL_KEY_MM);
+static int key_write(strb *res, disk_key *k) {
+  strb_appendn(res, (const char *)k, DISK_KEY_MM);
   strb_appendb(res, &k->src);
   return strb_error(res);
 }
 
-static kernel_key *key_read(const strb *b) {
-  kernel_key *k;
-  if (b->l < KERNEL_KEY_MM) return NULL;
+static disk_key *key_read(const strb *b) {
+  disk_key *k;
+  if (b->l < DISK_KEY_MM) return NULL;
   k = calloc(1, sizeof(*k));
   if (k == NULL) return NULL;
-  memcpy(k, b->s, KERNEL_KEY_MM);
+  memcpy(k, b->s, DISK_KEY_MM);
   if (k->version != 0) {
     free(k);
     return NULL;
   }
-  if (strb_ensure(&k->src, b->l - KERNEL_KEY_MM) != 0) {
+  if (strb_ensure(&k->src, b->l - DISK_KEY_MM) != 0) {
     strb_clear(&k->src);
     free(k);
     return NULL;
   }
-  strb_appendn(&k->src, b->s + KERNEL_KEY_MM, b->l - KERNEL_KEY_MM);
+  strb_appendn(&k->src, b->s + DISK_KEY_MM, b->l - DISK_KEY_MM);
   return k;
 }
 
@@ -1190,8 +1190,8 @@ out:
 static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
   strb ptx = STRB_STATIC_INIT;
   strb *cbin;
-  kernel_key k;
-  kernel_key *pk;
+  disk_key k;
+  disk_key *pk;
 
   memset(&k, 0, sizeof(k));
   k.version = 0;
@@ -1217,14 +1217,14 @@ static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
   GA_CHECK(make_bin(ctx, &ptx, bin, log));
 
   if (ctx->disk_cache) {
-    pk = calloc(sizeof(kernel_key), 1);
+    pk = calloc(sizeof(disk_key), 1);
     if (pk == NULL) {
       error_sys(ctx->err, "calloc");
       fprintf(stderr, "Error adding kernel to disk cache: %s\n",
               ctx->err->msg);
       return GA_NO_ERROR;
     }
-    memcpy(pk, &k, KERNEL_KEY_MM);
+    memcpy(pk, &k, DISK_KEY_MM);
     strb_appendb(&pk->src, src);
     if (strb_error(&pk->src)) {
       error_sys(ctx->err, "strb_appendb"); 
