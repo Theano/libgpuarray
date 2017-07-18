@@ -57,10 +57,15 @@ typedef struct _disk_key {
   strb src;
 } disk_key;
 
+typedef struct _kernel_key {
+  const char *fname;
+  strb src;
+} kernel_key;
+
 /* Size of the disk_key that we can memcopy to duplicate */
 #define DISK_KEY_MM (sizeof(disk_key) - sizeof(strb))
 
-static void key_free(cache_key_t _k) {
+static void disk_free(cache_key_t _k) {
   disk_key *k = (disk_key *)_k;
   strb_clear(&k->src);
   free(k);
@@ -71,16 +76,31 @@ static int strb_eq(strb *k1, strb *k2) {
           memcmp(k1->s, k2->s, k1->l) == 0);
 }
 
-static uint32_t strb_hash(strb *k) {
-  return XXH32(k->s, k->l, 42);
+static int kernel_eq(kernel_key *k1, kernel_key *k2) {
+  return (strcmp(k1->fname, k2->fname) == 0 &&
+          strb_eq(&k1->src, &k2->src));
 }
 
-static int key_eq(disk_key *k1, disk_key *k2) {
+static uint32_t kernel_hash(kernel_key *k) {
+  XXH32_state_t state;
+  XXH32_reset(&state, 42);
+  XXH32_update(&state, k->fname, strlen(k->fname));
+  XXH32_update(&state, k->src.s, k->src.l);
+  return XXH32_digest(&state);
+}
+
+static void kernel_free(kernel_key *k) {
+  free((void *)k->fname);
+  strb_clear(&k->src);
+  free(k);
+}
+
+static int disk_eq(disk_key *k1, disk_key *k2) {
   return (memcmp(k1, k2, DISK_KEY_MM) == 0 &&
           strb_eq(&k1->src, &k2->src));
 }
 
-static int key_hash(disk_key *k) {
+static int disk_hash(disk_key *k) {
   XXH32_state_t state;
   XXH32_reset(&state, 42);
   XXH32_update(&state, k, DISK_KEY_MM);
@@ -88,13 +108,13 @@ static int key_hash(disk_key *k) {
   return XXH32_digest(&state);
 }
 
-static int key_write(strb *res, disk_key *k) {
+static int disk_write(strb *res, disk_key *k) {
   strb_appendn(res, (const char *)k, DISK_KEY_MM);
   strb_appendb(res, &k->src);
   return strb_error(res);
 }
 
-static disk_key *key_read(const strb *b) {
+static disk_key *disk_read(const strb *b) {
   disk_key *k;
   if (b->l < DISK_KEY_MM) return NULL;
   k = calloc(1, sizeof(*k));
@@ -238,9 +258,9 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   }
 
   res->kernel_cache = cache_twoq(64, 128, 64, 8,
-                                 (cache_eq_fn)strb_eq,
-                                 (cache_hash_fn)strb_hash,
-                                 (cache_freek_fn)strb_free,
+                                 (cache_eq_fn)kernel_eq,
+                                 (cache_hash_fn)kernel_hash,
+                                 (cache_freek_fn)kernel_free,
                                  (cache_freev_fn)cuda_freekernel, global_err);
   if (res->kernel_cache == NULL) {
     error_cuda(global_err, "cuStreamCreate", err);
@@ -250,9 +270,9 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   cache_path = getenv("GPUARRAY_CACHE_PATH");
   if (cache_path != NULL) {
     mem_cache = cache_lru(64, 8,
-                          (cache_eq_fn)key_eq,
-                          (cache_hash_fn)key_hash,
-                          (cache_freek_fn)key_free,
+                          (cache_eq_fn)disk_eq,
+                          (cache_hash_fn)disk_hash,
+                          (cache_freek_fn)disk_free,
                           (cache_freev_fn)strb_free,
                           global_err);
     if (mem_cache == NULL) {
@@ -261,11 +281,11 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
       goto fail_disk_cache;
     }
     res->disk_cache = cache_disk(cache_path, mem_cache,
-                                 (kwrite_fn)key_write,
+                                 (kwrite_fn)disk_write,
                                  (vwrite_fn)kernel_write,
-                                 (kread_fn)key_read,
+                                 (kread_fn)disk_read,
                                  (vread_fn)kernel_read,
-                                 res->err);
+                                 global_err);
     if (res->disk_cache == NULL) {
       fprintf(stderr, "Error initializing disk cache, disabling: %s\n",
               global_err->msg);
@@ -1230,7 +1250,7 @@ static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
       error_sys(ctx->err, "strb_appendb"); 
       fprintf(stderr, "Error adding kernel to disk cache %s\n",
               ctx->err->msg);
-      key_free((cache_key_t)pk);
+      disk_free((cache_key_t)pk);
       return GA_NO_ERROR;
     }
     cbin = strb_alloc(bin->l);
@@ -1238,7 +1258,7 @@ static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
       error_sys(ctx->err, "strb_alloc"); 
       fprintf(stderr, "Error adding kernel to disk cache: %s\n",
               ctx->err->msg);
-      key_free((cache_key_t)pk);
+      disk_free((cache_key_t)pk);
       return GA_NO_ERROR;
     }
     strb_appendb(cbin, bin);
@@ -1246,7 +1266,7 @@ static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
       error_sys(ctx->err, "strb_appendb"); 
       fprintf(stderr, "Error adding kernel to disk cache %s\n",
               ctx->err->msg);
-      key_free((cache_key_t)pk);
+      disk_free((cache_key_t)pk);
       strb_free(cbin);
       return GA_NO_ERROR;
     }
@@ -1284,8 +1304,9 @@ static int cuda_newkernel(gpukernel **k, gpucontext *c, unsigned int count,
     strb src = STRB_STATIC_INIT;
     strb bin = STRB_STATIC_INIT;
     strb log = STRB_STATIC_INIT;
-    strb *psrc;
     gpukernel *res;
+    kernel_key k_key;
+    kernel_key *p_key;
     CUdevice dev;
     CUresult err;
     unsigned int i;
@@ -1350,7 +1371,10 @@ static int cuda_newkernel(gpukernel **k, gpucontext *c, unsigned int count,
       return error_sys(ctx->err, "strb");
     }
 
-    res = (gpukernel *)cache_get(ctx->kernel_cache, &src);
+    k_key.fname = fname;
+    k_key.src = src;
+
+    res = (gpukernel *)cache_get(ctx->kernel_cache, &k_key);
     if (res != NULL) {
       res->refcnt++;
       strb_clear(&src);
@@ -1434,13 +1458,19 @@ static int cuda_newkernel(gpukernel **k, gpucontext *c, unsigned int count,
     ctx->refcnt++;
     cuda_exit(ctx);
     TAG_KER(res);
-    psrc = memdup(&src, sizeof(strb));
-    if (psrc != NULL) {
-      /* One of the refs is for the cache */
-      res->refcnt++;
-      /* If this fails, it will free the key and remove a ref from the
-         kernel. */
-      cache_add(ctx->kernel_cache, psrc, res);
+    p_key = memdup(&k_key, sizeof(kernel_key));
+    if (p_key != NULL) {
+      p_key->fname = strdup(fname);
+      if (p_key->fname != NULL) {
+        /* One of the refs is for the cache */
+        res->refcnt++;
+        /* If this fails, it will free the key and remove a ref from the
+           kernel. */
+        cache_add(ctx->kernel_cache, p_key, res);
+      } else {
+        free(p_key);
+        strb_clear(&src);
+      }
     } else {
       strb_clear(&src);
     }
