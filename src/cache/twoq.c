@@ -124,15 +124,14 @@ struct _hash {
   size_t size;
 };
 
-static inline size_t roundup2(size_t s) {
+static inline unsigned long long roundup2(unsigned long long s) {
   s--;
   s |= s >> 1;
   s |= s >> 2;
   s |= s >> 4;
   s |= s >> 8;
   s |= s >> 16;
-  if (sizeof(size_t) >= 8)
-    s |= s >> 32;
+  s |= s >> 32;
   s++;
   return s;
 }

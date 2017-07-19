@@ -266,7 +266,7 @@ static uint64_t gaIMulMod    (uint64_t a, uint64_t b, uint64_t m){
 	);
 
 	return r;
-#elif (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+#elif ((__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)) && defined(__SIZEOF_INT128__) && __SIZEOF_INT128__ >= 16
 	/* Hardcore GCC 4.6+ optimization jazz */
 	return ((unsigned __int128)a * (unsigned __int128)b) % m;
 #else
