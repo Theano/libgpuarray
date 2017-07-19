@@ -162,7 +162,7 @@ gpukernel *gpukernel_init(gpucontext *ctx, unsigned int count,
                           const char *fname, unsigned int numargs,
                           const int *typecodes, int flags, int *ret,
                           char **err_str) {
-  gpukernel *res;
+  gpukernel *res = NULL;
   int err;
   err = ctx->ops->kernel_alloc(&res, ctx, count, strings, lengths, fname,
                                numargs, typecodes, flags, err_str);
