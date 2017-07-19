@@ -740,12 +740,12 @@ void GpuElemwise_free(GpuElemwise *ge) {
 }
 
 int GpuElemwise_call(GpuElemwise *ge, void **args, int flags) {
-  size_t n;
-  size_t *dims;
-  ssize_t **strides;
-  unsigned int nd;
-  int contig;
-  int call32;
+  size_t n = 0;
+  size_t *dims = NULL;
+  ssize_t **strides = NULL;
+  unsigned int nd = 0;
+  int contig = 0;
+  int call32 = 0;
   int err;
 
   err = check_contig(ge, args, &n, &contig);
