@@ -643,7 +643,8 @@ int GpuArray_reshape(GpuArray *res, const GpuArray *a, unsigned int nd,
   err = GpuArray_reshape_inplace(res, nd, newdims, ord);
   if (err == GA_COPY_ERROR && !nocopy) {
     GpuArray_clear(res);
-    GpuArray_copy(res, a, ord);
+    err = GpuArray_copy(res, a, ord);
+    if (err != GA_NO_ERROR) return err;
     err = GpuArray_reshape_inplace(res, nd, newdims, ord);
   }
   if (err != GA_NO_ERROR) GpuArray_clear(res);
