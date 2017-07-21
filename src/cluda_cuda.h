@@ -65,10 +65,14 @@ struct ga_half {
   ga_ushort data;
 };
 
-#define ga_half2float(p) __half2float((p).data)
-__device__ static inline ga_half ga_float2half(float f) {
+static __device__ inline float ga_half2float(ga_half h) {
+  float r;
+  asm("{ cvt.f32.f16 %0, %1; }\n" : "=f"(r) : "h"(h.data));
+  return r;
+}
+static __device__ inline ga_half ga_float2half(float f) {
   ga_half r;
-  r.data = __float2half_rn(f);
+  asm("{ cvt.rn.f16.f32 %0, %1; }\n" : "=h"(r.data) : "f"(f));
   return r;
 }
 
@@ -142,7 +146,7 @@ __device__ ga_half atom_add_eg(ga_half *addr, ga_half val) {
   do {
     assumed = old;
     tmp.data = __byte_perm(old, 0, ((ga_size)addr & 2) ? 0x4432 : 0x4410);
-    sum = __float2half_rn(__half2float(val.data) + __half2float(tmp.data));
+    sum = ga_float2half(ga_half2float(val) + ga_half2float(tmp)).data;
     new_ = __byte_perm(old, sum, ((ga_size)addr & 2) ? 0x5410 : 0x3254);
     old = atomicCAS(base, assumed, new_);
   } while (assumed != old);

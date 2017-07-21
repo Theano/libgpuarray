@@ -2,6 +2,7 @@
 
 #include "private.h"
 #include "private_cuda.h"
+
 #include "loaders/libnvrtc.h"
 #include "loaders/libcublas.h"
 
@@ -1087,9 +1088,11 @@ static int call_compiler(cuda_context *ctx, strb *src, strb *ptx, strb *log) {
   size_t buflen;
   const char *heads[1] = {"cluda.h"};
   const char *hsrc[1];
-  const char *opts[4] = {
+  const char *opts[] = {
     "-arch", ""
+#ifdef DEBUG
     , "-G", "-lineinfo"
+#endif
   };
   nvrtcResult err;
 
@@ -1100,13 +1103,7 @@ static int call_compiler(cuda_context *ctx, strb *src, strb *ptx, strb *log) {
   if (err != NVRTC_SUCCESS)
     return error_nvrtc(ctx->err, "nvrtcCreateProgram", err);
 
-  err = nvrtcCompileProgram(prog,
-#ifdef DEBUG
-                            4,
-#else
-                            2,
-#endif
-                            opts);
+  err = nvrtcCompileProgram(prog, sizeof(opts)/sizeof(char *), opts);
 
   /* Get the log before handling the error */
   if (nvrtcGetProgramLogSize(prog, &buflen) == NVRTC_SUCCESS) {
