@@ -1,4 +1,6 @@
 #include <assert.h>
+#include <limits.h>
+#include <float.h>
 
 #include <gpuarray/sort.h>
 #include <gpuarray/array.h>
@@ -8,14 +10,11 @@
 #include "private.h"
 
 const int flags = GA_USE_CLUDA;
-//"\ntypedef float t_key;\n"                                                                                    \
 
 static const char *code_helper_funcs =                                                                               \
 "\n#define SAMPLE_STRIDE 128 \n"                                                                                     \
 "\n#define SHARED_SIZE_LIMIT  1024U \n"                                                                              \
-"\n#define MAX_NUM 340282346638528859811704183484516925440.000000F\n" \
-"\n#define MIN_NUM -340282346638528859811704183484516925440.000000F\n" \
-"__device__ unsigned int iDivUp(unsigned int a, unsigned int b)"                                                     \                   
+"__device__ unsigned int iDivUp(unsigned int a, unsigned int b)"                                                     \
 "{"                                                                                                                  \
 "    return ((a % b) == 0) ? (a / b) : (a / b + 1); "                                                                \
 "} "                                                                                                                 \
@@ -41,9 +40,9 @@ static const char *code_helper_funcs =                                          
 "          return a[pos]; "                                                                                          \
 "      } "                                                                                                           \
 "  } "                                                                                                               \
-"template<typename T> __device__ void writeArray(T *a, unsigned int pos, T value, unsigned int length) "           \      
+"template<typename T> __device__ void writeArray(T *a, unsigned int pos, T value, unsigned int length) "           \
 " { "                                                                                                                \
-"     if (pos >= length) "                                                                                           \    
+"     if (pos >= length) "                                                                                           \
 "     { "                                                                                                            \
 "          return; "                                                                                                 \
 "     } "                                                                                                            \
@@ -105,7 +104,7 @@ static const char *code_bin_search =                                            
 "}"\
 "template<typename T> __device__ unsigned int binarySearchLowerBoundExclusive(T val, T *ptr, unsigned int first,"  \
 "                                                                             unsigned int last, unsigned int sortDir) "                 \
-"{ "\    
+"{ "\
 "    unsigned int len = last - first; "         \
 "    unsigned int half; "                                                                                           \
 "    unsigned int middle; "                                                                                           \
@@ -139,7 +138,7 @@ static const char *code_bin_search =                                            
 "        if ( (sortDir && ptr[middle] <= val) || (!sortDir && ptr[middle] >= val) ) "\
 "        { "\
 "            first = middle; "\
-"            ++first; "\ 
+"            ++first; "\
 "            len = len - half - 1; "\
 "        } "\
 "        else "\
@@ -216,7 +215,7 @@ static const char *code_bitonic_smem =                                          
 "                  arrayLength * batchSize "\
 "                ); "\
 "  }\n";
-static void bitonicSortShared(
+static int bitonicSortShared(
     GpuArray *d_DstKey,
     GpuArray *d_SrcKey,
     unsigned int batchSize,
@@ -229,43 +228,46 @@ static void bitonicSortShared(
 {
   size_t ls, gs;
   unsigned int p = 0;
-  int err;
+  int err = GA_NO_ERROR;
 
   ls = SHARED_SIZE_LIMIT / 2;
   gs = batchSize;
 
   err = GpuKernel_setarg(k_bitonic, p++, d_DstKey->data);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_bitonic, p++, &d_DstKey->offset);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
   
   err = GpuKernel_setarg(k_bitonic, p++, d_SrcKey->data);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_bitonic, p++, &d_SrcKey->offset);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
   
   err = GpuKernel_setarg(k_bitonic, p++, &batchSize);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
   
   err = GpuKernel_setarg(k_bitonic, p++, &arrayLength);
-  if (err != GA_NO_ERROR) printf("eror setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_bitonic, p++, &elemsOff);
-  if (err != GA_NO_ERROR) printf("eror setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
   
   err = GpuKernel_setarg(k_bitonic, p++, &sortDir);
-  if (err != GA_NO_ERROR) printf("eror setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_call(k_bitonic, 1, &gs, &ls, 0, NULL);
-  if (err != GA_NO_ERROR) printf("error calling kernel %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
+ error_call_basic:
+  return err;
 
+/*
   float *h_dst2 = (float *) malloc ( 16 * sizeof(float));
   err = GpuArray_read(h_dst2, 16 * sizeof(float), d_DstKey);
   if (err != GA_NO_ERROR) printf("error reading \n");
 
-  /*
+  
   int i;
   for (i = 0; i < 16; i++)
   {
@@ -278,7 +280,7 @@ static void bitonicSortShared(
 const int type_args_ranks[NUMARGS_SAMPLE_RANKS] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_UINT, GA_UINT, GA_UINT, GA_UINT};
 static const char *code_sample_ranks =                                            \
 "extern \"C\" __global__ void generateSampleRanksKernel("               \
-"    unsigned int *d_RanksA,"           \                 
+"    unsigned int *d_RanksA,"           \
 "    size_t rankAOff,"                          \
 "    unsigned int *d_RanksB,"                 \
 "    size_t rankBOff,"         \
@@ -324,7 +326,7 @@ static const char *code_sample_ranks =                                          
 "                                                 );"\
 "    }"\
 "}\n";
-static void generateSampleRanks(
+static int generateSampleRanks(
   GpuArray  *d_RanksA,
   GpuArray  *d_RanksB,
   GpuArray *d_SrcKey,
@@ -340,44 +342,45 @@ static void generateSampleRanks(
 
   size_t ls, gs;
   unsigned int p = 0;
-  int err;
+  int err = GA_NO_ERROR;
 
   ls = 256;
   gs = iDivUp(threadCount, 256);
 
   err = GpuKernel_setarg(k_ranks, p++, d_RanksA->data);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks, p++, &d_RanksA->offset);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks, p++, d_RanksB->data);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks, p++, &d_RanksB->offset);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
   
   err = GpuKernel_setarg(k_ranks, p++, d_SrcKey->data);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks, p++, &d_SrcKey->offset);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks, p++, &stride);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks, p++, &N);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks, p++, &threadCount);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks, p++, &sortDir);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_call(k_ranks, 1, &gs, &ls, 0, NULL);
-  if (err != GA_NO_ERROR) printf("error calling Ranks kernel %d \n", p);
-
+  if (err != GA_NO_ERROR) goto error_call_basic;
+ error_call_basic:
+  return err;
   
 
   /*unsigned int *h_dst = (unsigned int *) malloc ( (2048/128) * sizeof(unsigned int));
@@ -407,7 +410,7 @@ static const char *code_ranks_idxs =                                            
 "    unsigned int stride, "\
 "    unsigned int N, "\
 "    unsigned int threadCount "\
-") "\ 
+") "\
 "{ "\
 "    d_Limits = (unsigned int*) (((char*)d_Limits)+ limOff);" \
 "    d_Ranks = (unsigned int*) (((char*)d_Ranks)+ rankOff);" \
@@ -433,7 +436,7 @@ static const char *code_ranks_idxs =                                            
 "        d_Limits[dstPos] = d_Ranks[segmentSamplesA + i]; "\
 "    } "\
 "}\n";
-static void mergeRanksAndIndices(
+static int mergeRanksAndIndices(
   GpuArray *d_LimitsA,
   GpuArray *d_LimitsB,
   GpuArray *d_RanksA,
@@ -446,56 +449,57 @@ static void mergeRanksAndIndices(
 )
 {
   unsigned int lastSegmentElements = N % (2 * stride);
-  unsigned int threadCount = (lastSegmentElements > stride) ? (N + 2 * stride - lastSegmentElements) / (2 * SAMPLE_STRIDE) : (N - lastSegmentElements) / (2 * SAMPLE_STRIDE);
-
+  unsigned int threadCount = (lastSegmentElements > stride) ? 
+                             (N + 2 * stride - lastSegmentElements) / (2 * SAMPLE_STRIDE) : (N - lastSegmentElements) / (2 * SAMPLE_STRIDE);
   size_t ls, gs;
   unsigned int p = 0;
-  int err;
+  int err = GA_NO_ERROR;
 
   ls = 256U;
   gs = iDivUp(threadCount, 256U);
 
   err = GpuKernel_setarg(k_ranks_idxs, p++, d_LimitsA->data);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks_idxs, p++, &d_LimitsA->offset);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks_idxs, p++, d_RanksA->data);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks_idxs, p++, &d_RanksA->offset);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks_idxs, p++, &stride);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks_idxs, p++, &N);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks_idxs, p++, &threadCount);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_call(k_ranks_idxs, 1, &gs, &ls, 0, NULL);
-  if (err != GA_NO_ERROR) printf("error calling Ranks kernel %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   p = 0;
 
   err = GpuKernel_setarg(k_ranks_idxs, p++, d_LimitsB->data);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks_idxs, p++, &d_LimitsB->offset);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks_idxs, p++, d_RanksB->data);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_ranks_idxs, p++, &d_RanksB->offset);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_call(k_ranks_idxs, 1, &gs, &ls, 0, NULL);
-  if (err != GA_NO_ERROR) printf("error calling Ranks kernel %d \n", p);
-
+  if (err != GA_NO_ERROR) goto error_call_basic;
+ error_call_basic:
+  return err;
 
   /*unsigned int *h_dst = (unsigned int *) malloc ( (2048/128) * sizeof(unsigned int));
   err = GpuArray_read(h_dst, (2048/128) * sizeof(unsigned int), d_LimitsB);
@@ -579,7 +583,7 @@ static const char *code_merge =                                            \
 "        startSrcB    = d_LimitsB[blockIdx.x]; "\
 "        unsigned int endSrcA = (intervalI + 1 < segmentSamples) ? d_LimitsA[blockIdx.x + 1] : segmentElementsA; "\
 "        unsigned int endSrcB = (intervalI + 1 < segmentSamples) ? d_LimitsB[blockIdx.x + 1] : segmentElementsB; "\
-"        lenSrcA      = endSrcA - startSrcA; "\ 
+"        lenSrcA      = endSrcA - startSrcA; "\
 "        lenSrcB      = endSrcB - startSrcB; "\
 "        startDstA    = startSrcA + startSrcB; "\
 "        startDstB    = startDstA + lenSrcA; "\
@@ -612,7 +616,7 @@ static const char *code_merge =                                            \
 "        d_DstKey[startDstB + threadIdx.x] = s_key[lenSrcA + threadIdx.x]; "\
 "    } "\
 "}\n";
-static void mergeElementaryIntervals(
+static int mergeElementaryIntervals(
     GpuArray *d_DstKey,
     GpuArray *d_SrcKey,
     GpuArray  *d_LimitsA,
@@ -629,46 +633,49 @@ static void mergeElementaryIntervals(
 
   size_t ls, gs;
   unsigned int p = 0;
-  int err;
+  int err = GA_NO_ERROR;
 
   ls = SAMPLE_STRIDE;
   gs = mergePairs;
 
   err = GpuKernel_setarg(k_merge, p++, d_DstKey->data);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge, p++, &d_DstKey->offset);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge, p++, d_SrcKey->data);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge, p++, &d_SrcKey->offset);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p); 
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge, p++, d_LimitsA->data);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge, p++, &d_LimitsA->offset);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p); 
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge, p++, d_LimitsB->data);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge, p++, &d_LimitsB->offset);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p); 
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge, p++, &stride);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p); 
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge, p++, &N);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p); 
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge, p++, &sortDir);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p); 
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_call(k_merge, 1, &gs, &ls, 0, NULL);
-  if (err != GA_NO_ERROR) printf("error calling Ranks kernel %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
+ 
+ error_call_basic:
+  return err;
 }
 
 #define NUMARGS_MERGE_GLB 8
@@ -683,7 +690,7 @@ static const char *code_merge_glb =                                            \
 "    unsigned int segmentSizeB, "\
 "    unsigned int N, "\
 "    unsigned int sortDir "\
-") "\ 
+") "\
 "{ "\
 "    d_DstKey = (t_key*) (((char*)d_DstKey)+ dstOff);" \
 "    d_SrcKey = (t_key*) (((char*)d_SrcKey)+ srcOff);" \
@@ -707,7 +714,7 @@ static const char *code_merge_glb =                                            \
 "    d_DstKey[dstPos] = value; "\
 "}\n";
 
-static void mergeGlobalMem(
+static int mergeGlobalMem(
     GpuArray *d_DstKey,
     GpuArray *d_SrcKey,
     unsigned int segmentSizeA,
@@ -720,52 +727,80 @@ static void mergeGlobalMem(
 {
   size_t ls, gs;
   unsigned int p = 0;
-  int err;
+  int err = GA_NO_ERROR;
 
   ls = 256;
   gs = iDivUp(N, ls);
 
   err = GpuKernel_setarg(k_merge_global, p++, d_DstKey->data);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge_global, p++, &d_DstKey->offset);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge_global, p++, d_SrcKey->data);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge_global, p++, &d_SrcKey->offset);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge_global, p++, &segmentSizeA);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge_global, p++, &segmentSizeB);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge_global, p++, &N);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_setarg(k_merge_global, p++, &sortDir);
-  if (err != GA_NO_ERROR) printf("error setting arg %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
 
   err = GpuKernel_call(k_merge_global, 1, &gs, &ls, 0, NULL);
-  if (err != GA_NO_ERROR) printf("error calling Ranks kernel %d \n", p);
+  if (err != GA_NO_ERROR) goto error_call_basic;
+
+ error_call_basic:
+  return err;
 
 }
 
 // Generate type specific GPU code
-static void genMergeSortCode(char *str, int typecode)
+static void genMergeSortTypeCode(char *str, int typecode)
 {
+  int nchars = 0;
   // Generate typedef for the data type to be sorted    
-  sprintf(str, "typedef %s t_key;\n", ctype(typecode));
-  printf("sssss %s\n", str);
+  nchars = sprintf(str, "typedef %s t_key;\n", ctype(typecode));
 
   // Generate macro for MIN and MAX value of a given data type
-
-
-
-
+  switch (typecode){
+  case GA_UINT:
+    sprintf(str + nchars, "#define MAX_NUM %u \n#define MIN_NUM %u \n", UINT_MAX, 0);
+    break;
+  case GA_INT:
+    sprintf(str + nchars, "#define MAX_NUM %d \n#define MIN_NUM %d \n", INT_MAX, INT_MIN);
+    break;
+  case GA_FLOAT:
+    sprintf(str + nchars, "#define MAX_NUM %f \n#define MIN_NUM %f \n", FLT_MAX, -FLT_MAX);
+    break;
+  case GA_DOUBLE:
+    sprintf(str + nchars, "#define MAX_NUM %g \n#define MIN_NUM %g \n", DBL_MAX, -DBL_MAX);
+    break;
+  case GA_UBYTE:
+    sprintf(str + nchars, "#define MAX_NUM %u \n#define MIN_NUM %u \n", UCHAR_MAX, 0);
+    break;
+  case GA_BYTE:
+    sprintf(str + nchars, "#define MAX_NUM %d \n#define MIN_NUM %d \n", SCHAR_MAX, SCHAR_MIN);
+    break;
+  case GA_USHORT:
+    sprintf(str + nchars, "#define MAX_NUM %u \n#define MIN_NUM %u \n", USHRT_MAX, 0);
+    break;
+  case GA_SHORT:
+    sprintf(str + nchars, "#define MAX_NUM %d \n#define MIN_NUM %d \n", SHRT_MAX, SHRT_MIN);
+    break;
+  default:
+    fprintf(stderr, "Type %s not supported", ctype(typecode));
+    break;
+  }
 }
 
 #define NSTR_BITONIC 3
@@ -777,15 +812,25 @@ static void compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *
                            GpuKernel *k_merge_global, gpucontext *ctx, int typecode)
 {
   char *err_str = NULL;
-  int err;
+  int err = GA_NO_ERROR;
 
-  char code_typecode[100];
-  genMergeSortCode(code_typecode, typecode);
+  size_t lens_bitonic[NSTR_BITONIC]         = {0, strlen(code_helper_funcs), strlen(code_bitonic_smem)};
+  size_t lens_ranks[NSTR_RANKS]             = {0, strlen(code_helper_funcs), strlen(code_bin_search), strlen(code_sample_ranks)};
+  size_t lens_rks_idx[NSTRINGS_RKS_IDX]     = {0, strlen(code_helper_funcs), strlen(code_bin_search), strlen(code_ranks_idxs)};
+  size_t lens_merge[NSTRINGS_MERGE]         = {0, strlen(code_helper_funcs), strlen(code_bin_search), strlen(code_merge)};
+  size_t lens_merge_glb[NSTRINGS_MERGE_GLB] = {0, strlen(code_helper_funcs), strlen(code_bin_search), strlen(code_merge_glb)};
 
-  // Compile Bitonic sort Kernel
-  size_t lens_bitonic[NSTR_BITONIC]       = {0, strlen(code_helper_funcs), strlen(code_bitonic_smem)};
-  const char *codes_bitonic[NSTR_BITONIC] = {NULL, code_helper_funcs, code_bitonic_smem};
-  lens_bitonic[0]  = strlen(code_typecode);
+  const char *codes_bitonic[NSTR_BITONIC]         = {NULL, code_helper_funcs, code_bitonic_smem};
+  const char *codes_ranks[NSTR_RANKS]             = {NULL, code_helper_funcs, code_bin_search, code_sample_ranks};
+  const char *codes_rks_idx[NSTRINGS_RKS_IDX]     = {NULL, code_helper_funcs, code_bin_search, code_ranks_idxs};
+  const char *codes_merge[NSTRINGS_MERGE]         = {NULL, code_helper_funcs, code_bin_search, code_merge};
+  const char *codes_merge_glb[NSTRINGS_MERGE_GLB] = {NULL, code_helper_funcs, code_bin_search, code_merge_glb};
+
+  char code_typecode[500];
+  genMergeSortTypeCode(code_typecode, typecode);
+
+  // Compile Bitonic sort Kernel  
+  lens_bitonic[0] = strlen(code_typecode);
   codes_bitonic[0] = code_typecode;
 
   err = GpuKernel_init( k_bitonic,
@@ -803,8 +848,6 @@ static void compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *
   if (err != GA_NO_ERROR)  printf("error backend: %s \n", err_str);
 
   // Compile ranks kernel
-  size_t lens_ranks[NSTR_RANKS]       = {0, strlen(code_helper_funcs), strlen(code_bin_search), strlen(code_sample_ranks)};
-  const char *codes_ranks[NSTR_RANKS] = {NULL, code_helper_funcs, code_bin_search, code_sample_ranks};
   lens_ranks[0]  = strlen(code_typecode);
   codes_ranks[0] = code_typecode;
 
@@ -823,8 +866,6 @@ static void compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *
   if (err != GA_NO_ERROR)  printf("error backend: %s \n", err_str);
 
   // Compile ranks and idxs kernel
-  size_t lens_rks_idx[NSTRINGS_RKS_IDX]       = {0, strlen(code_helper_funcs), strlen(code_bin_search), strlen(code_ranks_idxs)};
-  const char *codes_rks_idx[NSTRINGS_RKS_IDX] = {NULL, code_helper_funcs, code_bin_search, code_ranks_idxs};
   lens_rks_idx[0]  = strlen(code_typecode);
   codes_rks_idx[0] = code_typecode;
 
@@ -843,8 +884,6 @@ static void compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *
   if (err != GA_NO_ERROR)  printf("error backend: %s \n", err_str);
 
   // Compile merge kernel
-  size_t lens_merge[NSTRINGS_MERGE]       = {0, strlen(code_helper_funcs), strlen(code_bin_search), strlen(code_merge)};
-  const char *codes_merge[NSTRINGS_MERGE] = {NULL, code_helper_funcs, code_bin_search, code_merge};
   lens_merge[0]  = strlen(code_typecode);
   codes_merge[0] = code_typecode;
 
@@ -863,8 +902,6 @@ static void compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *
   if (err != GA_NO_ERROR) printf("error backend: %s \n", err_str); 
 
   // Compile merge global kernel
-  size_t lens_merge_glb[NSTRINGS_MERGE_GLB]       = {0, strlen(code_helper_funcs), strlen(code_bin_search), strlen(code_merge_glb)};
-  const char *codes_merge_glb[NSTRINGS_MERGE_GLB] = {NULL, code_helper_funcs, code_bin_search, code_merge_glb};
   lens_merge_glb[0]  = strlen(code_typecode);
   codes_merge_glb[0] = code_typecode;
 
@@ -883,7 +920,7 @@ static void compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *
   if (err != GA_NO_ERROR)  printf("error backend: %s \n", err_str); 
 }
 
-static void sort(
+static int sort(
   GpuArray *d_DstKey,
   GpuArray *d_BufKey,
   GpuArray *d_SrcKey,
@@ -901,14 +938,15 @@ static void sort(
   int    typecode = d_SrcKey->typecode;
   size_t typeSize = typesize(typecode);
   size_t lstCopyOff;
-  int err;
+  int err = GA_NO_ERROR;
+
+  unsigned int stageCount = 0;
+  unsigned int stride;
 
   GpuArray *ikey, *okey, *t;
   GpuKernel k_bitonic, k_ranks, k_ranks_idxs, k_merge, k_merge_global;
   compileKernels(&k_bitonic, &k_ranks, &k_ranks_idxs, &k_merge, &k_merge_global, ctx, typecode);
 
-  unsigned int stageCount = 0;
-  unsigned int stride;
   for (stride = SHARED_SIZE_LIMIT; stride < Nfloor; stride <<= 1, stageCount++);
 
   if (stageCount & 1) {
@@ -920,32 +958,27 @@ static void sort(
     okey = d_BufKey;
   }
 
-  /////////////////////////////////////////////////////////////////////////
-  // Sort the array with bitonic sort for arrays shorter than 1024 elements
-  // Bitonic sort gives better performance than merge sort for short arrays
-  /////////////////////////////////////////////////////////////////////////
+  // Bitonic sort for arrays <= 1024 elements
   if (N <= SHARED_SIZE_LIMIT) {  
-    bitonicSortShared(d_DstKey, d_SrcKey, 1, N, sortDir, 0, &k_bitonic, ctx); 
+    err = bitonicSortShared(d_DstKey, d_SrcKey, 1, N, sortDir, 0, &k_bitonic, ctx); 
   }
-  ///////////////////////////////////////////////////////////////////////////////
-  // Sort the array with merge sort for arrays equal or bigger than 1024 elements
-  ///////////////////////////////////////////////////////////////////////////////
+  // Merge - Bitonic sort for bigger arrays
   else {
     unsigned int batchSize = Nfloor / SHARED_SIZE_LIMIT;
     unsigned int arrayLength = SHARED_SIZE_LIMIT;
-    bitonicSortShared(ikey, d_SrcKey, batchSize, arrayLength, sortDir, 0, &k_bitonic, ctx);
+    err = bitonicSortShared(ikey, d_SrcKey, batchSize, arrayLength, sortDir, 0, &k_bitonic, ctx);
 
     for (stride = SHARED_SIZE_LIMIT; stride < Nfloor; stride <<= 1) {
       unsigned int lastSegmentElements = Nfloor % (2 * stride);
 
       //Find sample ranks and prepare for limiters merge
-      generateSampleRanks(d_RanksA, d_RanksB, ikey, stride, Nfloor, sortDir, &k_ranks, ctx);   
+      err = generateSampleRanks(d_RanksA, d_RanksB, ikey, stride, Nfloor, sortDir, &k_ranks, ctx);   
 
       //Merge ranks and indices
-      mergeRanksAndIndices(d_LimitsA, d_LimitsB, d_RanksA, d_RanksB, stride, Nfloor, sortDir, &k_ranks_idxs, ctx);
+      err = mergeRanksAndIndices(d_LimitsA, d_LimitsB, d_RanksA, d_RanksB, stride, Nfloor, sortDir, &k_ranks_idxs, ctx);
 
       //Merge elementary intervals
-      mergeElementaryIntervals(okey, ikey, d_LimitsA, d_LimitsB, stride, Nfloor, sortDir, &k_merge, ctx);
+      err = mergeElementaryIntervals(okey, ikey, d_LimitsA, d_LimitsB, stride, Nfloor, sortDir, &k_merge, ctx);
 
       if (lastSegmentElements <= stride) {
         //Last merge segment consists of a single array which just needs to be passed through          
@@ -960,35 +993,20 @@ static void sort(
     }
     // If the array is not multiple of 1024, sort the remaining and merge
     if (Nleft > 0) {
-      printf("Sorting Remaining part %d \n", Nleft);
-      bitonicSortShared(d_SrcKey, d_DstKey, 1, Nleft, sortDir, Nfloor, &k_bitonic, ctx);
-/*
-      unsigned int *h_dst = (unsigned int *) malloc ( N * sizeof(unsigned int));
-      err = GpuArray_read(h_dst, N * sizeof(unsigned int), d_SrcKey);
-      if (err != GA_NO_ERROR) printf("error reading \n");
-
-      int i;
-      for (i = 0; i < N; i++)
-      {
-          printf("%d value %u \n", i, h_dst[i]);
-      }
-*/
+      err = bitonicSortShared(d_SrcKey, d_DstKey, 1, Nleft, sortDir, Nfloor, &k_bitonic, ctx);
 
       // Copy the leftMost segment to the output array of which contains the first sorted sequence
       lstCopyOff = okey->offset + Nfloor * typeSize;
       err = gpudata_move(d_DstKey->data, lstCopyOff, d_SrcKey->data, lstCopyOff, Nleft * typeSize);
 
-      mergeGlobalMem(d_SrcKey, d_DstKey, Nfloor, (unsigned int)Nleft, N, sortDir, &k_merge_global, ctx);
-      GpuArray_copy(d_DstKey, d_SrcKey, GA_C_ORDER);
+      err = mergeGlobalMem(d_SrcKey, d_DstKey, Nfloor, (unsigned int)Nleft, N, sortDir, &k_merge_global, ctx);
+      err = GpuArray_copy(d_DstKey, d_SrcKey, GA_C_ORDER);
     }
   }
-  //GpuArray_copy(d_DstKey, d_BufKey, GA_C_ORDER);
-  //cudaDeviceSynchronize();
+  return err;
 }
 
-
-
-static void initMergeSort(
+static int initMergeSort(
   GpuArray *d_RanksA,
   GpuArray *d_RanksB,
   GpuArray *d_LimitsA,
@@ -997,39 +1015,56 @@ static void initMergeSort(
   gpucontext *ctx
 )
 {
-  int res = GA_NO_ERROR;
+  int err = GA_NO_ERROR;
   const unsigned int nd = 1;
   const size_t dims =  MAX_SAMPLE_COUNT * sizeof(unsigned int);
 
-  //d_RanksA = gpudata_alloc(ctx, MAX_SAMPLE_COUNT * sizeof(unsigned int), NULL, GA_BUFFER_READ_WRITE, &res);
-  res = GpuArray_empty(d_RanksA, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
-  if (res != GA_NO_ERROR) printf("error allocating aux structures %d\n", res);
+  err = GpuArray_empty(d_RanksA, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
+  if (err != GA_NO_ERROR) printf("error allocating aux structures %d\n", err);
 
-  //d_RanksB = gpudata_alloc(ctx, MAX_SAMPLE_COUNT * sizeof(unsigned int), NULL, GA_BUFFER_READ_WRITE, &res);
-  res = GpuArray_empty(d_RanksB, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
-  if (res != GA_NO_ERROR) printf("error allocating aux structures %d\n", res);
+  err = GpuArray_empty(d_RanksB, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
+  if (err != GA_NO_ERROR) printf("error allocating aux structures %d\n", err);
   
-  //d_LimitsA = gpudata_alloc(ctx, MAX_SAMPLE_COUNT * sizeof(unsigned int), NULL, GA_BUFFER_READ_WRITE, &res);
-  res = GpuArray_empty(d_LimitsA, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
-  if (res != GA_NO_ERROR) printf("error allocating aux structures %d\n", res);
+  err = GpuArray_empty(d_LimitsA, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
+  if (err != GA_NO_ERROR) printf("error allocating aux structures %d\n", err);
 
-  //d_LimitsB = gpudata_alloc(ctx, MAX_SAMPLE_COUNT * sizeof(unsigned int), NULL, GA_BUFFER_READ_WRITE, &res);
-  res = GpuArray_empty(d_LimitsB, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
-  if (res != GA_NO_ERROR) printf("error allocating aux structures %d\n", res);
+  err = GpuArray_empty(d_LimitsB, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
+  if (err != GA_NO_ERROR) printf("error allocating aux structures %d\n", err);
+
+  return err;
+}
+
+static void destroyMergeSort(
+  GpuArray *d_RanksA,
+  GpuArray *d_RanksB,
+  GpuArray *d_LimitsA,
+  GpuArray *d_LimitsB,
+  GpuArray *BufKey
+)
+{
+  GpuArray_clear(d_RanksA);
+  GpuArray_clear(d_RanksB);
+  GpuArray_clear(d_LimitsA);
+  GpuArray_clear(d_LimitsB);
+  GpuArray_clear(BufKey);
 }
 
 
-int GpuArray_sort(GpuArray *dst, GpuArray *src, unsigned int sortDir, GpuArray *arg)
+int GpuArray_sort(
+  GpuArray *dst,
+  GpuArray *src,
+  unsigned int sortDir,
+  GpuArray *arg
+)
 {
-
-  int type = src->typecode;
-  gpucontext *ctx = GpuArray_context(src);
-
-  printf("%s\n", gpuarray_get_type(type)->cluda_name );
-  printf("%u\n", typesize(type) );
-
+  int err = GA_NO_ERROR;
   // Device pointers - auxiiary data structure    
   GpuArray d_RanksA, d_RanksB, d_LimitsA, d_LimitsB;
+
+  //int type = src->typecode;
+  gpucontext *ctx = GpuArray_context(src);
+
+  printf("Sorting GPU Array (%s -> %zu bytes)\n", gpuarray_get_type(src->typecode)->cluda_name, typesize(src->typecode));
 
 	if (arg != NULL)
   {
@@ -1044,42 +1079,32 @@ int GpuArray_sort(GpuArray *dst, GpuArray *src, unsigned int sortDir, GpuArray *
     const unsigned int Nfloor = roundDown(dims, SHARED_SIZE_LIMIT);
     const int Nleft = dims - Nfloor;
 
-    // Device pointers - buffer data strucute
+    // Buffer data strucute
     GpuArray BufKey;
-    GpuArray_empty(&BufKey, ctx, type, nd, &dims, GA_C_ORDER);
+    err = GpuArray_empty(&BufKey, ctx, src->typecode, nd, &dims, GA_C_ORDER);
 
-    // Initialize device  auxiliary data structure  
+    // Auxiliary data structure for MergeSort 
     initMergeSort(&d_RanksA, &d_RanksB, &d_LimitsA, &d_LimitsB, Nfloor / 128, ctx);
 
-    // Generate typecode specific code
-
-
     // perform regular sort
-    sort(
-      dst,
-      &BufKey,
-      src,
-      &d_RanksA,
-      &d_RanksB,
-      &d_LimitsA,
-      &d_LimitsB,
-      dims,
-      Nfloor,
-      Nleft,
-      sortDir,
-      ctx
-    );
+    err = sort(
+            dst,
+            &BufKey,
+            src,
+            &d_RanksA,
+            &d_RanksB,
+            &d_LimitsA,
+            &d_LimitsB,
+            dims,
+            Nfloor,
+            Nleft,
+            sortDir,
+            ctx
+          );
 
-
-    // type -> get typecode of the array
-
-    // vectorType -> "type"
-
-    // stbr_append all the kernels....
-
-    // Set arguments
+    destroyMergeSort(&d_RanksA, &d_RanksB, &d_LimitsA, &d_LimitsB, &BufKey);
   }
 
-  return 0;
+  return err;
 
 }
