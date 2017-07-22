@@ -6,6 +6,11 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMakeModules/")
 
 FIND_PACKAGE(CUDA 8.0)
 
+#for Travis
+if (NOT CUDA_FOUND)
+   set(CUDA_VERSION_MAJOR 8)
+endif()
+
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DCUDA_VERSION_MAJOR=${CUDA_VERSION_MAJOR}")
 
 # -Wall is unbelieveably noisy with Visual Studio:
