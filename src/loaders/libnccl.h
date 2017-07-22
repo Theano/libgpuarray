@@ -13,21 +13,23 @@ typedef struct { char internal[NCCL_UNIQUE_ID_BYTES]; } ncclUniqueId;
 
 typedef enum { ncclSuccess = 0 } ncclResult_t;
 
+/* Reduction operation selector */
 typedef enum { ncclSum        = 0,
                ncclProd       = 1,
                ncclMax        = 2,
                ncclMin        = 3,
-               nccl_NUM_OPS   = 4 } ncclRedOp_t;
-
+               ncclNumOps     = 4 } ncclRedOp_t;
 /* Data types */
-typedef enum { ncclChar       = 0,
-               ncclInt        = 1,
-               ncclHalf       = 2,
-               ncclFloat      = 3,
-               ncclDouble     = 4,
-               ncclInt64      = 5,
-               ncclUint64     = 6,
-               nccl_NUM_TYPES = 7 } ncclDataType_t;
+typedef enum { ncclInt8       = 0, ncclChar       = 0,
+               ncclUint8      = 1,
+               ncclInt32      = 2, ncclInt        = 2,
+               ncclUint32     = 3,
+               ncclInt64      = 4,
+               ncclUint64     = 5,
+               ncclFloat16    = 6, ncclHalf       = 6,
+               ncclFloat32    = 7, ncclFloat      = 7,
+               ncclFloat64    = 8, ncclDouble     = 8,
+               ncclNumTypes   = 9 } ncclDataType_t;
 
 /** @endcond */
 
