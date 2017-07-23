@@ -80,19 +80,18 @@ START_TEST(test_contig_f16) {
   GpuElemwise *ge;
 
   static uint16_t data1[3];
+  static uint16_t data2[3];
+  uint16_t data3[3] = {0};
+  size_t dims[1];
+  gpuelemwise_arg args[3] = {{0}};
+  void *rargs[3];
+
   data1[0] = F16[1];
   data1[1] = F16[2];
   data1[2] = F16[3];
-  static uint16_t data2[3];
   data2[0] = F16[4];
   data2[1] = F16[5];
   data2[2] = F16[6];
-  uint16_t data3[3] = {0};
-
-  size_t dims[1];
-
-  gpuelemwise_arg args[3] = {{0}};
-  void *rargs[3];
 
   dims[0] = 3;
 
@@ -243,19 +242,19 @@ START_TEST(test_basic_f16) {
   GpuElemwise *ge;
 
   static uint16_t data1[3];
+  static uint16_t data2[3];
+  uint16_t data3[3] = {0};
+  size_t dims[2];
+  gpuelemwise_arg args[3] = {{0}};
+  void *rargs[3];
+
   data1[0] = F16[1];
   data1[1] = F16[2];
   data1[2] = F16[3];
-  static uint16_t data2[3];
   data2[0] = F16[4];
   data2[1] = F16[5];
   data2[2] = F16[6];
-  uint16_t data3[3] = {0};
 
-  size_t dims[2];
-
-  gpuelemwise_arg args[3] = {{0}};
-  void *rargs[3];
 
   dims[0] = 1;
   dims[1] = 3;
