@@ -21,11 +21,13 @@ extern void teardown(void);
  */
 void setup_comm(void)
 {
-  setup();
   int err;
+  gpucommCliqueId comm_id;
+
+  setup();
 
   MPI_Barrier(MPI_COMM_WORLD);
-  gpucommCliqueId comm_id;
+
   err = gpucomm_gen_clique_id(ctx, &comm_id);
   // Has successfully got a unique comm id.
   ck_assert_int_eq(err, GA_NO_ERROR);
