@@ -19,7 +19,7 @@ extern "C" {
 #define SAMPLE_STRIDE 		128
 
 
-int GpuArray_sort(GpuArray *r, GpuArray *a, unsigned int sortDir, GpuArray *dstArg, GpuArray *srcArg);
+int GpuArray_sort(GpuArray *r, GpuArray *a, unsigned int sortDir);
 
 
 #ifdef __cplusplus

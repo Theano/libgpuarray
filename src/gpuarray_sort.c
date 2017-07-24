@@ -1045,9 +1045,7 @@ static void destroyMergeSort(
 int GpuArray_sort(
   GpuArray *dstKey,
   GpuArray *srcKey,
-  unsigned int sortDir,
-  GpuArray *dstArg,
-  GpuArray *srcArg
+  unsigned int sortDir
 )
 {
   int err = GA_NO_ERROR;
@@ -1057,19 +1055,20 @@ int GpuArray_sort(
   const int Nleft           = dims - Nfloor;
 
   // Buffer data structure
-  GpuArray BufKey, BufArg;
-  
+  GpuArray BufKey;
+
   // Device pointers - auxiiary data structure    
   GpuArray d_RanksA, d_RanksB, d_LimitsA, d_LimitsB;
   
   gpucontext *ctx = GpuArray_context(srcKey);
 
   if (srcKey->nd > 1)                      return GA_IMPL_ERROR;
-  if (dstArg != NULL || srcArg != NULL)    return GA_IMPL_ERROR;
+  // if (dstArg != NULL || srcArg != NULL)    return GA_IMPL_ERROR;
 
+  /*
 	if (dstArg != NULL || srcArg != NULL) {
     err = GpuArray_empty(&BufArg, ctx, GA_UINT, srcKey->nd, &dims, GA_C_ORDER);
-  }
+  }*/
 
   err = GpuArray_empty(&BufKey, ctx, srcKey->typecode, srcKey->nd, &dims, GA_C_ORDER);
 
