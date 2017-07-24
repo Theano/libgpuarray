@@ -29,8 +29,8 @@ extern void teardown_comm(void);
 #define _STR(x) #x
 #define COUNT_ERRORS(A, B, M, N, res)           \
   do {                                          \
-    res = 0;                                    \
     int loci, locj;                             \
+    res = 0;                                    \
     for (loci = 0; loci < (M); ++loci) {        \
       for (locj = 0; locj < (N); ++locj) {      \
         if ((A)[loci][locj] != (B)[loci][locj]) \
@@ -45,37 +45,38 @@ extern void teardown_comm(void);
 
 #define INIT_ARRAYS(inrows, incols, outrows, outcols)                        \
   int(*A)[(incols)];                                                         \
+  int(*RES)[(outcols)];                                                      \
+  int(*EXP)[(outcols)];                                                      \
+  size_t indims[ND];                                                         \
+  size_t outdims[ND];                                                        \
+  const ssize_t instrds[ND] = {sizeof(*A), sizeof(int)};                     \
+  const ssize_t outstrds[ND] = {sizeof(*RES), sizeof(int)};                  \
+  int err;                                                                   \
+  size_t i, j, outsize;                                                      \
+  GpuArray Adev;                                                             \
+  GpuArray RESdev;                                                           \
+                                                                             \
   A = (int(*)[(incols)])calloc((inrows), sizeof(*A));                        \
   if (A == NULL)                                                             \
     ck_abort_msg("system memory allocation failed");                         \
-  int(*RES)[(outcols)];                                                      \
   RES = (int(*)[(outcols)])calloc((outrows), sizeof(*RES));                  \
   if (RES == NULL)                                                           \
     ck_abort_msg("system memory allocation failed");                         \
-  int(*EXP)[(outcols)];                                                      \
   EXP = (int(*)[(outcols)])calloc((outrows), sizeof(*EXP));                  \
   if (EXP == NULL)                                                           \
     ck_abort_msg("system memory allocation failed");                         \
-  size_t indims[ND];                                                         \
   indims[0] = (inrows);                                                      \
   indims[1] = (incols);                                                      \
-  size_t outdims[ND];                                                        \
   outdims[0] = (outrows);                                                    \
   outdims[1] = (outcols);                                                    \
-  const ssize_t instrds[ND] = {sizeof(*A), sizeof(int)};                     \
-  const ssize_t outstrds[ND] = {sizeof(*RES), sizeof(int)};                  \
-  size_t outsize = outdims[0] * outstrds[0];                                 \
+  outsize = outdims[0] * outstrds[0];                                        \
                                                                              \
-  size_t i, j;                                                               \
   for (i = 0; i < indims[0]; ++i)                                            \
     for (j = 0; j < indims[1]; ++j)                                          \
       A[i][j] = comm_rank + 2;                                               \
                                                                              \
-  int err;                                                                   \
-  GpuArray Adev;                                                             \
   err = GpuArray_copy_from_host(&Adev, ctx, A, GA_INT, ND, indims, instrds); \
   ck_assert_int_eq(err, GA_NO_ERROR);                                        \
-  GpuArray RESdev;                                                           \
   err = GpuArray_empty(&RESdev, ctx, GA_INT, ND, outdims, GA_C_ORDER);       \
   ck_assert_int_eq(err, GA_NO_ERROR);
 
@@ -91,6 +92,7 @@ extern void teardown_comm(void);
  * aligned`.
  */
 START_TEST(test_GpuArray_reduce) {
+  int res;
   INIT_ARRAYS(ROWS, COLS, ROWS, COLS);
 
   if (comm_rank == ROOT_RANK) {
@@ -111,7 +113,6 @@ START_TEST(test_GpuArray_reduce) {
   if (comm_rank == ROOT_RANK) {
     err = GpuArray_read(RES, outsize, &RESdev);
     ck_assert_int_eq(err, GA_NO_ERROR);
-    int res;
     COUNT_ERRORS(RES, EXP, ROWS, COLS, res);
     ck_assert_msg(res == 0,
                   "GpuArray_reduce with %s op produced errors in %d places",
@@ -128,6 +129,7 @@ END_TEST
  * aligned`.
  */
 START_TEST(test_GpuArray_all_reduce) {
+  int res;
   INIT_ARRAYS(ROWS, COLS, ROWS, COLS);
 
   err = GpuArray_all_reduce(&Adev, &RESdev, GA_SUM, comm);
@@ -140,7 +142,6 @@ START_TEST(test_GpuArray_all_reduce) {
 
   err = GpuArray_read(RES, outsize, &RESdev);
   ck_assert_int_eq(err, GA_NO_ERROR);
-  int res;
   COUNT_ERRORS(RES, EXP, ROWS, COLS, res);
   ck_assert_msg(res == 0,
                 "GpuArray_all_reduce with %s op produced errors in %d places",
@@ -155,6 +156,8 @@ END_TEST
  * aligned`.
  */
 START_TEST(test_GpuArray_reduce_scatter) {
+  int res;
+  int* recvcounts;
   // In order for C contiguous arrays to be combined/split successfully they
   // should
   // split along the smallest axis (the one with the bigger stride).
@@ -165,7 +168,7 @@ START_TEST(test_GpuArray_reduce_scatter) {
   GpuArray_sync(&RESdev);
   GpuArray_sync(&Adev);
 
-  int* recvcounts = (int*)malloc(comm_ndev * sizeof(int));
+  recvcounts = (int*)malloc(comm_ndev * sizeof(int));
   if (recvcounts == NULL)
     ck_abort_msg("system memory allocation failed");
   for (i = 0; i < (size_t)comm_ndev; ++i)
@@ -177,7 +180,6 @@ START_TEST(test_GpuArray_reduce_scatter) {
 
   err = GpuArray_read(RES, outsize, &RESdev);
   ck_assert_int_eq(err, GA_NO_ERROR);
-  int res;
   COUNT_ERRORS(RES, EXP, ROWS / comm_ndev, COLS, res);
   ck_assert_msg(
       res == 0,
@@ -192,6 +194,7 @@ END_TEST
  * \note Untested for `not aligned`.
  */
 START_TEST(test_GpuArray_broadcast) {
+  int res;
   INIT_ARRAYS(ROWS, COLS, ROWS, COLS);
 
   for (i = 0; i < indims[0]; ++i)
@@ -207,7 +210,6 @@ START_TEST(test_GpuArray_broadcast) {
 
   err = GpuArray_read(RES, outsize, &Adev);
   ck_assert_int_eq(err, GA_NO_ERROR);
-  int res;
   COUNT_ERRORS(RES, EXP, ROWS, COLS, res);
   ck_assert_msg(res == 0, "GpuArray_broadcast produced errors in %d places",
                 res);
@@ -221,6 +223,7 @@ END_TEST
  * aligned`.
  */
 START_TEST(test_GpuArray_all_gather) {
+  int res;
   // In order for C contiguous arrays to be combined/split successfully they
   // should
   // split along the smallest axis (the one with the bigger stride).
@@ -237,7 +240,6 @@ START_TEST(test_GpuArray_all_gather) {
 
   err = GpuArray_read(RES, outsize, &RESdev);
   ck_assert_int_eq(err, GA_NO_ERROR);
-  int res;
   COUNT_ERRORS(RES, EXP, ROWS, COLS, res);
   ck_assert_msg(res == 0, "GpuArray_all_gather produced errors in %d places",
                 res);

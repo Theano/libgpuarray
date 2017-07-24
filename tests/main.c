@@ -15,6 +15,10 @@ extern Suite *get_suite(void);
 
 int main(int argc, char *argv[])
 {
+  int number_failed;
+  Suite *s;
+  SRunner *sr;
+
 #ifdef TEST_COLLECTIVES
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &comm_ndev);
@@ -29,9 +33,8 @@ int main(int argc, char *argv[])
   dev_name = argv[comm_rank + 1];  // Set a gpu for this process.
 #endif  // TEST_COLLECTIVES
 
-  int number_failed;
-  Suite *s = get_suite();
-  SRunner *sr = srunner_create(s);
+  s = get_suite();
+  sr = srunner_create(s);
 #ifdef TEST_COLLECTIVES
   // Check by default forks to another (non mpi registered) process in order to
   // run tests. Using MPI inside tests means we must disable this.
