@@ -18,7 +18,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DCUDA_VERSION_MAJOR=${CUDA_VERSION_MAJOR}")
 if(MSVC)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -W3")
 else()
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wno-unused-parameter -Werror=format-security -Wdeclaration-after-statement -std=gnu89")
 endif()
 
 enable_testing()

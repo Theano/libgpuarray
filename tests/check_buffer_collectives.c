@@ -28,9 +28,9 @@ extern void teardown_comm(void);
 #define ABS_DIFF(a, b) fabs((double)(b - a))
 #define MAX_ABS_DIFF(A, B, N, res)           \
   do {                                       \
-    res = 0;                                 \
     double locdelta;                         \
     int loci;                                \
+    res = 0;                                 \
     for (loci = 0; loci < N; ++loci) {       \
       locdelta = ABS_DIFF(A[loci], B[loci]); \
       if (locdelta > res)                    \
@@ -42,8 +42,8 @@ typedef unsigned long ulong;
 
 #define PRINTV(ar, N, t)           \
   do {                             \
-    printf("%s\n", STR(ar));       \
     int li;                        \
+    printf("%s\n", STR(ar));       \
     for (li = 0; li < (N); ++li) { \
       printf(STR(t) " ", ar[li]);  \
     }                              \
@@ -81,18 +81,21 @@ END_TEST
 
 #define INIT_ARRAYS(insize, outsize)                              \
   int err;                                                        \
-  void* Av = calloc((insize), sizeof(char));                      \
+  void* Av, * RESv, * EXPv;                                       \
+  gpudata* Adev, *RESdev;                                         \
+                                                                  \
+  Av = calloc((insize), sizeof(char));                            \
   if (Av == NULL)                                                 \
     ck_abort_msg("system memory allocation failed");              \
-  void* RESv = calloc((outsize), sizeof(char));                   \
+  RESv = calloc((outsize), sizeof(char));                         \
   if (RESv == NULL)                                               \
     ck_abort_msg("system memory allocation failed");              \
-  void* EXPv = calloc((outsize), sizeof(char));                   \
+  EXPv = calloc((outsize), sizeof(char));                         \
   if (EXPv == NULL)                                               \
     ck_abort_msg("system memory allocation failed");              \
-  gpudata* Adev = gpudata_alloc(ctx, (insize), NULL, 0, &err);    \
+  Adev = gpudata_alloc(ctx, (insize), NULL, 0, &err);             \
   ck_assert_ptr_ne(Adev, NULL);                                   \
-  gpudata* RESdev = gpudata_alloc(ctx, (outsize), NULL, 0, &err); \
+  RESdev = gpudata_alloc(ctx, (outsize), NULL, 0, &err);          \
   ck_assert_ptr_ne(RESdev, NULL);
 
 #define DESTROY_ARRAYS() \
@@ -104,13 +107,15 @@ END_TEST
 
 #define TEST_REDUCE(systype, gatype, mpitype, coloptype, epsilon, print)       \
   START_TEST(test_gpucomm_reduce_##gatype##_##coloptype) {                     \
+    systype* A, * RES, * EXP;                                                  \
+    int i, count;                                                              \
     INIT_ARRAYS(SIZE, SIZE)                                                    \
                                                                                \
-    systype* A = (systype*)Av;                                                 \
-    systype* RES = (systype*)RESv;                                             \
-    systype* EXP = (systype*)EXPv;                                             \
+    A = (systype*)Av;                                                          \
+    RES = (systype*)RESv;                                                      \
+    EXP = (systype*)EXPv;                                                      \
                                                                                \
-    int i, count = SIZE / sizeof(systype);                                     \
+    count = SIZE / sizeof(systype);                                            \
     for (i = 0; i < count; ++i)                                                \
       A[i] = comm_rank + 2;                                                    \
     err = gpudata_write(Adev, 0, A, SIZE);                                     \
@@ -128,9 +133,9 @@ END_TEST
                   "openmpi error: cannot produced expected");                  \
                                                                                \
     if (comm_rank == ROOT_RANK) {                                              \
+      systype res;                                                             \
       err = gpudata_read(RES, RESdev, 0, SIZE);                                \
       ck_assert_int_eq(err, GA_NO_ERROR);                                      \
-      systype res;                                                             \
       MAX_ABS_DIFF(RES, EXP, count, res);                                      \
       if (!(res <= epsilon)) {                                                 \
         print(RES, count);                                                     \
@@ -197,13 +202,16 @@ TEST_REDUCE_FAIL(elemcount, (size_t)INT_MAX + 1, GA_INT, GA_SUM, 0,
 
 #define TEST_ALL_REDUCE(systype, gatype, mpitype, coloptype, epsilon, print) \
   START_TEST(test_gpucomm_all_reduce_##gatype##_##coloptype) {               \
+    systype* A, * RES, * EXP;                                                \
+    systype res;                                                             \
+    int i, count;                                                            \
     INIT_ARRAYS(SIZE, SIZE)                                                  \
                                                                              \
-    systype* A = (systype*)Av;                                               \
-    systype* RES = (systype*)RESv;                                           \
-    systype* EXP = (systype*)EXPv;                                           \
+    A = (systype*)Av;                                                        \
+    RES = (systype*)RESv;                                                    \
+    EXP = (systype*)EXPv;                                                    \
                                                                              \
-    int i, count = SIZE / sizeof(systype);                                   \
+    count = SIZE / sizeof(systype);                                          \
     for (i = 0; i < count; ++i)                                              \
       A[i] = comm_rank + 2;                                                  \
     err = gpudata_write(Adev, 0, A, SIZE);                                   \
@@ -222,7 +230,6 @@ TEST_REDUCE_FAIL(elemcount, (size_t)INT_MAX + 1, GA_INT, GA_SUM, 0,
                                                                              \
     err = gpudata_read(RES, RESdev, 0, SIZE);                                \
     ck_assert_int_eq(err, GA_NO_ERROR);                                      \
-    systype res;                                                             \
     MAX_ABS_DIFF(RES, EXP, count, res);                                      \
     if (!(res <= epsilon)) {                                                 \
       print(RES, count);                                                     \
@@ -294,26 +301,31 @@ TEST_ALL_REDUCE_FAIL(elemcount, (size_t)INT_MAX + 1, GA_INT, GA_SUM, 0, 0,
 #define TEST_REDUCE_SCATTER(systype, gatype, mpitype, coloptype, epsilon,    \
                             print)                                           \
   START_TEST(test_gpucomm_reduce_scatter_##gatype##_##coloptype) {           \
+    systype* A, * RES, * EXP;                                                \
+    systype res;                                                             \
+    int i, count;                                                            \
+    int recvcount;                                                           \
+    int* recvcounts;                                                         \
     INIT_ARRAYS(SIZE, SIZE / comm_ndev)                                      \
                                                                              \
-    systype* A = (systype*)Av;                                               \
-    systype* RES = (systype*)RESv;                                           \
-    systype* EXP = (systype*)EXPv;                                           \
+    A = (systype*)Av;                                                        \
+    RES = (systype*)RESv;                                                    \
+    EXP = (systype*)EXPv;                                                    \
                                                                              \
-    int i, count = SIZE / sizeof(systype);                                   \
+    count = SIZE / sizeof(systype);                                          \
     for (i = 0; i < count; ++i)                                              \
       A[i] = comm_rank + 2;                                                  \
     err = gpudata_write(Adev, 0, A, SIZE);                                   \
     ck_assert_int_eq(err, GA_NO_ERROR);                                      \
                                                                              \
-    int recvcount = count / comm_ndev;                                       \
+    recvcount = count / comm_ndev;                                           \
     err = gpucomm_reduce_scatter(Adev, 0, RESdev, 0, recvcount, GA_##gatype, \
                                  GA_##coloptype, comm);                      \
     ck_assert_int_eq(err, GA_NO_ERROR);                                      \
     gpudata_sync(RESdev);                                                    \
     gpudata_sync(Adev);                                                      \
                                                                              \
-    int* recvcounts = (int*)malloc(comm_ndev * sizeof(int));                 \
+    recvcounts = (int*)malloc(comm_ndev * sizeof(int));                      \
     if (recvcounts == NULL)                                                  \
       ck_abort_msg("system memory allocation failed");                       \
     for (i = 0; i < comm_ndev; ++i)                                          \
@@ -326,7 +338,6 @@ TEST_ALL_REDUCE_FAIL(elemcount, (size_t)INT_MAX + 1, GA_INT, GA_SUM, 0, 0,
                                                                              \
     err = gpudata_read(RES, RESdev, 0, SIZE / comm_ndev);                    \
     ck_assert_int_eq(err, GA_NO_ERROR);                                      \
-    systype res;                                                             \
     MAX_ABS_DIFF(RES, EXP, recvcount, res);                                  \
     if (!(res <= epsilon)) {                                                 \
       print(RES, recvcount);                                                 \
@@ -396,12 +407,15 @@ TEST_REDUCE_SCATTER_FAIL(elemcount, (size_t)INT_MAX + 1, GA_INT, GA_SUM, 0, 0,
 
 #define TEST_BROADCAST(systype, gatype, mpitype, epsilon, print)             \
   START_TEST(test_gpucomm_broadcast_##gatype) {                              \
+    systype* RES, * EXP;                                                     \
+    systype res;                                                             \
+    int i, count;                                                            \
     INIT_ARRAYS(SIZE, SIZE)                                                  \
                                                                              \
-    systype* RES = (systype*)RESv;                                           \
-    systype* EXP = (systype*)EXPv;                                           \
+    RES = (systype*)RESv;                                                    \
+    EXP = (systype*)EXPv;                                                    \
                                                                              \
-    int i, count = SIZE / sizeof(systype);                                   \
+    count = SIZE / sizeof(systype);                                          \
     for (i = 0; i < count; ++i) {                                            \
       RES[i] = comm_rank + 1;                                                \
       EXP[i] = RES[i];                                                       \
@@ -419,7 +433,6 @@ TEST_REDUCE_SCATTER_FAIL(elemcount, (size_t)INT_MAX + 1, GA_INT, GA_SUM, 0, 0,
                                                                              \
     err = gpudata_read(RES, RESdev, 0, SIZE);                                \
     ck_assert_int_eq(err, GA_NO_ERROR);                                      \
-    systype res;                                                             \
     MAX_ABS_DIFF(RES, EXP, count, res);                                      \
     if (!(res <= epsilon)) {                                                 \
       print(RES, count);                                                     \
@@ -463,14 +476,17 @@ TEST_BROADCAST_FAIL(elemcount, (size_t)INT_MAX + 1, GA_INT, 0,
 
 #define TEST_ALL_GATHER(systype, gatype, mpitype, epsilon, print)             \
   START_TEST(test_gpucomm_all_gather_##gatype) {                              \
+    systype* A, * RES, * EXP;                                                 \
+    systype res;                                                              \
+    int i, count, sendcount;                                                  \
     INIT_ARRAYS(SIZE / comm_ndev, SIZE)                                       \
                                                                               \
-    systype* A = (systype*)Av;                                                \
-    systype* RES = (systype*)RESv;                                            \
-    systype* EXP = (systype*)EXPv;                                            \
+    A = (systype*)Av;                                                         \
+    RES = (systype*)RESv;                                                     \
+    EXP = (systype*)EXPv;                                                     \
                                                                               \
-    int i, count = SIZE / sizeof(systype);                                    \
-    int sendcount = count / comm_ndev;                                        \
+    count = SIZE / sizeof(systype);                                           \
+    sendcount = count / comm_ndev;                                            \
     for (i = 0; i < sendcount; ++i)                                           \
       A[i] = comm_rank + 1;                                                   \
     err = gpudata_write(Adev, 0, A, SIZE / comm_ndev);                        \
@@ -489,7 +505,6 @@ TEST_BROADCAST_FAIL(elemcount, (size_t)INT_MAX + 1, GA_INT, 0,
                                                                               \
     err = gpudata_read(RES, RESdev, 0, SIZE);                                 \
     ck_assert_int_eq(err, GA_NO_ERROR);                                       \
-    systype res;                                                              \
     MAX_ABS_DIFF(RES, EXP, count, res);                                       \
     if (!(res <= epsilon)) {                                                  \
       print(RES, count);                                                      \
@@ -536,14 +551,27 @@ TEST_ALL_GATHER_FAIL(elemcount, (size_t)INT_MAX + 1, GA_INT, 0, 0,
                      GA_XLARGE_ERROR)
 
 Suite* get_suite(void) {
-  Suite* s = suite_create("buffer_collectives_API");
+  Suite* s;
+  TCase* helps;
+  TCase* reds;
+  TCase* redf;
+  TCase* areds;
+  TCase* aredf;
+  TCase* redscs;
+  TCase* redscf;
+  TCase* bcasts;
+  TCase* bcastf;
+  TCase* agats;
+  TCase* agatf;
 
-  TCase* helps = tcase_create("test_helpers");
+  s = suite_create("buffer_collectives_API");
+
+  helps = tcase_create("test_helpers");
   tcase_add_unchecked_fixture(helps, setup_comm, teardown_comm);
   tcase_add_test(helps, test_gpucomm_get_count);
   tcase_add_test(helps, test_gpucomm_get_rank);
 
-  TCase* reds = tcase_create("test_reduce");
+  reds = tcase_create("test_reduce");
   tcase_add_unchecked_fixture(reds, setup_comm, teardown_comm);
   tcase_add_test(reds, test_gpucomm_reduce_INT_SUM);
   tcase_add_test(reds, test_gpucomm_reduce_INT_PROD);
@@ -570,14 +598,14 @@ Suite* get_suite(void) {
   tcase_add_test(reds, test_gpucomm_reduce_ULONG_MAX);
   tcase_add_test(reds, test_gpucomm_reduce_ULONG_MIN);
 
-  TCase* redf = tcase_create("test_reduce_fail");
+  redf = tcase_create("test_reduce_fail");
   tcase_add_unchecked_fixture(redf, setup_comm, teardown_comm);
   tcase_add_test(redf, test_gpucomm_reduce_fail_datatype);
   tcase_add_test(redf, test_gpucomm_reduce_fail_optype);
   tcase_add_test(redf, test_gpucomm_reduce_fail_src_offset);
   tcase_add_test(redf, test_gpucomm_reduce_fail_elemcount);
 
-  TCase* areds = tcase_create("test_all_reduce");
+  areds = tcase_create("test_all_reduce");
   tcase_add_unchecked_fixture(areds, setup_comm, teardown_comm);
   tcase_add_test(areds, test_gpucomm_all_reduce_INT_SUM);
   tcase_add_test(areds, test_gpucomm_all_reduce_INT_PROD);
@@ -604,7 +632,7 @@ Suite* get_suite(void) {
   tcase_add_test(areds, test_gpucomm_all_reduce_ULONG_MAX);
   tcase_add_test(areds, test_gpucomm_all_reduce_ULONG_MIN);
 
-  TCase* aredf = tcase_create("test_all_reduce_fail");
+  aredf = tcase_create("test_all_reduce_fail");
   tcase_add_unchecked_fixture(aredf, setup_comm, teardown_comm);
   tcase_add_test(aredf, test_gpucomm_all_reduce_fail_datatype);
   tcase_add_test(aredf, test_gpucomm_all_reduce_fail_optype);
@@ -612,7 +640,7 @@ Suite* get_suite(void) {
   tcase_add_test(aredf, test_gpucomm_all_reduce_fail_dest_offset);
   tcase_add_test(aredf, test_gpucomm_all_reduce_fail_elemcount);
 
-  TCase* redscs = tcase_create("test_reduce_scatter");
+  redscs = tcase_create("test_reduce_scatter");
   tcase_add_unchecked_fixture(redscs, setup_comm, teardown_comm);
   tcase_add_test(redscs, test_gpucomm_reduce_scatter_INT_SUM);
   tcase_add_test(redscs, test_gpucomm_reduce_scatter_INT_PROD);
@@ -639,7 +667,7 @@ Suite* get_suite(void) {
   tcase_add_test(redscs, test_gpucomm_reduce_scatter_ULONG_MAX);
   tcase_add_test(redscs, test_gpucomm_reduce_scatter_ULONG_MIN);
 
-  TCase* redscf = tcase_create("test_reduce_scatter_fail");
+  redscf = tcase_create("test_reduce_scatter_fail");
   tcase_add_unchecked_fixture(redscf, setup_comm, teardown_comm);
   tcase_add_test(redscf, test_gpucomm_reduce_scatter_fail_datatype);
   tcase_add_test(redscf, test_gpucomm_reduce_scatter_fail_optype);
@@ -647,7 +675,7 @@ Suite* get_suite(void) {
   tcase_add_test(redscf, test_gpucomm_reduce_scatter_fail_dest_offset);
   tcase_add_test(redscf, test_gpucomm_reduce_scatter_fail_elemcount);
 
-  TCase* bcasts = tcase_create("test_broadcast");
+  bcasts = tcase_create("test_broadcast");
   tcase_add_unchecked_fixture(bcasts, setup_comm, teardown_comm);
   tcase_add_test(bcasts, test_gpucomm_broadcast_INT);
   tcase_add_test(bcasts, test_gpucomm_broadcast_BYTE);
@@ -656,13 +684,13 @@ Suite* get_suite(void) {
   tcase_add_test(bcasts, test_gpucomm_broadcast_LONG);
   tcase_add_test(bcasts, test_gpucomm_broadcast_ULONG);
 
-  TCase* bcastf = tcase_create("test_broadcast_fail");
+  bcastf = tcase_create("test_broadcast_fail");
   tcase_add_unchecked_fixture(bcastf, setup_comm, teardown_comm);
   tcase_add_test(bcastf, test_gpucomm_broadcast_fail_datatype);
   tcase_add_test(bcastf, test_gpucomm_broadcast_fail_src_offset);
   tcase_add_test(bcastf, test_gpucomm_broadcast_fail_elemcount);
 
-  TCase* agats = tcase_create("test_all_gather");
+  agats = tcase_create("test_all_gather");
   tcase_add_unchecked_fixture(agats, setup_comm, teardown_comm);
   tcase_add_test(agats, test_gpucomm_all_gather_INT);
   tcase_add_test(agats, test_gpucomm_all_gather_BYTE);
@@ -671,7 +699,7 @@ Suite* get_suite(void) {
   tcase_add_test(agats, test_gpucomm_all_gather_LONG);
   tcase_add_test(agats, test_gpucomm_all_gather_ULONG);
 
-  TCase* agatf = tcase_create("test_all_gather_fail");
+  agatf = tcase_create("test_all_gather_fail");
   tcase_add_unchecked_fixture(agatf, setup_comm, teardown_comm);
   tcase_add_test(agatf, test_gpucomm_all_gather_fail_datatype);
   tcase_add_test(agatf, test_gpucomm_all_gather_fail_src_offset);
