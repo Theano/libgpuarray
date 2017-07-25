@@ -248,8 +248,6 @@ struct GpuReductionAttr{
 struct GpuReduction{
 	/* Function Arguments. */
 	GpuReductionAttr grAttr;
-	gpucontext*      gpuCtx;
-	ga_reduce_op     op;
 	int              nds;
 	int              ndd;
 	int              ndr;
@@ -652,6 +650,8 @@ GPUARRAY_PUBLIC void  GpuReductionAttr_free         (GpuReductionAttr*          
 }
 GPUARRAY_PUBLIC int   GpuReduction_new              (GpuReduction**             gr,
                                                      const GpuReductionAttr*    grAttr){
+	GpuReduction* grOut = NULL;
+	
 	if (!gr){
 		return GA_INVALID_ERROR;
 	}
@@ -660,16 +660,14 @@ GPUARRAY_PUBLIC int   GpuReduction_new              (GpuReduction**             
 		return GA_INVALID_ERROR;
 	}
 	
-	*gr = calloc(1, sizeof(**gr));
-	if (*gr){
-		(*gr)->grAttr = *grAttr;
-		(*gr)->gpuCtx = grAttr->gpuCtx;
-		(*gr)->op     = grAttr->op;
-		(*gr)->nds    = (int)grAttr->maxSrcDims;
-		(*gr)->ndd    = (int)grAttr->maxDstDims;
-		(*gr)->ndr    = (int)(grAttr->maxSrcDims-grAttr->maxDstDims);
+	grOut = calloc(1, sizeof(*grOut));
+	if (grOut){
+		grOut->grAttr = *grAttr;
+		grOut->nds    = (int)grAttr->maxSrcDims;
+		grOut->ndd    = (int)grAttr->maxDstDims;
+		grOut->ndr    = (int)(grAttr->maxSrcDims - grAttr->maxDstDims);
 		
-		return reduxGenInit(*gr);
+		return reduxGenInit(grOut);
 	}else{
 		return GA_MEMORY_ERROR;
 	}
@@ -684,7 +682,8 @@ GPUARRAY_PUBLIC int   GpuReduction_call             (const GpuReduction*        
                                                      unsigned                   reduxLen,
                                                      const int*                 reduxList,
                                                      int                        flags){
-	redux_ctx ctxSTACK, *ctx = &ctxSTACK;
+	redux_ctx ctxSTACK;
+	redux_ctx *ctx = &ctxSTACK;
 	memset(ctx, 0, sizeof(*ctx));
 
 	ctx->gr        = gr;
@@ -713,8 +712,7 @@ GPUARRAY_PUBLIC int   GpuReduction_call             (const GpuReduction*        
  */
 
 static int         reduxGetSumInit                  (int typecode, const char** property){
-	if (typecode == GA_POINTER ||
-	    typecode == GA_BUFFER){
+	if (typecode < 0){
 		return GA_UNSUPPORTED_ERROR;
 	}
 	*property = "0";
@@ -733,8 +731,7 @@ static int         reduxGetSumInit                  (int typecode, const char** 
  */
 
 static int         reduxGetProdInit                 (int typecode, const char** property){
-	if (typecode == GA_POINTER ||
-	    typecode == GA_BUFFER){
+	if (typecode < 0){
 		return GA_UNSUPPORTED_ERROR;
 	}
 	*property = "1";
@@ -942,8 +939,7 @@ static int         reduxGetMaxInit                  (int typecode, const char** 
  */
 
 static int         reduxGetAndInit                  (int typecode, const char** property){
-	if (typecode == GA_POINTER ||
-	    typecode == GA_BUFFER){
+	if (typecode < 0){
 		return GA_UNSUPPORTED_ERROR;
 	}
 	*property = "~0";
@@ -962,8 +958,7 @@ static int         reduxGetAndInit                  (int typecode, const char** 
  */
 
 static int         reduxGetOrInit                   (int typecode, const char** property){
-	if (typecode == GA_POINTER ||
-	    typecode == GA_BUFFER){
+	if (typecode < 0){
 		return GA_UNSUPPORTED_ERROR;
 	}
 	*property = "0";
@@ -2867,7 +2862,7 @@ static int         reduxGenCompile                  (GpuReduction*        gr){
 	}
 
 	ret  = GpuKernel_init(&gr->k,
-	                      gr->gpuCtx,
+	                      gr->grAttr.gpuCtx,
 	                      1,
 	                      (const char**)&gr->kSourceCode,
 	                      &gr->kSourceCodeLen,
@@ -3994,7 +3989,7 @@ static int        reduxInvSchedule              (redux_ctx*           ctx){
 	ctx->W0Off = reduxGenGetWMEMK0Off(ctx->gr, 2*ctx->gs*ctx->D);
 	ctx->W1Off = reduxGenGetWMEMK1Off(ctx->gr, 2*ctx->gs*ctx->D);
 	WSPACESIZE = reduxGenGetWMEMSize (ctx->gr, 2*ctx->gs*ctx->D);
-	ctx->W     = gpudata_alloc(ctx->gr->gpuCtx, WSPACESIZE, 0, flags, 0);
+	ctx->W     = gpudata_alloc(ctx->gr->grAttr.gpuCtx, WSPACESIZE, 0, flags, 0);
 	if (!ctx->W){
 		return reduxInvCleanupMsg(ctx, GA_MEMORY_ERROR,
 		       "Could not allocate %zu-byte workspace for reduction!\n",
