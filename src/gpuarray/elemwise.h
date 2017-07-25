@@ -157,6 +157,11 @@ GPUARRAY_PUBLIC int GpuElemwise_call(GpuElemwise *ge, void **args, int flags);
 #define GE_NOCOLLAPSE  0x0200
 
 /**
+ * Allow implicit left-padding of shape with dimensions of size 1.
+ */
+#define GE_PADSHAPE   0x0400
+
+/**
  * @}
  */
 

@@ -276,14 +276,21 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
   GpuArray *a = NULL, *v;
   unsigned int i, j, p, num_arrays = 0, nd = 0, nnd;
   int call32 = 1;
+  unsigned int nd_i = 0;
+  size_t v_dim_j = 0;
 
   /* Go through the list and grab some info */
   for (i = 0; i < ge->n; i++) {
     if (is_array(ge->args[i])) {
+      nd_i = ((GpuArray *)args[i])->nd;
       if (num_arrays == 0)
-        nd = ((GpuArray *)args[i])->nd;
-      else if (((GpuArray *)args[i])->nd != nd)
-        return error_fmt(ctx->err, GA_VALUE_ERROR, "Arg %u has differing nd = %u", i, ((GpuArray *)args[i])->nd);
+        nd = nd_i;
+      else if (nd_i != nd) {
+        if (flags & GE_PADSHAPE)
+          nd = nd_i > nd ? nd_i : nd;
+        else
+          return error_fmt(ctx->err, GA_VALUE_ERROR, "Arg %u has differing nd = %u", i, nd_i);
+      }
       ++num_arrays;
       if (a == NULL && is_output(ge->args[i]))
         a = (GpuArray *)args[i];
@@ -301,7 +308,7 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
       return error_sys(ctx->err, "ge_grow");
   }
 
-  /* Now we know that all array arguments have the same number of
+  /* Now we know that all array arguments have at most nd
      dimensions and that the expected output size is the size of a */
 
   /* And copy their initial values in */
@@ -309,7 +316,11 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
   p = 0;
   for (i = 0; i < ge->n; i++) {
     if (is_array(ge->args[i])) {
-      memcpy(ge->strides[p], ((GpuArray *)args[i])->strides, nd*sizeof(ssize_t));
+      /* Left-pad strides with zero on implicitly broadcasted dimensions */
+      memset(ge->strides[p], 0, nd*sizeof(ssize_t));
+      nd_i = ((GpuArray *)args[i])->nd;
+      memcpy((char *)(ge->strides[p]) + (nd - nd_i)*sizeof(ssize_t),
+             ((GpuArray *)args[i])->strides, nd_i*sizeof(ssize_t));
       p++;
     }
   }
@@ -326,16 +337,23 @@ static int check_basic(GpuElemwise *ge, void **args, int flags,
     for (i = 0; i < ge->n; i++) {
       if (is_array(ge->args[i])) {
         v = (GpuArray *)args[i];
-        if (ge->dims[j] != v->dimensions[j]) {
+        nd_i = v->nd;
+        /* Pad shape with 1 if needed for implicitly broadcasted dimensions
+           and shift if needed */
+        if (j < nd - nd_i)
+          v_dim_j = 1;
+        else
+          v_dim_j = v->dimensions[j - (nd - nd_i)];
+        if (ge->dims[j] != v_dim_j) {
           /* We can't broadcast outputs */
           if (ISCLR(flags, GE_BROADCAST) || is_output(ge->args[i]) ||
-              v->dimensions[j] != 1) {
-            return error_fmt(ctx->err, GA_VALUE_ERROR, "Mismatched dimension %u for input %u (expected %" SPREFIX "u got %" SPREFIX "u)", j, i, ge->dims[j], v->dimensions[j]);
+              v_dim_j != 1) {
+            return error_fmt(ctx->err, GA_VALUE_ERROR, "Mismatched dimension %u for input %u (expected %" SPREFIX "u got %" SPREFIX "u)", j, i, ge->dims[j], v_dim_j);
           }
         }
         /* If the dimension is 1 set the strides to 0 regardless since
            it won't change anything in the non-broadcast case. */
-        if (v->dimensions[j] == 1) {
+        if (v_dim_j == 1) {
           ge->strides[p][j] = 0;
         }
         call32 &= v->offset < ADDR32_MAX;
