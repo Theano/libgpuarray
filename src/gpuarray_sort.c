@@ -161,13 +161,22 @@ static const char *code_bin_search =                                            
 "}\n";
 
 #define NUMARGS_BITONIC_KERNEL 8
-const int type_args_bitonic[NUMARGS_BITONIC_KERNEL] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_UINT, GA_UINT, GA_UINT, GA_UINT};
+int type_args_bitonic[NUMARGS_BITONIC_KERNEL] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_UINT, GA_UINT, GA_UINT, GA_UINT};
+#define NUMARGS_BITONIC_KERNEL_ARG 12
+int type_args_bitonic_arg[NUMARGS_BITONIC_KERNEL_ARG] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, 
+                                                           GA_SIZE, GA_UINT, GA_UINT, GA_UINT, GA_UINT};
 static const char *code_bitonic_smem =                                                                                                          \
 " extern \"C\" __global__ void bitonicSortSharedKernel( "                                                                                       \
 "      t_key *d_DstKey, "                                                                                                                       \
 "      size_t dstOff,"                                                                                                                          \
 "      t_key *d_SrcKey, "                                                                                                                       \
-"      size_t srcOff,"                                                                                                                          \
+"      size_t srcOff,"\
+"\n#ifdef ARGSORT\n" \
+"      t_arg *d_DstArg, "\
+"      size_t dstArgOff, "\
+"      t_arg *d_SrcArg, "\
+"      size_t srcArgOff, "                                                                                                                \
+"\n#endif\n"\
 "      unsigned int batchSize, "                                                                                                                \
 "      unsigned int arrayLength, "                                                                                                              \
 "      unsigned int elemsOff, "                                                                                                                 \
@@ -176,6 +185,13 @@ static const char *code_bitonic_smem =                                          
 "  { "                                                                                                                                          \
 "      d_DstKey = (t_key*) (((char*)d_DstKey)+ dstOff);"                                                                                        \
 "      d_SrcKey = (t_key*) (((char*)d_SrcKey)+ srcOff);"                                                                                        \
+"\n#ifdef ARGSORT\n" \
+"      d_DstArg = (t_arg*) (((char*)d_DstArg)+ dstArgOff); "\
+"      d_SrcArg = (t_arg*) (((char*)d_SrcArg)+ srcArgOff);"\
+"      d_DstArg += elemsOff;"\
+"      d_SrcArg += elemsOff;" \
+"      __shared__ t_arg s_arg[SHARED_SIZE_LIMIT];" \
+"\n#endif\n"\
 "      d_DstKey += elemsOff;"                                                                                                                   \
 "      d_SrcKey += elemsOff;"                                                                                                                   \
 "      __shared__ t_key s_key[SHARED_SIZE_LIMIT]; "                                                                                             \
@@ -183,12 +199,24 @@ static const char *code_bitonic_smem =                                          
 "                                             blockIdx.x * SHARED_SIZE_LIMIT + threadIdx.x, "                                                   \
 "                                             arrayLength * batchSize, "                                                                        \
 "                                             sortDir "                                                                                         \
-"                                           ); "                                                                                                \ 
+"                                           ); "                                                                                                \
 "      s_key[threadIdx.x + (SHARED_SIZE_LIMIT / 2)] = readArray<t_key>( d_SrcKey, "                                                             \
 "                                                                       blockIdx.x * SHARED_SIZE_LIMIT + threadIdx.x + (SHARED_SIZE_LIMIT / 2),"\
 "                                                                       arrayLength * batchSize, "                                              \
 "                                                                       sortDir "                                                               \
 "                                                                     ); "                                                                      \
+"\n#ifdef ARGSORT\n"
+"      s_arg[threadIdx.x] = readArray<t_arg>( d_SrcArg, "\
+"                                                    blockIdx.x * SHARED_SIZE_LIMIT + threadIdx.x, "\
+"                                                    arrayLength * batchSize, "\
+"                                                    sortDir "\
+"                                                   ); "\
+"      s_arg[threadIdx.x + (SHARED_SIZE_LIMIT / 2)] = readArray<t_arg>( d_SrcArg," \
+"                                                                              blockIdx.x * SHARED_SIZE_LIMIT + threadIdx.x + (SHARED_SIZE_LIMIT / 2),"\
+"                                                                              arrayLength * batchSize, "\
+"                                                                              sortDir "\
+"                                                                            ); "\
+"\n#endif\n"                  \
 "      for (unsigned int size = 2; size < SHARED_SIZE_LIMIT; size <<= 1) { "                                                                    \
 "          unsigned int ddd = sortDir ^ ((threadIdx.x & (size / 2)) != 0); "                                                                    \
 "          for (unsigned int stride = size / 2; stride > 0; stride >>= 1) "                                                                     \
@@ -196,10 +224,16 @@ static const char *code_bitonic_smem =                                          
 "              __syncthreads(); "                                                                                                               \
 "              unsigned int pos = 2 * threadIdx.x - (threadIdx.x & (stride - 1)); "                                                             \
 "              t_key t; "                                                                                                                       \
+"              t_arg t2;" \
 "              if ((s_key[pos] > s_key[pos + stride]) == ddd) { "                                                                               \
 "                  t = s_key[pos]; "                                                                                                            \
 "                  s_key[pos] = s_key[pos + stride]; "                                                                                          \
 "                  s_key[pos + stride] = t; "                                                                                                   \
+"\n#ifdef ARGSORT\n" \
+"                  t2 = s_arg[pos];"\
+"                  s_arg[pos] = s_arg[pos + stride];" \
+"                  s_arg[pos + stride] = t2;" \
+"\n#endif\n" \
 "              } "                                                                                                                              \
 "          } "                                                                                                                                  \
 "      } "                                                                                                                                      \
@@ -208,10 +242,16 @@ static const char *code_bitonic_smem =                                          
 "              __syncthreads(); "                                                                                                               \
 "              unsigned int pos = 2 * threadIdx.x - (threadIdx.x & (stride - 1)); "                                                             \
 "              t_key t; "                                                                                                                       \
+"              t_arg t2; " \
 "              if ((s_key[pos] > s_key[pos + stride]) == sortDir) {"                                                                            \
 "                  t = s_key[pos]; "                                                                                                            \
 "                  s_key[pos] = s_key[pos + stride]; "                                                                                          \
 "                  s_key[pos + stride] = t; "                                                                                                   \
+"\n#ifdef ARGSORT\n" \
+"                  t2 = s_arg[pos];"\
+"                  s_arg[pos] = s_arg[pos + stride];" \
+"                  s_arg[pos + stride] = t2;" \
+"\n#endif\n" \
 "              } "                                                                                                                              \
 "          } "                                                                                                                                  \
 "      } "                                                                                                                                      \
@@ -226,14 +266,29 @@ static const char *code_bitonic_smem =                                          
 "                  s_key[threadIdx.x + (SHARED_SIZE_LIMIT / 2)], "                                                                              \
 "                  arrayLength * batchSize "                                                                                                    \
 "                ); "                                                                                                                           \
-"  }\n";
+"\n#ifdef ARGSORT\n" \
+"       writeArray<t_arg>( d_DstArg, " \
+"                   blockIdx.x * SHARED_SIZE_LIMIT + threadIdx.x, " \
+"                   s_arg[threadIdx.x], " \
+"                   arrayLength * batchSize " \
+"                  ); " \
+"      writeArray<t_arg>( d_DstArg, " \
+"                                 blockIdx.x * SHARED_SIZE_LIMIT + threadIdx.x + (SHARED_SIZE_LIMIT / 2), " \
+"                                 s_arg[threadIdx.x + (SHARED_SIZE_LIMIT / 2)], " \
+"                                 arrayLength * batchSize " \
+"                               ); " \
+"\n#endif\n "\
+"}\n";
 static int bitonicSortShared(
     GpuArray *d_DstKey,
     GpuArray *d_SrcKey,
+    GpuArray *d_DstArg,
+    GpuArray *d_SrcArg,
     unsigned int batchSize,
     unsigned int arrayLength,
     unsigned int sortDir,
     unsigned int elemsOff,
+    unsigned int argSortFlg,
     GpuKernel *k_bitonic,
     gpucontext *ctx
 )
@@ -250,12 +305,27 @@ static int bitonicSortShared(
 
   err = GpuKernel_setarg(k_bitonic, p++, &d_DstKey->offset);
   if (err != GA_NO_ERROR) return err;
-  
+
   err = GpuKernel_setarg(k_bitonic, p++, d_SrcKey->data);
   if (err != GA_NO_ERROR) return err;
 
   err = GpuKernel_setarg(k_bitonic, p++, &d_SrcKey->offset);
   if (err != GA_NO_ERROR) return err;
+
+  if (argSortFlg) {
+    printf("in params\n");
+    err = GpuKernel_setarg(k_bitonic, p++, d_DstArg->data);
+    if (err != GA_NO_ERROR) return err;
+
+    err = GpuKernel_setarg(k_bitonic, p++, &d_DstArg->offset);
+    if (err != GA_NO_ERROR) return err;
+
+    err = GpuKernel_setarg(k_bitonic, p++, d_SrcArg->data);
+    if (err != GA_NO_ERROR) return err;
+
+    err = GpuKernel_setarg(k_bitonic, p++, &d_SrcArg->offset);
+    if (err != GA_NO_ERROR) return err;
+  }
   
   err = GpuKernel_setarg(k_bitonic, p++, &batchSize);
   if (err != GA_NO_ERROR) return err;
@@ -288,7 +358,8 @@ static int bitonicSortShared(
 }
 
 #define NUMARGS_SAMPLE_RANKS 10
-const int type_args_ranks[NUMARGS_SAMPLE_RANKS] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_UINT, GA_UINT, GA_UINT, GA_UINT};
+const int type_args_ranks[NUMARGS_SAMPLE_RANKS] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE,
+                                                   GA_UINT, GA_UINT, GA_UINT, GA_UINT};                                                   
 static const char *code_sample_ranks =                                                                              \
 "extern \"C\" __global__ void generateSampleRanksKernel("                                                           \
 "    unsigned int *d_RanksA,"                                                                                       \
@@ -335,18 +406,18 @@ static const char *code_sample_ranks =                                          
 "    }"                                                                                                             \
 "}\n";
 static int generateSampleRanks(
-  GpuArray  *d_RanksA,
-  GpuArray  *d_RanksB,
+  GpuSortData *msData,
   GpuArray *d_SrcKey,
   unsigned int stride,
-  unsigned int N,
-  unsigned int sortDir,
+  GpuSortConfig *msConfig,
   GpuKernel *k_ranks,
   gpucontext *ctx
 )
 {
-  unsigned int lastSegmentElements = N % (2 * stride);
-  unsigned int threadCount = (lastSegmentElements > stride) ? (N + 2 * stride - lastSegmentElements) / (2 * SAMPLE_STRIDE) : (N - lastSegmentElements) / (2 * SAMPLE_STRIDE);
+  unsigned int lastSegmentElements = msConfig->Nfloor % (2 * stride);
+  unsigned int threadCount = (lastSegmentElements > stride) ? 
+                            (msConfig->Nfloor + 2 * stride - lastSegmentElements) / (2 * SAMPLE_STRIDE) : 
+                            (msConfig->Nfloor - lastSegmentElements) / (2 * SAMPLE_STRIDE);
 
   size_t ls, gs;
   unsigned int p = 0;
@@ -355,16 +426,16 @@ static int generateSampleRanks(
   ls = 256;
   gs = iDivUp(threadCount, 256);
 
-  err = GpuKernel_setarg(k_ranks, p++, d_RanksA->data);
+  err = GpuKernel_setarg(k_ranks, p++, msData->d_RanksA.data);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_ranks, p++, &d_RanksA->offset);
+  err = GpuKernel_setarg(k_ranks, p++, &msData->d_RanksA.offset);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_ranks, p++, d_RanksB->data);
+  err = GpuKernel_setarg(k_ranks, p++, msData->d_RanksB.data);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_ranks, p++, &d_RanksB->offset);
+  err = GpuKernel_setarg(k_ranks, p++, &msData->d_RanksB.offset);
   if (err != GA_NO_ERROR) return err;
   
   err = GpuKernel_setarg(k_ranks, p++, d_SrcKey->data);
@@ -376,13 +447,13 @@ static int generateSampleRanks(
   err = GpuKernel_setarg(k_ranks, p++, &stride);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_ranks, p++, &N);
+  err = GpuKernel_setarg(k_ranks, p++, &msConfig->Nfloor);
   if (err != GA_NO_ERROR) return err;
 
   err = GpuKernel_setarg(k_ranks, p++, &threadCount);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_ranks, p++, &sortDir);
+  err = GpuKernel_setarg(k_ranks, p++, &msConfig->sortDirFlg);
   if (err != GA_NO_ERROR) return err;
 
   err = GpuKernel_call(k_ranks, 1, &gs, &ls, 0, NULL);
@@ -429,20 +500,17 @@ static const char *code_ranks_idxs =                                            
 "    } "                                                                                                                       \
 "}\n";
 static int mergeRanksAndIndices(
-  GpuArray *d_LimitsA,
-  GpuArray *d_LimitsB,
-  GpuArray *d_RanksA,
-  GpuArray *d_RanksB,
+  GpuSortData *msData,
   unsigned int stride,
-  unsigned int N,
-  unsigned int sortDir,
+  GpuSortConfig *msConfig,
   GpuKernel *k_ranks_idxs,
   gpucontext *ctx
 )
 {
-  unsigned int lastSegmentElements = N % (2 * stride);
+  unsigned int lastSegmentElements = msConfig->Nfloor % (2 * stride);
   unsigned int threadCount = (lastSegmentElements > stride) ? 
-                             (N + 2 * stride - lastSegmentElements) / (2 * SAMPLE_STRIDE) : (N - lastSegmentElements) / (2 * SAMPLE_STRIDE);
+                             (msConfig->Nfloor + 2 * stride - lastSegmentElements) / (2 * SAMPLE_STRIDE) : 
+                             (msConfig->Nfloor - lastSegmentElements) / (2 * SAMPLE_STRIDE);
   size_t ls, gs;
   unsigned int p = 0;
   int err = GA_NO_ERROR;
@@ -450,22 +518,22 @@ static int mergeRanksAndIndices(
   ls = 256U;
   gs = iDivUp(threadCount, 256U);
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, d_LimitsA->data);
+  err = GpuKernel_setarg(k_ranks_idxs, p++, msData->d_LimitsA.data);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, &d_LimitsA->offset);
+  err = GpuKernel_setarg(k_ranks_idxs, p++, &msData->d_LimitsA.offset);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, d_RanksA->data);
+  err = GpuKernel_setarg(k_ranks_idxs, p++, msData->d_RanksA.data);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, &d_RanksA->offset);
+  err = GpuKernel_setarg(k_ranks_idxs, p++, &msData->d_RanksA.offset);
   if (err != GA_NO_ERROR) return err;
 
   err = GpuKernel_setarg(k_ranks_idxs, p++, &stride);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, &N);
+  err = GpuKernel_setarg(k_ranks_idxs, p++, &msConfig->Nfloor);
   if (err != GA_NO_ERROR) return err;
 
   err = GpuKernel_setarg(k_ranks_idxs, p++, &threadCount);
@@ -476,16 +544,16 @@ static int mergeRanksAndIndices(
 
   p = 0;
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, d_LimitsB->data);
+  err = GpuKernel_setarg(k_ranks_idxs, p++, msData->d_LimitsB.data);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, &d_LimitsB->offset);
+  err = GpuKernel_setarg(k_ranks_idxs, p++, &msData->d_LimitsB.offset);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, d_RanksB->data);
+  err = GpuKernel_setarg(k_ranks_idxs, p++, msData->d_RanksB.data);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, &d_RanksB->offset);
+  err = GpuKernel_setarg(k_ranks_idxs, p++, &msData->d_RanksB.offset);
   if (err != GA_NO_ERROR) return err;
 
   err = GpuKernel_call(k_ranks_idxs, 1, &gs, &ls, 0, NULL);
@@ -495,12 +563,21 @@ static int mergeRanksAndIndices(
 }
 
 #define NUMARGS_MERGE 11
-const int type_args_merge[NUMARGS_MERGE] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_UINT, GA_UINT, GA_UINT};
+int type_args_merge[NUMARGS_MERGE] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER,
+                                            GA_SIZE, GA_UINT, GA_UINT, GA_UINT};
+#define NUMARGS_MERGE_ARG 15
+int type_args_merge_arg[NUMARGS_MERGE_ARG] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER,
+                                                    GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_UINT, GA_UINT, GA_UINT};
 static const char *code_merge =                                                                                     \
 " template<typename T> __device__ void merge( "                                                                     \
 "    T *dstKey, "                                                                                                   \
 "    T *srcAKey, "                                                                                                  \
 "    T *srcBKey, "                                                                                                  \
+"\n#ifdef ARGSORT\n"                                                                                                \
+"    t_arg *dstVal, "                                                                                               \
+"    t_arg *srcAVal, "                                                                                              \
+"    t_arg *srcBVal, "                                                                                              \
+"\n#endif\n"                                                                                                        \
 "    unsigned int lenA, "                                                                                           \
 "    unsigned int nPowTwoLenA, "                                                                                    \
 "    unsigned int lenB, "                                                                                           \
@@ -509,21 +586,34 @@ static const char *code_merge =                                                 
 ") "                                                                                                                \
 "{ "                                                                                                                \
 "    T keyA, keyB; "                                                                                                \
+"    t_arg valA, valB; "                                                                                            \
 "    unsigned int dstPosA , dstPosB;"                                                                               \
 "    if (threadIdx.x < lenA) { "                                                                                    \
 "        keyA = srcAKey[threadIdx.x]; "                                                                             \
+"\n#ifdef ARGSORT\n"                                                                                                \
+"        valA = srcAVal[threadIdx.x]; "                                                                             \
+"\n#endif\n"                                                                                                        \
 "        dstPosA = binarySearchExclusive<T>(keyA, srcBKey, lenB, nPowTwoLenB, sortDir) + threadIdx.x; "             \
 "    } "                                                                                                            \
 "    if (threadIdx.x < lenB) { "                                                                                    \
 "        keyB = srcBKey[threadIdx.x]; "                                                                             \
+"\n#ifdef ARGSORT\n"                                                                                                \
+"    valB = srcBVal[threadIdx.x]; "                                                                                 \
+"\n#endif\n"                                                                                                        \
 "        dstPosB = binarySearchInclusive<T>(keyB, srcAKey, lenA, nPowTwoLenA, sortDir) + threadIdx.x; "             \
 "    } "                                                                                                            \
 "    __syncthreads(); "                                                                                             \
 "    if (threadIdx.x < lenA) { "                                                                                    \
 "        dstKey[dstPosA] = keyA; "                                                                                  \
+"\n#ifdef ARGSORT\n"                                                                                                \
+"        dstVal[dstPosA] = valA; "                                                                                  \
+"\n#endif\n"                                                                                                        \
 "    } "                                                                                                            \
 "    if (threadIdx.x < lenB) { "                                                                                    \
 "        dstKey[dstPosB] = keyB; "                                                                                  \
+"\n#ifdef ARGSORT\n"                                                                                                \
+"        dstVal[dstPosB] = valB; "                                                                                  \
+"\n#endif\n"                                                                                                        \
 "    } "                                                                                                            \
 "} "                                                                                                                \
 "extern \"C\" __global__ void mergeElementaryIntervalsKernel( "                                                     \
@@ -531,6 +621,12 @@ static const char *code_merge =                                                 
 "    size_t dstOff,"                                                                                                \
 "    t_key *d_SrcKey, "                                                                                             \
 "    size_t srcOff,"                                                                                                \
+"\n#ifdef ARGSORT\n"                                                                                                \
+"    t_arg *d_DstArg, "                                                                                             \
+"    size_t dstArgOff, "                                                                                            \
+"    t_arg *d_SrcArg, "                                                                                             \
+"    size_t srcArgOff, "                                                                                            \
+"\n#endif\n"                                                                                                        \
 "    unsigned int *d_LimitsA, "                                                                                     \
 "    size_t limAOff,"                                                                                               \
 "    unsigned int *d_LimitsB, "                                                                                     \
@@ -544,11 +640,20 @@ static const char *code_merge =                                                 
 "    d_SrcKey = (t_key*) (((char*)d_SrcKey)+ srcOff);"                                                              \
 "    d_LimitsA = (unsigned int*) (((char*)d_LimitsA)+ limAOff);"                                                    \
 "    d_LimitsB = (unsigned int*) (((char*)d_LimitsB)+ limBOff);"                                                    \
+"\n#ifdef ARGSORT\n"                                                                                                \
+"    d_DstArg = (t_arg*) (((char*)d_DstArg)+ dstArgOff); "                                                          \
+"    d_SrcArg = (t_arg*) (((char*)d_SrcArg)+ srcArgOff);"                                                           \
+"    __shared__ t_arg s_arg[2 * SAMPLE_STRIDE]; "                                                                   \
+"\n#endif\n"                                                                                                        \
 "    __shared__ t_key s_key[2 * SAMPLE_STRIDE]; "                                                                   \
 "    const unsigned int   intervalI = blockIdx.x & ((2 * stride) / SAMPLE_STRIDE - 1); "                            \
 "    const unsigned int segmentBase = (blockIdx.x - intervalI) * SAMPLE_STRIDE; "                                   \
 "    d_SrcKey += segmentBase; "                                                                                     \
 "    d_DstKey += segmentBase; "                                                                                     \
+"\n#ifdef ARGSORT\n"                                                                                                \
+"    d_DstArg += segmentBase; "                                                                                     \
+"    d_SrcArg += segmentBase; "                                                                                     \
+"\n#endif\n"                                                                                                        \
 "    __shared__ unsigned int startSrcA, startSrcB, lenSrcA, lenSrcB, startDstA, startDstB; "                        \
 "    if (threadIdx.x == 0) { "                                                                                      \
 "        unsigned int segmentElementsA = stride; "                                                                  \
@@ -568,15 +673,26 @@ static const char *code_merge =                                                 
 "    __syncthreads(); "                                                                                             \
 "    if (threadIdx.x < lenSrcA) { "                                                                                 \
 "        s_key[threadIdx.x +             0] = d_SrcKey[0 + startSrcA + threadIdx.x]; "                              \
+"\n#ifdef ARGSORT\n"                                                                                                \
+"        s_arg[threadIdx.x +             0] = d_SrcArg[0 + startSrcA + threadIdx.x]; "                              \
+"\n#endif\n"                                                                                                        \
 "    } "                                                                                                            \
 "    if (threadIdx.x < lenSrcB) { "                                                                                 \
 "        s_key[threadIdx.x + SAMPLE_STRIDE] = d_SrcKey[stride + startSrcB + threadIdx.x]; "                         \
+"\n#ifdef ARGSORT\n"                                                                                                \
+"        s_arg[threadIdx.x + SAMPLE_STRIDE] = d_SrcArg[stride + startSrcB + threadIdx.x]; "                         \
+"\n#endif\n"                                                                                                        \
 "    } "                                                                                                            \
 "    __syncthreads(); "                                                                                             \
 "    merge<t_key>( "                                                                                                \
 "        s_key, "                                                                                                   \
 "        s_key + 0, "                                                                                               \
 "        s_key + SAMPLE_STRIDE, "                                                                                   \
+"\n#ifdef ARGSORT\n"                                                                                                \
+"        s_arg, "                                                                                                   \
+"        s_arg + 0, "                                                                                               \
+"        s_arg + SAMPLE_STRIDE, "                                                                                   \
+"\n#endif\n"                                                                                                        \
 "        lenSrcA, SAMPLE_STRIDE, "                                                                                  \
 "        lenSrcB, SAMPLE_STRIDE, "                                                                                  \
 "        sortDir "                                                                                                  \
@@ -584,25 +700,31 @@ static const char *code_merge =                                                 
 "    __syncthreads(); "                                                                                             \
 "    if (threadIdx.x < lenSrcA) { "                                                                                 \
 "        d_DstKey[startDstA + threadIdx.x] = s_key[threadIdx.x]; "                                                  \
+"\n#ifdef ARGSORT\n"                                                                                                \
+"        d_DstArg[startDstA + threadIdx.x] = s_arg[threadIdx.x];"                                                   \
+"\n#endif\n"                                                                                                        \
 "    } "                                                                                                            \
 "    if (threadIdx.x < lenSrcB) { "                                                                                 \
 "        d_DstKey[startDstB + threadIdx.x] = s_key[lenSrcA + threadIdx.x]; "                                        \
+"\n#ifdef ARGSORT\n"                                                                                                \
+"        d_DstArg[startDstB + threadIdx.x] = s_arg[lenSrcA + threadIdx.x];"                                         \
+"\n#endif\n"                                                                                                        \
 "    } "                                                                                                            \
 "}\n";
 static int mergeElementaryIntervals(
     GpuArray *d_DstKey,
     GpuArray *d_SrcKey,
-    GpuArray  *d_LimitsA,
-    GpuArray  *d_LimitsB,
+    GpuSortData *msData,
     unsigned int stride,
-    unsigned int N,
-    unsigned int sortDir,
+    GpuSortConfig *msConfig,
     GpuKernel *k_merge,
     gpucontext *ctx
 )
 {
-  unsigned int lastSegmentElements = N % (2 * stride);
-  unsigned int mergePairs = (lastSegmentElements > stride) ? getSampleCount(N) : (N - lastSegmentElements) / SAMPLE_STRIDE;
+  unsigned int lastSegmentElements = msConfig->Nfloor % (2 * stride);
+  unsigned int mergePairs = (lastSegmentElements > stride) ? 
+                            getSampleCount(msConfig->Nfloor) : 
+                            (msConfig->Nfloor - lastSegmentElements) / SAMPLE_STRIDE;
 
   size_t ls, gs;
   unsigned int p = 0;
@@ -623,25 +745,25 @@ static int mergeElementaryIntervals(
   err = GpuKernel_setarg(k_merge, p++, &d_SrcKey->offset);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_merge, p++, d_LimitsA->data);
+  err = GpuKernel_setarg(k_merge, p++, msData->d_LimitsA.data);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_merge, p++, &d_LimitsA->offset);
+  err = GpuKernel_setarg(k_merge, p++, &msData->d_LimitsA.offset);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_merge, p++, d_LimitsB->data);
+  err = GpuKernel_setarg(k_merge, p++, msData->d_LimitsB.data);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_merge, p++, &d_LimitsB->offset);
+  err = GpuKernel_setarg(k_merge, p++, &msData->d_LimitsB.offset);
   if (err != GA_NO_ERROR) return err;
 
   err = GpuKernel_setarg(k_merge, p++, &stride);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_merge, p++, &N);
+  err = GpuKernel_setarg(k_merge, p++, &msConfig->Nfloor);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_merge, p++, &sortDir);
+  err = GpuKernel_setarg(k_merge, p++, &msConfig->sortDirFlg);
   if (err != GA_NO_ERROR) return err;
 
   err = GpuKernel_call(k_merge, 1, &gs, &ls, 0, NULL);
@@ -651,13 +773,24 @@ static int mergeElementaryIntervals(
 }
 
 #define NUMARGS_MERGE_GLB 8
-const int type_args_merge_glb[NUMARGS_MERGE_GLB] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_UINT, GA_UINT, GA_UINT, GA_UINT};
+int type_args_merge_glb[NUMARGS_MERGE_GLB] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, 
+                                                    GA_UINT, GA_UINT, GA_UINT, GA_UINT};
+#define NUMARGS_MERGE_GLB_ARG 12
+int type_args_merge_glb_arg[NUMARGS_MERGE_GLB_ARG] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, 
+                                                            GA_BUFFER, GA_SIZE, GA_UINT, GA_UINT, GA_UINT, GA_UINT};
+
 static const char *code_merge_glb =                                                                                     \
 "extern \"C\" __global__ void mergeGlobalMemKernel( "                                                                   \
 "    t_key *d_DstKey, "                                                                                                 \
 "    size_t dstOff, "                                                                                                   \
 "    t_key *d_SrcKey, "                                                                                                 \
 "    size_t srcOff, "                                                                                                   \
+"\n#ifdef ARGSORT\n"                                                                                                    \
+"    t_arg *d_DstArg, "                                                                                                 \
+"    size_t dstArgOff, "                                                                                                \
+"    t_arg *d_SrcArg, "                                                                                                 \
+"    size_t srcArgOff, "                                                                                                \
+"\n#endif\n"                                                                                                            \
 "    unsigned int segmentSizeA, "                                                                                       \
 "    unsigned int segmentSizeB, "                                                                                       \
 "    unsigned int N, "                                                                                                  \
@@ -666,6 +799,10 @@ static const char *code_merge_glb =                                             
 "{ "                                                                                                                    \
 "    d_DstKey = (t_key*) (((char*)d_DstKey)+ dstOff);"                                                                  \
 "    d_SrcKey = (t_key*) (((char*)d_SrcKey)+ srcOff);"                                                                  \
+"\n#ifdef ARGSORT\n"                                                                                                    \
+"    d_DstArg = (t_arg*) (((char*)d_DstArg)+ dstArgOff); "                                                              \
+"    d_SrcArg = (t_arg*) (((char*)d_SrcArg)+ srcArgOff);"                                                               \
+"\n#endif\n"                                                                                                            \
 "    unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x; "                                                        \
 "    t_key *segmentPtrA = d_SrcKey; "                                                                                   \
 "    t_key *segmentPtrB = d_SrcKey + segmentSizeA; "                                                                    \
@@ -674,6 +811,9 @@ static const char *code_merge_glb =                                             
 "    if (idx >= N) "                                                                                                    \
 "        return; "                                                                                                      \
 "    t_key value = d_SrcKey[idx]; "                                                                                     \
+"\n#ifdef ARGSORT\n"                                                                                                    \
+"    t_arg arg = d_SrcArg[idx]; "                                                                                       \
+"\n#endif\n"                                                                                                            \
 "    unsigned int dstPos; "                                                                                             \
 "    if (idx < segmentSizeA) { "                                                                                        \
 "        dstPos = binarySearchLowerBoundExclusive<t_key>(value, segmentPtrB, 0, segmentSizeB, sortDir) + idxSegmentA;"  \
@@ -682,15 +822,15 @@ static const char *code_merge_glb =                                             
 "        dstPos = binarySearchLowerBoundInclusive<t_key>(value, segmentPtrA, 0, segmentSizeA, sortDir) + idxSegmentB;"  \
 "    } "                                                                                                                \
 "    d_DstKey[dstPos] = value; "                                                                                        \
+"\n#ifdef ARGSORT\n"                                                                                                    \
+"    d_DstArg[dstPos] = arg; "                                                                                          \
+"\n#endif\n"                                                                                                            \
 "}\n";
 
 static int mergeGlobalMem(
     GpuArray *d_DstKey,
     GpuArray *d_SrcKey,
-    unsigned int segmentSizeA,
-    unsigned int segmentSizeB,
-    unsigned int N,
-    unsigned int sortDir,
+    GpuSortConfig *msConfig,
     GpuKernel *k_merge_global,
     gpucontext *ctx
 )
@@ -698,9 +838,10 @@ static int mergeGlobalMem(
   size_t ls, gs;
   unsigned int p = 0;
   int err = GA_NO_ERROR;
+  unsigned int NleftC = (unsigned int)msConfig->Nleft;
 
   ls = 256;
-  gs = iDivUp(N, ls);
+  gs = iDivUp(msConfig->dims, (unsigned int)ls);
 
   err = GpuKernel_setarg(k_merge_global, p++, d_DstKey->data);
   if (err != GA_NO_ERROR) return err;
@@ -714,16 +855,16 @@ static int mergeGlobalMem(
   err = GpuKernel_setarg(k_merge_global, p++, &d_SrcKey->offset);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_merge_global, p++, &segmentSizeA);
+  err = GpuKernel_setarg(k_merge_global, p++, &msConfig->Nfloor);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_merge_global, p++, &segmentSizeB);
+  err = GpuKernel_setarg(k_merge_global, p++, &NleftC);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_merge_global, p++, &N);
+  err = GpuKernel_setarg(k_merge_global, p++, &msConfig->dims);
   if (err != GA_NO_ERROR) return err;
 
-  err = GpuKernel_setarg(k_merge_global, p++, &sortDir);
+  err = GpuKernel_setarg(k_merge_global, p++, &msConfig->sortDirFlg);
   if (err != GA_NO_ERROR) return err;
 
   err = GpuKernel_call(k_merge_global, 1, &gs, &ls, 0, NULL);
@@ -733,11 +874,14 @@ static int mergeGlobalMem(
 }
 
 // Generate type specific GPU code
-static int genMergeSortTypeCode(strb *str, int typecode)
+static int genMergeSortTypeCode(strb *str, int typecode, unsigned int argSort)
 {
-  int err = GA_NO_ERROR;
+  if (argSort)
+    strb_appends(str, "\n#define ARGSORT\n");
+
   // Generate typedef for the data type to be sorted    
   strb_appendf(str, "typedef %s t_key;\n", ctype(typecode));
+  strb_appendf(str, "typedef %s t_arg;\n", "ga_uint");
 
   // Generate macro for MIN and MAX value of a given data type
   switch (typecode){
@@ -769,7 +913,7 @@ static int genMergeSortTypeCode(strb *str, int typecode)
     return GA_IMPL_ERROR;
     break;
   }
-  return strb_error(&str);
+  return strb_error(str);
 }
 
 #define NSTR_BITONIC 3
@@ -778,7 +922,7 @@ static int genMergeSortTypeCode(strb *str, int typecode)
 #define NSTRINGS_MERGE 4
 #define NSTRINGS_MERGE_GLB 4
 static int compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *k_ranks_idxs, GpuKernel *k_merge,
-                           GpuKernel *k_merge_global, gpucontext *ctx, int typecode)
+                           GpuKernel *k_merge_global, gpucontext *ctx, GpuSortConfig *msConfig)
 {
   char *err_str = NULL;
   int err = GA_NO_ERROR;
@@ -795,21 +939,32 @@ static int compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *k
   const char *codes_merge[NSTRINGS_MERGE]         = {NULL, code_helper_funcs, code_bin_search, code_merge};
   const char *codes_merge_glb[NSTRINGS_MERGE_GLB] = {NULL, code_helper_funcs, code_bin_search, code_merge_glb};
 
+  unsigned int nargs;
+  int *types;
+
   strb sb = STRB_STATIC_INIT;
-  err = genMergeSortTypeCode(&sb, typecode);
+  err = genMergeSortTypeCode(&sb, msConfig->typecode, msConfig->argSortFlg);
   if (err != GA_NO_ERROR) return err;
 
   // Compile Bitonic sort Kernel  
   lens_bitonic[0] = sb.l;
   codes_bitonic[0] = sb.s;
+  if (msConfig->argSortFlg) {
+    nargs = NUMARGS_BITONIC_KERNEL_ARG;
+    types = type_args_bitonic_arg;
+  }
+  else {
+    nargs = NUMARGS_BITONIC_KERNEL;
+    types = type_args_bitonic;
+  }
   err = GpuKernel_init( k_bitonic,
                         ctx,
                         NSTR_BITONIC,
                         codes_bitonic,
                         lens_bitonic,
                         "bitonicSortSharedKernel",
-                        NUMARGS_BITONIC_KERNEL,
-                        type_args_bitonic,
+                        nargs,
+                        types,
                         flags,
                         &err_str
                       );
@@ -859,6 +1014,14 @@ static int compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *k
     return err;
   }
 
+  if (msConfig->argSortFlg) {
+    nargs = NUMARGS_MERGE_ARG;
+    types = type_args_merge_arg;
+  }
+  else {
+    nargs = NUMARGS_MERGE;
+    types = type_args_merge;
+  }
   // Compile merge kernel
   lens_merge[0]  = sb.l;
   codes_merge[0] = sb.s;
@@ -868,8 +1031,8 @@ static int compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *k
                         codes_merge,
                         lens_merge,
                         "mergeElementaryIntervalsKernel",
-                        NUMARGS_MERGE,
-                        type_args_merge,
+                        nargs,
+                        types,
                         flags,
                         &err_str
                       );
@@ -879,6 +1042,14 @@ static int compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *k
     return err;
   }
 
+  if (msConfig->argSortFlg) {
+    nargs = NUMARGS_MERGE_GLB_ARG;
+    types = type_args_merge_glb_arg;
+  }
+  else {
+    nargs = NUMARGS_MERGE_GLB;
+    types = type_args_merge_glb;
+  }
   // Compile merge global kernel
   lens_merge_glb[0]  = sb.l;
   codes_merge_glb[0] = sb.s;
@@ -903,75 +1074,70 @@ static int compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *k
 
 static int sort(
   GpuArray *d_DstKey,
-  GpuArray *d_BufKey,
   GpuArray *d_SrcKey,
-  GpuArray  *d_RanksA,
-  GpuArray  *d_RanksB,
-  GpuArray  *d_LimitsA,
-  GpuArray  *d_LimitsB,
-  unsigned int N,
-  unsigned int Nfloor,
-  int Nleft,
-  unsigned int sortDir,
+  GpuArray *d_DstArg,
+  GpuArray *d_SrcArg,
+  GpuSortBuff *msBuff,
+  GpuSortData  *msData,
+  GpuSortConfig *msConfig,
   gpucontext *ctx
 )
 {
-  int    typecode = d_SrcKey->typecode;
-  size_t typeSize = typesize(typecode);
-  size_t lstCopyOff;
   int err = GA_NO_ERROR;
-
+  size_t lstCopyOff;
   unsigned int stageCount = 0;
   unsigned int stride;
 
-  GpuArray *ikey, *okey, *t;
+  GpuArray *ikey, *okey, *iarg, *oarg, *t;
   GpuKernel k_bitonic, k_ranks, k_ranks_idxs, k_merge, k_merge_global;
-  err = compileKernels(&k_bitonic, &k_ranks, &k_ranks_idxs, &k_merge, &k_merge_global, ctx, typecode);
+  err = compileKernels(&k_bitonic, &k_ranks, &k_ranks_idxs, &k_merge, &k_merge_global, ctx, msConfig);
   if (err != GA_NO_ERROR) return err;
 
-  for (stride = SHARED_SIZE_LIMIT; stride < Nfloor; stride <<= 1, stageCount++);
+  for (stride = SHARED_SIZE_LIMIT; stride < msConfig->Nfloor; stride <<= 1, stageCount++);
 
   if (stageCount & 1) {
-    ikey = d_BufKey;
+    ikey = &msBuff->BufKey;
     okey = d_DstKey;
+    iarg = &msBuff->BufArg;
+    oarg = d_DstArg;
   }
   else {
     ikey = d_DstKey;
-    okey = d_BufKey;
+    okey = &msBuff->BufKey;
+    iarg = d_DstArg;
+    oarg = &msBuff->BufArg;
   }
 
   // Bitonic sort for short arrays
-  if (N <= SHARED_SIZE_LIMIT) {  
-    err = bitonicSortShared(d_DstKey, d_SrcKey, 1, N, sortDir, 0, &k_bitonic, ctx);
-    if (err != GA_NO_ERROR) return err;
+  if (msConfig->dims <= SHARED_SIZE_LIMIT) { 
+
+    err = bitonicSortShared(d_DstKey, d_SrcKey, d_DstArg, d_SrcArg, 1, (unsigned int)msConfig->dims, 
+                            msConfig->sortDirFlg, 0, msConfig->argSortFlg, &k_bitonic, ctx);
   }
   // Merge - Bitonic sort for bigger arrays
   else {
-    unsigned int batchSize = Nfloor / SHARED_SIZE_LIMIT;
+    unsigned int batchSize = msConfig->Nfloor / SHARED_SIZE_LIMIT;
     unsigned int arrayLength = SHARED_SIZE_LIMIT;
-    err = bitonicSortShared(ikey, d_SrcKey, batchSize, arrayLength, sortDir, 0, &k_bitonic, ctx);
-    if (err != GA_NO_ERROR) return err;
+    err = bitonicSortShared(ikey, d_SrcKey, iarg, d_SrcArg, batchSize, arrayLength, 
+                            msConfig->sortDirFlg, 0, msConfig->argSortFlg, &k_bitonic, ctx);
 
-    for (stride = SHARED_SIZE_LIMIT; stride < Nfloor; stride <<= 1) {
-      unsigned int lastSegmentElements = Nfloor % (2 * stride);
+    for (stride = SHARED_SIZE_LIMIT; stride < msConfig->Nfloor; stride <<= 1) {
+      unsigned int lastSegmentElements = msConfig->Nfloor % (2 * stride);
 
       //Find sample ranks and prepare for limiters merge
-      err = generateSampleRanks(d_RanksA, d_RanksB, ikey, stride, Nfloor, sortDir, &k_ranks, ctx);
-      if (err != GA_NO_ERROR) return err;
+      err = generateSampleRanks(msData, ikey, stride, msConfig, &k_ranks, ctx);
 
       //Merge ranks and indices
-      err = mergeRanksAndIndices(d_LimitsA, d_LimitsB, d_RanksA, d_RanksB, stride, Nfloor, sortDir, &k_ranks_idxs, ctx);
-      if (err != GA_NO_ERROR) return err;
+      err = mergeRanksAndIndices(msData, stride, msConfig, &k_ranks_idxs, ctx);
 
       //Merge elementary intervals
-      err = mergeElementaryIntervals(okey, ikey, d_LimitsA, d_LimitsB, stride, Nfloor, sortDir, &k_merge, ctx);
-      if (err != GA_NO_ERROR) return err;
+      err = mergeElementaryIntervals(okey, ikey, msData, stride, msConfig, &k_merge, ctx);
 
       if (lastSegmentElements <= stride) {
         //Last merge segment consists of a single array which just needs to be passed through          
-        lstCopyOff = okey->offset + ((Nfloor - lastSegmentElements) * typeSize);
-        err = gpudata_move(okey->data, lstCopyOff, ikey->data, lstCopyOff, lastSegmentElements * typeSize);
-        if (err != GA_NO_ERROR) return err;
+        lstCopyOff = okey->offset + ((msConfig->Nfloor - lastSegmentElements) * msConfig->typesize);
+        err = gpudata_move(okey->data, lstCopyOff, ikey->data, lstCopyOff, 
+                           lastSegmentElements * msConfig->typesize);
       }
       // Swap pointers
       t = ikey;
@@ -979,120 +1145,158 @@ static int sort(
       okey = t;
     }
     // If the array is not multiple of 1024, sort the remaining and merge
-    if (Nleft > 0) {
-      err = bitonicSortShared(d_SrcKey, d_DstKey, 1, Nleft, sortDir, Nfloor, &k_bitonic, ctx);
-      if (err != GA_NO_ERROR) return err;
+    if (msConfig->Nleft > 0) {
+      err = bitonicSortShared(d_SrcKey, d_DstKey, d_SrcArg, d_DstArg, 1, msConfig->Nleft, 
+                              msConfig->sortDirFlg, msConfig->Nfloor, msConfig->argSortFlg, &k_bitonic, ctx);
 
       // Copy the leftMost segment to the output array of which contains the first sorted sequence
-      lstCopyOff = okey->offset + Nfloor * typeSize;
-      err = gpudata_move(d_DstKey->data, lstCopyOff, d_SrcKey->data, lstCopyOff, Nleft * typeSize);
-      if (err != GA_NO_ERROR) return err;
+      lstCopyOff = okey->offset + msConfig->Nfloor * msConfig->typesize;
+      err = gpudata_move(d_DstKey->data, lstCopyOff, d_SrcKey->data, lstCopyOff, 
+                         msConfig->Nleft * msConfig->typesize);
 
-      err = mergeGlobalMem(d_SrcKey, d_DstKey, Nfloor, (unsigned int)Nleft, N, sortDir, &k_merge_global, ctx);
-      if (err != GA_NO_ERROR) return err;
+      err = mergeGlobalMem(d_SrcKey, d_DstKey, msConfig, &k_merge_global, ctx);
 
       err = GpuArray_copy(d_DstKey, d_SrcKey, GA_C_ORDER);
-      if (err != GA_NO_ERROR) return err;
     }
   }
   return err;
 }
 
-static int initMergeSort(
-  GpuArray *d_RanksA,
-  GpuArray *d_RanksB,
-  GpuArray *d_LimitsA,
-  GpuArray *d_LimitsB,
-  unsigned int len,
-  unsigned int nd,
+static int initArgSort(
+  GpuArray *srcArg,
+  GpuArray *src,
   gpucontext *ctx
 )
 {
   int err = GA_NO_ERROR;
-  const size_t dims = len * sizeof(unsigned int);
+  const size_t dims = src->dimensions[0] * sizeof(unsigned long);
 
-  err = GpuArray_empty(d_RanksA, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
-  if (err != GA_NO_ERROR) printf("error allocating aux structures %d\n", err);
+  unsigned long *tmp = (unsigned long*) malloc(dims);
+  unsigned long i;
+  for (i = 0; i < src->dimensions[0]; ++i) tmp[i] = i;
 
-  err = GpuArray_empty(d_RanksB, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
-  if (err != GA_NO_ERROR) printf("error allocating aux structures %d\n", err);
+  err = GpuArray_empty(srcArg, ctx, GA_ULONG, src->nd, &dims, GA_C_ORDER);
+  if (err != GA_NO_ERROR) return err;
   
-  err = GpuArray_empty(d_LimitsA, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
-  if (err != GA_NO_ERROR) printf("error allocating aux structures %d\n", err);
+  err = GpuArray_write(srcArg, tmp, dims);
+  if (err != GA_NO_ERROR) return err;
 
-  err = GpuArray_empty(d_LimitsB, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
-  if (err != GA_NO_ERROR) printf("error allocating aux structures %d\n", err);
+  free(tmp);
+  return err;
+}
+
+static int initMergeSort(
+  GpuSortData *msData,
+  GpuSortConfig *msConfig,
+  GpuArray *src,
+  GpuArray *srcArg,
+  gpucontext *ctx
+)
+{
+  int err = GA_NO_ERROR;
+  const size_t dims = (msConfig->Nfloor / 128) * sizeof(unsigned int);
+  unsigned int nd = src->nd;
+
+  err = GpuArray_empty(&msData->d_RanksA, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
+  if (err != GA_NO_ERROR) return err;
+
+  err = GpuArray_empty(&msData->d_RanksB, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
+  if (err != GA_NO_ERROR) return err;
+  
+  err = GpuArray_empty(&msData->d_LimitsA, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
+  if (err != GA_NO_ERROR) return err;
+
+  err = GpuArray_empty(&msData->d_LimitsB, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
+  if (err != GA_NO_ERROR) return err;
+
+  if (msConfig->sortDirFlg) {
+    initArgSort(srcArg, src, ctx);
+  }
+  return err;
+}
+
+static void initMsConfig(GpuSortConfig *msConfig, GpuArray *src, unsigned int sortDir, unsigned int argSort)
+{
+  msConfig->dims = src->dimensions[0];
+  msConfig->Nfloor = roundDown((unsigned int)msConfig->dims, SHARED_SIZE_LIMIT);
+  msConfig->Nleft = (unsigned int)msConfig->dims - msConfig->Nfloor;
+  msConfig->sortDirFlg = sortDir;
+  msConfig->argSortFlg = argSort;
+  msConfig->typecode = src->typecode;
+  msConfig->typesize = typesize(src->typecode);
+}
+
+static int initMsBuff(GpuSortBuff *msBuff, GpuArray *src, gpucontext *ctx, unsigned int argSort)
+{
+  int err = GA_NO_ERROR;
+
+  err = GpuArray_empty(&msBuff->BufKey, ctx, src->typecode, src->nd, src->dimensions, GA_C_ORDER);
+  if (err != GA_NO_ERROR) return err;
+  
+  if (argSort) {
+    err = GpuArray_empty(&msBuff->BufArg, ctx, GA_ULONG, src->nd, src->dimensions, GA_C_ORDER);
+    if (err != GA_NO_ERROR) return err;
+  }
 
   return err;
 }
 
 static void destroyMergeSort(
-  GpuArray *d_RanksA,
-  GpuArray *d_RanksB,
-  GpuArray *d_LimitsA,
-  GpuArray *d_LimitsB,
-  GpuArray *BufKey
+  GpuSortData *msData,
+  GpuSortBuff *msBuff,
+  GpuArray *srcArg,
+  unsigned int argSort
 )
 {
-  GpuArray_clear(d_RanksA);
-  GpuArray_clear(d_RanksB);
-  GpuArray_clear(d_LimitsA);
-  GpuArray_clear(d_LimitsB);
-  GpuArray_clear(BufKey);
+  GpuArray_clear(&msData->d_RanksA);
+  GpuArray_clear(&msData->d_RanksB);
+  GpuArray_clear(&msData->d_LimitsA);
+  GpuArray_clear(&msData->d_LimitsB);
+  GpuArray_clear(&msBuff->BufKey);
+  if (argSort) {
+    GpuArray_clear(&msBuff->BufArg);
+    GpuArray_clear(srcArg);
+  }
 }
-
 
 int GpuArray_sort(
   GpuArray *dstKey,
   GpuArray *srcKey,
-  unsigned int sortDir
+  unsigned int sortDir,
+  GpuArray *dstArg
 )
 {
   int err = GA_NO_ERROR;
-
-  const size_t dims         = srcKey->dimensions[0];
-  const unsigned int Nfloor = roundDown(dims, SHARED_SIZE_LIMIT);
-  const int Nleft           = dims - Nfloor;
-
-  // Buffer data structure
-  GpuArray BufKey;
-
-  // Device pointers - auxiiary data structure    
-  GpuArray d_RanksA, d_RanksB, d_LimitsA, d_LimitsB;
-  
   gpucontext *ctx = GpuArray_context(srcKey);
 
-  if (srcKey->nd > 1)                      return GA_IMPL_ERROR;
-  // if (dstArg != NULL || srcArg != NULL)    return GA_IMPL_ERROR;
+  GpuArray srcArg; 
+  GpuSortConfig msConfig;
+  GpuSortBuff msBuff;
+  GpuSortData msData;
 
-  /*
-	if (dstArg != NULL || srcArg != NULL) {
-    err = GpuArray_empty(&BufArg, ctx, GA_UINT, srcKey->nd, &dims, GA_C_ORDER);
-  }*/
+  initMsConfig(&msConfig, srcKey, sortDir, dstArg != NULL ? 1 : 0);
 
-  err = GpuArray_empty(&BufKey, ctx, srcKey->typecode, srcKey->nd, &dims, GA_C_ORDER);
+  err = initMsBuff(&msBuff, srcKey, ctx, msConfig.argSortFlg);
+  if (err != GA_NO_ERROR) return err;
 
-  // Auxiliary data structure for MergeSort 
-  err = initMergeSort(&d_RanksA, &d_RanksB, &d_LimitsA, &d_LimitsB, Nfloor / 128, srcKey->nd, ctx);
-
+  err = initMergeSort(&msData, &msConfig, srcKey, &srcArg, ctx);
+  if (err != GA_NO_ERROR) return err;  
+  
+  if (srcKey->nd > 1) return GA_IMPL_ERROR;
+  
   // perform regular sort
   err = sort(
           dstKey,
-          &BufKey,
           srcKey,
-          &d_RanksA,
-          &d_RanksB,
-          &d_LimitsA,
-          &d_LimitsB,
-          dims,
-          Nfloor,
-          Nleft,
-          sortDir,
+          dstArg,
+          &srcArg,
+          &msBuff,
+          &msData,
+          &msConfig,
           ctx
         );
 
-  // Destroy auxiliary data structures
-  destroyMergeSort(&d_RanksA, &d_RanksB, &d_LimitsA, &d_LimitsB, &BufKey);
+  destroyMergeSort(&msData, &msBuff, &srcArg, msConfig.sortDirFlg);
 
   return err;
 }

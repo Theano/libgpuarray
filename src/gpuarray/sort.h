@@ -18,8 +18,32 @@ extern "C" {
 #define SHARED_SIZE_LIMIT 	1024U
 #define SAMPLE_STRIDE 		128
 
+typedef struct _GpuSortData {
+  GpuArray BufKey;
+  GpuArray BufArg;
+  GpuArray d_RanksA;
+  GpuArray d_RanksB;
+  GpuArray d_LimitsA;
+  GpuArray d_LimitsB;
+} GpuSortData;
 
-int GpuArray_sort(GpuArray *r, GpuArray *a, unsigned int sortDir);
+typedef struct _GpuSortConfig {
+  unsigned int dims;
+  unsigned int Nfloor;
+  int Nleft;
+  unsigned int sortDirFlg;
+  unsigned int argSortFlg;
+  int typecode;
+  size_t typesize;
+} GpuSortConfig;
+
+typedef struct _GpuSortBuffers {
+  GpuArray BufKey;
+  GpuArray BufArg;
+} GpuSortBuff;
+
+
+int GpuArray_sort(GpuArray *r, GpuArray *a, unsigned int sortDir, GpuArray *dstArg);
 
 
 #ifdef __cplusplus
