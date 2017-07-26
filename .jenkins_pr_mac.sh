@@ -22,7 +22,7 @@ export CPLUS_INCLUDE_PATH=/usr/local/cuda/include:${CPLUS_INCLUDE_PATH}
 git rev-parse HEAD
 
 # Build libgpuarray and run C tests
-rm -rf build
+rm -rf build lib
 mkdir build
 (cd build && cmake .. -DCMAKE_BUILD_TYPE=${GPUARRAY_CONFIG} && make)
 
@@ -41,15 +41,15 @@ export DYLD_LIBRARY_PATH=`pwd`/lib:${DYLD_LIBRARY_PATH}
 export CPLUS_INCLUDE_PATH=`pwd`/src:${CPLUS_INCLUDE_PATH}
 
 # Build the pygpu modules
-python setup.py build_ext --inplace -L`pwd`/lib -I`pwd`/src
+python setup.py build_ext --inplace -I`pwd`/src -L`pwd`/lib
 
 # Test it
 test=pygpu_pr_mac
 for dev in ${DEVICES_CUDA}; do
     echo "Testing pygpu for DEVICE=${dev}"
-    DEVICE=${dev} time nosetests --with-xunit --xunit-file=${test}${dev}tests.xml pygpu/tests
+    DEVICE=${dev} nosetests --with-xunit --xunit-file=${test}_${dev}tests.xml pygpu/tests
 done
 for dev in ${DEVICES_OPENCL}; do
     echo "Testing pygpu for DEVICE=${dev}"
-    DEVICE=${dev} time nosetests --with-xunit --xunit-file=${test}${dev}tests.xml pygpu/tests -e test_blas.py
+    DEVICE=${dev} nosetests --with-xunit --xunit-file=${test}_${dev}tests.xml pygpu/tests -e test_blas.py
 done
