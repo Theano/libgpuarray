@@ -28,13 +28,15 @@ typedef struct _GpuSortData {
 } GpuSortData;
 
 typedef struct _GpuSortConfig {
-  unsigned int dims;
-  unsigned int Nfloor;
-  int Nleft;
-  unsigned int sortDirFlg;
-  unsigned int argSortFlg;
-  int typecode;
-  size_t typesize;
+  unsigned int  dims;
+  unsigned int  Nfloor;
+  int           Nleft;
+  unsigned int  sortDirFlg;
+  unsigned int  argSortFlg;
+  int           typecodeKey;
+  size_t        typesizeKey;
+  int           typecodeArg;
+  size_t        typesizeArg;
 } GpuSortConfig;
 
 typedef struct _GpuSortBuffers {
