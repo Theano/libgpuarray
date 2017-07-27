@@ -4,7 +4,6 @@
 
 #include <gpuarray/sort.h>
 #include <gpuarray/array.h>
-#include <gpuarray/kernel.h>
 #include <gpuarray/util.h>
 
 #include "util/strb.h"
@@ -183,13 +182,13 @@ static const char *code_bitonic_smem =                                          
 "      t_key *d_DstKey, "                                                                                                                       \
 "      size_t dstOff,"                                                                                                                          \
 "      t_key *d_SrcKey, "                                                                                                                       \
-"      size_t srcOff,"\
-"\n#ifdef ARGSORT\n" \
-"      t_arg *d_DstArg, "\
-"      size_t dstArgOff, "\
-"      t_arg *d_SrcArg, "\
-"      size_t srcArgOff, "                                                                                                                \
-"\n#endif\n"\
+"      size_t srcOff,"                                                                                                                          \
+"\n#ifdef ARGSORT\n"                                                                                                                            \
+"      t_arg *d_DstArg, "                                                                                                                       \
+"      size_t dstArgOff, "                                                                                                                      \
+"      t_arg *d_SrcArg, "                                                                                                                       \
+"      size_t srcArgOff, "                                                                                                                      \
+"\n#endif\n"                                                                                                                                    \
 "      unsigned int batchSize, "                                                                                                                \
 "      unsigned int arrayLength, "                                                                                                              \
 "      unsigned int elemsOff, "                                                                                                                 \
@@ -198,13 +197,13 @@ static const char *code_bitonic_smem =                                          
 "  { "                                                                                                                                          \
 "      d_DstKey = (t_key*) (((char*)d_DstKey)+ dstOff);"                                                                                        \
 "      d_SrcKey = (t_key*) (((char*)d_SrcKey)+ srcOff);"                                                                                        \
-"\n#ifdef ARGSORT\n" \
-"      d_DstArg = (t_arg*) (((char*)d_DstArg)+ dstArgOff); "\
-"      d_SrcArg = (t_arg*) (((char*)d_SrcArg)+ srcArgOff);"\
-"      d_DstArg += elemsOff;"\
-"      d_SrcArg += elemsOff;" \
-"      __shared__ t_arg s_arg[SHARED_SIZE_LIMIT];" \
-"\n#endif\n"\
+"\n#ifdef ARGSORT\n"                                                                                                                            \
+"      d_DstArg = (t_arg*) (((char*)d_DstArg)+ dstArgOff); "                                                                                    \
+"      d_SrcArg = (t_arg*) (((char*)d_SrcArg)+ srcArgOff); "                                                                                    \
+"      d_DstArg += elemsOff;"                                                                                                                   \
+"      d_SrcArg += elemsOff;"                                                                                                                   \
+"      __shared__ t_arg s_arg[SHARED_SIZE_LIMIT];"                                                                                              \
+"\n#endif\n"                                                                                                                                    \
 "      d_DstKey += elemsOff;"                                                                                                                   \
 "      d_SrcKey += elemsOff;"                                                                                                                   \
 "      __shared__ t_key s_key[SHARED_SIZE_LIMIT]; "                                                                                             \
@@ -218,18 +217,18 @@ static const char *code_bitonic_smem =                                          
 "                                                                       arrayLength * batchSize, "                                              \
 "                                                                       sortDir "                                                               \
 "                                                                     ); "                                                                      \
-"\n#ifdef ARGSORT\n"
-"      s_arg[threadIdx.x] = readArray_arg<t_arg>( d_SrcArg, "\
-"                                             blockIdx.x * SHARED_SIZE_LIMIT + threadIdx.x, "\
-"                                             arrayLength * batchSize, "\
-"                                             sortDir "\
-"                                            ); "\
-"      s_arg[threadIdx.x + (SHARED_SIZE_LIMIT / 2)] = readArray_arg<t_arg>( d_SrcArg," \
+"\n#ifdef ARGSORT\n"                                                                                                                            \
+"      s_arg[threadIdx.x] = readArray_arg<t_arg>( d_SrcArg, "                                                                                   \
+"                                             blockIdx.x * SHARED_SIZE_LIMIT + threadIdx.x, "                                                   \
+"                                             arrayLength * batchSize, "                                                                        \
+"                                             sortDir "                                                                                         \
+"                                            ); "                                                                                               \
+"      s_arg[threadIdx.x + (SHARED_SIZE_LIMIT / 2)] = readArray_arg<t_arg>( d_SrcArg,"                                                          \
 "                                                                       blockIdx.x * SHARED_SIZE_LIMIT + threadIdx.x + (SHARED_SIZE_LIMIT / 2),"\
-"                                                                       arrayLength * batchSize, "\
-"                                                                       sortDir "\
-"                                                                      ); "\
-"\n#endif\n"                  \
+"                                                                       arrayLength * batchSize, "                                              \
+"                                                                       sortDir "                                                               \
+"                                                                      ); "                                                                     \
+"\n#endif\n"                                                                                                                                    \
 "      for (unsigned int size = 2; size < SHARED_SIZE_LIMIT; size <<= 1) { "                                                                    \
 "          unsigned int ddd = sortDir ^ ((threadIdx.x & (size / 2)) != 0); "                                                                    \
 "          for (unsigned int stride = size / 2; stride > 0; stride >>= 1) "                                                                     \
@@ -241,11 +240,11 @@ static const char *code_bitonic_smem =                                          
 "                  t = s_key[pos]; "                                                                                                            \
 "                  s_key[pos] = s_key[pos + stride]; "                                                                                          \
 "                  s_key[pos + stride] = t; "                                                                                                   \
-"\n#ifdef ARGSORT\n" \
-"                  t_arg t2 = s_arg[pos];"\
-"                  s_arg[pos] = s_arg[pos + stride];" \
-"                  s_arg[pos + stride] = t2;" \
-"\n#endif\n" \
+"\n#ifdef ARGSORT\n"                                                                                                                            \
+"                  t_arg t2 = s_arg[pos];"                                                                                                      \
+"                  s_arg[pos] = s_arg[pos + stride];"                                                                                           \
+"                  s_arg[pos + stride] = t2;"                                                                                                   \
+"\n#endif\n"                                                                                                                                    \
 "              } "                                                                                                                              \
 "          } "                                                                                                                                  \
 "      } "                                                                                                                                      \
@@ -258,11 +257,11 @@ static const char *code_bitonic_smem =                                          
 "                  t = s_key[pos]; "                                                                                                            \
 "                  s_key[pos] = s_key[pos + stride]; "                                                                                          \
 "                  s_key[pos + stride] = t; "                                                                                                   \
-"\n#ifdef ARGSORT\n" \
-"                  t_arg t2 = s_arg[pos];"\
-"                  s_arg[pos] = s_arg[pos + stride];" \
-"                  s_arg[pos + stride] = t2;" \
-"\n#endif\n" \
+"\n#ifdef ARGSORT\n"                                                                                                                            \
+"                  t_arg t2 = s_arg[pos];"                                                                                                      \
+"                  s_arg[pos] = s_arg[pos + stride];"                                                                                           \
+"                  s_arg[pos + stride] = t2;"                                                                                                   \
+"\n#endif\n"                                                                                                                                    \
 "              } "                                                                                                                              \
 "          } "                                                                                                                                  \
 "      } "                                                                                                                                      \
@@ -277,18 +276,18 @@ static const char *code_bitonic_smem =                                          
 "                  s_key[threadIdx.x + (SHARED_SIZE_LIMIT / 2)], "                                                                              \
 "                  arrayLength * batchSize "                                                                                                    \
 "                ); "                                                                                                                           \
-"\n#ifdef ARGSORT\n" \
-"       writeArray<t_arg>( d_DstArg, " \
-"                   blockIdx.x * SHARED_SIZE_LIMIT + threadIdx.x, " \
-"                   s_arg[threadIdx.x], " \
-"                   arrayLength * batchSize " \
-"                  ); " \
-"      writeArray<t_arg>( d_DstArg, " \
-"                                 blockIdx.x * SHARED_SIZE_LIMIT + threadIdx.x + (SHARED_SIZE_LIMIT / 2), " \
-"                                 s_arg[threadIdx.x + (SHARED_SIZE_LIMIT / 2)], " \
-"                                 arrayLength * batchSize " \
-"                               ); " \
-"\n#endif\n "\
+"\n#ifdef ARGSORT\n"                                                                                                                            \
+"       writeArray<t_arg>( d_DstArg, "                                                                                                          \
+"                   blockIdx.x * SHARED_SIZE_LIMIT + threadIdx.x, "                                                                             \
+"                   s_arg[threadIdx.x], "                                                                                                       \
+"                   arrayLength * batchSize "                                                                                                   \
+"                  ); "                                                                                                                         \
+"      writeArray<t_arg>( d_DstArg, "                                                                                                           \
+"                                 blockIdx.x * SHARED_SIZE_LIMIT + threadIdx.x + (SHARED_SIZE_LIMIT / 2), "                                     \
+"                                 s_arg[threadIdx.x + (SHARED_SIZE_LIMIT / 2)], "                                                               \
+"                                 arrayLength * batchSize "                                                                                     \
+"                               ); "                                                                                                            \
+"\n#endif\n "                                                                                                                                   \
 "}\n";
 static int bitonicSortShared(
     GpuArray *d_DstKey,
@@ -311,60 +310,35 @@ static int bitonicSortShared(
   ls = SHARED_SIZE_LIMIT / 2;
   gs = batchSize;
 
-  err = GpuKernel_setarg(k_bitonic, p++, d_DstKey->data);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_bitonic, p++, d_DstKey->data) );
 
-  err = GpuKernel_setarg(k_bitonic, p++, &d_DstKey->offset);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_bitonic, p++, &d_DstKey->offset) );
 
-  err = GpuKernel_setarg(k_bitonic, p++, d_SrcKey->data);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_bitonic, p++, d_SrcKey->data) );
 
-  err = GpuKernel_setarg(k_bitonic, p++, &d_SrcKey->offset);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_bitonic, p++, &d_SrcKey->offset) );
 
   if (argSortFlg) {
-    err = GpuKernel_setarg(k_bitonic, p++, d_DstArg->data);
-    if (err != GA_NO_ERROR) return err;
+    checkErr( GpuKernel_setarg(k_bitonic, p++, d_DstArg->data) );
 
-    err = GpuKernel_setarg(k_bitonic, p++, &d_DstArg->offset);
-    if (err != GA_NO_ERROR) return err;
+    checkErr( GpuKernel_setarg(k_bitonic, p++, &d_DstArg->offset) );
 
-    err = GpuKernel_setarg(k_bitonic, p++, d_SrcArg->data);
-    if (err != GA_NO_ERROR) return err;
+    checkErr( GpuKernel_setarg(k_bitonic, p++, d_SrcArg->data) );
 
-    err = GpuKernel_setarg(k_bitonic, p++, &d_SrcArg->offset);
-    if (err != GA_NO_ERROR) return err;
-  }
+    checkErr( GpuKernel_setarg(k_bitonic, p++, &d_SrcArg->offset) );
+
+  }  
+  checkErr( GpuKernel_setarg(k_bitonic, p++, &batchSize) );
   
-  err = GpuKernel_setarg(k_bitonic, p++, &batchSize);
-  if (err != GA_NO_ERROR) return err;
-  
-  err = GpuKernel_setarg(k_bitonic, p++, &arrayLength);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_bitonic, p++, &arrayLength) );
 
-  err = GpuKernel_setarg(k_bitonic, p++, &elemsOff);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_bitonic, p++, &elemsOff) );
   
-  err = GpuKernel_setarg(k_bitonic, p++, &sortDir);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_bitonic, p++, &sortDir) );
 
-  err = GpuKernel_call(k_bitonic, 1, &gs, &ls, 0, NULL);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_call(k_bitonic, 1, &gs, &ls, 0, NULL) );
 
   return err;  
-/*
-  float *h_dst2 = (float *) malloc ( 16 * sizeof(float));
-  err = GpuArray_read(h_dst2, 16 * sizeof(float), d_DstKey);
-  if (err != GA_NO_ERROR) printf("error reading \n");
-
-  
-  int i;
-  for (i = 0; i < 16; i++)
-  {
-      printf("%d afterbitonic %f \n", i, h_dst2[i]);
-  }
-  */
 }
 
 #define NUMARGS_SAMPLE_RANKS 10
@@ -428,7 +402,6 @@ static int generateSampleRanks(
   unsigned int threadCount = (lastSegmentElements > stride) ? 
                             (msConfig->Nfloor + 2 * stride - lastSegmentElements) / (2 * SAMPLE_STRIDE) : 
                             (msConfig->Nfloor - lastSegmentElements) / (2 * SAMPLE_STRIDE);
-
   size_t ls, gs;
   unsigned int p = 0;
   int err = GA_NO_ERROR;
@@ -436,39 +409,28 @@ static int generateSampleRanks(
   ls = 256;
   gs = iDivUp(threadCount, 256);
 
-  err = GpuKernel_setarg(k_ranks, p++, msData->d_RanksA.data);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks, p++, msData->d_RanksA.data) );
 
-  err = GpuKernel_setarg(k_ranks, p++, &msData->d_RanksA.offset);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks, p++, &msData->d_RanksA.offset) );
 
-  err = GpuKernel_setarg(k_ranks, p++, msData->d_RanksB.data);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks, p++, msData->d_RanksB.data) );
 
-  err = GpuKernel_setarg(k_ranks, p++, &msData->d_RanksB.offset);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks, p++, &msData->d_RanksB.offset) );
   
-  err = GpuKernel_setarg(k_ranks, p++, d_SrcKey->data);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks, p++, d_SrcKey->data) );
 
-  err = GpuKernel_setarg(k_ranks, p++, &d_SrcKey->offset);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks, p++, &d_SrcKey->offset) );
 
-  err = GpuKernel_setarg(k_ranks, p++, &stride);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks, p++, &stride) );
 
-  err = GpuKernel_setarg(k_ranks, p++, &msConfig->Nfloor);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks, p++, &msConfig->Nfloor) );
 
-  err = GpuKernel_setarg(k_ranks, p++, &threadCount);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks, p++, &threadCount) );
 
-  err = GpuKernel_setarg(k_ranks, p++, &msConfig->sortDirFlg);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks, p++, &msConfig->sortDirFlg) );
 
-  err = GpuKernel_call(k_ranks, 1, &gs, &ls, 0, NULL);
-  if (err != GA_NO_ERROR) return err;
- 
+  checkErr( GpuKernel_call(k_ranks, 1, &gs, &ls, 0, NULL) );
+
   return err;
 }
 
@@ -528,56 +490,43 @@ static int mergeRanksAndIndices(
   ls = 256U;
   gs = iDivUp(threadCount, 256U);
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, msData->d_LimitsA.data);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks_idxs, p++, msData->d_LimitsA.data) );
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, &msData->d_LimitsA.offset);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks_idxs, p++, &msData->d_LimitsA.offset) );
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, msData->d_RanksA.data);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks_idxs, p++, msData->d_RanksA.data) );
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, &msData->d_RanksA.offset);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks_idxs, p++, &msData->d_RanksA.offset) );
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, &stride);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks_idxs, p++, &stride) );
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, &msConfig->Nfloor);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks_idxs, p++, &msConfig->Nfloor) );
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, &threadCount);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks_idxs, p++, &threadCount) );
 
-  err = GpuKernel_call(k_ranks_idxs, 1, &gs, &ls, 0, NULL);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_call(k_ranks_idxs, 1, &gs, &ls, 0, NULL) );
 
   p = 0;
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, msData->d_LimitsB.data);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks_idxs, p++, msData->d_LimitsB.data) );
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, &msData->d_LimitsB.offset);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks_idxs, p++, &msData->d_LimitsB.offset) );
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, msData->d_RanksB.data);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks_idxs, p++, msData->d_RanksB.data) );
 
-  err = GpuKernel_setarg(k_ranks_idxs, p++, &msData->d_RanksB.offset);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_ranks_idxs, p++, &msData->d_RanksB.offset) );
 
-  err = GpuKernel_call(k_ranks_idxs, 1, &gs, &ls, 0, NULL);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_call(k_ranks_idxs, 1, &gs, &ls, 0, NULL) );
 
   return err;
 }
 
 #define NUMARGS_MERGE 11
 int type_args_merge[NUMARGS_MERGE] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER,
-                                            GA_SIZE, GA_UINT, GA_UINT, GA_UINT};
+                                      GA_SIZE, GA_UINT, GA_UINT, GA_UINT};
 #define NUMARGS_MERGE_ARG 15
 int type_args_merge_arg[NUMARGS_MERGE_ARG] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER,
-                                                    GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_UINT, GA_UINT, GA_UINT};
+                                              GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_UINT, GA_UINT, GA_UINT};
 static const char *code_merge =                                                                                     \
 " template<typename T> __device__ void merge( "                                                                     \
 "    T *dstKey, "                                                                                                   \
@@ -747,55 +696,38 @@ static int mergeElementaryIntervals(
   ls = SAMPLE_STRIDE;
   gs = mergePairs;
 
-  err = GpuKernel_setarg(k_merge, p++, d_DstKey->data);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge, p++, d_DstKey->data) );
 
-  err = GpuKernel_setarg(k_merge, p++, &d_DstKey->offset);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge, p++, &d_DstKey->offset) );
 
-  err = GpuKernel_setarg(k_merge, p++, d_SrcKey->data);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge, p++, d_SrcKey->data) );
 
-  err = GpuKernel_setarg(k_merge, p++, &d_SrcKey->offset);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge, p++, &d_SrcKey->offset) );
 
   if (msConfig->argSortFlg) {
-    err = GpuKernel_setarg(k_merge, p++, d_DstArg->data);
-    if (err != GA_NO_ERROR) return err;
+    checkErr( GpuKernel_setarg(k_merge, p++, d_DstArg->data) );
 
-    err = GpuKernel_setarg(k_merge, p++, &d_DstArg->offset);
-    if (err != GA_NO_ERROR) return err;
+    checkErr( GpuKernel_setarg(k_merge, p++, &d_DstArg->offset) );
 
-    err = GpuKernel_setarg(k_merge, p++, d_SrcArg->data);
-    if (err != GA_NO_ERROR) return err;
+    checkErr( GpuKernel_setarg(k_merge, p++, d_SrcArg->data) );
 
-    err = GpuKernel_setarg(k_merge, p++, &d_SrcArg->offset);
-    if (err != GA_NO_ERROR) return err;
+    checkErr( GpuKernel_setarg(k_merge, p++, &d_SrcArg->offset) );
   }
+  checkErr( GpuKernel_setarg(k_merge, p++, msData->d_LimitsA.data) );
 
-  err = GpuKernel_setarg(k_merge, p++, msData->d_LimitsA.data);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge, p++, &msData->d_LimitsA.offset) );
 
-  err = GpuKernel_setarg(k_merge, p++, &msData->d_LimitsA.offset);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge, p++, msData->d_LimitsB.data) );
 
-  err = GpuKernel_setarg(k_merge, p++, msData->d_LimitsB.data);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge, p++, &msData->d_LimitsB.offset) );
 
-  err = GpuKernel_setarg(k_merge, p++, &msData->d_LimitsB.offset);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge, p++, &stride) );
 
-  err = GpuKernel_setarg(k_merge, p++, &stride);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge, p++, &msConfig->Nfloor) );
 
-  err = GpuKernel_setarg(k_merge, p++, &msConfig->Nfloor);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge, p++, &msConfig->sortDirFlg) );
 
-  err = GpuKernel_setarg(k_merge, p++, &msConfig->sortDirFlg);
-  if (err != GA_NO_ERROR) return err;
-
-  err = GpuKernel_call(k_merge, 1, &gs, &ls, 0, NULL);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_call(k_merge, 1, &gs, &ls, 0, NULL) );
  
   return err;
 }
@@ -873,46 +805,32 @@ static int mergeGlobalMem(
   ls = 256;
   gs = iDivUp(msConfig->dims, (unsigned int)ls);
 
-  err = GpuKernel_setarg(k_merge_global, p++, d_DstKey->data);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge_global, p++, d_DstKey->data) );
 
-  err = GpuKernel_setarg(k_merge_global, p++, &d_DstKey->offset);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge_global, p++, &d_DstKey->offset) );
 
-  err = GpuKernel_setarg(k_merge_global, p++, d_SrcKey->data);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge_global, p++, d_SrcKey->data) );
 
-  err = GpuKernel_setarg(k_merge_global, p++, &d_SrcKey->offset);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge_global, p++, &d_SrcKey->offset) );
 
   if (msConfig->argSortFlg) {
-    err = GpuKernel_setarg(k_merge_global, p++, d_DstArg->data);
-    if (err != GA_NO_ERROR) return err;
+    checkErr( GpuKernel_setarg(k_merge_global, p++, d_DstArg->data) );
 
-    err = GpuKernel_setarg(k_merge_global, p++, &d_DstArg->offset);
-    if (err != GA_NO_ERROR) return err;
+    checkErr( GpuKernel_setarg(k_merge_global, p++, &d_DstArg->offset) );
 
-    err = GpuKernel_setarg(k_merge_global, p++, d_SrcArg->data);
-    if (err != GA_NO_ERROR) return err;
+    checkErr( GpuKernel_setarg(k_merge_global, p++, d_SrcArg->data) );
 
-    err = GpuKernel_setarg(k_merge_global, p++, &d_SrcArg->offset);
-    if (err != GA_NO_ERROR) return err;
+    checkErr( GpuKernel_setarg(k_merge_global, p++, &d_SrcArg->offset) );
   }
+  checkErr( GpuKernel_setarg(k_merge_global, p++, &msConfig->Nfloor) );
 
-  err = GpuKernel_setarg(k_merge_global, p++, &msConfig->Nfloor);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge_global, p++, &NleftC) );
 
-  err = GpuKernel_setarg(k_merge_global, p++, &NleftC);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge_global, p++, &msConfig->dims) );
 
-  err = GpuKernel_setarg(k_merge_global, p++, &msConfig->dims);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_setarg(k_merge_global, p++, &msConfig->sortDirFlg) );
 
-  err = GpuKernel_setarg(k_merge_global, p++, &msConfig->sortDirFlg);
-  if (err != GA_NO_ERROR) return err;
-
-  err = GpuKernel_call(k_merge_global, 1, &gs, &ls, 0, NULL);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuKernel_call(k_merge_global, 1, &gs, &ls, 0, NULL) );
 
   return err;
 }
@@ -966,8 +884,7 @@ static int genMergeSortTypeCode(strb *str, GpuSortConfig *msConfig)
 #define NSTRINGS_RKS_IDX 4
 #define NSTRINGS_MERGE 4
 #define NSTRINGS_MERGE_GLB 4
-static int compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *k_ranks_idxs, GpuKernel *k_merge,
-                           GpuKernel *k_merge_global, gpucontext *ctx, GpuSortConfig *msConfig)
+static int compileKernels(GpuSortKernels *msKernels, gpucontext *ctx, GpuSortConfig *msConfig)
 {
   char *err_str = NULL;
   int err = GA_NO_ERROR;
@@ -988,8 +905,7 @@ static int compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *k
   int *types;
 
   strb sb = STRB_STATIC_INIT;
-  err = genMergeSortTypeCode(&sb, msConfig);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( genMergeSortTypeCode(&sb, msConfig) );
 
   // Compile Bitonic sort Kernel  
   lens_bitonic[0] = sb.l;
@@ -1002,7 +918,7 @@ static int compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *k
     nargs = NUMARGS_BITONIC_KERNEL;
     types = type_args_bitonic;
   }
-  err = GpuKernel_init( k_bitonic,
+  err = GpuKernel_init( &msKernels->k_bitonic,
                         ctx,
                         NSTR_BITONIC,
                         codes_bitonic,
@@ -1022,7 +938,7 @@ static int compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *k
   // Compile ranks kernel
   lens_ranks[0]  = sb.l;
   codes_ranks[0] = sb.s;
-  err = GpuKernel_init( k_ranks,
+  err = GpuKernel_init( &msKernels->k_ranks,
                         ctx,
                         NSTR_RANKS, 
                         codes_ranks,
@@ -1042,7 +958,7 @@ static int compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *k
   // Compile ranks and idxs kernel
   lens_rks_idx[0]  = sb.l;
   codes_rks_idx[0] = sb.s;
-  err = GpuKernel_init( k_ranks_idxs,
+  err = GpuKernel_init( &msKernels->k_ranks_idxs,
                         ctx, 
                         NSTRINGS_RKS_IDX, 
                         codes_rks_idx,
@@ -1070,7 +986,7 @@ static int compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *k
   // Compile merge kernel
   lens_merge[0]  = sb.l;
   codes_merge[0] = sb.s;
-  err = GpuKernel_init( k_merge,
+  err = GpuKernel_init( &msKernels->k_merge,
                         ctx,
                         NSTRINGS_MERGE, 
                         codes_merge,
@@ -1098,7 +1014,7 @@ static int compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *k
   // Compile merge global kernel
   lens_merge_glb[0]  = sb.l;
   codes_merge_glb[0] = sb.s;
-  err = GpuKernel_init( k_merge_global,
+  err = GpuKernel_init( &msKernels->k_merge_global,
                         ctx, 
                         NSTRINGS_MERGE_GLB, 
                         codes_merge_glb,
@@ -1113,6 +1029,19 @@ static int compileKernels(GpuKernel *k_bitonic, GpuKernel *k_ranks, GpuKernel *k
     printf("error kernel init: %s \n", gpuarray_error_str(err));
     printf("error backend: %s \n", err_str);
     return err;
+  }
+  return err;
+}
+
+static int copysrc2dst(GpuArray *dstKey, GpuArray *srcKey, GpuArray *dstArg, GpuArray *srcArg, unsigned int argSortFlg, int Nleft)
+{
+  int err = GA_NO_ERROR;
+  
+  if (Nleft > 0) {
+    checkErr( GpuArray_copy(dstKey, srcKey, GA_C_ORDER) );
+    if (argSortFlg) {
+      checkErr( GpuArray_copy(dstArg, srcArg, GA_C_ORDER) );
+    }
   }
   return err;
 }
@@ -1132,10 +1061,12 @@ static int sort(
   size_t lstCopyOffDst, lstCopyOffSrc;
   unsigned int stageCount = 0;
   unsigned int stride;
+  unsigned int batchSize;
+  unsigned int arrayLength;
 
   GpuArray *ikey, *okey, *iarg, *oarg, *t, *t2;
-  GpuKernel k_bitonic, k_ranks, k_ranks_idxs, k_merge, k_merge_global;
-  checkErr( compileKernels(&k_bitonic, &k_ranks, &k_ranks_idxs, &k_merge, &k_merge_global, ctx, msConfig) );
+  GpuSortKernels msKernels;
+  checkErr( compileKernels(&msKernels, ctx, msConfig) );
 
   for (stride = SHARED_SIZE_LIMIT; stride < msConfig->Nfloor; stride <<= 1, stageCount++);
 
@@ -1156,29 +1087,30 @@ static int sort(
   if (msConfig->dims <= SHARED_SIZE_LIMIT) { 
 
     checkErr( bitonicSortShared(d_DstKey, d_SrcKey, d_DstArg, d_SrcArg, 1, (unsigned int)msConfig->dims, 
-                                msConfig->sortDirFlg, 0, msConfig->argSortFlg, &k_bitonic, ctx)
+                                msConfig->sortDirFlg, 0, msConfig->argSortFlg, &msKernels.k_bitonic, ctx)
             );
   }
   // Merge - Bitonic sort for bigger arrays
   else {
+    checkErr( copysrc2dst(d_DstKey, d_SrcKey, d_DstArg, d_SrcArg, msConfig->argSortFlg, msConfig->Nleft) );
 
-    unsigned int batchSize = msConfig->Nfloor / SHARED_SIZE_LIMIT;
-    unsigned int arrayLength = SHARED_SIZE_LIMIT;
+    batchSize = msConfig->Nfloor / SHARED_SIZE_LIMIT;
+    arrayLength = SHARED_SIZE_LIMIT;
     checkErr( bitonicSortShared(ikey, d_SrcKey, iarg, d_SrcArg, batchSize, arrayLength, 
-                                msConfig->sortDirFlg, 0, msConfig->argSortFlg, &k_bitonic, ctx)
+                                msConfig->sortDirFlg, 0, msConfig->argSortFlg, &msKernels.k_bitonic, ctx)
             );
 
     for (stride = SHARED_SIZE_LIMIT; stride < msConfig->Nfloor; stride <<= 1) {
       unsigned int lastSegmentElements = msConfig->Nfloor % (2 * stride);
 
       //Find sample ranks and prepare for limiters merge
-      checkErr( generateSampleRanks(msData, ikey, stride, msConfig, &k_ranks, ctx) );
+      checkErr( generateSampleRanks(msData, ikey, stride, msConfig, &msKernels.k_ranks, ctx) );
 
       //Merge ranks and indices
-      checkErr( mergeRanksAndIndices(msData, stride, msConfig, &k_ranks_idxs, ctx) );
+      checkErr( mergeRanksAndIndices(msData, stride, msConfig, &msKernels.k_ranks_idxs, ctx) );
 
       //Merge elementary intervals
-      checkErr( mergeElementaryIntervals(okey, ikey, oarg, iarg, msData, stride, msConfig, &k_merge, ctx) );
+      checkErr( mergeElementaryIntervals(okey, ikey, oarg, iarg, msData, stride, msConfig, &msKernels.k_merge, ctx) );
 
       if (lastSegmentElements <= stride) {
         //Last merge segment consists of a single array which just needs to be passed through          
@@ -1195,8 +1127,7 @@ static int sort(
                                  lastSegmentElements * msConfig->typesizeArg)
                   );
         }
-      }
-      // Swap pointers
+      }     
       t = ikey;
       ikey = okey;
       okey = t;
@@ -1204,13 +1135,13 @@ static int sort(
         t2 = iarg;
         iarg = oarg;
         oarg = t2;
-      }
+      } 
     }
     // If the array is not multiple of 1024, sort the remaining and merge
     if (msConfig->Nleft > 0) {
 
-      checkErr( bitonicSortShared(d_SrcKey, d_DstKey, d_SrcArg, d_DstArg, 1, msConfig->Nleft, 
-                              msConfig->sortDirFlg, msConfig->Nfloor, msConfig->argSortFlg, &k_bitonic, ctx)
+      checkErr( bitonicSortShared(d_SrcKey, d_DstKey, d_SrcArg, d_DstArg, 1, msConfig->Nleft, msConfig->sortDirFlg, 
+                                  msConfig->Nfloor, msConfig->argSortFlg, &msKernels.k_bitonic, ctx)
               );
 
       // Copy the leftMost segment to the output array of which contains the first sorted sequence
@@ -1219,7 +1150,6 @@ static int sort(
       checkErr( gpudata_move(d_DstKey->data, lstCopyOffDst, d_SrcKey->data, lstCopyOffSrc, 
                          msConfig->Nleft * msConfig->typesizeKey)
               );
-
       if (msConfig->argSortFlg) {
         lstCopyOffDst = d_DstArg->offset + (msConfig->Nfloor * msConfig->typesizeArg);
         lstCopyOffSrc = d_SrcArg->offset + (msConfig->Nfloor * msConfig->typesizeArg);        
@@ -1227,7 +1157,7 @@ static int sort(
                            msConfig->Nleft * msConfig->typesizeArg)
                 );
       }
-      checkErr( mergeGlobalMem(d_SrcKey, d_DstKey, d_SrcArg, d_DstArg, msConfig, &k_merge_global, ctx) );      
+      checkErr( mergeGlobalMem(d_SrcKey, d_DstKey, d_SrcArg, d_DstArg, msConfig, &msKernels.k_merge_global, ctx) );      
 
       checkErr( GpuArray_copy(d_DstKey, d_SrcKey, GA_C_ORDER) );
 
@@ -1267,11 +1197,9 @@ static int initArgSort(
       iPtr[i] = (unsigned int)i;
   }
 
-  err = GpuArray_empty(srcArg, ctx, msConfig->typecodeArg, src->nd, src->dimensions, GA_C_ORDER);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuArray_empty(srcArg, ctx, msConfig->typecodeArg, src->nd, src->dimensions, GA_C_ORDER) );
   
-  err = GpuArray_write(srcArg, tmp, dims);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuArray_write(srcArg, tmp, dims) );
 
   free(tmp);
   return err;
@@ -1289,20 +1217,16 @@ static int initMergeSort(
   const size_t dims = msConfig->Nfloor / 128;
   unsigned int nd = src->nd;
 
-  err = GpuArray_empty(&msData->d_RanksA, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuArray_empty(&msData->d_RanksA, ctx, GA_UINT, nd, &dims, GA_C_ORDER) );
 
-  err = GpuArray_empty(&msData->d_RanksB, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuArray_empty(&msData->d_RanksB, ctx, GA_UINT, nd, &dims, GA_C_ORDER) );
   
-  err = GpuArray_empty(&msData->d_LimitsA, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuArray_empty(&msData->d_LimitsA, ctx, GA_UINT, nd, &dims, GA_C_ORDER) );
 
-  err = GpuArray_empty(&msData->d_LimitsB, ctx, GA_UINT, nd, &dims, GA_C_ORDER);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuArray_empty(&msData->d_LimitsB, ctx, GA_UINT, nd, &dims, GA_C_ORDER) );
 
   if (msConfig->argSortFlg) {
-    initArgSort(srcArg, src, msConfig, ctx);
+    checkErr( initArgSort(srcArg, src, msConfig, ctx) );
   }
   return err;
 }
@@ -1327,12 +1251,10 @@ static int initMsBuff(GpuSortBuff *msBuff, GpuArray *src, gpucontext *ctx, GpuSo
 {
   int err = GA_NO_ERROR;
 
-  err = GpuArray_empty(&msBuff->BufKey, ctx, msConfig->typecodeKey, src->nd, src->dimensions, GA_C_ORDER);
-  if (err != GA_NO_ERROR) return err;
+  checkErr( GpuArray_empty(&msBuff->BufKey, ctx, msConfig->typecodeKey, src->nd, src->dimensions, GA_C_ORDER) );
   
   if (msConfig->argSortFlg) {
-    err = GpuArray_empty(&msBuff->BufArg, ctx, msConfig->typecodeArg, src->nd, src->dimensions, GA_C_ORDER);
-    if (err != GA_NO_ERROR) return err;
+    checkErr( GpuArray_empty(&msBuff->BufArg, ctx, msConfig->typecodeArg, src->nd, src->dimensions, GA_C_ORDER) );
   }
 
   return err;
@@ -1355,6 +1277,7 @@ static void destroyMergeSort(
     GpuArray_clear(srcArg);
   }
 }
+
 
 int GpuArray_sort(
   GpuArray *dstKey,
@@ -1381,7 +1304,7 @@ int GpuArray_sort(
   
   checkErr( sort(dstKey, srcKey, dstArg, &srcArg, &msBuff, &msData, &msConfig, ctx) );
 
-  destroyMergeSort(&msData, &msBuff, &srcArg, msConfig.sortDirFlg);
+  destroyMergeSort(&msData, &msBuff, &srcArg, msConfig.argSortFlg);
 
   return err;
 }
