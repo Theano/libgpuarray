@@ -177,6 +177,8 @@ cdef extern from "gpuarray/array.h":
     int GpuArray_setarray(_GpuArray *v, _GpuArray *a)
     int GpuArray_reshape(_GpuArray *res, _GpuArray *a, unsigned int nd,
                          const size_t *newdims, ga_order ord, int nocopy)
+    int GpuArray_reshape_inplace(_GpuArray *a, unsigned int nd,
+                                 const size_t *newdims, ga_order ord)
     int GpuArray_transpose(_GpuArray *res, _GpuArray *a,
                            const unsigned int *new_axes)
 

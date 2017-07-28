@@ -2137,7 +2137,7 @@ cdef class GpuArray:
             cdef size_t *newdims
             cdef unsigned int nd
             cdef unsigned int i
-            cdef GpuArray res
+            cdef int err
             nd = <unsigned int>len(newshape)
             newdims = <size_t *>calloc(nd, sizeof(size_t))
             if newdims == NULL:
@@ -2145,20 +2145,11 @@ cdef class GpuArray:
             try:
                 for i in range(nd):
                     newdims[i] = newshape[i]
-                res = new_GpuArray(GpuArray, self.context, None)
-                array_reshape(res, self, nd, newdims, GA_C_ORDER, 1)
+                err = GpuArray_reshape_inplace(&self.ga, nd, newdims, GA_C_ORDER)
+                if err != GA_NO_ERROR:
+                    raise get_exc(err), GpuArray_error(&self.ga, err)
             finally:
                 free(newdims)
-            # This is safe becase the reshape above is a nocopy one
-            free(self.ga.dimensions)
-            free(self.ga.strides)
-            self.ga.dimensions = res.ga.dimensions
-            self.ga.strides = res.ga.strides
-            self.ga.nd = res.ga.nd
-            res.ga.dimensions = NULL
-            res.ga.strides = NULL
-            res.ga.nd = 0
-            array_clear(res)
 
     property T:
         def __get__(self):
