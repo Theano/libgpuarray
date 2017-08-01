@@ -40,6 +40,15 @@ cdef bytes _s(s):
         return s
     raise TypeError("Expected a string")
 
+cdef size_t countis(l, object val):
+    cdef size_t count
+    cdef size_t i
+    count = 0
+    for i in range(len(l)):
+        if l[i] is val:
+            count += 1
+    return count
+
 def cl_wrap_ctx(size_t ptr):
     """
     cl_wrap_ctx(ptr)
@@ -244,7 +253,7 @@ cdef int strides_ok(GpuArray a, strides):
         if a.ga.dimensions[i] == 0:
             return 1
 
-        max_axis_offset = strides[i] * (a.ga.dimensions[i] - 1)
+        max_axis_offset = <ssize_t>(strides[i]) * <ssize_t>(a.ga.dimensions[i] - 1)
         if max_axis_offset > 0:
             if upper + max_axis_offset > size:
                 return 0
@@ -1951,7 +1960,7 @@ cdef class GpuArray:
             key = tuple(key)
 
         # Need to massage Ellipsis here, to avoid packing it into a tuple.
-        if key.count(Ellipsis) > 1:
+        if countis(key, Ellipsis) > 1:
             raise IndexError, "cannot use more than one Ellipsis"
 
         # The following code replaces an Ellipsis found in the key by
@@ -1966,7 +1975,7 @@ cdef class GpuArray:
         else:
             # Need number of axes minus missing dimensions extra slice(None)
             # objects, not counting None entries and the Ellipsis itself
-            num_slcs = self.ga.nd - (len(key) - key.count(None) - 1)
+            num_slcs = self.ga.nd - (len(key) - countis(key, None) - 1)
             fill_slices = (slice(None),) * num_slcs
             key = key[:ell_idx] + fill_slices + key[ell_idx + 1:]
 
@@ -1983,7 +1992,7 @@ cdef class GpuArray:
 
         # Slice into array, then reshape, accommodating for None entries in key
         sliced = self.__cgetitem__(getitem_idcs)
-        if key.count(None) == 0:
+        if countis(key, None) == 0:
             # Avoid unnecessary reshaping if there was no None
             return sliced
         else:
@@ -2085,7 +2094,7 @@ cdef class GpuArray:
 
             idx = tuple(idx)
 
-        if idx.count(Ellipsis) > 1:
+        if countis(idx, Ellipsis) > 1:
             raise IndexError, "cannot use more than one Ellipsis"
 
         # Remove None entries, they should be ignored (as in Numpy)
@@ -2425,7 +2434,7 @@ cdef class GpuKernel:
         """
         __call__(*args, n=None, gs=None, ls=None, shared=0)
         """
-        if n == None and (ls == None or gs == None):
+        if n is None and (ls is None or gs is None):
             raise ValueError, "Must specify size (n) or both gs and ls"
         self.do_call(n, gs, ls, args, shared)
 
