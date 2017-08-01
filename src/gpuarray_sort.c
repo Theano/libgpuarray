@@ -8,6 +8,7 @@
 
 #include "util/strb.h"
 #include "private.h"
+#include "private_sort.h"
 
 /*
  * Copyright 1993-2015 NVIDIA Corporation.  All rights reserved.
@@ -20,17 +21,16 @@
  *
  * This software contains source code provided by NVIDIA Corporation.
  *
- * Read more at: http://docs.nvidia.com/cuda/eula/index.html#ixzz4lUbgXjsr
- * Follow us: @GPUComputing on Twitter | NVIDIA on Facebook
- *
- *
  */
 
- //#define checkErr(x) checkErrors(x, __FILE__, __LINE__)
 #define checkErr(err)  if (err != GA_NO_ERROR) return err;
 
 const int flags = GA_USE_CLUDA;
 
+/* 
+ * Functions iDivUp, getSampleCount and  nextPowerOfTwo taken from 
+ * Merge Sort implementation in NVIDIA CUDA 8.0 Samples
+ */
 static const char *code_helper_funcs =                                                                               \
 "\n#define SAMPLE_STRIDE 128 \n"                                                                                     \
 "\n#define SHARED_SIZE_LIMIT  1024U \n"                                                                              \
@@ -103,6 +103,10 @@ static inline const char *ctype(int typecode) {
   return gpuarray_get_type(typecode)->cluda_name;
 }
 
+/* 
+ * Functions binarySearchInclusive and  binarySearchExclusive taken 
+ * from Merge Sort implementation in NVIDIA CUDA 8.0 Samples 
+ */
 static const char *code_bin_search =                                                                              \
 "template<typename T> __device__ unsigned int binarySearchInclusive(T val, T *data, unsigned int L, "             \
 "                                              unsigned int stride, unsigned int sortDir){"                       \
@@ -177,6 +181,8 @@ int type_args_bitonic[NUMARGS_BITONIC_KERNEL] = {GA_BUFFER, GA_SIZE, GA_BUFFER, 
 #define NUMARGS_BITONIC_KERNEL_ARG 12
 int type_args_bitonic_arg[NUMARGS_BITONIC_KERNEL_ARG] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, 
                                                            GA_SIZE, GA_UINT, GA_UINT, GA_UINT, GA_UINT};
+
+/* Code based on Bitonic Sort implementation in NVIDIA CUDA 8.0 Samples */
 static const char *code_bitonic_smem =                                                                                                          \
 " extern \"C\" __global__ void bitonicSortSharedKernel( "                                                                                       \
 "      t_key *d_DstKey, "                                                                                                                       \
@@ -344,6 +350,8 @@ static int bitonicSortShared(
 #define NUMARGS_SAMPLE_RANKS 10
 const int type_args_ranks[NUMARGS_SAMPLE_RANKS] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE,
                                                    GA_UINT, GA_UINT, GA_UINT, GA_UINT};                                                   
+
+/* Code taken from Merge Sort implementation in NVIDIA CUDA 8.0 Samples */
 static const char *code_sample_ranks =                                                                              \
 "extern \"C\" __global__ void generateSampleRanksKernel("                                                           \
 "    unsigned int *d_RanksA,"                                                                                       \
@@ -436,6 +444,8 @@ static int generateSampleRanks(
 
 #define NUMARGS_RANKS_IDXS 7
 const int type_args_ranks_idxs[NUMARGS_RANKS_IDXS] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_UINT, GA_UINT, GA_UINT};
+
+/* Code taken from Merge Sort implementation in NVIDIA CUDA 8.0 Samples */
 static const char *code_ranks_idxs =                                                                                           \
 "extern \"C\" __global__ void mergeRanksAndIndicesKernel( "                                                                    \
 "    unsigned int *d_Limits, "                                                                                                 \
@@ -527,6 +537,8 @@ int type_args_merge[NUMARGS_MERGE] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA
 #define NUMARGS_MERGE_ARG 15
 int type_args_merge_arg[NUMARGS_MERGE_ARG] = {GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER,
                                               GA_SIZE, GA_BUFFER, GA_SIZE, GA_BUFFER, GA_SIZE, GA_UINT, GA_UINT, GA_UINT};
+
+/* Code based on Merge Sort implementation in NVIDIA CUDA 8.0 Samples */
 static const char *code_merge =                                                                                     \
 " template<typename T> __device__ void merge( "                                                                     \
 "    T *dstKey, "                                                                                                   \
