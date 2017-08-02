@@ -103,6 +103,9 @@ int GpuArray_empty(GpuArray *a, gpucontext *ctx, int typecode,
   unsigned int i;
   int res = GA_NO_ERROR;
 
+  if (typecode == GA_SIZE || typecode == GA_SSIZE)
+    return error_set(ctx->err, GA_VALUE_ERROR, "Cannot create array with size type");
+
   if (ord == GA_ANY_ORDER)
     ord = GA_C_ORDER;
 
@@ -189,8 +192,10 @@ int GpuArray_fromdata(GpuArray *a, gpudata *data, size_t offset, int typecode,
                       unsigned int nd, const size_t *dims,
                       const ssize_t *strides, int writeable) {
   gpucontext *ctx = gpudata_context(data);
-  if (gpuarray_get_type(typecode)->typecode != typecode)
-    return error_set(ctx->err, GA_VALUE_ERROR, "typecode mismatch");
+
+  if (typecode == GA_SIZE || typecode == GA_SSIZE)
+    return error_set(ctx->err, GA_VALUE_ERROR, "Cannot create array with size type");
+
   assert(data != NULL);
   a->data = data;
   gpudata_retain(a->data);
@@ -221,6 +226,9 @@ int GpuArray_copy_from_host(GpuArray *a, gpucontext *ctx, void *buf,
   gpudata *b;
   int err;
   unsigned int i;
+
+  if (typecode == GA_SIZE || typecode == GA_SSIZE)
+    return error_set(ctx->err, GA_VALUE_ERROR, "Cannot create array with size type");
 
   for (i = 0; i < nd; i++) {
     if (dims[i] == 0) {
