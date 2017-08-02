@@ -1091,20 +1091,13 @@ cdef class GpuContext:
             ctx_property(self, GA_CTX_PROP_DEVNAME, tmp)
             return tmp.decode('ascii')
 
-    property pcibusid:
+    property unique_id:
         "Device PCI Bus ID for this context"
         def __get__(self):
             cdef char tmp[16]
 
-            ctx_property(self, GA_CTX_PROP_PCIBUSID, tmp)
+            ctx_property(self, GA_CTX_PROP_UNIQUE_ID, tmp)
             return tmp.decode('ascii')
-
-    property maxlsize:
-        "Maximum size of thread block (local size) for this context"
-        def __get__(self):
-            cdef size_t res
-            ctx_property(self, GA_CTX_PROP_MAXLSIZE, &res)
-            return res
 
     property lmemsize:
         "Size of the local (shared) memory, in bytes, for this context"
@@ -1118,13 +1111,6 @@ cdef class GpuContext:
         def __get__(self):
             cdef unsigned int res
             ctx_property(self, GA_CTX_PROP_NUMPROCS, &res)
-            return res
-
-    property maxgsize:
-        "Maximum group size for kernel calls"
-        def __get__(self):
-            cdef size_t res
-            ctx_property(self, GA_CTX_PROP_MAXGSIZE, &res)
             return res
 
     property bin_id:
