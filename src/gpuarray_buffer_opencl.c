@@ -1182,14 +1182,6 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     /* For the moment, PCI Bus ID is not supported for OpenCL. */
     return error_set(ctx->err, GA_DEVSUP_ERROR, "Can't get PCI bus ID on OpenCL");
 
-  case GA_CTX_PROP_MAXLSIZE:
-    CL_CHECK(ctx->err, clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES,
-                                        sizeof(id), &id, NULL));
-    CL_GET_PROP(ctx->err, clGetDeviceInfo, id, CL_DEVICE_MAX_WORK_ITEM_SIZES, psz);
-    *((size_t *)res) = psz[0];
-    free(psz);
-    return GA_NO_ERROR;
-
   case GA_CTX_PROP_LMEMSIZE:
     CL_CHECK(ctx->err, clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES,
                                         sizeof(id), &id, NULL));
@@ -1204,23 +1196,6 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     CL_CHECK(ctx->err, clGetDeviceInfo(id, CL_DEVICE_MAX_COMPUTE_UNITS,
                                        sizeof(ui), &ui, NULL));
     *((unsigned int *)res) = ui;
-    return GA_NO_ERROR;
-
-  case GA_CTX_PROP_MAXGSIZE:
-    CL_CHECK(ctx->err, clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES,
-                                        sizeof(id), &id, NULL));
-    CL_CHECK(ctx->err, clGetDeviceInfo(id, CL_DEVICE_ADDRESS_BITS, sizeof(ui),
-                                       &ui, NULL));
-    CL_CHECK(ctx->err, clGetDeviceInfo(id, CL_DEVICE_MAX_WORK_GROUP_SIZE,
-                                       sizeof(sz), &sz, NULL));
-    if (ui == 32) {
-      sz = 4294967295UL/sz;
-    } else if (ui == 64) {
-      sz = 18446744073709551615ULL/sz;
-    } else {
-      assert(0 && "This should not be reached!");
-    }
-    *((size_t *)res) = sz;
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_BLAS_OPS:

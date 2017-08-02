@@ -1676,20 +1676,12 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     *((size_t *)res) = largest_size(ctx);
     return GA_NO_ERROR;
 
-  case GA_CTX_PROP_MAXLSIZE:
-    GETPROP(CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_X, size_t);
-    return GA_NO_ERROR;
-
   case GA_CTX_PROP_LMEMSIZE:
     GETPROP(CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK, size_t);
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_NUMPROCS:
     GETPROP(CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT, unsigned int);
-    return GA_NO_ERROR;
-
-  case GA_CTX_PROP_MAXGSIZE:
-    GETPROP(CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_X, size_t);
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_BLAS_OPS:

@@ -54,7 +54,7 @@ int GpuKernel_sched(GpuKernel *k, size_t n, size_t *gs, size_t *ls) {
   err = gpukernel_property(k->k, GA_CTX_PROP_NUMPROCS, &numprocs);
   if (err != GA_NO_ERROR)
     return err;
-  err = gpukernel_property(k->k, GA_CTX_PROP_MAXGSIZE, &max_g);
+  err = gpukernel_property(k->k, GA_CTX_PROP_MAXGSIZE0, &max_g);
   if (err != GA_NO_ERROR)
     return err;
 

@@ -550,13 +550,7 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
  */
 #define GA_CTX_PROP_DEVNAME  1
 
-/**
- * Get the maximum block size (also known as local size) for a kernel
- * call in the context.
- *
- * Type: `size_t`
- */
-#define GA_CTX_PROP_MAXLSIZE 2
+/* UNUSED: 2 */
 
 /**
  * Get the local memory size available for a call in the context.
@@ -576,12 +570,7 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
  */
 #define GA_CTX_PROP_NUMPROCS 4
 
-/**
- * Get the maximum group size for a kernel call in this context.
- *
- * Type: `size_t`
- */
-#define GA_CTX_PROP_MAXGSIZE  5
+/* UNUSED: 5 */
 
 /**
  * Get the vector of blas ops for the context.
