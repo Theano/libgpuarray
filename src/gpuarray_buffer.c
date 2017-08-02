@@ -44,11 +44,6 @@ gpucontext *gpucontext_init(const char *name, int dev, int flags, int *ret) {
   res = ops->buffer_init(dev, flags);
   if (res == NULL) FAIL(NULL, global_err);
   res->ops = ops;
-  if (gpucontext_property(res, GA_CTX_PROP_BLAS_OPS, (void *)&res->blas_ops) != GA_NO_ERROR)
-    res->blas_ops = NULL;
-  res->blas_handle = NULL;
-  if (gpucontext_property(res, GA_CTX_PROP_COMM_OPS, (void *)&res->comm_ops) != GA_NO_ERROR)
-    res->comm_ops = NULL;
   res->extcopy_cache = NULL;
   return res;
 }

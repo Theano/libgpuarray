@@ -18,6 +18,9 @@
 #define _unused(x) ((void)x)
 #define SSIZE_MIN (-(SSIZE_MAX-1))
 
+extern gpuarray_blas_ops clblas_ops;
+extern gpuarray_blas_ops clblast_ops;
+
 const gpuarray_buffer_ops opencl_ops;
 
 static int cl_property(gpucontext *c, gpudata *b, gpukernel *k, int p, void *r);
@@ -194,6 +197,17 @@ cl_ctx *cl_make_ctx(cl_context ctx, int flags) {
   res->preamble = strb_cstr(&context_preamble);
   if (res->preamble == NULL)
     goto fail;
+
+  res->blas_handle = NULL;
+  if (load_libclblas(res->err) == GA_NO_ERROR) {
+    res->blas_ops = &clblas_ops;
+  } else if (load_libclblast(res->err) == GA_NO_ERROR) {
+    res->blas_ops = &clblast_ops;
+  } else {
+    res->blas_ops = NULL;
+  }
+
+  res->comm_ops = NULL;
 
   return res;
 
@@ -1137,9 +1151,6 @@ static int cl_transfer(gpudata *dst, size_t dstoff,
   return error_set(dst->ctx->err, GA_UNSUPPORTED_ERROR, "Operation not supported");
 }
 
-extern gpuarray_blas_ops clblas_ops;
-extern gpuarray_blas_ops clblast_ops;
-
 static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
                        void *res) {
   cl_ctx *ctx = NULL;
@@ -1197,26 +1208,6 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
                                        sizeof(ui), &ui, NULL));
     *((unsigned int *)res) = ui;
     return GA_NO_ERROR;
-
-  case GA_CTX_PROP_BLAS_OPS:
-  {
-    int e;
-    if ((e = load_libclblas(ctx->err)) == GA_NO_ERROR) {
-      *((gpuarray_blas_ops **)res) = &clblas_ops;
-      return e;
-    }
-    if ((e = load_libclblast(ctx->err)) == GA_NO_ERROR) {
-      *((gpuarray_blas_ops **)res) = &clblast_ops;
-      return e;
-    }
-    return e;
-  }
-
-  case GA_CTX_PROP_COMM_OPS:
-    // TODO Complete in the future whenif a multi-gpu collectives API for
-    // opencl appears
-    *((void **)res) = NULL;
-    return error_set(ctx->err, GA_DEVSUP_ERROR, "Collectives operations not supported on OpenCL");
 
   case GA_CTX_PROP_BIN_ID:
     *((const char **)res) = ctx->bin_id;

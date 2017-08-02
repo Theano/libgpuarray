@@ -572,16 +572,7 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
 
 /* UNUSED: 5 */
 
-/**
- * Get the vector of blas ops for the context.
- *
- * This may differ from one context to the other in the same backend
- * depending of the availability and performance of various BLAS
- * libraries.
- *
- * Type: `const gpuarray_blas_ops *`
- */
-#define GA_CTX_PROP_BLAS_OPS  6
+/* UNUSED: 6 */
 
 /**
  * Get the compatibility ID for the binaries generated with this context.
@@ -669,12 +660,7 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
  */
 #define GA_CTX_PROP_MAXLSIZE2 17
 
-/**
- * Get the vector of collective ops for the context.
- *
- * Type: `const gpuarray_comm_ops *`
- */
-#define GA_CTX_PROP_COMM_OPS  18
+/* UNUSED: 18 */
 
 /**
  * Get the device PCI Bus ID for the context.

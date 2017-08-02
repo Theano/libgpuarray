@@ -2307,7 +2307,7 @@ cdef class GpuKernel:
         k(param1, param2, gs=gs, ls=ls)
 
     If you choose to use this interface, make sure to stay within the
-    limits of `k.maxlsize` and `ctx.maxgsize` or the call will fail.
+    limits of `k.maxlsize` or the call will fail.
 
     Parameters
     ----------

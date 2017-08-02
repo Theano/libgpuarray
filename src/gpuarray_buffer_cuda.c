@@ -37,6 +37,9 @@ STATIC_ASSERT(sizeof(GpuArrayIpcMemHandle) == sizeof(CUipcMemHandle), cuda_ipcme
  */
 #define FRAG_SIZE (64)
 
+extern gpuarray_blas_ops cublas_ops;
+extern gpuarray_comm_ops nccl_ops;
+
 const gpuarray_buffer_ops cuda_ops;
 
 static void cuda_freekernel(gpukernel *);
@@ -334,7 +337,6 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
 static void deallocate(gpudata *);
 
 static void cuda_free_ctx(cuda_context *ctx) {
-  gpuarray_blas_ops *blas_ops;
   gpudata *next, *curr;
   CUdevice dev;
 
@@ -343,9 +345,7 @@ static void cuda_free_ctx(cuda_context *ctx) {
   if (ctx->refcnt == 0) {
     assert(ctx->enter == 0 && "Context was active when freed!");
     if (ctx->blas_handle != NULL) {
-      cuda_property((gpucontext *)ctx, NULL, NULL, GA_CTX_PROP_BLAS_OPS,
-                    &blas_ops);
-      blas_ops->teardown((gpucontext *)ctx);
+      ctx->blas_ops->teardown((gpucontext *)ctx);
     }
     cuMemFreeHost((void *)ctx->errbuf->ptr);
     deallocate(ctx->errbuf);
@@ -556,6 +556,17 @@ static cuda_context *do_init(CUdevice dev, int flags, error *e) {
       error_set(e, global_err->code, global_err->msg);
     return NULL;
   }
+
+  res->blas_handle = NULL;
+  /* If we can't load cublas, then we have no blas */
+  if (!load_libcublas(major, minor, res->err)) {
+    res->blas_ops = &cublas_ops;
+  } else {
+    res->blas_ops = NULL;
+  }
+
+  res->comm_ops = &nccl_ops;
+
   /* Don't leave the context on the thread stack */
   cuCtxPopCurrent(NULL);
 
@@ -592,6 +603,7 @@ static gpucontext *cuda_init(int ord, int flags) {
       return (gpucontext *)do_init(dev, flags, global_err);
     }
 }
+
 static void cuda_deinit(gpucontext *c) {
   cuda_free_ctx((cuda_context *)c);
 }
@@ -1614,9 +1626,6 @@ static int cuda_transfer(gpudata *dst, size_t dstoff,
   return GA_NO_ERROR;
 }
 
-extern gpuarray_blas_ops cublas_ops;
-extern gpuarray_comm_ops nccl_ops;
-
 static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
                          void *res) {
   cuda_context *ctx = NULL;
@@ -1682,15 +1691,6 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
 
   case GA_CTX_PROP_NUMPROCS:
     GETPROP(CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT, unsigned int);
-    return GA_NO_ERROR;
-
-  case GA_CTX_PROP_BLAS_OPS:
-    GA_CHECK(load_libcublas(major, minor, ctx->err));
-    *((gpuarray_blas_ops **)res) = &cublas_ops;
-    return GA_NO_ERROR;
-
-  case GA_CTX_PROP_COMM_OPS:
-    *((gpuarray_comm_ops**)res) = &nccl_ops;
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_BIN_ID:

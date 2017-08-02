@@ -187,7 +187,7 @@ class ReductionKernel(object):
 
         self.init_local_size = min(context.lmemsize //
                                    self.out_arg.dtype.itemsize,
-                                   context.maxlsize)
+                                   context.maxlsize0)
 
         # this is to prep the cache
         if init_nd is not None:
@@ -253,7 +253,7 @@ class ReductionKernel(object):
         if gs == 0:
             gs = 1
         n /= gs
-        if gs > self.context.maxgsize:
+        if gs > self.context.maxgsize0:
             raise ValueError("Array too big to be reduced along the "
                              "selected axes")
 
