@@ -1674,7 +1674,7 @@ static int cuda_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     cuda_exit(ctx);
     return GA_NO_ERROR;
 
-  case GA_CTX_PROP_PCIBUSID:
+  case GA_CTX_PROP_UNIQUE_ID:
     cuda_enter(ctx);
     CUDA_EXIT_ON_ERROR(ctx, cuCtxGetDevice(&id));
     CUDA_EXIT_ON_ERROR(ctx, cuDeviceGetPCIBusId((char *)res, 13, id));

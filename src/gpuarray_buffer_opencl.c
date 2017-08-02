@@ -1189,9 +1189,8 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
                                        NULL));
     return GA_NO_ERROR;
 
-  case GA_CTX_PROP_PCIBUSID:
-    /* For the moment, PCI Bus ID is not supported for OpenCL. */
-    return error_set(ctx->err, GA_DEVSUP_ERROR, "Can't get PCI bus ID on OpenCL");
+  case GA_CTX_PROP_UNIQUE_ID:
+    return error_set(ctx->err, GA_DEVSUP_ERROR, "Can't get unique ID on OpenCL");
 
   case GA_CTX_PROP_LMEMSIZE:
     CL_CHECK(ctx->err, clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES,

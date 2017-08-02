@@ -663,11 +663,11 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
 /* UNUSED: 18 */
 
 /**
- * Get the device PCI Bus ID for the context.
+ * Get a unique ID for the device behind the context.
  *
  * Type: `char [16]`
  */
-#define GA_CTX_PROP_PCIBUSID 19
+#define GA_CTX_PROP_UNIQUE_ID 19
 
 /**
  * Get the largest single block of memory that can be allocted.
