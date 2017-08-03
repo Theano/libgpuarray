@@ -77,7 +77,7 @@ int gpucontext_props_sched(gpucontext_props *p, int sched) {
   }
 }
 
-int gpucontext_props_set_single_treams(gpucontext_props *p) {
+int gpucontext_props_set_single_stream(gpucontext_props *p) {
   p->flags |= GA_CTX_SINGLE_STREAM;
   return GA_NO_ERROR;
 }
