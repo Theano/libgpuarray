@@ -602,9 +602,11 @@ cdef GpuContext pygpu_init(dev, gpucontext_props *p):
         raise get_exc(err), gpucontext_error(NULL, err)
     return res
 
-def init(dev, sched='default', disable_alloc_cache=False, single_stream=False):
+def init(dev, sched='default', single_stream=False, kernel_cache_path=None,
+         max_cache_size=0, initial_cache_size=0):
     """
-    init(dev, sched='default', disable_alloc_cache=False, single_stream=False)
+    init(dev, sched='default', single_stream=False, kernel_cache_path=None,
+         max_cache_size=0, initial_cache_size=0)
 
     Creates a context from a device specifier.
 
@@ -641,6 +643,7 @@ def init(dev, sched='default', disable_alloc_cache=False, single_stream=False):
     """
     cdef gpucontext_props *p = NULL
     cdef int err
+    cdef bytes kernel_cache_path_b
     err = gpucontext_props_new(&p)
     if err != GA_NO_ERROR:
         raise MemoryError
@@ -651,8 +654,10 @@ def init(dev, sched='default', disable_alloc_cache=False, single_stream=False):
             gpucontext_props_sched(p, GA_CTX_SCHED_MULTI)
         elif sched != 'default':
             raise TypeError('unexpected value for parameter sched: %s' % (sched,))
-        if disable_alloc_cache:
-            gpucontext_props_alloc_cache(p, 0, 0);
+        if kernel_cache_path:
+            kernel_cache_path_b = _s(kernel_cache_path)
+            gpucontext_props_kernel_cache(p, <const char *>kernel_cache_path_b)
+        gpucontext_props_alloc_cache(p, max_cache_size, initial_cache_size)
         if single_stream:
             gpucontext_props_set_single_stream(p);
     except:

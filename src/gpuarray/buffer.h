@@ -95,8 +95,6 @@ GPUARRAY_PUBLIC int gpucontext_props_alloc_cache(gpucontext_props *p,
 
 GPUARRAY_PUBLIC void gpucontext_props_del(gpucontext_props *p);
 
-/* TODO: add new props */
-
 /**
  * Create a context on the specified device.
  *
