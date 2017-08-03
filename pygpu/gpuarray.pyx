@@ -572,13 +572,17 @@ def count_devices(kind, unsigned int platform):
         raise get_exc(err), gpucontext_error(NULL, err)
     return devcount
 
-cdef GpuContext pygpu_init(dev, int flags):
+cdef GpuContext pygpu_init(dev, gpucontext_props *p):
+    cdef int err
+    cdef GpuContext res
+
     if dev.startswith('cuda'):
         kind = b"cuda"
         if dev[4:] == '':
             devnum = -1
         else:
             devnum = int(dev[4:])
+        gpucontext_props_cuda_dev(p, devnum)
     elif dev.startswith('opencl'):
         kind = b"opencl"
         devspec = dev[6:].split(':')
@@ -587,10 +591,16 @@ cdef GpuContext pygpu_init(dev, int flags):
         if not devspec[0].isdigit() or not devspec[1].isdigit():
             raise ValueError, "OpenCL name incorrect. Should be opencl<int>:<int> instead got: " + dev
         else:
-            devnum = int(devspec[0]) << 16 | int(devspec[1])
+            gpucontext_props_opencl_dev(p, int(devspec[0]), int(devspec[1]))
     else:
         raise ValueError, "Unknown device format:" + dev
-    return GpuContext(kind, devnum, flags)
+
+    res = GpuContext.__new__(GpuContext)
+    res.kind = kind
+    err = gpucontext_init(&res.ctx, <char *>res.kind, p)
+    if err != GA_NO_ERROR:
+        raise get_exc(err), gpucontext_error(NULL, err)
+    return res
 
 def init(dev, sched='default', disable_alloc_cache=False, single_stream=False):
     """
@@ -629,18 +639,26 @@ def init(dev, sched='default', disable_alloc_cache=False, single_stream=False):
         enable single stream mode
 
     """
-    cdef int flags = 0
-    if sched == 'single':
-        flags |= GA_CTX_SINGLE_THREAD
-    elif sched == 'multi':
-        flags |= GA_CTX_MULTI_THREAD
-    elif sched != 'default':
-        raise TypeError('unexpected value for parameter sched: %s' % (sched,))
-    if disable_alloc_cache:
-        flags |= GA_CTX_DISABLE_ALLOCATION_CACHE
-    if single_stream:
-        flags |= GA_CTX_SINGLE_STREAM
-    return pygpu_init(dev, flags)
+    cdef gpucontext_props *p = NULL
+    cdef int err
+    err = gpucontext_props_new(&p)
+    if err != GA_NO_ERROR:
+        raise MemoryError
+    try:
+        if sched == 'single':
+            gpucontext_props_sched(p, GA_CTX_SCHED_SINGLE)
+        elif sched == 'multi':
+            gpucontext_props_sched(p, GA_CTX_SCHED_MULTI)
+        elif sched != 'default':
+            raise TypeError('unexpected value for parameter sched: %s' % (sched,))
+        if disable_alloc_cache:
+            gpucontext_props_alloc_cache(p, 0, 0);
+        if single_stream:
+            gpucontext_props_set_single_stream(p);
+    except:
+        gpucontext_props_del(p)
+        raise
+    return pygpu_init(dev, p)
 
 def zeros(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
           cls=None):
@@ -1026,8 +1044,6 @@ cuda_exit = <void (*)(gpucontext *)>gpuarray_get_extension("cuda_exit")
 
 cdef class GpuContext:
     """
-    GpuContext(kind, devno, flags)
-
     Class that holds all the information pertaining to a context.
 
     The currently implemented modules (for the `kind` parameter) are
@@ -1057,13 +1073,9 @@ cdef class GpuContext:
     def __reduce__(self):
         raise RuntimeError, "Cannot pickle GpuContext object"
 
-    def __cinit__(self, bytes kind, devno, int flags):
-        cdef int err = GA_NO_ERROR
-        cdef gpucontext *ctx
-        self.kind = kind
-        self.ctx = gpucontext_init(<char *>self.kind, devno, flags, &err)
-        if (err != GA_NO_ERROR):
-            raise get_exc(err), gpucontext_error(NULL, err)
+    def __init__(self):
+        if type(self) is GpuContext:
+            raise RuntimeError, "Called raw GpuContext.__init__"
 
     def __enter__(self):
         if cuda_enter == NULL:

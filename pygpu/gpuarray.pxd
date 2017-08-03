@@ -65,6 +65,8 @@ cdef extern from "gpuarray/error.h":
         GA_UNALIGNED_ERROR, GA_COPY_ERROR, GA_COMM_ERROR
 
 cdef extern from "gpuarray/buffer.h":
+    ctypedef struct gpucontext_props:
+        pass
     ctypedef struct gpucontext:
         pass
     ctypedef struct gpudata:
@@ -74,7 +76,17 @@ cdef extern from "gpuarray/buffer.h":
 
     int gpu_get_platform_count(const char* name, unsigned int* platcount)
     int gpu_get_device_count(const char* name, unsigned int platform, unsigned int* devcount)
-    gpucontext *gpucontext_init(const char *name, int devno, int flags, int *ret)
+
+    int gpucontext_props_new(gpucontext_props **res)
+    int gpucontext_props_cuda_dev(gpucontext_props *p, int devno)
+    int gpucontext_props_opencl_dev(gpucontext_props *p, int platno, int devno)
+    int gpucontext_props_sched(gpucontext_props *p, int sched)
+    int gpucontext_props_set_single_stream(gpucontext_props *p)
+    int gpucontext_props_kernel_cache(gpucontext_props *p, const char *path)
+    int gpucontext_props_alloc_cache(gpucontext_props *p, size_t initial, size_t max)
+    void gpucontext_props_del(gpucontext_props *p)
+
+    int gpucontext_init(gpucontext **res, const char *name, gpucontext_props *p)
     void gpucontext_deref(gpucontext *ctx)
     char *gpucontext_error(gpucontext *ctx, int err)
     int gpudata_property(gpudata *ctx, int prop_id, void *res)
@@ -83,11 +95,9 @@ cdef extern from "gpuarray/buffer.h":
     gpucontext *gpudata_context(gpudata *)
     gpucontext *gpukernel_context(gpukernel *)
 
-    int GA_CTX_DEFAULT
-    int GA_CTX_MULTI_THREAD
-    int GA_CTX_SINGLE_THREAD
-    int GA_CTX_SINGLE_STREAM
-    int GA_CTX_DISABLE_ALLOCATION_CACHE
+    int GA_CTX_SCHED_AUTO
+    int GA_CTX_SCHED_SINGLE
+    int GA_CTX_SCHED_MULTI
 
     int GA_CTX_PROP_DEVNAME
     int GA_CTX_PROP_UNIQUE_ID
@@ -279,7 +289,7 @@ cdef api GpuContext pygpu_default_context()
 
 cdef api bint pygpu_GpuArray_Check(object o)
 
-cdef api GpuContext pygpu_init(object dev, int flags)
+cdef api GpuContext pygpu_init(object dev, gpucontext_props *p)
 
 cdef api GpuArray pygpu_zeros(unsigned int nd, const size_t *dims,
                               int typecode, ga_order order,
