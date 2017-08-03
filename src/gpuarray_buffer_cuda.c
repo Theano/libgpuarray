@@ -46,6 +46,7 @@ static void cuda_freekernel(gpukernel *);
 static int cuda_property(gpucontext *, gpudata *, gpukernel *, int, void *);
 static int cuda_waits(gpudata *, int, CUstream);
 static int cuda_records(gpudata *, int, CUstream);
+static gpudata *cuda_alloc(gpucontext *c, size_t size, void *data, int flags);
 
 static int detect_arch(const char *prefix, char *ret, error *e);
 static gpudata *new_gpudata(cuda_context *ctx, CUdeviceptr ptr, size_t size);
@@ -209,11 +210,11 @@ static int cuda_get_device_count(unsigned int platform,
   return GA_NO_ERROR;
 }
 
-cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
+cuda_context *cuda_make_ctx(CUcontext ctx, gpucontext_props *p) {
   cuda_context *res;
   cache *mem_cache;
-  char *cache_path;
-  void *p;
+  const char *cache_path;
+  void *pp;
   CUresult err;
   int e;
 
@@ -229,7 +230,8 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
   res->ctx = ctx;
   res->ops = &cuda_ops;
   res->refcnt = 1;
-  res->flags = flags;
+  res->flags = p->flags;
+  res->max_cache_size = p->max_cache_size;
   res->enter = 0;
   res->major = major;
   res->minor = minor;
@@ -270,7 +272,9 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
     goto fail_cache;
   }
 
-  cache_path = getenv("GPUARRAY_CACHE_PATH");
+  cache_path = p->kernel_cache_path;
+  if (cache_path == NULL)
+    cache_path = getenv("GPUARRAY_CACHE_PATH");
   if (cache_path != NULL) {
     mem_cache = cache_lru(64, 8,
                           (cache_eq_fn)disk_eq,
@@ -300,24 +304,26 @@ cuda_context *cuda_make_ctx(CUcontext ctx, int flags) {
     res->disk_cache = NULL;
   }
 
-  err = cuMemAllocHost(&p, 16);
+  err = cuMemAllocHost(&pp, 16);
   if (err != CUDA_SUCCESS) {
     error_cuda(global_err, "cuMemAllocHost", err);
     goto fail_errbuf;
   }
-  memset(p, 0, 16);
+  memset(pp, 0, 16);
   /* Need to tag for new_gpudata */
   TAG_CTX(res);
-  res->errbuf = new_gpudata(res, (CUdeviceptr)p, 16);
+  res->errbuf = new_gpudata(res, (CUdeviceptr)pp, 16);
   if (res->errbuf == NULL) {
     /* Copy the error from the context since we are getting rid of it */
     error_set(global_err, res->err->code, res->err->msg);
     goto fail_end;
   }
   res->errbuf->flags |= CUDA_MAPPED_PTR;
+  /* Prime the cache */
+  cuda_alloc((gpucontext *)res, p->initial_cache_size, NULL, 0);
   return res;
  fail_end:
-  cuMemFreeHost(p);
+  cuMemFreeHost(pp);
  fail_errbuf:
   if (res->disk_cache)
     cache_destroy(res->disk_cache);
@@ -515,19 +521,26 @@ static const char CUDA_PREAMBLE[] =
 /* XXX: add complex, quads, longlong */
 /* XXX: add vector types */
 
-static cuda_context *do_init(CUdevice dev, int flags, error *e) {
+static cuda_context *do_init(CUdevice dev, gpucontext_props *p, error *e) {
   cuda_context *res;
   CUcontext ctx;
   CUresult err;
-  unsigned int fl = CU_CTX_SCHED_AUTO;
+  unsigned int fl = 0;
   unsigned int cur_fl;
   int act;
   int i;
 
-  if (flags & GA_CTX_SINGLE_THREAD)
+  switch (p->sched) {
+  case GA_CTX_SCHED_AUTO:
+    fl = CU_CTX_SCHED_AUTO;
+    break;
+  case GA_CTX_SCHED_SINGLE:
     fl = CU_CTX_SCHED_SPIN;
-  if (flags & GA_CTX_MULTI_THREAD)
+    break;
+  case GA_CTX_SCHED_MULTI:
     fl = CU_CTX_SCHED_BLOCKING_SYNC;
+    break;
+  }
   err = cuDeviceGetAttribute(&i, CU_DEVICE_ATTRIBUTE_UNIFIED_ADDRESSING, dev);
   CHKFAIL(e, "cuDeviceGetAttribute", NULL);
   if (i != 1) {
@@ -549,7 +562,7 @@ static cuda_context *do_init(CUdevice dev, int flags, error *e) {
   CHKFAIL(e, "cuDevicePrimaryCtxRetain", NULL);
   err = cuCtxPushCurrent(ctx);
   CHKFAIL(e, "cuCtxPushCurrent", NULL);
-  res = cuda_make_ctx(ctx, flags);
+  res = cuda_make_ctx(ctx, p);
   if (res == NULL) {
     cuDevicePrimaryCtxRelease(dev);
     if (e != global_err)
@@ -573,7 +586,7 @@ static cuda_context *do_init(CUdevice dev, int flags, error *e) {
   return res;
 }
 
-static gpucontext *cuda_init(int ord, int flags) {
+static gpucontext *cuda_init(gpucontext_props *p) {
     CUdevice dev;
     cuda_context *res;
     CUresult err;
@@ -584,23 +597,23 @@ static gpucontext *cuda_init(int ord, int flags) {
       return NULL;
     }
 
-    if (ord == -1) {
+    if (p->dev == -1) {
       int i, c;
       err = cuDeviceGetCount(&c);
       CHKFAIL(global_err, "cuDeviceGetCount", NULL);
       for (i = 0; i < c; i++) {
         err = cuDeviceGet(&dev, i);
         CHKFAIL(global_err, "cuDeviceGet", NULL);
-        res = do_init(dev, flags, global_err);
+        res = do_init(dev, p, global_err);
         if (res != NULL)
           return (gpucontext *)res;
       }
       error_set(global_err, GA_NODEV_ERROR, "No cuda device available");
       return NULL;
     } else {
-      err = cuDeviceGet(&dev, ord);
+      err = cuDeviceGet(&dev, p->dev);
       CHKFAIL(global_err, "cuDeviceGet", NULL);
-      return (gpucontext *)do_init(dev, flags, global_err);
+      return (gpucontext *)do_init(dev, p, global_err);
     }
 }
 
@@ -654,8 +667,11 @@ static int allocate(cuda_context *ctx, gpudata **res, gpudata **prev,
 
   *prev = NULL;
 
-  if (!(ctx->flags & GA_CTX_DISABLE_ALLOCATION_CACHE))
+  if (ctx->max_cache_size != 0) {
     if (size < BLOCK_SIZE) size = BLOCK_SIZE;
+    if (ctx->cache_size + size > ctx->max_cache_size)
+      return error_set(ctx->err, GA_VALUE_ERROR, "Maximum cache size reached");
+  }
 
   cuda_enter(ctx);
 
@@ -673,6 +689,8 @@ static int allocate(cuda_context *ctx, gpudata **res, gpudata **prev,
     cuMemFree(ptr);
     return ctx->err->code;
   }
+
+  ctx->cache_size += size;
 
   (*res)->flags |= CUDA_HEAD_ALLOC;
 
@@ -758,7 +776,7 @@ static gpudata *cuda_alloc(gpucontext *c, size_t size, void *data, int flags) {
    * to a multiple of FRAG_SIZE.  This also ensures that if we split a
    * block, the next block starts properly aligned for any data type.
    */
-  if (!(ctx->flags & GA_CTX_DISABLE_ALLOCATION_CACHE)) {
+  if (ctx->max_cache_size != 0) {
     asize = roundup(size, FRAG_SIZE);
     find_best(ctx, &res, &prev, asize);
   } else {
@@ -843,7 +861,7 @@ static void cuda_free(gpudata *d) {
     } else if (d->flags & CUDA_IPC_MEMORY) {
       cuIpcCloseMemHandle(d->ptr);
       deallocate(d);
-    } else if (ctx->flags & GA_CTX_DISABLE_ALLOCATION_CACHE) {
+    } else if (ctx->max_cache_size == 0) {
       /* Just free the pointer */
       cuMemFree(d->ptr);
       deallocate(d);

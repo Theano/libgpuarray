@@ -105,7 +105,7 @@ static cl_device_id get_dev(cl_context ctx, error *e) {
   return res;
 }
 
-cl_ctx *cl_make_ctx(cl_context ctx, int flags) {
+cl_ctx *cl_make_ctx(cl_context ctx, gpucontext_props *p) {
   cl_ctx *res;
   cl_device_id id;
   cl_command_queue_properties qprop;
@@ -159,7 +159,7 @@ cl_ctx *cl_make_ctx(cl_context ctx, int flags) {
   res->preamble = NULL;
   res->q = clCreateCommandQueue(
     ctx, id,
-    ISSET(flags, GA_CTX_SINGLE_STREAM) ? 0 : qprop&CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE,
+    ISSET(p->flags, GA_CTX_SINGLE_STREAM) ? 0 : qprop&CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE,
     &err);
   if (res->q == NULL) {
     error_cl(global_err, "clCreateCommandQueue", err);
@@ -415,7 +415,7 @@ errcb(const char *errinfo, const void *pi, size_t cb, void *u) {
   fprintf(stderr, "%s\n", errinfo);
 }
 
-static gpucontext *cl_init(int devno, int flags) {
+static gpucontext *cl_init(gpucontext_props *pp) {
   cl_device_id *ds;
   cl_device_id d;
   cl_platform_id *ps;
@@ -429,10 +429,11 @@ static gpucontext *cl_init(int devno, int flags) {
   cl_ctx *res;
   cl_int err;
   int platno;
+  int devno;
   int e;
 
-  platno = devno >> 16;
-  devno &= 0xFFFF;
+  platno = pp->dev >> 16;
+  devno = pp->dev & 0xFFFF;
 
   e = setup_lib(global_err);
   if (e != GA_NO_ERROR)
@@ -487,7 +488,7 @@ static gpucontext *cl_init(int devno, int flags) {
     return NULL;
   }
 
-  res = cl_make_ctx(ctx, flags);
+  res = cl_make_ctx(ctx, pp);
   clReleaseContext(ctx);
   return (gpucontext *)res;
 }

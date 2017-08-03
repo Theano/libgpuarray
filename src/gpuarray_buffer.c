@@ -37,15 +37,84 @@ int gpu_get_device_count(const char* name, unsigned int platform,
   return ops->get_device_count(platform, devcount);
 }
 
-gpucontext *gpucontext_init(const char *name, int dev, int flags, int *ret) {
-  gpucontext *res;
+int gpucontext_props_new(gpucontext_props **res) {
+  gpucontext_props *r = calloc(1, sizeof(gpucontext_props));
+  if (r == NULL) return error_sys(global_err, "calloc");
+  r->dev = -1;
+  r->sched = GA_CTX_SCHED_AUTO;
+  r->flags = 0;
+  r->kernel_cache_path = NULL;
+  r->initial_cache_size = 0;
+  r->max_cache_size = (size_t)-1;
+  *res = r;
+  return GA_NO_ERROR;
+}
+
+int gpucontext_props_cuda_dev(gpucontext_props *p, int devno) {
+  p->dev = devno;
+  return GA_NO_ERROR;
+}
+
+int gpucontext_props_opencl_dev(gpucontext_props *p, int platno, int devno) {
+  p->dev = platno << 16 || devno;
+  return GA_NO_ERROR;
+}
+
+int gpucontext_props_sched(gpucontext_props *p, int sched) {
+  if (sched == GA_CTX_SCHED_MULTI)
+    FLSET(p->flags, GA_CTX_MULTI_THREAD);
+  else
+    FLCLR(p->flags, GA_CTX_MULTI_THREAD);
+
+  switch (sched) {
+  case GA_CTX_SCHED_MULTI:
+  case GA_CTX_SCHED_AUTO:
+  case GA_CTX_SCHED_SINGLE:
+    p->sched = sched;
+    return GA_NO_ERROR;
+  default:
+    return error_fmt(global_err, GA_INVALID_ERROR, "Invalid value for sched: %d", sched);
+  }
+}
+
+int gpucontext_props_set_single_treams(gpucontext_props *p) {
+  p->flags |= GA_CTX_SINGLE_STREAM;
+  return GA_NO_ERROR;
+}
+
+int gpucontext_props_kernel_cache(gpucontext_props *p, const char *path) {
+  p->kernel_cache_path = path;
+  return GA_NO_ERROR;
+}
+
+int gpucontext_props_alloc_cache(gpucontext_props *p, size_t initial, size_t max) {
+  if (initial > max)
+    return error_set(global_err, GA_VALUE_ERROR, "Initial size can't be bigger than max size");
+  p->initial_cache_size = initial;
+  p->max_cache_size = max;
+  return GA_NO_ERROR;
+}
+
+void gpucontext_props_del(gpucontext_props *p) {
+  free(p);
+}
+
+int gpucontext_init(gpucontext **res, const char *name, gpucontext_props *p) {
   const gpuarray_buffer_ops *ops = gpuarray_get_ops(name);
-  if (ops == NULL) FAIL(NULL, global_err);
-  res = ops->buffer_init(dev, flags);
-  if (res == NULL) FAIL(NULL, global_err);
-  res->ops = ops;
-  res->extcopy_cache = NULL;
-  return res;
+  gpucontext *r;
+  if (ops == NULL) {
+    gpucontext_props_del(p);
+    return global_err->code;
+  }
+  if (p == NULL && gpucontext_props_new(&p) != GA_NO_ERROR)
+    return global_err->code;
+  r = ops->buffer_init(p);
+  gpucontext_props_del(p);
+  if (r == NULL) return global_err->code;
+  r->ops = ops;
+  r->extcopy_cache = NULL;
+  *res = r;
+  return GA_NO_ERROR;
 }
 
 void gpucontext_deref(gpucontext *ctx) {

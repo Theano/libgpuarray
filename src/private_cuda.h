@@ -73,6 +73,8 @@ typedef struct _cuda_context {
   CUstream s;
   CUstream mem_s;
   gpudata *freeblocks;
+  size_t cache_size;
+  size_t max_cache_size;
   cache *kernel_cache;
   cache *disk_cache; // This is per-context to avoid lock contention
   unsigned int enter;
@@ -102,7 +104,7 @@ STATIC_ASSERT(sizeof(cuda_context) <= sizeof(gpucontext),
 
 #define ARCH_PREFIX "compute_"
 
-cuda_context *cuda_make_ctx(CUcontext ctx, int flags);
+cuda_context *cuda_make_ctx(CUcontext ctx, gpucontext_props *p);
 CUstream cuda_get_stream(cuda_context *ctx);
 void cuda_enter(cuda_context *ctx);
 void cuda_exit(cuda_context *ctx);

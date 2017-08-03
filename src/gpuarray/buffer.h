@@ -71,77 +71,47 @@ GPUARRAY_PUBLIC int gpu_get_device_count(const char* name,
                                          unsigned int platform,
                                          unsigned int* devcount);
 
+typedef struct _gpucontext_props gpucontext_props;
 
+GPUARRAY_PUBLIC int gpucontext_props_new(gpucontext_props **res);
+
+GPUARRAY_PUBLIC int gpucontext_props_cuda_dev(gpucontext_props *p, int devno);
+
+GPUARRAY_PUBLIC int gpucontext_props_opencl_dev(gpucontext_props *p,
+                                                int platno, int devno);
+
+#define GA_CTX_SCHED_AUTO   0
+#define GA_CTX_SCHED_SINGLE 1
+#define GA_CTX_SCHED_MULTI  2
+GPUARRAY_PUBLIC int gpucontext_props_sched(gpucontext_props *p, int sched);
+
+GPUARRAY_PUBLIC int gpucontext_props_set_single_stream(gpucontext_props *p);
+
+GPUARRAY_PUBLIC int gpucontext_props_kernel_cache(gpucontext_props *p,
+                                                  const char *path);
+
+GPUARRAY_PUBLIC int gpucontext_props_alloc_cache(gpucontext_props *p,
+                                                 size_t initial, size_t max);
+
+GPUARRAY_PUBLIC void gpucontext_props_del(gpucontext_props *p);
+
+/* TODO: add new props */
 
 /**
  * Create a context on the specified device.
  *
  * \warning This function is not thread-safe.
  *
+ * \param res a pointer to a location that will be allocated
  * \param name the backend name.
  * \param dev the device number.  The precise meaning of the device
  *            number is backend-dependent
- * \param flags see \ref context_flags "Context flags"
- * \param ret error return location.  Will be ignored if set to NULL.
+ * \param props a properties object for the context.  Can be NULL for defaults.
  *
- * \returns An opaque pointer to the created context or NULL if an
- * error occured.
+ * \returns GA_NO_ERROR or an error code if an error occurred.
  */
-GPUARRAY_PUBLIC gpucontext *gpucontext_init(const char *name, int dev,
-                                            int flags, int *ret);
-
-/**
- * \defgroup context_flags Context flags
- * @{
- */
-
-/**
- * Let the backend decide on optimal parameters, using backend-defined
- * heuristics and defaults.
- *
- * This is the default (0) value.
- */
-#define GA_CTX_DEFAULT       0x00
-
-/**
- * Optimize parameters for multi-thread performance.
- *
- * May decrease overall performance in single-thread scenarios.
- */
-#define GA_CTX_MULTI_THREAD  0x01
-
-/**
- * Optimize parameters for single-thread performance.
- *
- * May decrease overall performace in multithread scenarios.
- */
-#define GA_CTX_SINGLE_THREAD 0x02
-
-/**
- * Allocate a single stream per context, performing all operations in order.
- *
- * This will remove any attempt at exploiting parallelism in the
- * underlying device by performing unrelated operations concurrently
- * and/or out of order.
- *
- * This can help performance by removing the small cost paid for each
- * operation to keep everything coherent in the face of parallelism.
- * It can also hinder performance by not exploiting concurrency.
- */
-#define GA_CTX_SINGLE_STREAM 0x4
-
-/**
- * Disable allocations cache (if any).
- *
- * This will usually decrease performance by quite a bit, but will
- * enable better debugging of kernels that perform out of bounds
- * access.
- */
-#define GA_CTX_DISABLE_ALLOCATION_CACHE 0x10
-
-/**
- * @}
- */
+GPUARRAY_PUBLIC int gpucontext_init(gpucontext **res, const char *name,
+                                    gpucontext_props *props);
 
 /**
  * Dereference a context.

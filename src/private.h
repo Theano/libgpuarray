@@ -53,6 +53,19 @@ typedef struct _gpuarray_comm_ops gpuarray_comm_ops;
   char bin_id[64];                              \
   char tag[8]
 
+/* These will go away eventually but are kept to ease the transition for now */
+#define GA_CTX_SINGLE_STREAM 0x01
+#define GA_CTX_MULTI_THREAD  0x02
+
+struct _gpucontext_props {
+  int dev;
+  int sched;
+  int flags;
+  const char *kernel_cache_path;
+  size_t max_cache_size;
+  size_t initial_cache_size;
+};
+
 struct _gpucontext {
   GPUCONTEXT_HEAD;
   void *ctx_ptr;
@@ -77,7 +90,7 @@ typedef struct _partial_gpucomm {
 struct _gpuarray_buffer_ops {
   int (*get_platform_count)(unsigned int* platcount);
   int (*get_device_count)(unsigned int platform, unsigned int* devcount);
-  gpucontext *(*buffer_init)(int dev, int flags);
+  gpucontext *(*buffer_init)(gpucontext_props *props);
   void (*buffer_deinit)(gpucontext *ctx);
   gpudata *(*buffer_alloc)(gpucontext *ctx, size_t sz, void *data, int flags);
   void (*buffer_retain)(gpudata *b);
