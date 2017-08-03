@@ -5,6 +5,7 @@
 #include <check.h>
 
 #include "gpuarray/buffer.h"
+#include "gpuarray/error.h"
 
 char* dev_name = NULL;
 
@@ -59,7 +60,7 @@ void setup(void) {
   int dev = get_env_dev(&name);
   if (dev == -1)
     ck_abort_msg("Bad test device");
-  ctx = gpucontext_init(name, dev, 0, NULL);
+  ck_assert_int_eq(gpucontext_init(&ctx, name, NULL), GA_NO_ERROR);
   ck_assert_ptr_ne(ctx, NULL);
 }
 
