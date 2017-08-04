@@ -40,6 +40,7 @@ cdef extern from "gpuarray/elemwise.h":
 
     cdef int GE_BROADCAST
     cdef int GE_NOCOLLAPSE
+    cdef int GE_PADSHAPE
 
 
 cdef class arg:
@@ -193,9 +194,19 @@ cdef class GpuElemwise:
     def __call__(self, *args, **kwargs):
         cdef unsigned int i
         cdef int err
+        cdef int flags
+
+        flags = 0
+        if kwargs.pop('broadcast', True):
+            flags |= GE_BROADCAST
+        if kwargs.pop('padshape', True):
+            flags |= GE_PADSHAPE
+
+        if len(kwargs) != 0:
+            raise TypeError("Unknown keyword argument: %s" % list(kwargs.keys())[0])
 
         for i, arg in enumerate(args):
             self._setarg(i, arg)
-        err = GpuElemwise_call(self.ge, self.callbuf, GE_BROADCAST if kwargs.get('broadcast', True) else 0)
+        err = GpuElemwise_call(self.ge, self.callbuf, flags)
         if err != GA_NO_ERROR:
             raise get_exc(err)("Could not call GpuElemwise")
