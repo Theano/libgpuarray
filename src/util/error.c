@@ -29,15 +29,20 @@ int error_set(error *e, int code, const char *msg) {
   return code;
 }
 
-int error_fmt(error *e, int code, const char *fmt, ...) {
-  va_list ap;
-
+int error_vfmt(error *e, int code, const char *fmt, va_list ap) {
   e->code = code;
-  va_start(ap, fmt);
   vsnprintf(e->msg, ERROR_MSGBUF_LEN, fmt, ap);
-  va_end(ap);
 #ifdef DEBUG
   fprintf(stderr, "ERROR %d: %s\n", e->code, e->msg);
 #endif
   return code;
+}
+
+int error_fmt(error *e, int code, const char *fmt, ...) {
+  int ret;
+  va_list ap;
+  va_start(ap, fmt);
+  ret = error_vfmt(e, code, fmt, ap);
+  va_end(ap);
+  return ret;
 }

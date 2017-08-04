@@ -18,6 +18,7 @@ int error_alloc(error **e);
 void error_free(error *e);
 int error_set(error *e, int code, const char *msg);
 int error_fmt(error *e, int code, const char *fmt, ...);
+int error_vfmt(error *e, int code, const char *fmt, va_list ap);
 
 extern error *global_err;
 
