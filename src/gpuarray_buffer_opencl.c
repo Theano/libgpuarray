@@ -850,52 +850,37 @@ static int cl_newkernel(gpukernel **k, gpucontext *c, unsigned int count,
   dev = get_dev(ctx->ctx, ctx->err);
   if (dev == NULL) return ctx->err->code;
 
-  if (flags & GA_USE_BINARY) {
-    // GA_USE_BINARY is exclusive
-    if (flags & ~GA_USE_BINARY)
-      return error_set(ctx->err, GA_INVALID_ERROR, "Cannot combine GA_USE_BINARY with any other flag");
+  if (cl_check_extensions(preamble, &n, flags, ctx))
+    return ctx->err->code;
 
-    // We need the length for binary data and there is only one blob.
-    if (count != 1 || lengths == NULL || lengths[0] == 0)
-      return error_set(ctx->err, GA_VALUE_ERROR, "GA_USE_BINARY requires the length to be specified");
-
-    p = clCreateProgramWithBinary(ctx->ctx, 1, &dev, lengths, (const unsigned char **)strings, NULL, &err);
-    if (err != CL_SUCCESS)
-      return error_cl(ctx->err, "clCreateProgramWithBinary", err);
-  } else {
-
-    if (cl_check_extensions(preamble, &n, flags, ctx))
-      return ctx->err->code;
-
-    if (n != 0) {
-      news = calloc(count+n, sizeof(const char *));
-      if (news == NULL)
-        return error_sys(ctx->err, "calloc");
-      memcpy(news, preamble, n*sizeof(const char *));
-      memcpy(news+n, strings, count*sizeof(const char *));
-      if (lengths == NULL) {
-        newl = NULL;
-      } else {
-        newl = calloc(count+n, sizeof(size_t));
-        if (newl == NULL) {
-          free(news);
-          return error_sys(ctx->err, "calloc");
-        }
-        memcpy(newl+n, lengths, count*sizeof(size_t));
-      }
+  if (n != 0) {
+    news = calloc(count+n, sizeof(const char *));
+    if (news == NULL)
+      return error_sys(ctx->err, "calloc");
+    memcpy(news, preamble, n*sizeof(const char *));
+    memcpy(news+n, strings, count*sizeof(const char *));
+    if (lengths == NULL) {
+      newl = NULL;
     } else {
-      news = strings;
-      newl = (size_t *)lengths;
-    }
-
-    p = clCreateProgramWithSource(ctx->ctx, count+n, news, newl, &err);
-    if (err != CL_SUCCESS) {
-      if (n != 0) {
+      newl = calloc(count+n, sizeof(size_t));
+      if (newl == NULL) {
         free(news);
-        free(newl);
+        return error_sys(ctx->err, "calloc");
       }
-      return error_cl(ctx->err, "clCreateProgramWithSource", err);
+      memcpy(newl+n, lengths, count*sizeof(size_t));
     }
+  } else {
+    news = strings;
+    newl = (size_t *)lengths;
+  }
+
+  p = clCreateProgramWithSource(ctx->ctx, count+n, news, newl, &err);
+  if (err != CL_SUCCESS) {
+    if (n != 0) {
+      free(news);
+      free(newl);
+    }
+    return error_cl(ctx->err, "clCreateProgramWithSource", err);
   }
 
   err = clBuildProgram(p, 0, NULL, NULL, NULL, NULL);
@@ -915,11 +900,7 @@ static int cl_newkernel(gpukernel **k, gpucontext *c, unsigned int count,
         debug_msg.l += (log_size-1); // Back off to before final '\0'
       }
 
-      if (flags & GA_USE_BINARY) {
-        // Not clear what to do with binary 'source' - the log will have to suffice
-      } else {
-        gpukernel_source_with_line_numbers(count+n, news, newl, &debug_msg);
-      }
+      gpukernel_source_with_line_numbers(count+n, news, newl, &debug_msg);
 
       strb_append0(&debug_msg); // Make sure a final '\0' is present
 
@@ -1102,31 +1083,6 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
     clReleaseEvent(k->ev);
   k->ev = ev;
 
-  return GA_NO_ERROR;
-}
-
-static int cl_kernelbin(gpukernel *k, size_t *sz, void **obj) {
-  cl_ctx *ctx = k->ctx;
-  cl_program p;
-  size_t rsz;
-  void *res;
-  cl_int err;
-
-  ASSERT_KER(k);
-  ASSERT_CTX(ctx);
-
-  CL_CHECK(ctx->err, clGetKernelInfo(k->k, CL_KERNEL_PROGRAM, sizeof(p), &p, NULL));
-  CL_CHECK(ctx->err, clGetProgramInfo(p, CL_PROGRAM_BINARY_SIZES, sizeof(rsz), &rsz, NULL));
-  res = malloc(rsz);
-  if (res == NULL)
-    return error_sys(ctx->err, "malloc");
-  err = clGetProgramInfo(p, CL_PROGRAM_BINARIES, sizeof(res), &res, NULL);
-  if (err != CL_SUCCESS) {
-    free(res);
-    return error_cl(ctx->err, "clProgramGetInfo", err);
-  }
-  *sz = rsz;
-  *obj = res;
   return GA_NO_ERROR;
 }
 
@@ -1359,7 +1315,6 @@ const gpuarray_buffer_ops opencl_ops = {cl_get_platform_count,
                                         cl_releasekernel,
                                         cl_setkernelarg,
                                         cl_callkernel,
-                                        cl_kernelbin,
                                         cl_sync,
                                         cl_transfer,
                                         cl_property,

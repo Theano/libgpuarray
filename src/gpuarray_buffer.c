@@ -253,10 +253,6 @@ int gpukernel_call(gpukernel *k, unsigned int n, const size_t *gs,
                                                          shared, args);
 }
 
-int gpukernel_binary(gpukernel *k, size_t *sz, void **obj) {
-  return ((partial_gpukernel *)k)->ctx->ops->kernel_binary(k, sz, obj);
-}
-
 int gpukernel_property(gpukernel *k, int prop_id, void *res) {
   return ((partial_gpukernel *)k)->ctx->ops->property(NULL, NULL, k, prop_id,
                                                       res);

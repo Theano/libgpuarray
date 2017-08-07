@@ -98,10 +98,6 @@ int GpuKernel_call(GpuKernel *k, unsigned int n,
   return gpukernel_call(k->k, n, gs, ls, shared, args);
 }
 
-int GpuKernel_binary(const GpuKernel *k, size_t *sz, void **bin) {
-  return gpukernel_binary(k->k, sz, bin);
-}
-
 const char *GpuKernel_error(const GpuKernel *k, int err) {
   return gpucontext_error(gpukernel_context(k->k), err);
 }

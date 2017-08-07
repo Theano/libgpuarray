@@ -123,7 +123,7 @@ cdef extern from "gpuarray/buffer.h":
 
     cdef enum ga_usefl:
         GA_USE_CLUDA, GA_USE_SMALL, GA_USE_DOUBLE, GA_USE_COMPLEX, GA_USE_HALF,
-        GA_USE_BINARY, GA_USE_CUDA, GA_USE_OPENCL
+        GA_USE_CUDA, GA_USE_OPENCL
 
 cdef extern from "gpuarray/kernel.h":
     ctypedef struct _GpuKernel "GpuKernel":
@@ -139,7 +139,6 @@ cdef extern from "gpuarray/kernel.h":
     int GpuKernel_call(_GpuKernel *k, unsigned int n,
                        const size_t *gs, const size_t *ls,
                        size_t shared, void **args)
-    int GpuKernel_binary(_GpuKernel *, size_t *, void **)
 
 cdef extern from "gpuarray/array.h":
     ctypedef struct _GpuArray "GpuArray":
@@ -279,7 +278,6 @@ cdef int kernel_sched(GpuKernel k, size_t n, size_t *gs, size_t *ls) except -1
 cdef int kernel_call(GpuKernel k, unsigned int n,
                      const size_t *gs, const size_t *ls,
                      size_t shared, void **args) except -1
-cdef int kernel_binary(GpuKernel k, size_t *, void **) except -1
 cdef int kernel_property(GpuKernel k, int prop_id, void *res) except -1
 
 cdef int ctx_property(GpuContext c, int prop_id, void *res) except -1

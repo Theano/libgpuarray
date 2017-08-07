@@ -109,9 +109,6 @@ GPUARRAY_PUBLIC int GpuKernel_call(GpuKernel *k, unsigned int n,
                                    const size_t *gs, const size_t *ls,
                                    size_t shared, void **args);
 
-GPUARRAY_PUBLIC int GpuKernel_binary(const GpuKernel *k, size_t *sz,
-                                    void **obj);
-
 GPUARRAY_PUBLIC const char *GpuKernel_error(const GpuKernel *k, int err);
 
 #ifdef __cplusplus

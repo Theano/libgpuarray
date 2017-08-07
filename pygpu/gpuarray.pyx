@@ -478,12 +478,6 @@ cdef int kernel_call(GpuKernel k, unsigned int n, const size_t *gs,
     if err != GA_NO_ERROR:
         raise get_exc(err), kernel_error(k, err)
 
-cdef int kernel_binary(GpuKernel k, size_t *sz, void **bin) except -1:
-    cdef int err
-    err = GpuKernel_binary(&k.k, sz, bin)
-    if err != GA_NO_ERROR:
-        raise get_exc(err), kernel_error(k, err)
-
 cdef int kernel_property(GpuKernel k, int prop_id, void *res) except -1:
     cdef int err
     err = gpukernel_property(k.k.k, prop_id, res)
@@ -2279,7 +2273,7 @@ cdef class GpuArray:
 
 cdef class GpuKernel:
     """
-    GpuKernel(source, name, types, context=None, cluda=True, have_double=False, have_small=False, have_complex=False, have_half=False, binary=False, cuda=False, opencl=False)
+    GpuKernel(source, name, types, context=None, cluda=True, have_double=False, have_small=False, have_complex=False, have_half=False, cuda=False, opencl=False)
 
     Compile a kernel on the device
 
@@ -2332,8 +2326,6 @@ cdef class GpuKernel:
         ensure complex types will work?
     have_half: bool
         ensure half-floats will work?
-    binary: bool
-        kernel is pre-compiled binary blob?
     cuda: bool
         kernel is cuda code?
     opencl: bool
@@ -2379,8 +2371,8 @@ cdef class GpuKernel:
 
     def __cinit__(self, source, name, types, GpuContext context=None,
                   cluda=True, have_double=False, have_small=False,
-                  have_complex=False, have_half=False, binary=False,
-                  cuda=False, opencl=False, *a, **kwa):
+                  have_complex=False, have_half=False, cuda=False,
+                  opencl=False, *a, **kwa):
         cdef const char *s[1]
         cdef size_t l
         cdef unsigned int numargs
@@ -2403,8 +2395,6 @@ cdef class GpuKernel:
             flags |= GA_USE_COMPLEX
         if have_half:
             flags |= GA_USE_HALF
-        if binary:
-            flags |= GA_USE_BINARY
         if cuda:
             flags |= GA_USE_CUDA
         if opencl:
@@ -2565,13 +2555,3 @@ cdef class GpuKernel:
             kernel_property(self, GA_KERNEL_PROP_NUMARGS, &res)
             return res
 
-    property _binary:
-        "Kernel compiled binary for the associated context."
-        def __get__(self):
-            cdef size_t sz
-            cdef char *bin
-            kernel_binary(self, &sz, <void **>&bin)
-            try:
-                return <bytes>bin[:sz]
-            finally:
-                free(bin)

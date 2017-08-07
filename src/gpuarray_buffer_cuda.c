@@ -1348,9 +1348,6 @@ static int cuda_newkernel(gpukernel **k, gpucontext *c, unsigned int count,
     if (flags & GA_USE_OPENCL)
       return error_set(ctx->err, GA_DEVSUP_ERROR, "OpenCL kernel not supported on cuda devices");
 
-    if (flags & GA_USE_BINARY)
-      return error_set(ctx->err, GA_UNSUPPORTED_ERROR, "Binary mode not supported any more");
-
     cuda_enter(ctx);
 
     err = cuCtxGetDevice(&dev);
@@ -1576,16 +1573,6 @@ static int cuda_callkernel(gpukernel *k, unsigned int n,
 
     cuda_exit(ctx);
     return GA_NO_ERROR;
-}
-
-static int cuda_kernelbin(gpukernel *k, size_t *sz, void **obj) {
-  void *res = malloc(k->bin_sz);
-  if (res == NULL)
-    return error_sys(k->ctx->err, "malloc");
-  memcpy(res, k->bin, k->bin_sz);
-  *sz = k->bin_sz;
-  *obj = res;
-  return GA_NO_ERROR;
 }
 
 static int cuda_sync(gpudata *b) {
@@ -1828,7 +1815,6 @@ const gpuarray_buffer_ops cuda_ops = {cuda_get_platform_count,
                                       cuda_freekernel,
                                       cuda_kernelsetarg,
                                       cuda_callkernel,
-                                      cuda_kernelbin,
                                       cuda_sync,
                                       cuda_transfer,
                                       cuda_property,
