@@ -322,7 +322,8 @@ cuda_context *cuda_make_ctx(CUcontext ctx, gpucontext_props *p) {
   }
   res->errbuf->flags |= CUDA_MAPPED_PTR;
   /* Prime the cache */
-  cuda_alloc((gpucontext *)res, p->initial_cache_size, NULL, 0);
+  if (p->initial_cache_size)
+    cuda_alloc((gpucontext *)res, p->initial_cache_size, NULL, 0);
   return res;
  fail_end:
   cuMemFreeHost(pp);

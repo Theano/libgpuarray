@@ -1,6 +1,6 @@
 #define local_barrier() __syncthreads()
-#define WITHIN_KERNEL extern \"C\" __device__
-#define KERNEL extern \"C\" __global__
+#define WITHIN_KERNEL extern "C" __device__
+#define KERNEL extern "C" __global__
 #define GLOBAL_MEM /* empty */
 #define LOCAL_MEM __shared__
 #define LOCAL_MEM_ARG /* empty */
@@ -76,8 +76,8 @@ struct ga_half {
     return p.a;                                         \
   }
 
-#define gen_atom32_xchg(name, argtype) gen_atom_xhg(name, argtype, unsigned int)
-#define gen_atom64_xchg(name, argtype) gen_atom_xhg(name, argtype, unsigned long long)
+#define gen_atom32_xchg(name, argtype) gen_atom_xchg(name, argtype, unsigned int)
+#define gen_atom64_xchg(name, argtype) gen_atom_xchg(name, argtype, unsigned long long)
 
 /* ga_int */
 #define atom_add_ig(a, b, c) atomicAdd(a, b, c)
@@ -92,7 +92,7 @@ struct ga_half {
 /* ga_long */
 gen_atom64_add(atom_add_lg, ga_long)
 #define atom_add_ll(a, b) atom_add_lg(a, b)
-gen_atom64_xhg(atom_xchg_lg, ga_long)
+gen_atom64_xchg(atom_xchg_lg, ga_long)
 #define atom_xchg_ll(a, b) atom_xchg_lg(a, b)
 /* ga_ulong */
 #define atom_add_Lg(a, b, c) atomicAdd(a, b, c)
