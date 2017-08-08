@@ -710,10 +710,7 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
  * cases result in silent data corruption (especially on ATI cards).
  */
 typedef enum _ga_usefl {
-  /**
-   * The kernel source uses CLUDA unified language.
-   */
-  GA_USE_CLUDA =      0x01,
+  /* UNUSED: 0x01 */
   /**
    * The kernel makes use of small (size is smaller than 4 bytes) types.
    */

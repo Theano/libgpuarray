@@ -15,6 +15,8 @@
 #include "loaders/libclblas.h"
 #include "loaders/libclblast.h"
 
+#include "cluda_opencl.h.c"
+
 #define _unused(x) ((void)x)
 #define SSIZE_MIN (-(SSIZE_MAX-1))
 
@@ -32,7 +34,7 @@ static int cl_newkernel(gpukernel **k, gpucontext *ctx, unsigned int count,
                         const char *fname, unsigned int argcount,
                         const int *types, int flags, char **err_str);
 static const char CL_CONTEXT_PREAMBLE[] =
-"#define GA_WARP_SIZE %lu\n";  // to be filled by cl_make_ctx()
+"-D __GA_WARP_SIZE=%lu";  // to be filled by cl_make_ctx()
 
 static int setup_done = 0;
 static int setup_lib(error *e) {
@@ -156,7 +158,7 @@ cl_ctx *cl_make_ctx(cl_context ctx, gpucontext_props *p) {
   res->refcnt = 1;
   res->exts = NULL;
   res->blas_handle = NULL;
-  res->preamble = NULL;
+  res->options = NULL;
   res->q = clCreateCommandQueue(
     ctx, id,
     ISSET(p->flags, GA_CTX_SINGLE_STREAM) ? 0 : qprop&CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE,
@@ -194,8 +196,8 @@ cl_ctx *cl_make_ctx(cl_context ctx, gpucontext_props *p) {
 
   // Write the preferred workgroup multiple as GA_WARP_SIZE in preamble
   strb_appendf(&context_preamble, CL_CONTEXT_PREAMBLE, (unsigned long)warp_size);
-  res->preamble = strb_cstr(&context_preamble);
-  if (res->preamble == NULL)
+  res->options = strb_cstr(&context_preamble);
+  if (res->options == NULL)
     goto fail;
 
   res->blas_handle = NULL;
@@ -234,8 +236,8 @@ static void cl_free_ctx(cl_ctx *ctx) {
     }
     clReleaseCommandQueue(ctx->q);
     clReleaseContext(ctx->ctx);
-    if (ctx->preamble != NULL)
-      free(ctx->preamble);
+    if (ctx->options != NULL)
+      free(ctx->options);
     error_free(ctx->err);
     CLEAR(ctx);
     free(ctx);
@@ -291,52 +293,7 @@ static int cl_callkernel(gpukernel *k, unsigned int n,
                          const size_t *gs, const size_t *ls,
                          size_t shared, void **args);
 
-static const char CL_PREAMBLE[] =
-  "#define local_barrier() barrier(CLK_LOCAL_MEM_FENCE)\n"
-  "#define WITHIN_KERNEL /* empty */\n"
-  "#define KERNEL __kernel\n"
-  "#define GLOBAL_MEM __global\n"
-  "#define LOCAL_MEM __local\n"
-  "#define LOCAL_MEM_ARG __local\n"
-  "#ifndef NULL\n"
-  "  #define NULL ((void*)0)\n"
-  "#endif\n"
-  "#define LID_0 get_local_id(0)\n"
-  "#define LID_1 get_local_id(1)\n"
-  "#define LID_2 get_local_id(2)\n"
-  "#define LDIM_0 get_local_size(0)\n"
-  "#define LDIM_1 get_local_size(1)\n"
-  "#define LDIM_2 get_local_size(2)\n"
-  "#define GID_0 get_group_id(0)\n"
-  "#define GID_1 get_group_id(1)\n"
-  "#define GID_2 get_group_id(2)\n"
-  "#define GDIM_0 get_num_groups(0)\n"
-  "#define GDIM_1 get_num_groups(1)\n"
-  "#define GDIM_2 get_num_groups(2)\n"
-  "#define ga_bool uchar\n"
-  "#define ga_byte char\n"
-  "#define ga_ubyte uchar\n"
-  "#define ga_short short\n"
-  "#define ga_ushort ushort\n"
-  "#define ga_int int\n"
-  "#define ga_uint uint\n"
-  "#define ga_long long\n"
-  "#define ga_ulong ulong\n"
-  "#define ga_float float\n"
-  "#define ga_double double\n"
-  "#define ga_half half\n"
-  "#define ga_size ulong\n"
-  "#define ga_ssize long\n"
-  "#define load_half(p) vload_half(0, p)\n"
-  "#define store_half(p, v) vstore_half_rtn(v, 0, p)\n"
-  "#define GA_DECL_SHARED_PARAM(type, name) , __local type *name\n"
-  "#define GA_DECL_SHARED_BODY(type, name)\n";
-
-/* XXX: add complex types, quad types, and longlong */
-/* XXX: add vector types */
-
 const char *cl_error_string(cl_int err) {
-  /* OpenCL 1.0 error codes */
   switch (err) {
   case CL_SUCCESS:                        return "Success!";
   case CL_DEVICE_NOT_FOUND:               return "Device not found.";
@@ -797,14 +754,6 @@ static int cl_memset(gpudata *dst, size_t offset, int data) {
 
 static int cl_check_extensions(const char **preamble, unsigned int *count,
                                int flags, cl_ctx *ctx) {
-  if (flags & GA_USE_CLUDA) {
-    // add the common preamble
-    preamble[*count] = CL_PREAMBLE;
-    (*count)++;
-    // add the per-context preamble
-    preamble[*count] = ctx->preamble;
-    (*count)++;
-  }
   if (flags & GA_USE_SMALL) {
     GA_CHECK(check_ext(ctx, CL_SMALL));
     preamble[*count] = PRAGMA CL_SMALL ENABLE;
@@ -832,9 +781,12 @@ static int cl_newkernel(gpukernel **k, gpucontext *c, unsigned int count,
   gpukernel *res;
   cl_device_id dev;
   cl_program p;
+  cl_program cluda;
   // Sync this table size with the number of flags that can add stuff
   // at the beginning
   const char *preamble[5];
+  const char *cluda_src[1];
+  const char *headers[1] = {"cluda.h"};
   size_t *newl = NULL;
   const char **news = NULL;
   cl_int err;
@@ -874,18 +826,35 @@ static int cl_newkernel(gpukernel **k, gpucontext *c, unsigned int count,
     newl = (size_t *)lengths;
   }
 
-  p = clCreateProgramWithSource(ctx->ctx, count+n, news, newl, &err);
+  cluda_src[0] = cluda_opencl_h;
+  cluda = clCreateProgramWithSource(ctx->ctx, 1, cluda_src, NULL, &err);
   if (err != CL_SUCCESS) {
     if (n != 0) {
       free(news);
       free(newl);
     }
-    return error_cl(ctx->err, "clCreateProgramWithSource", err);
+    return error_cl(ctx->err, "clCreateProgramWithSource (header)", err);
   }
 
-  err = clBuildProgram(p, 0, NULL, NULL, NULL, NULL);
+  p = clCreateProgramWithSource(ctx->ctx, count+n, news, newl, &err);
   if (err != CL_SUCCESS) {
-    if (err == CL_BUILD_PROGRAM_FAILURE && err_str != NULL) {
+    if (n != 0) {
+      free(news);
+      free(newl);
+      clReleaseProgram(cluda);
+    }
+    return error_cl(ctx->err, "clCreateProgramWithSource (kernel)", err);
+  }
+
+  err = clCompileProgram(p, 0, NULL, ctx->options, 1, &cluda, headers, NULL, NULL);
+  if (err != CL_SUCCESS)
+    goto compile_error;
+
+  err = clBuildProgram(p, 0, NULL, NULL, NULL, NULL);
+ compile_error:
+  if (err != CL_SUCCESS) {
+    if ((err == CL_COMPILE_PROGRAM_FAILURE || err == CL_BUILD_PROGRAM_FAILURE)
+        && err_str != NULL) {
       *err_str = NULL;  // Fallback, in case there's an error
 
       // We're substituting debug_msg for a string with this first line:

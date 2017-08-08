@@ -22,6 +22,8 @@
 
 #include "gpuarray/extension.h"
 
+#include "cluda_cuda.h.c"
+
 STATIC_ASSERT(DONTFREE == GPUARRAY_CUDA_CTX_NOFREE, cuda_nofree_eq);
 STATIC_ASSERT(CUDA_WAIT_READ == GPUARRAY_CUDA_WAIT_READ, cuda_wait_read_eq);
 STATIC_ASSERT(CUDA_WAIT_WRITE == GPUARRAY_CUDA_WAIT_WRITE, cuda_wait_write_eq);
@@ -469,57 +471,6 @@ size_t cuda_get_sz(gpudata *g) { ASSERT_BUF(g); return g->sz; }
     error_cuda(e, n, err);   \
     return v;                \
   }
-
-static const char CUDA_PREAMBLE[] =
-    "#define local_barrier() __syncthreads()\n"
-    "#define WITHIN_KERNEL extern \"C\" __device__\n"
-    "#define KERNEL extern \"C\" __global__\n"
-    "#define GLOBAL_MEM /* empty */\n"
-    "#define LOCAL_MEM __shared__\n"
-    "#define LOCAL_MEM_ARG /* empty */\n"
-    "#ifdef NAN\n"
-    "#undef NAN\n"
-    "#endif\n"
-    "#define NAN __int_as_float(0x7fffffff)\n"
-    "#ifdef INFINITY\n"
-    "#undef INFINITY\n"
-    "#endif\n"
-    "#define INFINITY __int_as_float(0x7f800000)\n"
-    "#define LID_0 threadIdx.x\n"
-    "#define LID_1 threadIdx.y\n"
-    "#define LID_2 threadIdx.z\n"
-    "#define LDIM_0 blockDim.x\n"
-    "#define LDIM_1 blockDim.y\n"
-    "#define LDIM_2 blockDim.z\n"
-    "#define GID_0 blockIdx.x\n"
-    "#define GID_1 blockIdx.y\n"
-    "#define GID_2 blockIdx.z\n"
-    "#define GDIM_0 gridDim.x\n"
-    "#define GDIM_1 gridDim.y\n"
-    "#define GDIM_2 gridDim.z\n"
-    "#define ga_bool unsigned char\n"
-    "#define ga_byte signed char\n"
-    "#define ga_ubyte unsigned char\n"
-    "#define ga_short short\n"
-    "#define ga_ushort unsigned short\n"
-    "#define ga_int int\n"
-    "#define ga_uint unsigned int\n"
-    "#define ga_long long long\n"
-    "#define ga_ulong unsigned long long\n"
-    "#define ga_float float\n"
-    "#define ga_double double\n"
-    "#define ga_half ga_ushort\n"
-    "#define ga_size size_t\n"
-    "#define ga_ssize ptrdiff_t\n"
-    "#define load_half(p) __half2float(*(p))\n"
-    "#define store_half(p, v) (*(p) = __float2half_rn(v))\n"
-    "#define GA_DECL_SHARED_PARAM(type, name)\n"
-    "#define GA_DECL_SHARED_BODY(type, name) extern __shared__ type name[];\n"
-    "#define GA_WARP_SIZE warpSize\n"
-    "#line 1\n";
-
-/* XXX: add complex, quads, longlong */
-/* XXX: add vector types */
 
 static cuda_context *do_init(CUdevice dev, gpucontext_props *p, error *e) {
   cuda_context *res;
@@ -1128,6 +1079,8 @@ static inline int error_nvrtc(error *e, const char *msg, nvrtcResult err) {
 static int call_compiler(cuda_context *ctx, strb *src, strb *ptx, strb *log) {
   nvrtcProgram prog;
   size_t buflen;
+  const char *heads[1] = {"cluda.h"};
+  const char *hsrc[1];
   const char *opts[4] = {
     "-arch", ""
     , "-G", "-lineinfo"
@@ -1136,7 +1089,8 @@ static int call_compiler(cuda_context *ctx, strb *src, strb *ptx, strb *log) {
 
   opts[1] = ctx->bin_id;
 
-  err = nvrtcCreateProgram(&prog, src->s, NULL, 0, NULL, NULL);
+  hsrc[0] = cluda_cuda_h;
+  err = nvrtcCreateProgram(&prog, src->s, NULL, 1, hsrc, heads);
   if (err != NVRTC_SUCCESS)
     return error_nvrtc(ctx->err, "nvrtcCreateProgram", err);
 
@@ -1359,7 +1313,6 @@ static int cuda_newkernel(gpukernel **k, gpucontext *c, unsigned int count,
     if (get_cc(dev, &major, &minor, ctx->err) != GA_NO_ERROR)
       return ctx->err->code;
 
-    // GA_USE_CLUDA is done later
     // GA_USE_SMALL will always work
     // GA_USE_HALF should always work
     if (flags & GA_USE_DOUBLE) {
@@ -1372,10 +1325,6 @@ static int cuda_newkernel(gpukernel **k, gpucontext *c, unsigned int count,
       // just for now since it is most likely broken
       cuda_exit(ctx);
       return error_set(ctx->err, GA_UNSUPPORTED_ERROR, "Complex support is not there yet.");
-    }
-
-    if (flags & GA_USE_CLUDA) {
-      strb_appends(&src, CUDA_PREAMBLE);
     }
 
     if (lengths == NULL) {

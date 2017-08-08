@@ -366,7 +366,7 @@ static int gen_take1_kernel(GpuKernel *k, gpucontext *ctx, char **err_str,
   char *sz, *ssz;
   unsigned int i, i2;
   unsigned int nargs, apos;
-  int flags = GA_USE_CLUDA;
+  int flags = 0;
   int res;
 
   nargs = 9 + 2 * v->nd;
@@ -384,7 +384,8 @@ static int gen_take1_kernel(GpuKernel *k, gpucontext *ctx, char **err_str,
   }
 
   apos = 0;
-  strb_appendf(&sb, "KERNEL void take1(GLOBAL_MEM %s *r, ga_size r_off, "
+  strb_appendf(&sb, "#include <cluda.h>\n"
+               "KERNEL void take1(GLOBAL_MEM %s *r, ga_size r_off, "
                "GLOBAL_MEM const %s *v, ga_size v_off,",
                gpuarray_get_type(a->typecode)->cluda_name,
                gpuarray_get_type(v->typecode)->cluda_name);

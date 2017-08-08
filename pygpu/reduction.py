@@ -31,6 +31,8 @@ def _ceil_log2(x):
 
 
 basic_kernel = Template("""
+#include <cluda.h>
+
 ${preamble}
 
 #define REDUCE(a, b) (${reduce_expr})
@@ -230,7 +232,7 @@ class ReductionKernel(object):
                 spec.append('uint32')
                 spec.extend('int32' for _ in range(nd))
         k = gpuarray.GpuKernel(src, "reduk", spec, context=self.context,
-                               cluda=True, **self.flags)
+                               **self.flags)
         return k, src, spec
 
     @lru_cache()

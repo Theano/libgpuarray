@@ -71,7 +71,7 @@ typedef struct _cl_ctx {
   cl_context ctx;
   cl_command_queue q;
   char *exts;
-  char *preamble;
+  char *options;
 } cl_ctx;
 
 /** @cond NEVER */

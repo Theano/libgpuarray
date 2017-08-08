@@ -133,7 +133,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k, gpucontext *ctx,
   int *ktypes;
   char *size = "ga_size", *ssize = "ga_ssize";
   unsigned int p;
-  int flags = GA_USE_CLUDA;
+  int flags = 0;
   int res;
 
   if (ISSET(gen_flags, GEN_ADDR32)) {
@@ -154,6 +154,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k, gpucontext *ctx,
 
   p = 0;
 
+  strb_appends(&sb, "#include <cluda.h>\n");
   if (preamble)
     strb_appends(&sb, preamble);
   strb_appends(&sb, "\nKERNEL void elem(const ga_size n, ");
@@ -451,7 +452,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
   int *ktypes = NULL;
   unsigned int p;
   unsigned int j;
-  int flags = GA_USE_CLUDA;
+  int flags = 0;
   int res;
 
   flags |= gpuarray_type_flagsa(n, args);
@@ -468,6 +469,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
 
   p = 0;
 
+  strb_appends(&sb, "#include <cluda.h>\n");
   if (preamble)
     strb_appends(&sb, preamble);
   strb_appends(&sb, "\nKERNEL void elem(const ga_size n, ");

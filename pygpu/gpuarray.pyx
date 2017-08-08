@@ -2273,7 +2273,7 @@ cdef class GpuArray:
 
 cdef class GpuKernel:
     """
-    GpuKernel(source, name, types, context=None, cluda=True, have_double=False, have_small=False, have_complex=False, have_half=False, cuda=False, opencl=False)
+    GpuKernel(source, name, types, context=None, have_double=False, have_small=False, have_complex=False, have_half=False, cuda=False, opencl=False)
 
     Compile a kernel on the device
 
@@ -2316,8 +2316,6 @@ cdef class GpuKernel:
         list of argument types
     context: GpuContext
         device on which the kernel is compiled
-    cluda: bool
-        use cluda layer?
     have_double: bool
         ensure working doubles?
     have_small: bool
@@ -2333,7 +2331,7 @@ cdef class GpuKernel:
 
     Notes
     -----
-    With the cuda backend, unless you use `cluda=True`, you must
+    With the cuda backend, unless you use the cluda include, you must
     either pass the mangled name of your kernel or declare the
     function 'extern "C"', because cuda uses a C++ compiler
     unconditionally.
@@ -2370,9 +2368,8 @@ cdef class GpuKernel:
         raise RuntimeError, "Cannot pickle GpuKernel object"
 
     def __cinit__(self, source, name, types, GpuContext context=None,
-                  cluda=True, have_double=False, have_small=False,
-                  have_complex=False, have_half=False, cuda=False,
-                  opencl=False, *a, **kwa):
+                  have_double=False, have_small=False, have_complex=False,
+                  have_half=False, cuda=False, opencl=False, *a, **kwa):
         cdef const char *s[1]
         cdef size_t l
         cdef unsigned int numargs
@@ -2385,8 +2382,6 @@ cdef class GpuKernel:
 
         self.context = ensure_context(context)
 
-        if cluda:
-            flags |= GA_USE_CLUDA
         if have_double:
             flags |= GA_USE_DOUBLE
         if have_small:

@@ -322,6 +322,7 @@ static int   maxandargmaxGenSource              (maxandargmax_ctx*  ctx){
 	return ctx->ret=GA_NO_ERROR;
 }
 static void  maxandargmaxAppendKernel           (maxandargmax_ctx*  ctx){
+	strb_appends           (&ctx->s, "#include <cluda.h>\n");
 	maxandargmaxAppendTypedefs         (ctx);
 	maxandargmaxAppendPrototype        (ctx);
 	strb_appends           (&ctx->s, "{\n");
@@ -657,7 +658,7 @@ static int   maxandargmaxCompile                (maxandargmax_ctx*  ctx){
 	                          "maxandargmax",
 	                          ARG_TYPECODES_LEN,
 	                          ARG_TYPECODES,
-	                          GA_USE_CLUDA,
+	                          0,
 	                          (char**)0);
 	free(ctx->sourceCode);
 	ctx->sourceCode = NULL;
