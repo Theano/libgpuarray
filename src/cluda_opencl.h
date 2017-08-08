@@ -30,11 +30,14 @@
 #define ga_ulong ulong
 #define ga_float float
 #define ga_double double
-#define ga_half half
 #define ga_size ulong
 #define ga_ssize long
-#define load_half(p) vload_half(0, p)
-#define store_half(p, v) vstore_half_rtn(v, 0, p)
+#define load_half(p) vload_half(0, &(p)->data)
+#define store_half(p, v) vstore_half_rtn(v, 0, &(p)->data)
 #define GA_DECL_SHARED_PARAM(type, name) , __local type *name
 #define GA_DECL_SHARED_BODY(type, name)
 #define GA_WARP_SIZE __GA_WARP_SIZE
+
+struct ga_half {
+  half data;
+};

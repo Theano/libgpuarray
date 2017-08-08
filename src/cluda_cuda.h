@@ -35,11 +35,14 @@
 #define ga_ulong unsigned long long
 #define ga_float float
 #define ga_double double
-#define ga_half ga_ushort
 #define ga_size size_t
 #define ga_ssize ptrdiff_t
-#define load_half(p) __half2float(*(p))
-#define store_half(p, v) (*(p) = __float2half_rn(v))
+#define load_half(p) __half2float((p)->data)
+#define store_half(p, v) ((p)->data = __float2half_rn(v))
 #define GA_DECL_SHARED_PARAM(type, name)
 #define GA_DECL_SHARED_BODY(type, name) extern __shared__ type name[];
 #define GA_WARP_SIZE warpSize
+
+struct ga_half {
+  ga_ushort data;
+};
