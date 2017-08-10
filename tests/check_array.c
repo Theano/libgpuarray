@@ -27,20 +27,20 @@ START_TEST(test_take1_ok) {
                               18, 19, 20, 21, 22, 23};
   uint32_t buf[12 * 24];
   const size_t data_dims[1] = {24};
-  ssize_t indexes[12];
+  long indexes[12];
   size_t dims[3];
 
   ga_assert_ok(GpuArray_empty(&base, ctx, GA_UINT, 1, data_dims, GA_C_ORDER));
   ga_assert_ok(GpuArray_write(&base, data, sizeof(data)));
   dims[0] = 12;
-  ga_assert_ok(GpuArray_empty(&idx, ctx, GA_SSIZE, 1, dims, GA_C_ORDER));
+  ga_assert_ok(GpuArray_empty(&idx, ctx, GA_LONG, 1, dims, GA_C_ORDER));
   dims[1] = 6;
   ga_assert_ok(GpuArray_empty(&res, ctx, GA_UINT, 2, dims, GA_C_ORDER));
 
   /* test v[[1, 0]] on 1d (4) */
   indexes[0] = 1;
   indexes[1] = 0;
-  ga_assert_ok(GpuArray_write(&idx, indexes, sizeof(ssize_t) * 2));
+  ga_assert_ok(GpuArray_write(&idx, indexes, sizeof(long) * 2));
 
   ga_assert_ok(GpuArray_view(&v, &base));
   ga_assert_ok(GpuArray_view(&vidx, &idx));
