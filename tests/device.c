@@ -9,11 +9,11 @@
 
 char* dev_name = NULL;
 
-int get_env_dev(const char **name) {
+int get_env_dev(const char **name, gpucontext_props *p) {
   char *dev = NULL;
   char *end;
   long no;
-  int d;
+  int pl;
   dev = dev_name;
   if (dev == NULL) {
     if ((dev = getenv("GPUARRAY_TEST_DEVICE")) == NULL) {
@@ -30,7 +30,8 @@ int get_env_dev(const char **name) {
       return -1;
     if (no < 0 || no > INT_MAX)
       return -1;
-    return (int)no;
+    gpucontext_props_cuda_dev(p, (int)no);
+    return 0;
   }
   if (strncmp(dev, "opencl", 6) == 0) {
     *name = "opencl";
@@ -39,16 +40,15 @@ int get_env_dev(const char **name) {
       return -1;
     if (no < 0 || no > 32768)
       return -1;
-    d = (int)no;
+    pl = (int)no;
     dev = end;
     no = strtol(dev + 1, &end, 10);
     if (end == dev || *end != '\0')
       return -1;
     if (no < 0 || no > 32768)
       return -1;
-    d <<= 16;
-    d |= (int)no;
-    return d;
+    gpucontext_props_opencl_dev(p, pl, (int)no);
+    return 0;
   }
   return -1;
 }
@@ -57,10 +57,10 @@ gpucontext *ctx;
 
 void setup(void) {
   const char *name = NULL;
-  int dev = get_env_dev(&name);
-  if (dev == -1)
-    ck_abort_msg("Bad test device");
-  ck_assert_int_eq(gpucontext_init(&ctx, name, NULL), GA_NO_ERROR);
+  gpucontext_props *p;
+  ck_assert_int_eq(gpucontext_props_new(&p), GA_NO_ERROR);
+  ck_assert_int_eq(get_env_dev(&name, p), 0);
+  ck_assert_int_eq(gpucontext_init(&ctx, name, p), GA_NO_ERROR);
   ck_assert_ptr_ne(ctx, NULL);
 }
 
