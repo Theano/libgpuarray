@@ -267,7 +267,7 @@ START_TEST(test_take1_offset) {
   ga_assert_ok(GpuArray_empty(&r, ctx, GA_UINT, 1, out_dims, GA_C_ORDER));
 
   /* Fake subtensor for offset */
-  i.offset = 8;
+  i.offset += 8;
   i.dimensions[0] = 2;
   GpuArray_fix_flags(&i);
 
