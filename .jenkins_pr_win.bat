@@ -1,5 +1,7 @@
 REM Set path for cuda, conda python and cmake
-set PATH=%PATH%;C:\ProgramData\Miniconda2;C:\Program Files\CMake\bin;C:\lib\cuda\bin
+REM Set conda python, cudnn, cmake path
+set PATH=%PATH%;C:\ProgramData\Miniconda2;C:\ProgramData\Miniconda2\Library\usr\bin;C:\ProgramData\Miniconda2\Library\bin;C:\ProgramData\Miniconda2\Scripts
+set PATH=%PATH%;%CUDNNPATH%\bin;C:\Program Files\CMake\bin
 
 REM Can also set to "Debug", "Release" to go faster
 set GPUARRAY_CONFIG="Release"
@@ -24,7 +26,7 @@ cd ..
 set PATH=%PATH%;%WORKSPACE%\lib
 
 REM Add conda gcc toolchain path
-set PATH=%PATH%;C:\ProgramData\Miniconda2\Library\mingw-w64\bin;C:\ProgramData\Miniconda2\Library\usr\bin;C:\ProgramData\Miniconda2\Library\bin;C:\ProgramData\Miniconda2\Scripts
+set PATH=%PATH%;C:\ProgramData\Miniconda2\Library\mingw-w64\bin
 
 REM Build the pygpu modules
 python setup.py build_ext --inplace

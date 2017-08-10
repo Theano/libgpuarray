@@ -170,13 +170,14 @@ If you prefer a command-line approach, cmake is available as a console
 program with the same options as the Unix variant.  You can select the
 nmake builder by passing ``-G "NMake Makefiles"`` to cmake.
 
-Since there is no standard install location on Windows, there is no
-install step.  It is up to you to copy the headers and libraries to an
-appropriate place.
+There is no standard install location on Windows, but you can specify a custom
+location by passing ``-DCMAKE_INSTALL_PREFIX=%LIBDIR%`` to cmake. You can then
+install using ``cmake --build . --target install`` after ``nmake``.
 
-If you don't have Visual Studio installed, you can get the free
-Express version from `here <https://www.visualstudio.com/>`_ in the
-downloads section (select the "for windows" edition).
+If you don't have Visual Studio installed, you can get the free `Visual Studio
+Community edition <https://www.visualstudio.com/vs/community/>`_,
+which has compilation tools for python 3.5 and up. For python 2.7, install
+`Microsoft Visual C++ Compiler for Python 2.7 <https://www.microsoft.com/en-ca/download/details.aspx?id=44266>`_.
 
 .. warning::
    While you may get the library to compile using cygwin, this is not
