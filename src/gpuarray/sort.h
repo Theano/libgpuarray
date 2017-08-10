@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 
-int GpuArray_sort(GpuArray *r, GpuArray *a, unsigned int sortDir, GpuArray *dstArg);
+GPUARRAY_PUBLIC int GpuArray_sort(GpuArray *r, GpuArray *a, unsigned int sortDir, GpuArray *dstArg);
 
 
 #ifdef __cplusplus
