@@ -571,7 +571,7 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
   if (check_error && err == GA_NO_ERROR) {
     err = gpudata_read(&kerr, errbuf, 0, sizeof(int));
     if (err == GA_NO_ERROR && kerr != 0) {
-      err = GA_VALUE_ERROR;
+      err = error_set(ctx->err, GA_VALUE_ERROR, "Index out of bounds");
       kerr = 0;
       /* We suppose this will not fail */
       gpudata_write(errbuf, 0, &kerr, sizeof(int));
