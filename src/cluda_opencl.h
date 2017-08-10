@@ -40,13 +40,14 @@
 #define GA_DECL_SHARED_BODY(type, name)
 #define GA_WARP_SIZE __GA_WARP_SIZE
 
-struct ga_half {
+typedef struct _ga_half {
   half data;
-};
+} ga_half;
 
 #pragma OPENCL_EXTENSION cl_khr_int64_base_atomics: enable
 
 #define gen_atom32_add(name, argtype, aspace)                     \
+  argtype name(volatile aspace argtype *, argtype);               \
   argtype name(volatile aspace argtype *addr, argtype val) {      \
     union {                                                       \
       argtype a;                                                  \
@@ -57,12 +58,13 @@ struct ga_half {
     do {                                                          \
       a = p.w;                                                    \
       n.a = p.a + val;                                            \
-      p.w = atomic_cmpxhg((volatile aspace int *)addr, a, n.w);   \
+      p.w = atomic_cmpxchg((volatile aspace int *)addr, a, n.w);  \
     } while (p.w != a);                                           \
     return n.a;                                                   \
   }
 
 #define gen_atom64_add(name, argtype, aspace)                     \
+  argtype name(volatile aspace argtype *, argtype);               \
   argtype name(volatile aspace argtype *addr, argtype val) {      \
     union {                                                       \
       argtype a;                                                  \
@@ -73,19 +75,20 @@ struct ga_half {
     do {                                                          \
       a = p.w;                                                    \
       n.a = p.a + val;                                            \
-      p.w = atom_cmpxhg((volatile aspace long *)addr, a, n.w);    \
+      p.w = atom_cmpxchg((volatile aspace long *)addr, a, n.w);   \
     } while (p.w != a);                                           \
     return n.a;                                                   \
   }
 
 #define gen_atom64_xchg(name, argtype, aspace)                  \
+  argtype name(volatile aspace argtype *, argtype);             \
   argtype name(volatile aspace argtype *addr, argtype val) {    \
     union {                                                     \
       argtype a;                                                \
       long w;                                                   \
     } p, n;                                                     \
     n.a = val;                                                  \
-    p.w = atom_xchg((volatile aspace wtype *)addr, n.w);        \
+    p.w = atom_xchg((volatile aspace long *)addr, n.w);         \
     return p.a;                                                 \
   }
 
@@ -120,57 +123,46 @@ gen_atom64_add(atom_add_dl, ga_double, local)
 gen_atom64_xchg(atom_xchg_dg, ga_double, global)
 gen_atom64_xchg(atom_xchg_dl, ga_double, local)
 /* ga_half */
-#define gen_atomh_add(name, aspace) \
+#define gen_atomh_add(name, aspace)                                     \
+  ga_half name(volatile aspace ga_half *addr, ga_half val);             \
   ga_half name(volatile aspace ga_half *addr, ga_half val) {            \
-    ga_size off = (ga_size)addr & 2;                                    \
-    volatile aspace int *base = (volatile aspace int *)((ga_size)addr - off); \
-    int o, a, n;                                                        \
+    ga_uint idx = ((ga_size)addr & 2) >> 1;                             \
+    volatile aspace int *base = (volatile aspace int *)((ga_size)addr & ~2); \
+    union {                                                             \
+      int i;                                                            \
+      ga_half h[2];                                                     \
+    } o, a, n;                                                          \
     float fo;                                                           \
     float fval;                                                         \
-    ga_half hn;                                                         \
-    fval = vload_half(0, &val->data);                                   \
-    o = *base;                                                          \
+    fval = load_half(&val);                                             \
+    o.i = *base;                                                        \
     do {                                                                \
-      a = o;                                                            \
-      /* This loads the half of `o` that we want to update */           \
-      fo = vload_half(off, (__private half *)&o);                       \
-      /* We compute the half addition in float 32 */                    \
-      store_half(fval + fo, &hn);                                       \
-      /* Now we reassemble the the parts to form a 32-bits n */         \
-      if (off == 2)                                                     \
-        n = (int)hn->data << 16 & (o & 0xffff);                         \
-      else                                                              \
-        n = (int)hn->data & (o & 0xffff0000);                           \
-      o = atomic_cmpxchg(base, a, n);                                   \
-    } while (o != a);                                                   \
-    if (off == 2)                                                       \
-      hn->data = (ushort)(o >> 16);                                     \
-    else                                                                \
-      hn->data = (ushort)(o & 0xffff);                                  \
-    return hn;                                                          \
+      a.i = o.i;                                                        \
+      fo = load_half(&o.h[idx]);                                        \
+      n.i = o.i;                                                        \
+      store_half(&n.h[idx], fval + fo);                                 \
+      o.i = atomic_cmpxchg(base, a.i, n.i);                             \
+    } while (o.i != a.i);                                               \
+    return n.h[idx];                                                    \
   }
 
-#define gen_atomh_xchg(name, aspace) \
-  ga_half name(volatile aspace ga_half *addr, ga_half *val) { \
-    ga_size off = (ga_size)addr & 2;                                    \
-    volatile aspace int *base = (volatile aspace int *)((ga_size)addr - off); \
-    int o, a, n;                                                        \
-    ga_half hr;                                                         \
-    o = *base;                                                          \
+#define gen_atomh_xchg(name, aspace)                                    \
+  ga_half name(volatile aspace ga_half *addr, ga_half val);             \
+  ga_half name(volatile aspace ga_half *addr, ga_half val) {            \
+    ga_uint idx = ((ga_size)addr & 2) >> 1;                             \
+    volatile aspace int *base = (volatile aspace int *)((ga_size)addr & ~2); \
+    union {                                                             \
+      int i;                                                            \
+      ga_half h[2];                                                     \
+    } o, a, n;                                                          \
+    o.i = *base;                                                        \
     do {                                                                \
-      a = o;                                                            \
-      /* we have to combine our half value with the right part of `o` */ \
-      if (off == 2)                                                     \
-        n = (int)val->data << 16 & (o & 0xffff);                        \
-      else                                                              \
-        n = (int)val->data & (o & 0xffff0000);                          \
-      o = atomic_cmpxchg(base, a, n);                                   \
-    } while (o != a);                                                   \
-    if (off == 2)                                                       \
-      hr->data = (ushort)o << 16;                                       \
-    else                                                                \
-      hr->data = (ushort)o & 0xffff;                                    \
-    return hr;                                                          \
+      a.i = o.i;                                                        \
+      n.i = o.i;                                                        \
+      n.h[idx] = val;                                                   \
+      o.i = atomic_cmpxchg(base, a.i, n.i);                             \
+    } while (o.i != a.i);                                               \
+    return o.h[idx];                                                    \
   }
 
 gen_atomh_add(atom_add_hg, global)
