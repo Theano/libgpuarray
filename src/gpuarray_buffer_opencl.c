@@ -113,6 +113,7 @@ cl_ctx *cl_make_ctx(cl_context ctx, gpucontext_props *p) {
   cl_command_queue_properties qprop;
   char vendor[32];
   char driver_version[64];
+  char device_version[32];
   cl_uint vendor_id;
   cl_int err;
   size_t len;
@@ -120,7 +121,7 @@ cl_ctx *cl_make_ctx(cl_context ctx, gpucontext_props *p) {
   int e = 0;
   size_t warp_size;
   int ret;
-  const char dummy_kern[] = "__kernel void kdummy(float f) {}\n";
+  const char dummy_kern[] = "__kernel void kdummy(__global float *f) { f[0] = 0; }\n";
   strb context_preamble = STRB_STATIC_INIT;
   const char *rlk[1];
   gpukernel *m;
@@ -130,9 +131,18 @@ cl_ctx *cl_make_ctx(cl_context ctx, gpucontext_props *p) {
     return NULL;
   id = get_dev(ctx, global_err);
   if (id == NULL) return NULL;
+
+  CL_CHECKN(global_err, clGetDeviceInfo(id, CL_DEVICE_VERSION,
+                                        sizeof(device_version),
+                                        &device_version, NULL));
+  if (device_version[7] == '1' && device_version[9] < '2') {
+    error_set(global_err, GA_UNSUPPORTED_ERROR,
+              "We only support OpenCL 1.2 and up");
+    return NULL;
+  }
+
   CL_CHECKN(global_err, clGetDeviceInfo(id, CL_DEVICE_QUEUE_PROPERTIES,
                                         sizeof(qprop), &qprop, NULL));
-
   CL_CHECKN(global_err, clGetDeviceInfo(id, CL_DEVICE_VENDOR, sizeof(vendor),
                                         vendor, NULL));
   CL_CHECKN(global_err, clGetDeviceInfo(id, CL_DEVICE_VENDOR_ID,
@@ -782,6 +792,7 @@ static int cl_newkernel(gpukernel **k, gpucontext *c, unsigned int count,
   cl_device_id dev;
   cl_program p;
   cl_program cluda;
+  cl_program tmp;
   // Sync this table size with the number of flags that can add stuff
   // at the beginning
   const char *preamble[5];
@@ -850,10 +861,15 @@ static int cl_newkernel(gpukernel **k, gpucontext *c, unsigned int count,
   if (err != CL_SUCCESS)
     goto compile_error;
 
-  err = clBuildProgram(p, 0, NULL, NULL, NULL, NULL);
+  tmp = clLinkProgram(ctx->ctx, 0, NULL, NULL, 1, &p, NULL, NULL, &err);
+  if (tmp != NULL) {
+    clReleaseProgram(p);
+    p = tmp;
+    tmp = NULL;
+  }
  compile_error:
   if (err != CL_SUCCESS) {
-    if ((err == CL_COMPILE_PROGRAM_FAILURE || err == CL_BUILD_PROGRAM_FAILURE)
+    if ((err == CL_COMPILE_PROGRAM_FAILURE || err == CL_LINK_PROGRAM_FAILURE)
         && err_str != NULL) {
       *err_str = NULL;  // Fallback, in case there's an error
 

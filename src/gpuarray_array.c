@@ -421,13 +421,13 @@ static int gen_take1_kernel(GpuKernel *k, gpucontext *ctx, char **err_str,
                "    %s ii0 = ind[i0];\n"
                "    %s pos0 = v_off;\n"
                "    if (ii0 < 0) ii0 += d0;\n"
-               "    if ((ii0 < 0) || (ii0 >= d0)) {\n"
+               "    if ((ii0 < 0) || (ii0 >= (%s)d0)) {\n"
                "      *err = -1;\n"
                "      continue;\n"
                "    }\n"
                "    pos0 += ii0 * (%s)s0;\n"
                "    for (i1 = idx1; i1 < n1; i1 += numThreads1) {\n"
-               "      %s p = pos0;\n", ssz, sz, sz, sz);
+               "      %s p = pos0;\n", ssz, sz, ssz, sz, sz);
   if (v->nd > 1) {
     strb_appendf(&sb, "      %s pos, ii = i1;\n", sz);
     for (i2 = v->nd; i2 > 1; i2--) {

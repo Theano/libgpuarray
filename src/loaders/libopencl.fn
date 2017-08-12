@@ -1,6 +1,6 @@
 DEF_PROC(cl_context, clCreateContext, (const cl_context_properties *, cl_uint, const cl_device_id *, void (CL_CALLBACK *)(const char *, const void *, size_t, void *), void *, cl_int *));
-DEF_PROC(cl_int, clBuildProgram, (cl_program, cl_uint, const cl_device_id *, const char *, void (CL_CALLBACK *)(cl_program, void *), void *));
 DEF_PROC(cl_int, clCompileProgram, (cl_program, cl_uint, const cl_device_id *, const char *, cl_uint, cl_program *, const char **,  void (CL_CALLBACK *)(cl_program, void *), void *));
+DEF_PROC(cl_program, clLinkProgram, (cl_context, cl_uint, const cl_device_id *, const char *, cl_uint, const cl_program *, void (CL_CALLBACK *)(cl_program, void *), void *, cl_int *));
 DEF_PROC(cl_mem, clCreateBuffer, (cl_context, cl_mem_flags, size_t, void *, cl_int *));
 DEF_PROC(cl_command_queue, clCreateCommandQueue, (cl_context, cl_device_id, cl_command_queue_properties, cl_int *));
 DEF_PROC(cl_kernel, clCreateKernel, (cl_program, const char *, cl_int *));
