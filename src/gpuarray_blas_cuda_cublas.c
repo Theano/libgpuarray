@@ -77,7 +77,7 @@ typedef struct _blas_handle {
 #define LARGE_VAL(v) (v >= INT_MAX)
 
 static const char *code_sgemvBH_N_a1_b1_small =                         \
-  "#include <cluda.h>\n"                                                \
+  "#include \"cluda.h\"\n"                                              \
   "KERNEL void sgemv(const float *A[], size_t lda, "                    \
   "                  const float *x[], size_t incx, "                   \
   "                  float *y[], size_t incy, "                         \
@@ -101,7 +101,7 @@ static const char *code_sgemvBH_N_a1_b1_small =                         \
   "}\n";
 
 static const char *code_sgemvBH_T_a1_b1_small =         \
-  "#include <cluda.h>\n"                                \
+  "#include \"cluda.h\"\n"                              \
   "KERNEL void sgemv(const float *A[], size_t lda, "    \
   "                  const float *x[], size_t incx, "   \
   "                  float *y[], size_t incy, "         \
@@ -121,7 +121,7 @@ static const char *code_sgemvBH_T_a1_b1_small =         \
   "}\n";
 
 static const char *code_dgemvBH_N_a1_b1_small =                         \
-  "#include <cluda.h>\n"                                                \
+  "#include \"cluda.h\"\n"                                              \
   "KERNEL void dgemv(const double *A[], size_t lda, "                   \
   "                  const double *x[], size_t incx, "                  \
   "                  double *y[], size_t incy, "                        \
@@ -145,7 +145,7 @@ static const char *code_dgemvBH_N_a1_b1_small =                         \
   "}\n";
 
 static const char *code_dgemvBH_T_a1_b1_small =         \
-  "#include <cluda.h>\n"                                \
+  "#include \"cluda.h\"\n"                              \
   "KERNEL void dgemv(const double *A[], size_t lda, "   \
   "                  const double *x[], size_t incx, "  \
   "                  double *y[], size_t incy, "        \
@@ -165,7 +165,7 @@ static const char *code_dgemvBH_T_a1_b1_small =         \
   "}\n";
 
 static const char *code_sgerBH_gen_small =                              \
-  "#include <cluda.h>\n"                                                \
+  "#include \"cluda.h\"\n"                                              \
   "KERNEL void _sgerBH_gen_small("                                      \
   "    const float *x[], size_t incx,"                                  \
   "    const float *y[], size_t incy,"                                  \
@@ -181,7 +181,7 @@ static const char *code_sgerBH_gen_small =                              \
   "}\n";
 
 static const char *code_dgerBH_gen_small =                              \
-  "#include <cluda.h>\n"                                                \
+  "#include \"cluda.h\"\n"                                              \
   "KERNEL void _dgerBH_gen_small("                                      \
   "      const double *x[], size_t incx, "                              \
   "      const double *y[], size_t incy,"                               \

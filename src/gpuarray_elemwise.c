@@ -154,7 +154,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k, gpucontext *ctx,
 
   p = 0;
 
-  strb_appends(&sb, "#include <cluda.h>\n");
+  strb_appends(&sb, "#include \"cluda.h\"\n");
   if (preamble)
     strb_appends(&sb, preamble);
   strb_appends(&sb, "\nKERNEL void elem(const ga_size n, ");
@@ -469,7 +469,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
 
   p = 0;
 
-  strb_appends(&sb, "#include <cluda.h>\n");
+  strb_appends(&sb, "#include \"cluda.h\"\n");
   if (preamble)
     strb_appends(&sb, preamble);
   strb_appends(&sb, "\nKERNEL void elem(const ga_size n, ");

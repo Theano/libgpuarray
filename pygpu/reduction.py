@@ -31,7 +31,7 @@ def _ceil_log2(x):
 
 
 basic_kernel = Template("""
-#include <cluda.h>
+#include "cluda.h"
 
 ${preamble}
 
