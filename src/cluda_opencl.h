@@ -42,8 +42,8 @@ typedef struct _ga_half {
   half data;
 } ga_half;
 
-#define load_half(p) vload_half(0, &(p)->data)
-static inline ga_half store_half(ga_float f) {
+#define ga_half2float(p) vload_half(0, &((p).data))
+static inline ga_half ga_float2half(ga_float f) {
   ga_half r;
   vstore_half_rtn(f, 0, &r.data);
   return r;
@@ -139,13 +139,13 @@ gen_atom64_xchg(atom_xchg_dl, ga_double, local)
     } o, a, n;                                                          \
     float fo;                                                           \
     float fval;                                                         \
-    fval = load_half(&val);                                             \
+    fval = ga_half2float(val);                                          \
     o.i = *base;                                                        \
     do {                                                                \
       a.i = o.i;                                                        \
-      fo = load_half(&o.h[idx]);                                        \
+      fo = ga_half2float(o.h[idx]);                                     \
       n.i = o.i;                                                        \
-      n.h[idx] = store_half(fval + fo);                                 \
+      n.h[idx] = ga_float2half(fval + fo);                              \
       o.i = atomic_cmpxchg(base, a.i, n.i);                             \
     } while (o.i != a.i);                                               \
     return n.h[idx];                                                    \

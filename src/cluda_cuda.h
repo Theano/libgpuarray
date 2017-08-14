@@ -46,8 +46,8 @@ struct ga_half {
   ga_ushort data;
 };
 
-#define load_half(p) __half2float((p)->data)
-__device__ static inline ga_half store_half(float f) {
+#define ga_half2float(p) __half2float((p).data)
+__device__ static inline ga_half ga_float2half(float f) {
   ga_half r;
   r.data = __float2half_rn(f);
   return r;

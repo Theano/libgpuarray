@@ -213,7 +213,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k, gpucontext *ctx,
                                         GA_FLOAT : args[j].typecode), args[j].name);
       if (ISSET(args[j].flags, GE_READ)) {
         if (args[j].typecode == GA_HALF && ISSET(gen_flags, GEN_CONVERT_F16)) {
-          strb_appendf(&sb, "%s = load_half((GLOBAL_MEM ga_half *)(((GLOBAL_MEM char *)%s_data) + %s_p));\n",
+          strb_appendf(&sb, "%s = ga_half2float(*(GLOBAL_MEM ga_half *)(((GLOBAL_MEM char *)%s_data) + %s_p));\n",
                        args[j].name, args[j].name, args[j].name);
         } else {
           strb_appendf(&sb, "%s = *(GLOBAL_MEM %s *)(((GLOBAL_MEM char *)%s_data) + %s_p);\n",
@@ -227,7 +227,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k, gpucontext *ctx,
   for (j = 0; j < n; j++) {
     if (is_array(args[j]) && ISSET(args[j].flags, GE_WRITE)) {
       if (args[j].typecode == GA_HALF && ISSET(gen_flags, GEN_CONVERT_F16)) {
-        strb_appendf(&sb, "*(GLOBAL_MEM ga_half *)(((GLOBAL_MEM char *)%s_data) + %s_p) = store_half(%s);\n",
+        strb_appendf(&sb, "*(GLOBAL_MEM ga_half *)(((GLOBAL_MEM char *)%s_data) + %s_p) = ga_float2half(%s);\n",
                      args[j].name, args[j].name, args[j].name);
       } else {
         strb_appendf(&sb, "*(GLOBAL_MEM %s *)(((GLOBAL_MEM char *)%s_data) + %s_p) = %s;\n",
@@ -508,7 +508,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
                                           GA_FLOAT : args[j].typecode), args[j].name);
       if (ISSET(args[j].flags, GE_READ)) {
         if (args[j].typecode == GA_HALF && ISSET(gen_flags, GEN_CONVERT_F16)) {
-          strb_appendf(&sb, "%s = load_half(&%s_p[i]);\n", args[j].name, args[j].name);
+          strb_appendf(&sb, "%s = ga_half2float(%s_p[i]);\n", args[j].name, args[j].name);
         } else {
           strb_appendf(&sb, "%s = %s_p[i];\n", args[j].name, args[j].name);
         }
@@ -522,7 +522,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
     if (is_array(args[j])) {
       if (ISSET(args[j].flags, GE_WRITE)) {
         if (args[j].typecode == GA_HALF && ISSET(gen_flags, GEN_CONVERT_F16)) {
-          strb_appendf(&sb, "%s_p[i] = store_half(%s);\n", args[j].name, args[j].name);
+          strb_appendf(&sb, "%s_p[i] = ga_float2half(%s);\n", args[j].name, args[j].name);
         } else {
           strb_appendf(&sb, "%s_p[i] = %s;\n", args[j].name, args[j].name);
         }
