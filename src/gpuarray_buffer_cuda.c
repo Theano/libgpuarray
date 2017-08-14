@@ -708,6 +708,8 @@ static gpudata *cuda_alloc(gpucontext *c, size_t size, void *data, int flags) {
   cuda_context *ctx = (cuda_context *)c;
   size_t asize;
 
+  if (size == 0) size = 1;
+
   if ((flags & GA_BUFFER_INIT) && data == NULL) {
     error_set(ctx->err, GA_VALUE_ERROR, "Requested buffer initialisation but no data given");
     return NULL;
