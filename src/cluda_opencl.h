@@ -34,8 +34,6 @@
 #define ga_double double
 #define ga_size ulong
 #define ga_ssize long
-#define load_half(p) vload_half(0, &(p)->data)
-#define store_half(p, v) vstore_half_rtn(v, 0, &(p)->data)
 #define GA_DECL_SHARED_PARAM(type, name) , __local type *name
 #define GA_DECL_SHARED_BODY(type, name)
 #define GA_WARP_SIZE __GA_WARP_SIZE
@@ -43,6 +41,13 @@
 typedef struct _ga_half {
   half data;
 } ga_half;
+
+#define load_half(p) vload_half(0, &(p)->data)
+static inline ga_half store_half(ga_float f) {
+  ga_half r;
+  vstore_half_rtn(f, 0, &r.data);
+  return r;
+}
 
 #pragma OPENCL_EXTENSION cl_khr_int64_base_atomics: enable
 
@@ -140,7 +145,7 @@ gen_atom64_xchg(atom_xchg_dl, ga_double, local)
       a.i = o.i;                                                        \
       fo = load_half(&o.h[idx]);                                        \
       n.i = o.i;                                                        \
-      store_half(&n.h[idx], fval + fo);                                 \
+      n.h[idx] = store_half(fval + fo);                                 \
       o.i = atomic_cmpxchg(base, a.i, n.i);                             \
     } while (o.i != a.i);                                               \
     return n.h[idx];                                                    \

@@ -38,8 +38,6 @@
 #define ga_double double
 #define ga_size size_t
 #define ga_ssize ptrdiff_t
-#define load_half(p) __half2float((p)->data)
-#define store_half(p, v) ((p)->data = __float2half_rn(v))
 #define GA_DECL_SHARED_PARAM(type, name)
 #define GA_DECL_SHARED_BODY(type, name) extern __shared__ type name[];
 #define GA_WARP_SIZE warpSize
@@ -47,6 +45,13 @@
 struct ga_half {
   ga_ushort data;
 };
+
+#define load_half(p) __half2float((p)->data)
+__device__ static inline ga_half store_half(float f) {
+  ga_half r;
+  r.data = __float2half_rn(f);
+  return r;
+}
 
 #define gen_atom_add(name, argtype, wtype)              \
   __device__ argtype name(argtype *addr, argtype val) { \
