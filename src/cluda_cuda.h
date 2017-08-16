@@ -120,7 +120,7 @@ gen_atom64_add(atom_add_dg, ga_double)
 gen_atom64_xchg(atom_xchg_dg, ga_double)
 #define atom_xchg_dl(a, b) atom_xchg_dg(a, b)
 /* ga_half */
-__device__ ga_half atom_add_hg(ga_half *addr, ga_half val) {
+__device__ ga_half atom_add_eg(ga_half *addr, ga_half val) {
   ga_uint *base = (ga_uint *)((ga_size)addr & ~2);
   ga_uint old, assumed, sum, new_;
   ga_half tmp;
@@ -135,9 +135,9 @@ __device__ ga_half atom_add_hg(ga_half *addr, ga_half val) {
   tmp.data = __byte_perm(old, 0, ((ga_size)addr & 2) ? 0x4432 : 0x4410);
   return tmp;
 }
-#define atom_add_hl(a, b) atom_add_hg(a, b)
+#define atom_add_el(a, b) atom_add_eg(a, b)
 
-__device__ ga_half atom_xchg_hg(ga_half *addr, ga_half val) {
+__device__ ga_half atom_xchg_eg(ga_half *addr, ga_half val) {
   ga_uint *base = (ga_uint *)((ga_size)addr & ~2);
   ga_uint old, assumed, new_;
   ga_half tmp;
@@ -150,4 +150,4 @@ __device__ ga_half atom_xchg_hg(ga_half *addr, ga_half val) {
   tmp.data = __byte_perm(old, 0, ((ga_size)addr & 2) ? 0x4432 : 0x4410);
   return tmp;
 }
-#define atom_xchg_hl(a, b) atom_xchg_hg(a, b)
+#define atom_xchg_el(a, b) atom_xchg_eg(a, b)

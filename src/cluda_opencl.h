@@ -170,7 +170,7 @@ gen_atom64_xchg(atom_xchg_dl, ga_double, local)
     return o.h[idx];                                                    \
   }
 
-gen_atomh_add(atom_add_hg, global)
-gen_atomh_add(atom_add_hl, local)
-gen_atomh_xchg(atom_xchg_hg, global)
-gen_atomh_xchg(atom_xchg_hl, local)
+gen_atomh_add(atom_add_eg, global)
+gen_atomh_add(atom_add_el, local)
+gen_atomh_xchg(atom_xchg_eg, global)
+gen_atomh_xchg(atom_xchg_el, local)
