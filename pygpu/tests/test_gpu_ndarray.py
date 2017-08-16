@@ -811,8 +811,9 @@ class TestPickle(unittest.TestCase):
             pickle.dumps(ctx, protocol=-1)
 
     def test_GpuKernel(self):
-        k = GpuKernel("KERNEL void nothing(GLOBAL_MEM ga_float *in) "
-                      "{in[0] = 0;}", "nothing", [], context=ctx)
+        k = GpuKernel("#include \"cluda.h\"\nKERNEL void "
+                      "k(GLOBAL_MEM ga_float *in)"
+                      "{in[0] = 0;}", "k", [], context=ctx)
         with self.assertRaises(RuntimeError):
             pickle.dumps(k)
         with self.assertRaises(RuntimeError):
