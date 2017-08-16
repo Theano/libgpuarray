@@ -4,6 +4,7 @@ from .gpuarray import GpuArray, GpuKernel, SIZE
 
 def _generate_kernel(ctx, cols, upper=True):
     tmpl = Template("""
+    #include "cluda.h"
     KERNEL void extract_tri(GLOBAL_MEM ga_float *a, ga_size a_off, ga_uint N) {
         a = (GLOBAL_MEM ga_float *)(((char *)a) + a_off);
         unsigned int idx = GID_1 * LDIM_0 * GDIM_0 +
