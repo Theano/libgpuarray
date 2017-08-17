@@ -100,8 +100,9 @@ def test_transfer_not_contiguous():
 @guard_devsup
 def transfer_not_contiguous(shp, dtype):
     a = numpy.random.rand(*shp) * 10
-    a = a[::-1]
     b = pygpu.array(a, context=ctx)
+    a = a[::-1]
+    b = b[::-1]
     c = numpy.asarray(b)
 
     assert numpy.allclose(c, a)
@@ -121,11 +122,12 @@ def test_transfer_fortran():
 @guard_devsup
 def transfer_fortran(shp, dtype):
     a = numpy.random.rand(*shp) * 10
+    b = pygpu.array(a, context=ctx)
     a_ = numpy.asfortranarray(a)
     if len(shp) > 1:
         assert a_.strides != a.strides
     a = a_
-    b = pygpu.array(a, context=ctx)
+    b = pygpu.asfortranarray(b)
     c = numpy.asarray(b)
 
     assert a.shape == b.shape == c.shape
