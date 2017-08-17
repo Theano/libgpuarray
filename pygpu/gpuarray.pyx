@@ -308,17 +308,6 @@ cdef int array_fromdata(GpuArray a,
     if err != GA_NO_ERROR:
         raise get_exc(err), gpucontext_error(gpudata_context(data), err)
 
-cdef int array_copy_from_host(GpuArray a,
-                              gpucontext *ctx, void *buf, int typecode,
-                              unsigned int nd, const size_t *dims,
-                              const ssize_t *strides) except -1:
-    cdef int err
-    with nogil:
-        err = GpuArray_copy_from_host(&a.ga, ctx, buf, typecode, nd, dims,
-                                      strides);
-    if err != GA_NO_ERROR:
-        raise get_exc(err), gpucontext_error(ctx, err)
-
 cdef int array_view(GpuArray v, GpuArray a) except -1:
     cdef int err
     err = GpuArray_view(&v.ga, &a.ga)
@@ -702,17 +691,6 @@ cdef GpuArray pygpu_empty(unsigned int nd, const size_t *dims, int typecode,
     array_empty(res, context.ctx, typecode, nd, dims, order)
     return res
 
-cdef GpuArray pygpu_fromhostdata(void *buf, int typecode, unsigned int nd,
-                                 const size_t *dims, const ssize_t *strides,
-                                 GpuContext context, object cls):
-    cdef GpuArray res
-    context = ensure_context(context)
-
-    res = new_GpuArray(cls, context, None)
-    array_copy_from_host(res, context.ctx, buf, typecode, nd,
-                         dims, strides)
-    return res
-
 cdef GpuArray pygpu_fromgpudata(gpudata *buf, size_t offset, int typecode,
                                 unsigned int nd, const size_t *dims,
                                 const ssize_t *strides, GpuContext context,
@@ -984,7 +962,6 @@ cdef carray(proto, dtype, copy, order, unsigned int ndmin,
     cdef GpuArray arg
     cdef GpuArray tmp
     cdef np.ndarray a
-    cdef ga_order ord
 
     if isinstance(proto, GpuArray):
         arg = proto
@@ -1028,12 +1005,18 @@ cdef carray(proto, dtype, copy, order, unsigned int ndmin,
 
     context = ensure_context(context)
 
+    # We need a contiguous array for the copy
+    if order != 'C' and order != 'F':
+        order = 'C'
+
     a = numpy.array(proto, dtype=dtype_to_npdtype(dtype), order=order,
                     ndmin=ndmin, copy=False)
 
-    return pygpu_fromhostdata(np.PyArray_DATA(a), dtype_to_typecode(a.dtype),
-                              np.PyArray_NDIM(a), <size_t *>np.PyArray_DIMS(a),
-                              <ssize_t *>np.PyArray_STRIDES(a), context, cls)
+    res = pygpu_empty(np.PyArray_NDIM(a), <size_t *>np.PyArray_DIMS(a),
+                      dtype_to_typecode(a.dtype), to_ga_order(order),
+                      context, cls)
+    array_write(res, np.PyArray_DATA(a), np.PyArray_NBYTES(a))
+    return res
 
 cdef void (*cuda_enter)(gpucontext *)
 cdef void (*cuda_exit)(gpucontext *)

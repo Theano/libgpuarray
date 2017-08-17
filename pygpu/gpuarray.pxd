@@ -172,10 +172,6 @@ cdef extern from "gpuarray/array.h":
                           gpudata *data, size_t offset, int typecode,
                           unsigned int nd, const size_t *dims,
                           const ssize_t *strides, int writable)
-    int GpuArray_copy_from_host(_GpuArray *a,
-                            gpucontext *ctx, void *buf, int typecode,
-                            unsigned int nd, const size_t *dims,
-                            const ssize_t *strides) nogil
     int GpuArray_view(_GpuArray *v, _GpuArray *a)
     int GpuArray_sync(_GpuArray *a) nogil
     int GpuArray_index(_GpuArray *r, _GpuArray *a, const ssize_t *starts,
@@ -241,10 +237,6 @@ cdef int array_fromdata(GpuArray a,
                         gpudata *data, size_t offset, int typecode,
                         unsigned int nd, const size_t *dims,
                         const ssize_t *strides, int writeable) except -1
-cdef int array_copy_from_host(GpuArray a,
-                              gpucontext *ctx, void *buf, int typecode,
-                              unsigned int nd, const size_t *dims,
-                              const ssize_t *strides) except -1
 cdef int array_view(GpuArray v, GpuArray a) except -1
 cdef int array_sync(GpuArray a) except -1
 cdef int array_index(GpuArray r, GpuArray a, const ssize_t *starts,
@@ -295,11 +287,6 @@ cdef api GpuArray pygpu_zeros(unsigned int nd, const size_t *dims,
 cdef api GpuArray pygpu_empty(unsigned int nd, const size_t *dims,
                               int typecode, ga_order order,
                               GpuContext context, object cls)
-cdef api GpuArray pygpu_fromhostdata(void *buf, int typecode, unsigned int nd,
-                                     const size_t *dims,
-                                     const ssize_t *strides,
-                                     GpuContext context, object cls)
-
 cdef api GpuArray pygpu_fromgpudata(gpudata *buf, size_t offset, int typecode,
                                     unsigned int nd, const size_t *dims,
                                     const ssize_t *strides, GpuContext context,
