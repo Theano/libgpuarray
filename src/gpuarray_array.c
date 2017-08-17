@@ -61,7 +61,7 @@ static int ga_extcopy(GpuArray *dst, const GpuArray *src) {
     gargs[1].name = "dst";
     gargs[1].typecode = dst->typecode;
     gargs[1].flags = GE_WRITE;
-    k = GpuElemwise_new(ctx, "", "dst = src", 2, gargs, 0, 0);
+    k = GpuElemwise_new(ctx, "", "dst = src", 2, gargs, 0, GE_CONVERT_F16);
     if (k == NULL)
       return ctx->err->code;
     aa = memdup(&a, sizeof(a));
