@@ -53,37 +53,6 @@ __device__ static inline ga_half ga_float2half(float f) {
   return r;
 }
 
-#define gen_atom_add(name, argtype, wtype)              \
-  __device__ argtype name(argtype *addr, argtype val) { \
-    union {                                             \
-      argtype a;                                        \
-      wtype w;                                          \
-    } p, n;                                             \
-    p.a = *addr;                                        \
-    do {                                                \
-      n.a = p.a + val;                                  \
-      p.w = atomicCAS((wtype *)addr, p.w, n.w);         \
-    } while (p.w != n.w);                               \
-    return n.a;                                         \
-  }
-
-#define gen_atom32_add(name, argtype) gen_atom_add(name, argtype, unsigned int)
-#define gen_atom64_add(name, argtype) gen_atom_add(name, argtype, unsigned long long)
-
-#define gen_atom_xchg(name, argtype, wtype)              \
-  __device__ argtype name(argtype *addr, argtype val) { \
-    union {                                             \
-      argtype a;                                        \
-      wtype w;                                          \
-    } n, p;                                             \
-    n.a = val;                                          \
-    p.w = atomicExch((wtype *)addr, n.w);               \
-    return p.a;                                         \
-  }
-
-#define gen_atom32_xchg(name, argtype) gen_atom_xchg(name, argtype, unsigned int)
-#define gen_atom64_xchg(name, argtype) gen_atom_xchg(name, argtype, unsigned long long)
-
 /* ga_int */
 #define atom_add_ig(a, b) atomicAdd(a, b)
 #define atom_add_il(a, b) atomicAdd(a, b)
@@ -95,9 +64,22 @@ __device__ static inline ga_half ga_float2half(float f) {
 #define atom_xchg_Ig(a, b) atomicExch(a, b)
 #define atom_xchg_Il(a, b) atomicExch(a, b)
 /* ga_long */
-gen_atom64_add(atom_add_lg, ga_long)
+__device__ ga_long atom_add_lg(ga_long *addr, ga_long val) {
+  unsigned long long *waddr = (unsigned long long *)addr;
+  unsigned long long old = *waddr;
+  unsigned long long assumed;
+  do {
+    assumed = old;
+    old = atomicCAS(waddr, assumed, (val + (ga_long)(assumed)));
+  } while (assumed != old);
+  return (ga_long)old;
+}
 #define atom_add_ll(a, b) atom_add_lg(a, b)
-gen_atom64_xchg(atom_xchg_lg, ga_long)
+__device__ ga_long atom_xchg_lg(ga_long *addr, ga_long val) {
+  unsigned long long res;
+  res = atomicExch((unsigned long long *)addr, val);
+  return (ga_long)res;
+}
 #define atom_xchg_ll(a, b) atom_xchg_lg(a, b)
 /* ga_ulong */
 #define atom_add_Lg(a, b) atomicAdd(a, b)
@@ -111,13 +93,26 @@ gen_atom64_xchg(atom_xchg_lg, ga_long)
 #define atom_xchg_fl(a, b) atomicExch(a, b)
 /* ga_double */
 #if __CUDA_ARCH__ < 600
-gen_atom64_add(atom_add_dg, ga_double)
+__device__ ga_double atom_add_dg(ga_double *addr, ga_double val) {
+  unsigned long long *waddr = (unsigned long long *)addr;
+  unsigned long long old = *waddr;
+  unsigned long long assumed;
+  do {
+    assumed = old;
+    old = atomicCAS(waddr, assumed, __double_as_longlong(val + __longlong_as_double(assumed)));
+  } while (assumed != old);
+  return __longlong_as_double(old);
+}
 #define atom_add_dl(a, b) atom_add_dg(a, b)
 #else
-#define atom_add_dg(a, b, c) atomicAdd(a, b, c)
-#define atom_add_dl(a, b, c) atomicAdd(a, b, c)
+#define atom_add_dg(a, b) atomicAdd(a, b)
+#define atom_add_dl(a, b) atomicAdd(a, b)
 #endif
-gen_atom64_xchg(atom_xchg_dg, ga_double)
+__device__ ga_double atom_xchg_dg(ga_double *addr, ga_double val) {
+  unsigned long long res;
+  res = atomicExch((unsigned long long *)addr, __double_as_longlong(val));
+  return __longlong_as_double(res);
+}
 #define atom_xchg_dl(a, b) atom_xchg_dg(a, b)
 /* ga_half */
 __device__ ga_half atom_add_eg(ga_half *addr, ga_half val) {
