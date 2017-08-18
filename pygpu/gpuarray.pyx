@@ -6,6 +6,8 @@ from libc.string cimport strncmp
 cimport numpy as np
 import numpy as np
 
+import sys
+
 from cpython cimport Py_INCREF, PyNumber_Index
 from cpython.object cimport Py_EQ, Py_NE
 
@@ -586,10 +588,10 @@ cdef GpuContext pygpu_init(dev, gpucontext_props *p):
     return res
 
 def init(dev, sched='default', single_stream=False, kernel_cache_path=None,
-         max_cache_size=0, initial_cache_size=0):
+         max_cache_size=sys.maxsize, initial_cache_size=0):
     """
     init(dev, sched='default', single_stream=False, kernel_cache_path=None,
-         max_cache_size=0, initial_cache_size=0)
+         max_cache_size=sys.maxsize, initial_cache_size=0)
 
     Creates a context from a device specifier.
 
