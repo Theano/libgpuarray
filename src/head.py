@@ -1,3 +1,5 @@
+# Used to generate the string tables to embed the cluda headers.
+
 def wrt(f, n, b):
     f.write(b',')
     n += 1

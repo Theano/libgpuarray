@@ -61,20 +61,22 @@ int gpucontext_props_opencl_dev(gpucontext_props *p, int platno, int devno) {
 }
 
 int gpucontext_props_sched(gpucontext_props *p, int sched) {
-  if (sched == GA_CTX_SCHED_MULTI)
-    FLSET(p->flags, GA_CTX_MULTI_THREAD);
-  else
-    FLCLR(p->flags, GA_CTX_MULTI_THREAD);
-
   switch (sched) {
   case GA_CTX_SCHED_MULTI:
   case GA_CTX_SCHED_AUTO:
   case GA_CTX_SCHED_SINGLE:
     p->sched = sched;
-    return GA_NO_ERROR;
+    break;
   default:
     return error_fmt(global_err, GA_INVALID_ERROR, "Invalid value for sched: %d", sched);
   }
+
+  if (sched == GA_CTX_SCHED_MULTI)
+    FLSET(p->flags, GA_CTX_MULTI_THREAD);
+  else
+    FLCLR(p->flags, GA_CTX_MULTI_THREAD);
+
+  return GA_NO_ERROR;
 }
 
 int gpucontext_props_set_single_stream(gpucontext_props *p) {

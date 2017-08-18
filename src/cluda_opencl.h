@@ -1,3 +1,5 @@
+#ifndef CLUDA_H
+#define CLUDA_H
 #define local_barrier() barrier(CLK_LOCAL_MEM_FENCE)
 #define WITHIN_KERNEL /* empty */
 #define KERNEL __kernel
@@ -174,3 +176,5 @@ gen_atomh_add(atom_add_eg, global)
 gen_atomh_add(atom_add_el, local)
 gen_atomh_xchg(atom_xchg_eg, global)
 gen_atomh_xchg(atom_xchg_el, local)
+
+#endif

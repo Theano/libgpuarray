@@ -1,3 +1,5 @@
+#ifndef CLUDA_H
+#define CLUDA_H
 #define local_barrier() __syncthreads()
 #define WITHIN_KERNEL extern "C" __device__
 #define KERNEL extern "C" __global__
@@ -163,3 +165,4 @@ __device__ ga_half atom_xchg_eg(ga_half *addr, ga_half val) {
   return tmp;
 }
 #define atom_xchg_el(a, b) atom_xchg_eg(a, b)
+#endif
