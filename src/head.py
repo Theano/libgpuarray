@@ -18,7 +18,7 @@ def convert(src, dst):
         f.write(b'static const char %s[] = {\n' % (src_name.encode('utf-8'),))
         first = True
         n = 0
-        for b in src_data:
+        for b in bytearray(src_data):
             if b == 0:
                 raise ValueError('NUL in file')
             if first:
@@ -29,7 +29,6 @@ def convert(src, dst):
         wrt(f, n, 0)
         f.write(b'};\n')
 
-            
 if __name__ == '__main__':
     import sys
     convert(sys.argv[1], sys.argv[1] + '.c')
