@@ -153,7 +153,7 @@ static int get_rank(const gpucomm *comm, int *rank) {
  * \ref
  * ncclRedOp_t.
  *
- * If invalid, return `nccl_NUM_OPS`.
+ * If invalid, return `ncclNumOps`.
  */
 static inline ncclRedOp_t convert_reduce_op(int opcode) {
   switch (opcode) {
@@ -162,14 +162,14 @@ static inline ncclRedOp_t convert_reduce_op(int opcode) {
   case GA_MAX: return ncclMax;
   case GA_MIN: return ncclMin;
   }
-  return nccl_NUM_OPS;
+  return ncclNumOps;
 }
 
 /**
  * \brief Helper function to try to convert \ref enum GPUARRAY_TYPES to \ref
  * ncclDataType_t.
  *
- * If invalid, return `nccl_NUM_TYPES`.
+ * If invalid, return `ncclNumTypes`.
  */
 static inline ncclDataType_t convert_data_type(int typecode) {
   switch (typecode) {
@@ -181,7 +181,7 @@ static inline ncclDataType_t convert_data_type(int typecode) {
   case GA_ULONG: return ncclUint64;
   case GA_HALF: return ncclHalf;
   }
-  return nccl_NUM_TYPES;
+  return ncclNumTypes;
 }
 
 /**
@@ -208,13 +208,13 @@ static inline int check_restrictions(gpudata *src, size_t offsrc,
   // typecode must correspond to a valid ncclDataType_t
   if (datatype != NULL) {
     *datatype = convert_data_type(typecode);
-    if (*datatype == nccl_NUM_TYPES)
+    if (*datatype == ncclNumTypes)
       return error_set(comm->ctx->err, GA_INVALID_ERROR, "Invalid data type");
   }
   // opcode must correspond to a valid ncclRedOp_t
   if (op != NULL) {
     *op = convert_reduce_op(opcode);
-    if (*op == nccl_NUM_OPS)
+    if (*op == ncclNumOps)
       return error_set(comm->ctx->err, GA_INVALID_ERROR, "Invalid reduce op");
   }
   // offsets must not be larger than gpudata's size itself
@@ -237,8 +237,8 @@ static int reduce(gpudata *src, size_t offsrc, gpudata *dest, size_t offdest,
                   size_t count, int typecode, int opcode, int root,
                   gpucomm *comm) {
   // need dummy init so that compiler shuts up
-  ncclRedOp_t op = nccl_NUM_OPS;
-  ncclDataType_t datatype = nccl_NUM_TYPES;
+  ncclRedOp_t op = ncclNumOps;
+  ncclDataType_t datatype = ncclNumTypes;
   gpudata *dst = NULL;
   int rank = 0;
   cuda_context *ctx;
@@ -287,8 +287,8 @@ static int all_reduce(gpudata *src, size_t offsrc, gpudata *dest,
                       size_t offdest, size_t count, int typecode, int opcode,
                       gpucomm *comm) {
   // need dummy init so that compiler shuts up
-  ncclRedOp_t op = nccl_NUM_OPS;
-  ncclDataType_t datatype = nccl_NUM_TYPES;
+  ncclRedOp_t op = ncclNumOps;
+  ncclDataType_t datatype = ncclNumTypes;
   cuda_context *ctx;
 
   ASSERT_BUF(src);
@@ -325,8 +325,8 @@ static int reduce_scatter(gpudata *src, size_t offsrc, gpudata *dest,
                           size_t offdest, size_t count, int typecode,
                           int opcode, gpucomm *comm) {
   // need dummy init so that compiler shuts up
-  ncclRedOp_t op = nccl_NUM_OPS;
-  ncclDataType_t datatype = nccl_NUM_TYPES;
+  ncclRedOp_t op = ncclNumOps;
+  ncclDataType_t datatype = ncclNumTypes;
   int ndev = 0;
   size_t resc_size;
   cuda_context *ctx;
@@ -371,7 +371,7 @@ static int reduce_scatter(gpudata *src, size_t offsrc, gpudata *dest,
 static int broadcast(gpudata *array, size_t offset, size_t count, int typecode,
                      int root, gpucomm *comm) {
   // need dummy init so that compiler shuts up
-  ncclDataType_t datatype = nccl_NUM_TYPES;
+  ncclDataType_t datatype = ncclNumTypes;
   int rank = 0;
   cuda_context *ctx;
 
@@ -411,7 +411,7 @@ static int all_gather(gpudata *src, size_t offsrc, gpudata *dest,
                       size_t offdest, size_t count, int typecode,
                       gpucomm *comm) {
   // need dummy init so that compiler shuts up
-  ncclDataType_t datatype = nccl_NUM_TYPES;
+  ncclDataType_t datatype = ncclNumTypes;
   int ndev = 0;
   size_t resc_size;
   cuda_context *ctx;
@@ -439,8 +439,8 @@ static int all_gather(gpudata *src, size_t offsrc, gpudata *dest,
 
   // change stream of nccl ops to enable concurrency
   NCCL_EXIT_ON_ERROR(
-      ctx, ncclAllGather((void *)(src->ptr + offsrc), count, datatype,
-                         (void *)(dest->ptr + offdest), comm->c, ctx->s));
+      ctx, ncclAllGather((void *)(src->ptr + offsrc),
+			 (void *)(dest->ptr + offdest), count, datatype, comm->c, ctx->s));
 
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(src, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(dest, CUDA_WAIT_WRITE));

@@ -2,6 +2,7 @@
 
 #include "private.h"
 #include "private_cuda.h"
+
 #include "loaders/libnvrtc.h"
 #include "loaders/libcublas.h"
 
@@ -465,6 +466,24 @@ size_t cuda_get_sz(gpudata *g) { ASSERT_BUF(g); return g->sz; }
   }
 
 static const char CUDA_PREAMBLE[] =
+    "typedef struct { unsigned short x; } __half;\n"
+    "#define __HALF_TO_US(var) *(reinterpret_cast<unsigned short *>(&(var)))\n"
+    "#define __HALF_TO_CUS(var) *(reinterpret_cast<const unsigned short *>(&(var)))\n"
+    "#if __CUDACC_VER_MAJOR__ >= 9\n"
+    "#define __CUDA_FP16_DECL__ static __device__ __forceinline__\n"
+    "__CUDA_FP16_DECL__ __half __float2half_rn(const float f) \n"
+    "{\n"
+    "  __half val;\n"
+    "  asm(\"{  cvt.rn.f16.f32 %0, %1;}\\n\" : \"=h\"(__HALF_TO_US(val)) : \"f\"(f));\n"
+    "  return val;\n"
+    "}\n"
+    "__CUDA_FP16_DECL__ float __half2float(const __half h)\n"
+    "{\n"
+    "  float val;\n"
+    "  asm(\"{  cvt.f32.f16 %0, %1;}\\n\" : \"=f\"(val) : \"h\"(__HALF_TO_CUS(h)));\n"
+    "  return val;\n"
+    "}\n "
+    "#endif\n"
     "#define local_barrier() __syncthreads()\n"
     "#define WITHIN_KERNEL extern \"C\" __device__\n"
     "#define KERNEL extern \"C\" __global__\n"
@@ -502,11 +521,17 @@ static const char CUDA_PREAMBLE[] =
     "#define ga_ulong unsigned long long\n"
     "#define ga_float float\n"
     "#define ga_double double\n"
-    "#define ga_half ga_ushort\n"
+    "#define ga_half __half\n"
     "#define ga_size size_t\n"
     "#define ga_ssize ptrdiff_t\n"
-    "#define load_half(p) __half2float(*(p))\n"
-    "#define store_half(p, v) (*(p) = __float2half_rn(v))\n"
+    "#define load_half(p) __half2float(*((__half*)p))\n"
+    "#if __CUDACC_VER_MAJOR__ >= 9\n"
+    "# define store_half(p, v) (*((__half*)p) = __float2half_rn(v))\n"
+    "# define __float2half_as_us(v) __float2half_rn(v).x\n"
+    "#else\n"
+    "# define store_half(p, v) (*((unsigned short*)p) = __float2half_rn(v))\n"
+    "# define __float2half_as_us __float2half_rn\n"
+    "#endif\n"
     "#define GA_DECL_SHARED_PARAM(type, name)\n"
     "#define GA_DECL_SHARED_BODY(type, name) extern __shared__ type name[];\n"
     "#define GA_WARP_SIZE warpSize\n"
@@ -1098,9 +1123,11 @@ static inline int error_nvrtc(error *e, const char *msg, nvrtcResult err) {
 static int call_compiler(cuda_context *ctx, strb *src, strb *ptx, strb *log) {
   nvrtcProgram prog;
   size_t buflen;
-  const char *opts[4] = {
+  const char *opts[] = {
     "-arch", ""
+#ifdef DEBUG
     , "-G", "-lineinfo"
+#endif
   };
   nvrtcResult err;
 
@@ -1111,11 +1138,7 @@ static int call_compiler(cuda_context *ctx, strb *src, strb *ptx, strb *log) {
     return error_nvrtc(ctx->err, "nvrtcCreateProgram", err);
 
   err = nvrtcCompileProgram(prog,
-#ifdef DEBUG
-                            4,
-#else
-                            2,
-#endif
+			    sizeof(opts)/sizeof(char*),
                             opts);
 
   /* Get the log before handling the error */

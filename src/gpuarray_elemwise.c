@@ -208,10 +208,10 @@ static int gen_elemwise_basic_kernel(GpuKernel *k, gpucontext *ctx,
   }
   for (j = 0; j < n; j++) {
     if (is_array(args[j])) {
-      strb_appendf(&sb, "%s %s;", ctype(ISSET(gen_flags, GEN_CONVERT_F16) && args[j].typecode == GA_HALF ?
+      strb_appendf(&sb, "%s %s;", ctype(/* ISSET(gen_flags, GEN_CONVERT_F16) && */ args[j].typecode == GA_HALF ?
                                         GA_FLOAT : args[j].typecode), args[j].name);
       if (ISSET(args[j].flags, GE_READ)) {
-        if (args[j].typecode == GA_HALF && ISSET(gen_flags, GEN_CONVERT_F16)) {
+        if (args[j].typecode == GA_HALF /* && ISSET(gen_flags, GEN_CONVERT_F16)*/) {
           strb_appendf(&sb, "%s = load_half((GLOBAL_MEM ga_half *)(((GLOBAL_MEM char *)%s_data) + %s_p));\n",
                        args[j].name, args[j].name, args[j].name);
         } else {
@@ -225,7 +225,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k, gpucontext *ctx,
   strb_appends(&sb, ";\n");
   for (j = 0; j < n; j++) {
     if (is_array(args[j]) && ISSET(args[j].flags, GE_WRITE)) {
-      if (args[j].typecode == GA_HALF && ISSET(gen_flags, GEN_CONVERT_F16)) {
+      if (args[j].typecode == GA_HALF /* && ISSET(gen_flags, GEN_CONVERT_F16)*/) {
         strb_appendf(&sb, "store_half((GLOBAL_MEM ga_half *)(((GLOBAL_MEM char *)%s_data) + %s_p), %s);\n",
                      args[j].name, args[j].name, args[j].name);
       } else {
@@ -502,10 +502,10 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
   strb_appends(&sb, "for (i = idx; i < n; i += numThreads) {\n");
   for (j = 0; j < n; j++) {
     if (is_array(args[j])) {
-      strb_appendf(&sb, "%s %s;\n", ctype(ISSET(gen_flags, GEN_CONVERT_F16) && args[j].typecode == GA_HALF ?
+      strb_appendf(&sb, "%s %s;\n", ctype(/* ISSET(gen_flags, GEN_CONVERT_F16) && */ args[j].typecode == GA_HALF ?
                                           GA_FLOAT : args[j].typecode), args[j].name);
       if (ISSET(args[j].flags, GE_READ)) {
-        if (args[j].typecode == GA_HALF && ISSET(gen_flags, GEN_CONVERT_F16)) {
+        if (args[j].typecode == GA_HALF /* && ISSET(gen_flags, GEN_CONVERT_F16) */) {
           strb_appendf(&sb, "%s = load_half(&%s_p[i]);\n", args[j].name, args[j].name);
         } else {
           strb_appendf(&sb, "%s = %s_p[i];\n", args[j].name, args[j].name);
@@ -519,7 +519,7 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
   for (j = 0; j < n; j++) {
     if (is_array(args[j])) {
       if (ISSET(args[j].flags, GE_WRITE)) {
-        if (args[j].typecode == GA_HALF && ISSET(gen_flags, GEN_CONVERT_F16)) {
+        if (args[j].typecode == GA_HALF/* && ISSET(gen_flags, GEN_CONVERT_F16) */) {
           strb_appendf(&sb, "store_half(&%s_p[i], %s);\n", args[j].name, args[j].name);
         } else {
           strb_appendf(&sb, "%s_p[i] = %s;\n", args[j].name, args[j].name);

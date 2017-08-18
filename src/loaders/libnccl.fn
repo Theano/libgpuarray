@@ -4,9 +4,8 @@ DEF_PROC(void, ncclCommDestroy, (ncclComm_t comm));
 DEF_PROC(ncclResult_t, ncclCommCount, (const ncclComm_t comm, int* count));
 DEF_PROC(ncclResult_t, ncclCommUserRank, (const ncclComm_t comm, int* rank));
 DEF_PROC(const char*, ncclGetErrorString, (ncclResult_t result));
-DEF_PROC(ncclResult_t, ncclReduce, (const void* sendbuff, void* recvbuf, int count, ncclDataType_t datatype, ncclRedOp_t op, int root, ncclComm_t comm, cudaStream_t stream));
-DEF_PROC(ncclResult_t, ncclAllReduce, (const void* sendbuff, void* recvbuff, int count, ncclDataType_t datatype, ncclRedOp_t op, ncclComm_t comm, cudaStream_t stream));
-DEF_PROC(ncclResult_t, ncclReduceScatter, (const void* sendbuff, void* recvbuff, int recvcount, ncclDataType_t datatype, ncclRedOp_t op, ncclComm_t comm,
-cudaStream_t stream));
-DEF_PROC(ncclResult_t, ncclBcast, (void* buff, int count, ncclDataType_t datatype, int root, ncclComm_t comm, cudaStream_t stream));
-DEF_PROC(ncclResult_t, ncclAllGather, (const void* sendbuff, int count, ncclDataType_t datatype, void* recvbuff, ncclComm_t comm, cudaStream_t stream));
+DEF_PROC(ncclResult_t, ncclReduce, (const void* sendbuff, void* recvbuff, size_t count, ncclDataType_t datatype, ncclRedOp_t op, int root, ncclComm_t comm, cudaStream_t stream));
+DEF_PROC(ncclResult_t, ncclAllReduce, (const void* sendbuff, void* recvbuff, size_t count, ncclDataType_t datatype, ncclRedOp_t op, ncclComm_t comm, cudaStream_t stream ));
+DEF_PROC(ncclResult_t, ncclReduceScatter, (const void* sendbuff, void* recvbuff, size_t recvcount, ncclDataType_t datatype, ncclRedOp_t op, ncclComm_t comm, cudaStream_t stream));
+DEF_PROC(ncclResult_t, ncclBcast, (void* buff, size_t count, ncclDataType_t datatype, int root, ncclComm_t comm, cudaStream_t stream ));
+DEF_PROC(ncclResult_t, ncclAllGather, (const void* sendbuff, void* recvbuff, size_t sendcount, ncclDataType_t datatype, ncclComm_t comm, cudaStream_t stream));

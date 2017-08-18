@@ -31,12 +31,11 @@ int error_set(error *e, int code, const char *msg) {
 
 int error_fmt(error *e, int code, const char *fmt, ...) {
   va_list ap;
-
   e->code = code;
+#ifdef DEBUG
   va_start(ap, fmt);
   vsnprintf(e->msg, ERROR_MSGBUF_LEN, fmt, ap);
   va_end(ap);
-#ifdef DEBUG
   fprintf(stderr, "ERROR %d: %s\n", e->code, e->msg);
 #endif
   return code;
