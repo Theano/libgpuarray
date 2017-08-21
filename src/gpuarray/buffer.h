@@ -100,11 +100,16 @@ GPUARRAY_PUBLIC void gpucontext_props_del(gpucontext_props *p);
  *
  * \warning This function is not thread-safe.
  *
+ * The passed-in properties pointer will be managed by this function
+ * and needs not be freed.  This means that you shouldn't touch the
+ * properties object after passing it to this function.
+ *
  * \param res a pointer to a location that will be allocated
  * \param name the backend name.
  * \param dev the device number.  The precise meaning of the device
  *            number is backend-dependent
- * \param props a properties object for the context.  Can be NULL for defaults.
+ * \param props a properties object for the context.  Can be NULL for
+ *              defaults.
  *
  * \returns GA_NO_ERROR or an error code if an error occurred.
  */

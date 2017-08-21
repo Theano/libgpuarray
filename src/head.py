@@ -1,4 +1,6 @@
 # Used to generate the string tables to embed the cluda headers.
+# Usage: python head.py <file>
+# This will output <file>.c
 
 def wrt(f, n, b):
     f.write(b',')
