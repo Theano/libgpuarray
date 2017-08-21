@@ -49,6 +49,7 @@ static int cuda_property(gpucontext *, gpudata *, gpukernel *, int, void *);
 static int cuda_waits(gpudata *, int, CUstream);
 static int cuda_records(gpudata *, int, CUstream);
 static gpudata *cuda_alloc(gpucontext *c, size_t size, void *data, int flags);
+static void cuda_free(gpudata *);
 
 static int detect_arch(const char *prefix, char *ret, error *e);
 static gpudata *new_gpudata(cuda_context *ctx, CUdeviceptr ptr, size_t size);
@@ -698,7 +699,6 @@ static int extract(gpudata *curr, gpudata *prev, size_t size) {
   return GA_NO_ERROR;
 }
 
-static void cuda_free(gpudata *);
 static int cuda_write(gpudata *dst, size_t dstoff, const void *src,
                       size_t sz);
 
