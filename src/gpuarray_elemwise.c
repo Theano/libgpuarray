@@ -547,7 +547,6 @@ static int gen_elemwise_contig_kernel(GpuKernel *k,
 static int check_contig(GpuElemwise *ge, void **args,
                         size_t *_n, int *contig) {
   GpuArray *a = NULL, *v;
-  gpucontext *ctx = GpuKernel_context(&ge->k_contig);
   size_t n = 1;
   unsigned int i, j;
   int c_contig = 1, f_contig = 1;
@@ -563,10 +562,10 @@ static int check_contig(GpuElemwise *ge, void **args,
       f_contig &= GpuArray_IS_F_CONTIGUOUS(v);
       if (a != v) {
         if (a->nd != v->nd)
-          return error_fmt(ctx->err, GA_INVALID_ERROR, "Mismatched nd for input %u (expected %u, got %u)", i, a->nd, v->nd);
+          return -1; /* We don't check the value of the error code */
         for (j = 0; j < a->nd; j++) {
           if (v->dimensions[j] != a->dimensions[j])
-            return error_fmt(ctx->err, GA_VALUE_ERROR, "Mismatched dimension %u (expected %" SPREFIX "u, got %" SPREFIX "u)", j, a->dimensions[j], v->dimensions[j]);
+            return -1; /* We don't check the value of the error code */
         }
       }
     }
