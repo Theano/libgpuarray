@@ -71,28 +71,136 @@ GPUARRAY_PUBLIC int gpu_get_device_count(const char* name,
                                          unsigned int platform,
                                          unsigned int* devcount);
 
+
+/**
+ * Opaque structure that holds properties for the context.
+ */
 typedef struct _gpucontext_props gpucontext_props;
 
+/**
+ * Allocate and initialized an instance of gpucontext_props.
+ *
+ * Initialization is done with default values.
+ *
+ * \param res pointer to storage space for the created object
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
 GPUARRAY_PUBLIC int gpucontext_props_new(gpucontext_props **res);
 
+/**
+ * Set the device number for a CUDA device.
+ *
+ * \param p properties object
+ * \param devno device number
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
 GPUARRAY_PUBLIC int gpucontext_props_cuda_dev(gpucontext_props *p, int devno);
 
+
+/**
+ * Set the platform and device for OpenCL.
+ *
+ * \param p properties object
+ * \param platno platform number
+ * \param devno device number
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
 GPUARRAY_PUBLIC int gpucontext_props_opencl_dev(gpucontext_props *p,
                                                 int platno, int devno);
 
-#define GA_CTX_SCHED_AUTO   0
-#define GA_CTX_SCHED_SINGLE 1
-#define GA_CTX_SCHED_MULTI  2
+/**
+ * Set the scheduling mode for the device.
+ *
+ * \param p properties object
+ * \param sched scheduling mode.  One of \ref sched_modes "these".
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
 GPUARRAY_PUBLIC int gpucontext_props_sched(gpucontext_props *p, int sched);
 
+/** \defgroup sched_modes
+ * @{
+ */
+
+/**
+ * Automatic scheduling, decide what to do depending on the workload,
+ * number of cores in the computer and other relevant factors. (default)
+ */
+#define GA_CTX_SCHED_AUTO   0
+
+/**
+ * Single-work scheduling.  Optimize for speed in a single process,
+ * with a single thread.  This is the fastest mode, but it may keep
+ * the CPU busy more than necessary.
+ */
+#define GA_CTX_SCHED_SINGLE 1
+
+/**
+ * Multi-work scheduling.  Try to not keep the CPU busy more than
+ * necessary and let other threads a chance at some CPU time.  This
+ * may increase the latency when waiting for GPU operations.
+ */
+#define GA_CTX_SCHED_MULTI  2
+
+/** @}*/
+
+/**
+ * Set single-stream mode.
+ *
+ * All operations on the device will be serialized on a single stream.
+ * This will also disable most of the interlocking normally done
+ * between multiple streams to keep everything in order.
+ *
+ * This mode can be faster if you don't have a lot of device-level
+ * parallelism in your workload.
+ *
+ * \param p properties object
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
 GPUARRAY_PUBLIC int gpucontext_props_set_single_stream(gpucontext_props *p);
 
+/**
+ * Set the path for the kernel cache.
+ *
+ * The cache can be shared with other running instances, even on
+ * shared drives.
+ *
+ * \param p properties object
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
 GPUARRAY_PUBLIC int gpucontext_props_kernel_cache(gpucontext_props *p,
                                                   const char *path);
 
+/**
+ * Configure the allocation cache.
+ *
+ * The maximum size is also a limit on the total amount of memory
+ * allocated on the device.
+ *
+ * \param p properties object
+ * \param initial initial size of the cache
+ * \param max maximum size of the cache
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
 GPUARRAY_PUBLIC int gpucontext_props_alloc_cache(gpucontext_props *p,
                                                  size_t initial, size_t max);
 
+/**
+ * Free a properties object.
+ *
+ * This should not be called on a properties object that has been
+ * passed to gpucontext_init().
+ *
+ * \param p properties object
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
 GPUARRAY_PUBLIC void gpucontext_props_del(gpucontext_props *p);
 
 /**
