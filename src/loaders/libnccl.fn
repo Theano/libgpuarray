@@ -9,5 +9,3 @@ DEF_PROC(ncclResult_t, ncclAllReduce, (const void* sendbuff, void* recvbuff, siz
 DEF_PROC(ncclResult_t, ncclReduceScatter, (const void* sendbuff, void* recvbuff, size_t recvcount, ncclDataType_t datatype, ncclRedOp_t op, ncclComm_t comm, cudaStream_t stream));
 DEF_PROC(ncclResult_t, ncclBcast, (void* buff, size_t count, ncclDataType_t datatype, int root, ncclComm_t comm, cudaStream_t stream ));
 DEF_PROC(ncclResult_t, ncclAllGather, (const void* sendbuff, void* recvbuff, size_t sendcount, ncclDataType_t datatype, ncclComm_t comm, cudaStream_t stream));
-// We don't need this but we use it as a sentinel to prevent nccl 1.0 from loading.
-DEF_PROC(ncclResult_t, ncclGroupStart, ());
