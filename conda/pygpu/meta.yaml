@@ -1,0 +1,44 @@
+{% set version = "0.7.0" %}
+
+package:
+  name: pygpu
+  version: {{ version }}
+
+source:
+  fn: libgpuarray-{{ version }}.tar.gz
+  url: https://github.com/Theano/libgpuarray/archive/v{{ version }}.tar.gz
+
+build:
+  number: 0
+  script:
+    - export CFLAGS="${CFLAGS} -I${PREFIX}/include -L${PREFIX}/lib"  # [unix]
+    - python setup.py install --single-version-externally-managed --record record.txt
+
+requirements:
+  build:
+    - python
+    - cython >=0.25
+    - numpy x.x
+    - mako
+    - setuptools
+    - libgpuarray =={{ version }}
+
+  run:
+    - python
+    - numpy x.x
+    - mako
+    - six
+    - libgpuarray =={{ version }}
+
+test:
+  imports:
+    - pygpu
+    - pygpu.gpuarray
+
+about:
+  home: http://github.com/Theano/libgpuarray
+  license: ISC
+  license_file: LICENSE
+  summary: 'Library to manipulate arrays on GPU'
+  doc_url: http://deeplearning.net/software/libgpuarray/
+  dev_url: http://github.com/Theano/libgpuarray
