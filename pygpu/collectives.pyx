@@ -48,7 +48,7 @@ cdef class GpuCommCliqueId:
         buffer.readonly = 0
         buffer.itemsize = sizeof(char)
         if flags & PyBUF_FORMAT == PyBUF_FORMAT:
-            buffer.format = 'b'
+            buffer.format = 'B'
         else:
             buffer.format = NULL
         buffer.ndim = 1

@@ -293,19 +293,19 @@ class TestGpuComm(unittest.TestCase):
 
         a = cpu.reshape((5, 2), order='F')
         exp = texp.reshape((5, 2 * self.size), order='F')
-        gpu = gpuarray.asarray(a, context=self.ctx)
+        gpu = gpuarray.asarray(a, context=self.ctx, order='F')
         resgpu = self.gpucomm.all_gather(gpu, nd_up=0)
         check_all(resgpu, exp)
 
         a = cpu.reshape((5, 2), order='F')
         exp = texp.reshape((5, 2, self.size), order='F')
-        gpu = gpuarray.asarray(a, context=self.ctx)
+        gpu = gpuarray.asarray(a, context=self.ctx, order='F')
         resgpu = self.gpucomm.all_gather(gpu, nd_up=1)
         check_all(resgpu, exp)
 
         a = cpu.reshape((5, 2), order='F')
         exp = texp.reshape((5, 2, 1, 1, self.size), order='F')
-        gpu = gpuarray.asarray(a, context=self.ctx)
+        gpu = gpuarray.asarray(a, context=self.ctx, order='F')
         resgpu = self.gpucomm.all_gather(gpu, nd_up=3)
         check_all(resgpu, exp)
 
