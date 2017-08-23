@@ -40,6 +40,9 @@ int load_libnccl(error *e) {
 
   #include "libnccl.fn"
 
+  if (ga_func_ptr(lib, "ncclGroupStart", e) == NULL)
+    return error_set(e, GA_LOAD_ERROR, "Found NCCL 1.0 but NCCL 2.0 required");
+
   loaded = 1;
   return GA_NO_ERROR;
 }
