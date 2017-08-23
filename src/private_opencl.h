@@ -71,7 +71,7 @@ typedef struct _cl_ctx {
   cl_context ctx;
   cl_command_queue q;
   char *exts;
-  char *preamble;
+  char *options;
 } cl_ctx;
 
 /** @cond NEVER */
@@ -104,7 +104,7 @@ struct _gpukernel {
 #endif
 };
 
-cl_ctx *cl_make_ctx(cl_context ctx, int flags);
+cl_ctx *cl_make_ctx(cl_context ctx, gpucontext_props *p);
 cl_command_queue cl_get_stream(gpucontext *ctx);
 gpudata *cl_make_buf(gpucontext *c, cl_mem buf);
 cl_mem cl_get_buf(gpudata *g);

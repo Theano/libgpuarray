@@ -14,6 +14,22 @@ add_custom_command(
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen_types.py)
 
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/cluda_cuda.h.c
+  COMMAND python head.py cluda_cuda.h
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/head.py
+          ${CMAKE_CURRENT_SOURCE_DIR}/cluda_cuda.h
+  )
+
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/cluda_opencl.h.c
+  COMMAND python head.py cluda_opencl.h
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/head.py
+          ${CMAKE_CURRENT_SOURCE_DIR}/cluda_opencl.h
+  )
+
 macro (set_rel var)
   file (RELATIVE_PATH _relPath "${CMAKE_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}")
   # clear previous list (if any)
@@ -57,6 +73,9 @@ gpuarray_blas_opencl_clblas.c
 gpuarray_blas_opencl_clblast.c
 )
 
+set_property(SOURCE gpuarray_buffer_cuda.c APPEND PROPERTY OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/cluda_cuda.h.c)
+set_property(SOURCE gpuarray_buffer_opencl.c APPEND PROPERTY OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/cluda_opencl.h.c)
+
 check_function_exists(strlcat HAVE_STRL)
 check_function_exists(mkstemp HAVE_MKSTEMP)
 
@@ -89,7 +108,7 @@ set_target_properties(gpuarray PROPERTIES
   INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/lib
   MACOSX_RPATH OFF
   # This is the shared library version
-  VERSION 2.1
+  VERSION 3.0
   )
 
 add_library(gpuarray-static STATIC ${GPUARRAY_SRC})

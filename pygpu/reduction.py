@@ -31,11 +31,14 @@ def _ceil_log2(x):
 
 
 basic_kernel = Template("""
+#include "cluda.h"
+
 ${preamble}
 
 #define REDUCE(a, b) (${reduce_expr})
 
-KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} out
+KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} out,
+                    const unsigned int out_off
 % for d in range(nd):
                     , const unsigned int dim${d}
 % endfor
@@ -62,6 +65,8 @@ KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} out
   ${arg.name}_data = (${arg.decltype()})tmp;
   % endif
 % endfor
+  tmp = (GLOBAL_MEM char *)out; tmp += out_off;
+  out = (${out_arg.decltype()})tmp;
 
   i = GID_0;
 % for i in range(nd-1, -1, -1):
@@ -123,6 +128,7 @@ KERNEL void ${name}(const unsigned int n, ${out_arg.decltype()} out
       ldata[lid] = REDUCE(ldata[lid], ldata[lid+${cur_size}]);
     }
   % endwhile
+  local_barrier();
   if (lid == 0) out[GID_0] = ldata[0];
 }
 """)
@@ -187,7 +193,7 @@ class ReductionKernel(object):
 
         self.init_local_size = min(context.lmemsize //
                                    self.out_arg.dtype.itemsize,
-                                   context.maxlsize)
+                                   context.maxlsize0)
 
         # this is to prep the cache
         if init_nd is not None:
@@ -222,7 +228,7 @@ class ReductionKernel(object):
                                   redux=self.redux,
                                   neutral=self.neutral,
                                   map_expr=self.expression)
-        spec = ['uint32', gpuarray.GpuArray]
+        spec = ['uint32', gpuarray.GpuArray, 'uint32']
         spec.extend('uint32' for _ in range(nd))
         for i, arg in enumerate(self.arguments):
             spec.append(arg.spec())
@@ -230,7 +236,7 @@ class ReductionKernel(object):
                 spec.append('uint32')
                 spec.extend('int32' for _ in range(nd))
         k = gpuarray.GpuKernel(src, "reduk", spec, context=self.context,
-                               cluda=True, **self.flags)
+                               **self.flags)
         return k, src, spec
 
     @lru_cache()
@@ -253,7 +259,7 @@ class ReductionKernel(object):
         if gs == 0:
             gs = 1
         n /= gs
-        if gs > self.context.maxgsize:
+        if gs > self.context.maxgsize0:
             raise ValueError("Array too big to be reduced along the "
                              "selected axes")
 
@@ -272,7 +278,7 @@ class ReductionKernel(object):
         else:
             k, _, _, ls = self._get_basic_kernel(2**_ceil_log2(n), nd)
 
-        kargs = [n, out]
+        kargs = [n, out, out.offset]
         kargs.extend(dims)
         for i, arg in enumerate(args):
             kargs.append(arg)

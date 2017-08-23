@@ -1,4 +1,4 @@
-version: '0.6.9.{build}'
+version: '0.7.0.{build}'
 
 pull_requests:
   do_not_increment_build_number: true
@@ -25,6 +25,9 @@ environment:
       VS_PATH: "C:\\Users\\appveyor\\AppData\\Local\\Programs\\Common\\Microsoft\\Visual C++ for Python\\9.0"
     - PYTHON: "C:\\Python35"
       VS_PATH: "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC"
+
+install:
+  - python -m pip install mako cython
 
 build_script:
   - echo "Python:" "%PYTHON%"

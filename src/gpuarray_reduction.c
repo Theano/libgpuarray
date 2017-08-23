@@ -322,6 +322,7 @@ static int   maxandargmaxGenSource              (maxandargmax_ctx*  ctx){
 	return ctx->ret=GA_NO_ERROR;
 }
 static void  maxandargmaxAppendKernel           (maxandargmax_ctx*  ctx){
+	strb_appends           (&ctx->s, "#include \"cluda.h\"\n");
 	maxandargmaxAppendTypedefs         (ctx);
 	maxandargmaxAppendPrototype        (ctx);
 	strb_appends           (&ctx->s, "{\n");
@@ -657,7 +658,7 @@ static int   maxandargmaxCompile                (maxandargmax_ctx*  ctx){
 	                          "maxandargmax",
 	                          ARG_TYPECODES_LEN,
 	                          ARG_TYPECODES,
-	                          GA_USE_CLUDA,
+	                          0,
 	                          (char**)0);
 	free(ctx->sourceCode);
 	ctx->sourceCode = NULL;
@@ -697,8 +698,8 @@ static int   maxandargmaxSchedule               (maxandargmax_ctx*  ctx){
 	gpudata_property  (ctx->src->data, GA_CTX_PROP_MAXLSIZE0,    &maxL0);
 	gpudata_property  (ctx->src->data, GA_CTX_PROP_MAXLSIZE1,    &maxL1);
 	gpudata_property  (ctx->src->data, GA_CTX_PROP_MAXLSIZE2,    &maxL2);
-	gpudata_property  (ctx->src->data, GA_CTX_PROP_MAXGSIZE,     &maxG);
 	gpudata_property  (ctx->src->data, GA_CTX_PROP_MAXGSIZE0,    &maxG0);
+	maxG = maxG0;
 	gpudata_property  (ctx->src->data, GA_CTX_PROP_MAXGSIZE1,    &maxG1);
 	gpudata_property  (ctx->src->data, GA_CTX_PROP_MAXGSIZE2,    &maxG2);
 

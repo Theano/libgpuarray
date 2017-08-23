@@ -77,10 +77,11 @@ typedef struct _blas_handle {
 #define LARGE_VAL(v) (v >= INT_MAX)
 
 static const char *code_sgemvBH_N_a1_b1_small =                         \
-  "extern \"C\"__global__ void sgemv(const float *A[], size_t lda, "    \
-  "                                  const float *x[], size_t incx, "   \
-  "                                  float *y[], size_t incy, "         \
-  "                                  size_t b, size_t m, size_t n) {"   \
+  "#include \"cluda.h\"\n"                                              \
+  "KERNEL void sgemv(const float *A[], size_t lda, "                    \
+  "                  const float *x[], size_t incx, "                   \
+  "                  float *y[], size_t incy, "                         \
+  "                  size_t b, size_t m, size_t n) {"                   \
   "  for (size_t p = blockIdx.y * blockDim.y + threadIdx.y; p < b;"     \
   "       p += gridDim.y * blockDim.y) {"                               \
   "    for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < m;"   \
@@ -94,51 +95,37 @@ static const char *code_sgemvBH_N_a1_b1_small =                         \
   "        Ap += lda;"                                                  \
   "        xp += incx;"                                                 \
   "      }"                                                             \
-  "     atomicAdd(&y[p][i*incy], yi);"                                  \
+  "     atom_add_fg(&y[p][i*incy], yi);"                                \
   "    }"                                                               \
   "  }"                                                                 \
   "}\n";
 
-static const char *code_sgemvBH_T_a1_b1_small =                         \
-  "extern \"C\" __global__ void sgemv(const float *A[], size_t lda, "   \
-  "                                   const float *x[], size_t incx, "  \
-  "                                   float *y[], size_t incy, "        \
-  "                                   size_t b, size_t m, size_t n) {"  \
-  "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;"                 \
-  "  size_t p = blockIdx.y * blockDim.y + threadIdx.y;"                 \
-  "  if (i >= m || p >= b) return;"                                     \
-  "  float yi = 0.0f;"                                                  \
-  "  const float *Ap = A[p] + i * lda;"                                 \
-  "  const float *xp = x[p];\n"                                         \
-  "  # pragma unroll 32\n"                                              \
-  "  for (size_t j = 0; j < n; j++) {"                                  \
-  "    yi += Ap[j] * xp[0];"                                            \
-  "    xp += incx;"                                                     \
-  "  }"                                                                 \
-  "  atomicAdd(&y[p][i*incy], yi);"                                     \
+static const char *code_sgemvBH_T_a1_b1_small =         \
+  "#include \"cluda.h\"\n"                              \
+  "KERNEL void sgemv(const float *A[], size_t lda, "    \
+  "                  const float *x[], size_t incx, "   \
+  "                  float *y[], size_t incy, "         \
+  "                  size_t b, size_t m, size_t n) {"   \
+  "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;" \
+  "  size_t p = blockIdx.y * blockDim.y + threadIdx.y;" \
+  "  if (i >= m || p >= b) return;"                     \
+  "  float yi = 0.0f;"                                  \
+  "  const float *Ap = A[p] + i * lda;"                 \
+  "  const float *xp = x[p];\n"                         \
+  "  # pragma unroll 32\n"                              \
+  "  for (size_t j = 0; j < n; j++) {"                  \
+  "    yi += Ap[j] * xp[0];"                            \
+  "    xp += incx;"                                     \
+  "  }"                                                 \
+  "  atom_add_fg(&y[p][i*incy], yi);"                   \
   "}\n";
 
-static const char *atomicadd_double =                                   \
-  "#if __CUDA_ARCH__ < 600\n"						\
-  "__device__ double atomicAdd(double* address, double val) {"          \
-  "  unsigned long long int* address_as_ull ="                          \
-  "  (unsigned long long int*)address;"                                 \
-  "  unsigned long long int old = *address_as_ull, assumed;"            \
-  "  do {"                                                              \
-  "    assumed = old;"                                                  \
-  "    old = atomicCAS(address_as_ull, assumed,"                        \
-  "                    __double_as_longlong(val +"                      \
-  "                    __longlong_as_double(assumed)));"                \
-  "  } while (assumed != old);"                                         \
-  "  return __longlong_as_double(old);"                                 \
-  "}\n"									\
-  "#endif\n";
-
 static const char *code_dgemvBH_N_a1_b1_small =                         \
-  "extern \"C\" __global__ void dgemv(const double *A[], size_t lda, "  \
-  "                                   const double *x[], size_t incx, " \
-  "                                   double *y[], size_t incy, "       \
-  "                                   size_t b, size_t m, size_t n) {"  \
+  "#include \"cluda.h\"\n"                                              \
+  "KERNEL void dgemv(const double *A[], size_t lda, "                   \
+  "                  const double *x[], size_t incx, "                  \
+  "                  double *y[], size_t incy, "                        \
+  "                  size_t b, size_t m, size_t n) {"                   \
   "  for (size_t p = blockIdx.y * blockDim.y + threadIdx.y; p < b;"     \
   "       p += gridDim.y * blockDim.y) {"                               \
   "    for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < m;"   \
@@ -152,32 +139,34 @@ static const char *code_dgemvBH_N_a1_b1_small =                         \
   "        Ap += lda;"                                                  \
   "        xp += incx;"                                                 \
   "      }"                                                             \
-  "     atomicAdd(&y[p][i*incy], yi);"                                  \
+  "     atom_add_dg(&y[p][i*incy], yi);"                                \
   "    }"                                                               \
   "  }"                                                                 \
   "}\n";
 
-static const char *code_dgemvBH_T_a1_b1_small =                         \
-  "extern \"C\" __global__ void dgemv(const double *A[], size_t lda, "  \
-  "                                   const double *x[], size_t incx, " \
-  "                                   double *y[], size_t incy, "       \
-  "                                   size_t b, size_t m, size_t n) {"  \
-  "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;"                 \
-  "  size_t p = blockIdx.y * blockDim.y + threadIdx.y;"                 \
-  "  if (i >= m || p >= b) return;"                                     \
-  "  double yi = 0.0;"                                                  \
-  "  const double *Ap = A[p] + i * lda;"                                \
-  "  const double *xp = x[p];\n"                                        \
-  "  # pragma unroll 32\n"                                              \
-  "  for (size_t j = 0; j < n; j++) {"                                  \
-  "    yi += Ap[j] * xp[0];"                                            \
-  "    xp += incx;"                                                     \
-  "  }"                                                                 \
-  "  atomicAdd(&y[p][i*incy], yi);"                                     \
+static const char *code_dgemvBH_T_a1_b1_small =         \
+  "#include \"cluda.h\"\n"                              \
+  "KERNEL void dgemv(const double *A[], size_t lda, "   \
+  "                  const double *x[], size_t incx, "  \
+  "                  double *y[], size_t incy, "        \
+  "                  size_t b, size_t m, size_t n) {"   \
+  "  size_t i = blockIdx.x * blockDim.x + threadIdx.x;" \
+  "  size_t p = blockIdx.y * blockDim.y + threadIdx.y;" \
+  "  if (i >= m || p >= b) return;"                     \
+  "  double yi = 0.0;"                                  \
+  "  const double *Ap = A[p] + i * lda;"                \
+  "  const double *xp = x[p];\n"                        \
+  "  # pragma unroll 32\n"                              \
+  "  for (size_t j = 0; j < n; j++) {"                  \
+  "    yi += Ap[j] * xp[0];"                            \
+  "    xp += incx;"                                     \
+  "  }"                                                 \
+  "  atom_add_dg(&y[p][i*incy], yi);"                   \
   "}\n";
 
 static const char *code_sgerBH_gen_small =                              \
-  "extern \"C\" __global__ void _sgerBH_gen_small("                     \
+  "#include \"cluda.h\"\n"                                              \
+  "KERNEL void _sgerBH_gen_small("                                      \
   "    const float *x[], size_t incx,"                                  \
   "    const float *y[], size_t incy,"                                  \
   "    float alpha, float *A[], size_t lda,"                            \
@@ -186,13 +175,14 @@ static const char *code_sgerBH_gen_small =                              \
   "  size_t j = blockIdx.y * blockDim.y + threadIdx.y;"                 \
   "  if (i >= m || j >= n) return;"                                     \
   "  for (size_t p = blockIdx.z; p < b; p += gridDim.z) {"              \
-  "    atomicAdd(&A[p][j * lda + i],"                                   \
-  "              alpha * x[p][i * incx] * y[p][j * incy]);"             \
+  "    atom_add_fg(&A[p][j * lda + i],"                                 \
+  "                alpha * x[p][i * incx] * y[p][j * incy]);"           \
   "  }"                                                                 \
   "}\n";
 
 static const char *code_dgerBH_gen_small =                              \
-  "extern \"C\" __global__ void _dgerBH_gen_small("                     \
+  "#include \"cluda.h\"\n"                                              \
+  "KERNEL void _dgerBH_gen_small("                                      \
   "      const double *x[], size_t incx, "                              \
   "      const double *y[], size_t incy,"                               \
   "      double alpha, double *A[], size_t lda,"                        \
@@ -201,15 +191,14 @@ static const char *code_dgerBH_gen_small =                              \
   "  size_t j = blockIdx.y * blockDim.y + threadIdx.y;"                 \
   "  if (i >= m || j >= n) return;"                                     \
   "  for (size_t p = blockIdx.z; p < b; p += gridDim.z) {"              \
-  "    atomicAdd(&A[p][j * lda + i],"                                   \
-  "              alpha * x[p][i * incx] * y[p][j * incy]);"             \
+  "    atom_add_dg(&A[p][j * lda + i],"                                 \
+  "                alpha * x[p][i * incx] * y[p][j * incy]);"           \
   "  }"                                                                 \
   "}\n";
 
 static int setup(gpucontext *c) {
   cuda_context *ctx = (cuda_context *)c;
   blas_handle *handle;
-  const char *tmp[2];
   cublasStatus_t err;
   int types[10];
   int e;
@@ -254,13 +243,9 @@ static int setup(gpucontext *c) {
   if (e != GA_NO_ERROR) goto e1;
   e = GpuKernel_init(&handle->sgemvBH_T_a1_b1_small, c, 1, &code_sgemvBH_T_a1_b1_small, NULL, "sgemv", 9, types, 0, NULL);
   if (e != GA_NO_ERROR) goto e2;
-  tmp[0] = atomicadd_double;
-  tmp[1] = code_dgemvBH_N_a1_b1_small;
-  e = GpuKernel_init(&handle->dgemvBH_N_a1_b1_small, c, 2, tmp, NULL, "dgemv", 9, types, GA_USE_DOUBLE, NULL);
+  e = GpuKernel_init(&handle->dgemvBH_N_a1_b1_small, c, 1, &code_dgemvBH_N_a1_b1_small, NULL, "dgemv", 9, types, GA_USE_DOUBLE, NULL);
   if (e != GA_NO_ERROR) goto e3;
-  tmp[0] = atomicadd_double;
-  tmp[1] = code_dgemvBH_T_a1_b1_small;
-  e = GpuKernel_init(&handle->dgemvBH_T_a1_b1_small, c, 2, tmp, NULL, "dgemv", 9, types, GA_USE_DOUBLE, NULL);
+  e = GpuKernel_init(&handle->dgemvBH_T_a1_b1_small, c, 1, &code_dgemvBH_T_a1_b1_small, NULL, "dgemv", 9, types, GA_USE_DOUBLE, NULL);
   if (e != GA_NO_ERROR) goto e4;
 
   types[0] = GA_BUFFER;
@@ -276,9 +261,7 @@ static int setup(gpucontext *c) {
   e = GpuKernel_init(&handle->sgerBH_gen_small, c, 1, &code_sgerBH_gen_small, NULL, "_sgerBH_gen_small", 10, types, 0, NULL);
   if (e != GA_NO_ERROR) goto e5;
   types[4] = GA_DOUBLE;
-  tmp[0] = atomicadd_double;
-  tmp[1] = code_dgerBH_gen_small;
-  e = GpuKernel_init(&handle->dgerBH_gen_small, c, 2, tmp, NULL, "_dgerBH_gen_small", 10, types, GA_USE_DOUBLE, NULL);
+  e = GpuKernel_init(&handle->dgerBH_gen_small, c, 1, &code_dgerBH_gen_small, NULL, "_dgerBH_gen_small", 10, types, GA_USE_DOUBLE, NULL);
   if (e != GA_NO_ERROR) goto e6;
 
   ctx->blas_handle = handle;

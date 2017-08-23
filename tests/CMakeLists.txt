@@ -48,6 +48,9 @@ endif()
 if(CHECK_FOUND)
 enable_testing()
 
+include_directories("${CMAKE_SOURCE_DIR}/src")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
+
 include_directories(${CHECK_INCLUDE_DIRS})
 link_directories(${CHECK_LIBRARY_DIRS})
 
@@ -58,9 +61,6 @@ endforeach()
 foreach(flag ${CHECK_LDFLAGS_OTHER})
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${flag}")
 endforeach()
-
-include_directories("${CMAKE_SOURCE_DIR}/src")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_executable(check_types main.c check_types.c)
 target_link_libraries(check_types ${CHECK_LIBRARIES} gpuarray)

@@ -75,7 +75,9 @@ extern void teardown_comm(void);
     for (j = 0; j < indims[1]; ++j)                                          \
       A[i][j] = comm_rank + 2;                                               \
                                                                              \
-  err = GpuArray_copy_from_host(&Adev, ctx, A, GA_INT, ND, indims, instrds); \
+  err = GpuArray_empty(&Adev, ctx, GA_INT, ND, indims, GA_C_ORDER);          \
+  ck_assert_int_eq(err, GA_NO_ERROR);                                        \
+  err = GpuArray_write(&Adev, A, sizeof(*A) * inrows);                       \
   ck_assert_int_eq(err, GA_NO_ERROR);                                        \
   err = GpuArray_empty(&RESdev, ctx, GA_INT, ND, outdims, GA_C_ORDER);       \
   ck_assert_int_eq(err, GA_NO_ERROR);

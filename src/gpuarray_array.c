@@ -61,7 +61,7 @@ static int ga_extcopy(GpuArray *dst, const GpuArray *src) {
     gargs[1].name = "dst";
     gargs[1].typecode = dst->typecode;
     gargs[1].flags = GE_WRITE;
-    k = GpuElemwise_new(ctx, "", "dst = src", 2, gargs, 0, 0);
+    k = GpuElemwise_new(ctx, "", "dst = src", 2, gargs, 0, GE_CONVERT_F16);
     if (k == NULL)
       return ctx->err->code;
     aa = memdup(&a, sizeof(a));
@@ -102,6 +102,9 @@ int GpuArray_empty(GpuArray *a, gpucontext *ctx, int typecode,
   size_t size = gpuarray_get_elsize(typecode);
   unsigned int i;
   int res = GA_NO_ERROR;
+
+  if (typecode == GA_SIZE || typecode == GA_SSIZE)
+    return error_set(ctx->err, GA_VALUE_ERROR, "Cannot create array with size type");
 
   if (ord == GA_ANY_ORDER)
     ord = GA_C_ORDER;
@@ -189,8 +192,10 @@ int GpuArray_fromdata(GpuArray *a, gpudata *data, size_t offset, int typecode,
                       unsigned int nd, const size_t *dims,
                       const ssize_t *strides, int writeable) {
   gpucontext *ctx = gpudata_context(data);
-  if (gpuarray_get_type(typecode)->typecode != typecode)
-    return error_set(ctx->err, GA_VALUE_ERROR, "typecode mismatch");
+
+  if (typecode == GA_SIZE || typecode == GA_SSIZE)
+    return error_set(ctx->err, GA_VALUE_ERROR, "Cannot create array with size type");
+
   assert(data != NULL);
   a->data = data;
   gpudata_retain(a->data);
@@ -210,39 +215,6 @@ int GpuArray_fromdata(GpuArray *a, gpudata *data, size_t offset, int typecode,
   GpuArray_fix_flags(a);
 
   return GA_NO_ERROR;
-}
-
-int GpuArray_copy_from_host(GpuArray *a, gpucontext *ctx, void *buf,
-                            int typecode, unsigned int nd, const size_t *dims,
-                            const ssize_t *strides) {
-  char *base = (char *)buf;
-  size_t offset = 0;
-  size_t size = gpuarray_get_elsize(typecode);
-  gpudata *b;
-  int err;
-  unsigned int i;
-
-  for (i = 0; i < nd; i++) {
-    if (dims[i] == 0) {
-      size = 0;
-      base = (char *)buf;
-      break;
-    }
-
-    if (strides[i] < 0)
-      base += (dims[i]-1) * strides[i];
-    else
-      size += (dims[i]-1) * strides[i];
-  }
-  offset = (char *)buf - base;
-  size += offset;
-
-  b = gpudata_alloc(ctx, size, base, GA_BUFFER_INIT, &err);
-  if (b == NULL) return err;
-
-  err = GpuArray_fromdata(a, b, offset, typecode, nd, dims, strides, 1);
-  gpudata_release(b);
-  return err;
 }
 
 int GpuArray_view(GpuArray *v, const GpuArray *a) {
@@ -358,7 +330,7 @@ static int gen_take1_kernel(GpuKernel *k, gpucontext *ctx, char **err_str,
   char *sz, *ssz;
   unsigned int i, i2;
   unsigned int nargs, apos;
-  int flags = GA_USE_CLUDA;
+  int flags = 0;
   int res;
 
   nargs = 9 + 2 * v->nd;
@@ -376,7 +348,8 @@ static int gen_take1_kernel(GpuKernel *k, gpucontext *ctx, char **err_str,
   }
 
   apos = 0;
-  strb_appendf(&sb, "KERNEL void take1(GLOBAL_MEM %s *r, ga_size r_off, "
+  strb_appendf(&sb, "#include \"cluda.h\"\n"
+               "KERNEL void take1(GLOBAL_MEM %s *r, ga_size r_off, "
                "GLOBAL_MEM const %s *v, ga_size v_off,",
                gpuarray_get_type(a->typecode)->cluda_name,
                gpuarray_get_type(v->typecode)->cluda_name);
@@ -412,13 +385,13 @@ static int gen_take1_kernel(GpuKernel *k, gpucontext *ctx, char **err_str,
                "    %s ii0 = ind[i0];\n"
                "    %s pos0 = v_off;\n"
                "    if (ii0 < 0) ii0 += d0;\n"
-               "    if ((ii0 < 0) || (ii0 >= d0)) {\n"
+               "    if ((ii0 < 0) || (ii0 >= (%s)d0)) {\n"
                "      *err = -1;\n"
                "      continue;\n"
                "    }\n"
                "    pos0 += ii0 * (%s)s0;\n"
                "    for (i1 = idx1; i1 < n1; i1 += numThreads1) {\n"
-               "      %s p = pos0;\n", ssz, sz, sz, sz);
+               "      %s p = pos0;\n", ssz, sz, ssz, sz, sz);
   if (v->nd > 1) {
     strb_appendf(&sb, "      %s pos, ii = i1;\n", sz);
     for (i2 = v->nd; i2 > 1; i2--) {
@@ -562,7 +535,7 @@ int GpuArray_take1(GpuArray *a, const GpuArray *v, const GpuArray *i,
   if (check_error && err == GA_NO_ERROR) {
     err = gpudata_read(&kerr, errbuf, 0, sizeof(int));
     if (err == GA_NO_ERROR && kerr != 0) {
-      err = GA_VALUE_ERROR;
+      err = error_set(ctx->err, GA_VALUE_ERROR, "Index out of bounds");
       kerr = 0;
       /* We suppose this will not fail */
       gpudata_write(errbuf, 0, &kerr, sizeof(int));

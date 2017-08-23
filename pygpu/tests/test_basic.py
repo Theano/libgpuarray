@@ -63,14 +63,14 @@ class test_errors(TestCase):
 
     def run_noncontiguous_tril(self):
         a = numpy.random.rand(5, 5)
-        a = a[::-1]
         b = pygpu.array(a, context=context)
+        b = b[::-1]
         assert b.flags.c_contiguous is b.flags.f_contiguous is False
         tril(b)
 
     def run_noncontiguous_triu(self):
         a = numpy.random.rand(5, 5)
-        a = a[::-1]
         b = pygpu.array(a, context=context)
+        b = b[::-1]
         assert b.flags.c_contiguous is b.flags.f_contiguous is False
         triu(b)

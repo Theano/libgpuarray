@@ -6,6 +6,8 @@ from libc.string cimport strncmp
 cimport numpy as np
 import numpy as np
 
+import sys
+
 from cpython cimport Py_INCREF, PyNumber_Index
 from cpython.object cimport Py_EQ, Py_NE
 
@@ -308,17 +310,6 @@ cdef int array_fromdata(GpuArray a,
     if err != GA_NO_ERROR:
         raise get_exc(err), gpucontext_error(gpudata_context(data), err)
 
-cdef int array_copy_from_host(GpuArray a,
-                              gpucontext *ctx, void *buf, int typecode,
-                              unsigned int nd, const size_t *dims,
-                              const ssize_t *strides) except -1:
-    cdef int err
-    with nogil:
-        err = GpuArray_copy_from_host(&a.ga, ctx, buf, typecode, nd, dims,
-                                      strides);
-    if err != GA_NO_ERROR:
-        raise get_exc(err), gpucontext_error(ctx, err)
-
 cdef int array_view(GpuArray v, GpuArray a) except -1:
     cdef int err
     err = GpuArray_view(&v.ga, &a.ga)
@@ -478,12 +469,6 @@ cdef int kernel_call(GpuKernel k, unsigned int n, const size_t *gs,
     if err != GA_NO_ERROR:
         raise get_exc(err), kernel_error(k, err)
 
-cdef int kernel_binary(GpuKernel k, size_t *sz, void **bin) except -1:
-    cdef int err
-    err = GpuKernel_binary(&k.k, sz, bin)
-    if err != GA_NO_ERROR:
-        raise get_exc(err), kernel_error(k, err)
-
 cdef int kernel_property(GpuKernel k, int prop_id, void *res) except -1:
     cdef int err
     err = gpukernel_property(k.k.k, prop_id, res)
@@ -572,13 +557,17 @@ def count_devices(kind, unsigned int platform):
         raise get_exc(err), gpucontext_error(NULL, err)
     return devcount
 
-cdef GpuContext pygpu_init(dev, int flags):
+cdef GpuContext pygpu_init(dev, gpucontext_props *p):
+    cdef int err
+    cdef GpuContext res
+
     if dev.startswith('cuda'):
         kind = b"cuda"
         if dev[4:] == '':
             devnum = -1
         else:
             devnum = int(dev[4:])
+        gpucontext_props_cuda_dev(p, devnum)
     elif dev.startswith('opencl'):
         kind = b"opencl"
         devspec = dev[6:].split(':')
@@ -587,14 +576,22 @@ cdef GpuContext pygpu_init(dev, int flags):
         if not devspec[0].isdigit() or not devspec[1].isdigit():
             raise ValueError, "OpenCL name incorrect. Should be opencl<int>:<int> instead got: " + dev
         else:
-            devnum = int(devspec[0]) << 16 | int(devspec[1])
+            gpucontext_props_opencl_dev(p, int(devspec[0]), int(devspec[1]))
     else:
         raise ValueError, "Unknown device format:" + dev
-    return GpuContext(kind, devnum, flags)
 
-def init(dev, sched='default', disable_alloc_cache=False, single_stream=False):
+    res = GpuContext.__new__(GpuContext)
+    res.kind = kind
+    err = gpucontext_init(&res.ctx, <char *>res.kind, p)
+    if err != GA_NO_ERROR:
+        raise get_exc(err), gpucontext_error(NULL, err)
+    return res
+
+def init(dev, sched='default', single_stream=False, kernel_cache_path=None,
+         max_cache_size=sys.maxsize, initial_cache_size=0):
     """
-    init(dev, sched='default', disable_alloc_cache=False, single_stream=False)
+    init(dev, sched='default', single_stream=False, kernel_cache_path=None,
+         max_cache_size=sys.maxsize, initial_cache_size=0)
 
     Creates a context from a device specifier.
 
@@ -629,18 +626,29 @@ def init(dev, sched='default', disable_alloc_cache=False, single_stream=False):
         enable single stream mode
 
     """
-    cdef int flags = 0
-    if sched == 'single':
-        flags |= GA_CTX_SINGLE_THREAD
-    elif sched == 'multi':
-        flags |= GA_CTX_MULTI_THREAD
-    elif sched != 'default':
-        raise TypeError('unexpected value for parameter sched: %s' % (sched,))
-    if disable_alloc_cache:
-        flags |= GA_CTX_DISABLE_ALLOCATION_CACHE
-    if single_stream:
-        flags |= GA_CTX_SINGLE_STREAM
-    return pygpu_init(dev, flags)
+    cdef gpucontext_props *p = NULL
+    cdef int err
+    cdef bytes kernel_cache_path_b
+    err = gpucontext_props_new(&p)
+    if err != GA_NO_ERROR:
+        raise MemoryError
+    try:
+        if sched == 'single':
+            gpucontext_props_sched(p, GA_CTX_SCHED_SINGLE)
+        elif sched == 'multi':
+            gpucontext_props_sched(p, GA_CTX_SCHED_MULTI)
+        elif sched != 'default':
+            raise TypeError('unexpected value for parameter sched: %s' % (sched,))
+        if kernel_cache_path:
+            kernel_cache_path_b = _s(kernel_cache_path)
+            gpucontext_props_kernel_cache(p, <const char *>kernel_cache_path_b)
+        gpucontext_props_alloc_cache(p, initial_cache_size, max_cache_size)
+        if single_stream:
+            gpucontext_props_set_single_stream(p);
+    except:
+        gpucontext_props_del(p)
+        raise
+    return pygpu_init(dev, p)
 
 def zeros(shape, dtype=GA_DOUBLE, order='C', GpuContext context=None,
           cls=None):
@@ -683,17 +691,6 @@ cdef GpuArray pygpu_empty(unsigned int nd, const size_t *dims, int typecode,
 
     res = new_GpuArray(cls, context, None)
     array_empty(res, context.ctx, typecode, nd, dims, order)
-    return res
-
-cdef GpuArray pygpu_fromhostdata(void *buf, int typecode, unsigned int nd,
-                                 const size_t *dims, const ssize_t *strides,
-                                 GpuContext context, object cls):
-    cdef GpuArray res
-    context = ensure_context(context)
-
-    res = new_GpuArray(cls, context, None)
-    array_copy_from_host(res, context.ctx, buf, typecode, nd,
-                         dims, strides)
     return res
 
 cdef GpuArray pygpu_fromgpudata(gpudata *buf, size_t offset, int typecode,
@@ -967,7 +964,6 @@ cdef carray(proto, dtype, copy, order, unsigned int ndmin,
     cdef GpuArray arg
     cdef GpuArray tmp
     cdef np.ndarray a
-    cdef ga_order ord
 
     if isinstance(proto, GpuArray):
         arg = proto
@@ -1011,12 +1007,18 @@ cdef carray(proto, dtype, copy, order, unsigned int ndmin,
 
     context = ensure_context(context)
 
+    # We need a contiguous array for the copy
+    if order != 'C' and order != 'F':
+        order = 'C'
+
     a = numpy.array(proto, dtype=dtype_to_npdtype(dtype), order=order,
                     ndmin=ndmin, copy=False)
 
-    return pygpu_fromhostdata(np.PyArray_DATA(a), dtype_to_typecode(a.dtype),
-                              np.PyArray_NDIM(a), <size_t *>np.PyArray_DIMS(a),
-                              <ssize_t *>np.PyArray_STRIDES(a), context, cls)
+    res = pygpu_empty(np.PyArray_NDIM(a), <size_t *>np.PyArray_DIMS(a),
+                      dtype_to_typecode(a.dtype), to_ga_order(order),
+                      context, cls)
+    array_write(res, np.PyArray_DATA(a), np.PyArray_NBYTES(a))
+    return res
 
 cdef void (*cuda_enter)(gpucontext *)
 cdef void (*cuda_exit)(gpucontext *)
@@ -1026,8 +1028,6 @@ cuda_exit = <void (*)(gpucontext *)>gpuarray_get_extension("cuda_exit")
 
 cdef class GpuContext:
     """
-    GpuContext(kind, devno, flags)
-
     Class that holds all the information pertaining to a context.
 
     The currently implemented modules (for the `kind` parameter) are
@@ -1057,13 +1057,9 @@ cdef class GpuContext:
     def __reduce__(self):
         raise RuntimeError, "Cannot pickle GpuContext object"
 
-    def __cinit__(self, bytes kind, devno, int flags):
-        cdef int err = GA_NO_ERROR
-        cdef gpucontext *ctx
-        self.kind = kind
-        self.ctx = gpucontext_init(<char *>self.kind, devno, flags, &err)
-        if (err != GA_NO_ERROR):
-            raise get_exc(err), gpucontext_error(NULL, err)
+    def __init__(self):
+        if type(self) is GpuContext:
+            raise RuntimeError, "Called raw GpuContext.__init__"
 
     def __enter__(self):
         if cuda_enter == NULL:
@@ -1091,20 +1087,13 @@ cdef class GpuContext:
             ctx_property(self, GA_CTX_PROP_DEVNAME, tmp)
             return tmp.decode('ascii')
 
-    property pcibusid:
+    property unique_id:
         "Device PCI Bus ID for this context"
         def __get__(self):
             cdef char tmp[16]
 
-            ctx_property(self, GA_CTX_PROP_PCIBUSID, tmp)
+            ctx_property(self, GA_CTX_PROP_UNIQUE_ID, tmp)
             return tmp.decode('ascii')
-
-    property maxlsize:
-        "Maximum size of thread block (local size) for this context"
-        def __get__(self):
-            cdef size_t res
-            ctx_property(self, GA_CTX_PROP_MAXLSIZE, &res)
-            return res
 
     property lmemsize:
         "Size of the local (shared) memory, in bytes, for this context"
@@ -1118,13 +1107,6 @@ cdef class GpuContext:
         def __get__(self):
             cdef unsigned int res
             ctx_property(self, GA_CTX_PROP_NUMPROCS, &res)
-            return res
-
-    property maxgsize:
-        "Maximum group size for kernel calls"
-        def __get__(self):
-            cdef size_t res
-            ctx_property(self, GA_CTX_PROP_MAXGSIZE, &res)
             return res
 
     property bin_id:
@@ -2276,7 +2258,7 @@ cdef class GpuArray:
 
 cdef class GpuKernel:
     """
-    GpuKernel(source, name, types, context=None, cluda=True, have_double=False, have_small=False, have_complex=False, have_half=False, binary=False, cuda=False, opencl=False)
+    GpuKernel(source, name, types, context=None, have_double=False, have_small=False, have_complex=False, have_half=False, cuda=False, opencl=False)
 
     Compile a kernel on the device
 
@@ -2307,7 +2289,7 @@ cdef class GpuKernel:
         k(param1, param2, gs=gs, ls=ls)
 
     If you choose to use this interface, make sure to stay within the
-    limits of `k.maxlsize` and `ctx.maxgsize` or the call will fail.
+    limits of `k.maxlsize` or the call will fail.
 
     Parameters
     ----------
@@ -2319,8 +2301,6 @@ cdef class GpuKernel:
         list of argument types
     context: GpuContext
         device on which the kernel is compiled
-    cluda: bool
-        use cluda layer?
     have_double: bool
         ensure working doubles?
     have_small: bool
@@ -2329,8 +2309,6 @@ cdef class GpuKernel:
         ensure complex types will work?
     have_half: bool
         ensure half-floats will work?
-    binary: bool
-        kernel is pre-compiled binary blob?
     cuda: bool
         kernel is cuda code?
     opencl: bool
@@ -2338,7 +2316,7 @@ cdef class GpuKernel:
 
     Notes
     -----
-    With the cuda backend, unless you use `cluda=True`, you must
+    With the cuda backend, unless you use the cluda include, you must
     either pass the mangled name of your kernel or declare the
     function 'extern "C"', because cuda uses a C++ compiler
     unconditionally.
@@ -2375,9 +2353,8 @@ cdef class GpuKernel:
         raise RuntimeError, "Cannot pickle GpuKernel object"
 
     def __cinit__(self, source, name, types, GpuContext context=None,
-                  cluda=True, have_double=False, have_small=False,
-                  have_complex=False, have_half=False, binary=False,
-                  cuda=False, opencl=False, *a, **kwa):
+                  have_double=False, have_small=False, have_complex=False,
+                  have_half=False, cuda=False, opencl=False, *a, **kwa):
         cdef const char *s[1]
         cdef size_t l
         cdef unsigned int numargs
@@ -2390,8 +2367,6 @@ cdef class GpuKernel:
 
         self.context = ensure_context(context)
 
-        if cluda:
-            flags |= GA_USE_CLUDA
         if have_double:
             flags |= GA_USE_DOUBLE
         if have_small:
@@ -2400,8 +2375,6 @@ cdef class GpuKernel:
             flags |= GA_USE_COMPLEX
         if have_half:
             flags |= GA_USE_HALF
-        if binary:
-            flags |= GA_USE_BINARY
         if cuda:
             flags |= GA_USE_CUDA
         if opencl:
@@ -2562,13 +2535,3 @@ cdef class GpuKernel:
             kernel_property(self, GA_KERNEL_PROP_NUMARGS, &res)
             return res
 
-    property _binary:
-        "Kernel compiled binary for the associated context."
-        def __get__(self):
-            cdef size_t sz
-            cdef char *bin
-            kernel_binary(self, &sz, <void **>&bin)
-            try:
-                return <bytes>bin[:sz]
-            finally:
-                free(bin)

@@ -72,76 +72,157 @@ GPUARRAY_PUBLIC int gpu_get_device_count(const char* name,
                                          unsigned int* devcount);
 
 
+/**
+ * Opaque structure that holds properties for the context.
+ */
+typedef struct _gpucontext_props gpucontext_props;
+
+/**
+ * Allocate and initialized an instance of gpucontext_props.
+ *
+ * Initialization is done with default values.
+ *
+ * \param res pointer to storage space for the created object
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpucontext_props_new(gpucontext_props **res);
+
+/**
+ * Set the device number for a CUDA device.
+ *
+ * \param p properties object
+ * \param devno device number
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpucontext_props_cuda_dev(gpucontext_props *p, int devno);
+
+
+/**
+ * Set the platform and device for OpenCL.
+ *
+ * \param p properties object
+ * \param platno platform number
+ * \param devno device number
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpucontext_props_opencl_dev(gpucontext_props *p,
+                                                int platno, int devno);
+
+/**
+ * Set the scheduling mode for the device.
+ *
+ * \param p properties object
+ * \param sched scheduling mode.  One of \ref sched_modes "these".
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpucontext_props_sched(gpucontext_props *p, int sched);
+
+/** \defgroup sched_modes
+ * @{
+ */
+
+/**
+ * Automatic scheduling, decide what to do depending on the workload,
+ * number of cores in the computer and other relevant factors. (default)
+ */
+#define GA_CTX_SCHED_AUTO   0
+
+/**
+ * Single-work scheduling.  Optimize for speed in a single process,
+ * with a single thread.  This is the fastest mode, but it may keep
+ * the CPU busy more than necessary.
+ */
+#define GA_CTX_SCHED_SINGLE 1
+
+/**
+ * Multi-work scheduling.  Try to not keep the CPU busy more than
+ * necessary and let other threads a chance at some CPU time.  This
+ * may increase the latency when waiting for GPU operations.
+ */
+#define GA_CTX_SCHED_MULTI  2
+
+/** @}*/
+
+/**
+ * Set single-stream mode.
+ *
+ * All operations on the device will be serialized on a single stream.
+ * This will also disable most of the interlocking normally done
+ * between multiple streams to keep everything in order.
+ *
+ * This mode can be faster if you don't have a lot of device-level
+ * parallelism in your workload.
+ *
+ * \param p properties object
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpucontext_props_set_single_stream(gpucontext_props *p);
+
+/**
+ * Set the path for the kernel cache.
+ *
+ * The cache can be shared with other running instances, even on
+ * shared drives.
+ *
+ * \param p properties object
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpucontext_props_kernel_cache(gpucontext_props *p,
+                                                  const char *path);
+
+/**
+ * Configure the allocation cache.
+ *
+ * The maximum size is also a limit on the total amount of memory
+ * allocated on the device.
+ *
+ * \param p properties object
+ * \param initial initial size of the cache
+ * \param max maximum size of the cache
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC int gpucontext_props_alloc_cache(gpucontext_props *p,
+                                                 size_t initial, size_t max);
+
+/**
+ * Free a properties object.
+ *
+ * This should not be called on a properties object that has been
+ * passed to gpucontext_init().
+ *
+ * \param p properties object
+ *
+ * \returns GA_NO_ERROR or an error code if an error occurred.
+ */
+GPUARRAY_PUBLIC void gpucontext_props_del(gpucontext_props *p);
 
 /**
  * Create a context on the specified device.
  *
  * \warning This function is not thread-safe.
  *
+ * The passed-in properties pointer will be managed by this function
+ * and needs not be freed.  This means that you shouldn't touch the
+ * properties object after passing it to this function.
+ *
+ * \param res a pointer to a location that will be allocated
  * \param name the backend name.
  * \param dev the device number.  The precise meaning of the device
  *            number is backend-dependent
- * \param flags see \ref context_flags "Context flags"
- * \param ret error return location.  Will be ignored if set to NULL.
+ * \param props a properties object for the context.  Can be NULL for
+ *              defaults.
  *
- * \returns An opaque pointer to the created context or NULL if an
- * error occured.
+ * \returns GA_NO_ERROR or an error code if an error occurred.
  */
-GPUARRAY_PUBLIC gpucontext *gpucontext_init(const char *name, int dev,
-                                            int flags, int *ret);
-
-/**
- * \defgroup context_flags Context flags
- * @{
- */
-
-/**
- * Let the backend decide on optimal parameters, using backend-defined
- * heuristics and defaults.
- *
- * This is the default (0) value.
- */
-#define GA_CTX_DEFAULT       0x00
-
-/**
- * Optimize parameters for multi-thread performance.
- *
- * May decrease overall performance in single-thread scenarios.
- */
-#define GA_CTX_MULTI_THREAD  0x01
-
-/**
- * Optimize parameters for single-thread performance.
- *
- * May decrease overall performace in multithread scenarios.
- */
-#define GA_CTX_SINGLE_THREAD 0x02
-
-/**
- * Allocate a single stream per context, performing all operations in order.
- *
- * This will remove any attempt at exploiting parallelism in the
- * underlying device by performing unrelated operations concurrently
- * and/or out of order.
- *
- * This can help performance by removing the small cost paid for each
- * operation to keep everything coherent in the face of parallelism.
- * It can also hinder performance by not exploiting concurrency.
- */
-#define GA_CTX_SINGLE_STREAM 0x4
-
-/**
- * Disable allocations cache (if any).
- *
- * This will usually decrease performance by quite a bit, but will
- * enable better debugging of kernels that perform out of bounds
- * access.
- */
-#define GA_CTX_DISABLE_ALLOCATION_CACHE 0x10
-
-/**
- * @}
- */
+GPUARRAY_PUBLIC int gpucontext_init(gpucontext **res, const char *name,
+                                    gpucontext_props *props);
 
 /**
  * Dereference a context.
@@ -501,26 +582,6 @@ GPUARRAY_PUBLIC int gpukernel_call(gpukernel *k, unsigned int n,
                                    size_t shared, void **args);
 
 /**
- * (Deprecated) Get the kernel binary.
- *
- * This function is deprecated and will be removed in the next release.
- *
- * This can be use to cache kernel binaries after compilation of a
- * specific device.  The kernel can be recreated by calling
- * gpukernel_alloc with the binary and size and passing `GA_USE_BINARY`
- * as the use flags.
- *
- * The returned pointer is allocated and must be freed by the caller.
- *
- * \param k kernel
- * \param sz size of the returned binary
- * \param obj pointer to the binary for the kernel.
- *
- * \returns GA_NO_ERROR or an error code if an error occurred.
- */
-GPUARRAY_PUBLIC int gpukernel_binary(gpukernel *k, size_t *sz, void **obj);
-
-/**
  * Fetch a property.
  *
  * Can be used for kernel and context properties. The context
@@ -550,13 +611,7 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
  */
 #define GA_CTX_PROP_DEVNAME  1
 
-/**
- * Get the maximum block size (also known as local size) for a kernel
- * call in the context.
- *
- * Type: `size_t`
- */
-#define GA_CTX_PROP_MAXLSIZE 2
+/* UNUSED: 2 */
 
 /**
  * Get the local memory size available for a call in the context.
@@ -576,23 +631,9 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
  */
 #define GA_CTX_PROP_NUMPROCS 4
 
-/**
- * Get the maximum group size for a kernel call in this context.
- *
- * Type: `size_t`
- */
-#define GA_CTX_PROP_MAXGSIZE  5
+/* UNUSED: 5 */
 
-/**
- * Get the vector of blas ops for the context.
- *
- * This may differ from one context to the other in the same backend
- * depending of the availability and performance of various BLAS
- * libraries.
- *
- * Type: `const gpuarray_blas_ops *`
- */
-#define GA_CTX_PROP_BLAS_OPS  6
+/* UNUSED: 6 */
 
 /**
  * Get the compatibility ID for the binaries generated with this context.
@@ -680,19 +721,14 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
  */
 #define GA_CTX_PROP_MAXLSIZE2 17
 
-/**
- * Get the vector of collective ops for the context.
- *
- * Type: `const gpuarray_comm_ops *`
- */
-#define GA_CTX_PROP_COMM_OPS  18
+/* UNUSED: 18 */
 
 /**
- * Get the device PCI Bus ID for the context.
+ * Get a unique ID for the device behind the context.
  *
  * Type: `char [16]`
  */
-#define GA_CTX_PROP_PCIBUSID 19
+#define GA_CTX_PROP_UNIQUE_ID 19
 
 /**
  * Get the largest single block of memory that can be allocted.
@@ -787,10 +823,7 @@ GPUARRAY_PUBLIC gpucontext *gpukernel_context(gpukernel *k);
  * cases result in silent data corruption (especially on ATI cards).
  */
 typedef enum _ga_usefl {
-  /**
-   * The kernel source uses CLUDA unified language.
-   */
-  GA_USE_CLUDA =      0x01,
+  /* UNUSED: 0x01 */
   /**
    * The kernel makes use of small (size is smaller than 4 bytes) types.
    */
@@ -807,12 +840,6 @@ typedef enum _ga_usefl {
    * The kernel makes use of half-floats (also known as float16)
    */
   GA_USE_HALF =       0x10,
-  /**
-   * The source code passed is actually a kernel binary.
-   *
-   * For the cuda backend this can also be a PTX module.
-   */
-  GA_USE_BINARY =     0x20,
   /* If you add a new flag, don't forget to update both
      gpuarray_buffer_{cuda,opencl}.c with the implementation of your flag */
   /**

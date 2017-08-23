@@ -81,9 +81,9 @@ START_TEST(test_reduction){
 	size_t prodDims = dims[0]*dims[1]*dims[2];
 	const unsigned reduxList[] = {0,2};
 
-	float*  pSrc    = calloc(1, sizeof(*pSrc)    * dims[0]*dims[1]*dims[2]);
-	float*  pMax    = calloc(1, sizeof(*pMax)    *         dims[1]        );
-	size_t* pArgmax = calloc(1, sizeof(*pArgmax) *         dims[1]        );
+	float *pSrc = calloc(sizeof(*pSrc), prodDims);
+	float *pMax = calloc(sizeof(*pMax), dims[1]);
+	unsigned long *pArgmax = calloc(sizeof(*pArgmax), dims[1]);
 
 	ck_assert_ptr_ne(pSrc,    NULL);
 	ck_assert_ptr_ne(pMax,    NULL);
@@ -106,7 +106,7 @@ START_TEST(test_reduction){
 
 	ga_assert_ok(GpuArray_empty(&gaSrc,    ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaMax,    ctx, GA_FLOAT, 1, &dims[1], GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaArgmax, ctx, GA_SIZE,  1, &dims[1], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaArgmax, ctx, GA_ULONG,  1, &dims[1], GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaMax,    -1));  /* 0xFFFFFFFF is a qNaN. */
@@ -171,9 +171,9 @@ START_TEST(test_idxtranspose){
 	size_t rdxProdDims = rdxDims[0];
 	const unsigned reduxList[] = {2,0};
 
-	float*  pSrc    = calloc(1, sizeof(*pSrc)    * prodDims);
-	float*  pMax    = calloc(1, sizeof(*pMax)    * rdxProdDims);
-	size_t* pArgmax = calloc(1, sizeof(*pArgmax) * rdxProdDims);
+	float *pSrc = calloc(sizeof(*pSrc), prodDims);
+	float *pMax = calloc(sizeof(*pMax), rdxProdDims);
+	unsigned long *pArgmax = calloc(sizeof(*pArgmax), rdxProdDims);
 
 	ck_assert_ptr_ne(pSrc,    NULL);
 	ck_assert_ptr_ne(pMax,    NULL);
@@ -196,7 +196,7 @@ START_TEST(test_idxtranspose){
 
 	ga_assert_ok(GpuArray_empty(&gaSrc,    ctx, GA_FLOAT, 3, dims,    GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaMax,    ctx, GA_FLOAT, 1, rdxDims, GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaArgmax, ctx, GA_SIZE,  1, rdxDims, GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaArgmax, ctx, GA_ULONG,  1, rdxDims, GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaMax,    -1));  /* 0xFFFFFFFF is a qNaN. */
@@ -259,9 +259,9 @@ START_TEST(test_veryhighrank){
 	size_t rdxProdDims = rdxDims[0]*rdxDims[1]*rdxDims[2]*rdxDims[3];
 	const unsigned reduxList[] = {2,4,7,5};
 
-	float*  pSrc    = calloc(1, sizeof(*pSrc)    * prodDims);
-	float*  pMax    = calloc(1, sizeof(*pMax)    * rdxProdDims);
-	size_t* pArgmax = calloc(1, sizeof(*pArgmax) * rdxProdDims);
+	float *pSrc = calloc(sizeof(*pSrc), prodDims);
+	float *pMax = calloc(sizeof(*pMax), rdxProdDims);
+	unsigned long *pArgmax = calloc(sizeof(*pArgmax), rdxProdDims);
 
 	ck_assert_ptr_ne(pSrc,    NULL);
 	ck_assert_ptr_ne(pMax,    NULL);
@@ -284,7 +284,7 @@ START_TEST(test_veryhighrank){
 
 	ga_assert_ok(GpuArray_empty(&gaSrc,    ctx, GA_FLOAT, 8, dims,    GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaMax,    ctx, GA_FLOAT, 4, rdxDims, GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaArgmax, ctx, GA_SIZE,  4, rdxDims, GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaArgmax, ctx, GA_ULONG,  4, rdxDims, GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaMax,    -1));  /* 0xFFFFFFFF is a qNaN. */
@@ -358,9 +358,9 @@ START_TEST(test_alldimsreduced){
 	size_t gtArgmax;
 	float  gtMax;
 
-	float*  pSrc    = calloc(1, sizeof(*pSrc)    * dims[0]*dims[1]*dims[2]);
-	float*  pMax    = calloc(1, sizeof(*pMax)                             );
-	size_t* pArgmax = calloc(1, sizeof(*pArgmax)                          );
+	float *pSrc    = calloc(sizeof(*pSrc), prodDims);
+	float *pMax    = calloc(1, sizeof(*pMax));
+	unsigned long *pArgmax = calloc(1, sizeof(*pArgmax));
 
 	ck_assert_ptr_ne(pSrc,    NULL);
 	ck_assert_ptr_ne(pMax,    NULL);
@@ -383,7 +383,7 @@ START_TEST(test_alldimsreduced){
 
 	ga_assert_ok(GpuArray_empty(&gaSrc,    ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaMax,    ctx, GA_FLOAT, 0, NULL,     GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaArgmax, ctx, GA_SIZE,  0, NULL,     GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaArgmax, ctx, GA_ULONG,  0, NULL,     GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaSrc,    pSrc, sizeof(*pSrc)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaMax,    -1));  /* 0xFFFFFFFF is a qNaN. */

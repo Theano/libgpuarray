@@ -4,9 +4,9 @@ import os
 have_cython = False
 
 MAJOR = 0
-MINOR = 6
-PATCH = 9
-SUFFIX = '' # include the '.'
+MINOR = 7
+PATCH = 0
+SUFFIX = '.dev0' # include the '.'
 FULLVERSION = '%d.%d.%d%s' % (MAJOR, MINOR, PATCH, SUFFIX)
 
 try:

@@ -54,7 +54,7 @@ int GpuKernel_sched(GpuKernel *k, size_t n, size_t *gs, size_t *ls) {
   err = gpukernel_property(k->k, GA_CTX_PROP_NUMPROCS, &numprocs);
   if (err != GA_NO_ERROR)
     return err;
-  err = gpukernel_property(k->k, GA_CTX_PROP_MAXGSIZE, &max_g);
+  err = gpukernel_property(k->k, GA_CTX_PROP_MAXGSIZE0, &max_g);
   if (err != GA_NO_ERROR)
     return err;
 
@@ -96,10 +96,6 @@ int GpuKernel_call(GpuKernel *k, unsigned int n,
                    const size_t *gs, const size_t *ls,
                    size_t shared, void **args) {
   return gpukernel_call(k->k, n, gs, ls, shared, args);
-}
-
-int GpuKernel_binary(const GpuKernel *k, size_t *sz, void **bin) {
-  return gpukernel_binary(k->k, sz, bin);
 }
 
 const char *GpuKernel_error(const GpuKernel *k, int err) {

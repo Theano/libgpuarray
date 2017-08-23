@@ -137,10 +137,11 @@ def gen_gpuarray(shape_orig, dtype='float32', offseted_outer=False,
     a += incr
 
     a = numpy.asarray(a, dtype=dtype)
+    b = gpuarray.array(a, context=ctx, cls=cls)
     assert order in ['c', 'f']
     if order == 'f' and len(shape) > 0:
         a = numpy.asfortranarray(a)
-    b = gpuarray.array(a, context=ctx, cls=cls)
+        b = gpuarray.asfortranarray(b)
     if order == 'f' and len(shape) > 0 and b.size > 1:
         assert b.flags['F_CONTIGUOUS']
 

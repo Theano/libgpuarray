@@ -1,8 +1,8 @@
 Installation
 ============
 
-The library is routinely tested on OS X and linux and, less
-frequently, on Windows.  The OS most frequently tested are:
+The library is routinely tested on linux and, less frequently, on
+Windows and Mac OS X.  The OS most frequently tested are:
 
  - Debian 6
  - Ubuntu 16.04
@@ -55,8 +55,16 @@ functionality.
 
  * For OpenCL:
 
-   - OpenCL version 1.1 or more
+   - OpenCL version 1.2 or more
    - (optional) clBLAS (clblas_) or CLBlast (clblast_) for blas functionality
+
+   .. note::
+
+      The OpenCL that comes with OS X is fundamentally broken and
+      doesn't work with some of the kernels in the library.  You can
+      use it at your own risk, but don't report problems with it we
+      can't fix them.
+
 
 Download
 --------
