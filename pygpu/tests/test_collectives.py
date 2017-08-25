@@ -88,13 +88,6 @@ class TestGpuCommCliqueId(unittest.TestCase):
         with self.assertRaises(TypeError):
             a = cid2 > "asdfasfa"
 
-    def test_as_buffer(self):
-        a = np.asarray(self.cid)
-        assert np.allclose(a, self.cid.comm_id)
-        a[:] = [ord(b'a')] * COMM_ID_BYTES
-        assert np.allclose(a, self.cid.comm_id)
-
-
 @unittest.skipUnless(MPI_IMPORTED, "Needs mpi4py module")
 @unittest.skipIf(get_user_gpu_rank() == -1, "Collective operations supported on CUDA devices only")
 class TestGpuComm(unittest.TestCase):
@@ -293,19 +286,19 @@ class TestGpuComm(unittest.TestCase):
 
         a = cpu.reshape((5, 2), order='F')
         exp = texp.reshape((5, 2 * self.size), order='F')
-        gpu = gpuarray.asarray(a, context=self.ctx)
+        gpu = gpuarray.asarray(a, context=self.ctx, order='F')
         resgpu = self.gpucomm.all_gather(gpu, nd_up=0)
         check_all(resgpu, exp)
 
         a = cpu.reshape((5, 2), order='F')
         exp = texp.reshape((5, 2, self.size), order='F')
-        gpu = gpuarray.asarray(a, context=self.ctx)
+        gpu = gpuarray.asarray(a, context=self.ctx, order='F')
         resgpu = self.gpucomm.all_gather(gpu, nd_up=1)
         check_all(resgpu, exp)
 
         a = cpu.reshape((5, 2), order='F')
         exp = texp.reshape((5, 2, 1, 1, self.size), order='F')
-        gpu = gpuarray.asarray(a, context=self.ctx)
+        gpu = gpuarray.asarray(a, context=self.ctx, order='F')
         resgpu = self.gpucomm.all_gather(gpu, nd_up=3)
         check_all(resgpu, exp)
 

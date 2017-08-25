@@ -49,7 +49,6 @@ extern void teardown_comm(void);
   int(*EXP)[(outcols)];                                                      \
   size_t indims[ND];                                                         \
   size_t outdims[ND];                                                        \
-  const ssize_t instrds[ND] = {sizeof(*A), sizeof(int)};                     \
   const ssize_t outstrds[ND] = {sizeof(*RES), sizeof(int)};                  \
   int err;                                                                   \
   size_t i, j, outsize;                                                      \

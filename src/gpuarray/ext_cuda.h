@@ -2,6 +2,7 @@
 #define LIBGPU_EXT_CUDA
 
 #include <cuda.h>
+#include <cuda_fp16.h>
 
 #include <gpuarray/config.h>
 #include <gpuarray/buffer.h>
