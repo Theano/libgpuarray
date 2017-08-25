@@ -171,10 +171,6 @@ TEST_REDUCE(int, INT, INT, SUM, 0, PRINTVI)
 TEST_REDUCE(int, INT, INT, PROD, 0, PRINTVI)
 TEST_REDUCE(int, INT, INT, MAX, 0, PRINTVI)
 TEST_REDUCE(int, INT, INT, MIN, 0, PRINTVI)
-TEST_REDUCE(char, BYTE, BYTE, SUM, 0, PRINTVI)
-TEST_REDUCE(char, BYTE, BYTE, PROD, 0, PRINTVI)
-TEST_REDUCE(char, BYTE, BYTE, MAX, 0, PRINTVI)
-TEST_REDUCE(char, BYTE, BYTE, MIN, 0, PRINTVI)
 TEST_REDUCE(float, FLOAT, FLOAT, SUM, EPS, PRINTVF)
 TEST_REDUCE(float, FLOAT, FLOAT, PROD, EPS, PRINTVF)
 TEST_REDUCE(float, FLOAT, FLOAT, MAX, EPS, PRINTVF)
@@ -265,10 +261,6 @@ TEST_ALL_REDUCE(int, INT, INT, SUM, 0, PRINTVI)
 TEST_ALL_REDUCE(int, INT, INT, PROD, 0, PRINTVI)
 TEST_ALL_REDUCE(int, INT, INT, MAX, 0, PRINTVI)
 TEST_ALL_REDUCE(int, INT, INT, MIN, 0, PRINTVI)
-TEST_ALL_REDUCE(char, BYTE, BYTE, SUM, 0, PRINTVI)
-TEST_ALL_REDUCE(char, BYTE, BYTE, PROD, 0, PRINTVI)
-TEST_ALL_REDUCE(char, BYTE, BYTE, MAX, 0, PRINTVI)
-TEST_ALL_REDUCE(char, BYTE, BYTE, MIN, 0, PRINTVI)
 TEST_ALL_REDUCE(float, FLOAT, FLOAT, SUM, EPS, PRINTVF)
 TEST_ALL_REDUCE(float, FLOAT, FLOAT, PROD, EPS, PRINTVF)
 TEST_ALL_REDUCE(float, FLOAT, FLOAT, MAX, EPS, PRINTVF)
@@ -373,10 +365,6 @@ TEST_REDUCE_SCATTER(int, INT, INT, SUM, 0, PRINTVI)
 TEST_REDUCE_SCATTER(int, INT, INT, PROD, 0, PRINTVI)
 TEST_REDUCE_SCATTER(int, INT, INT, MAX, 0, PRINTVI)
 TEST_REDUCE_SCATTER(int, INT, INT, MIN, 0, PRINTVI)
-TEST_REDUCE_SCATTER(char, BYTE, BYTE, SUM, 0, PRINTVI)
-TEST_REDUCE_SCATTER(char, BYTE, BYTE, PROD, 0, PRINTVI)
-TEST_REDUCE_SCATTER(char, BYTE, BYTE, MAX, 0, PRINTVI)
-TEST_REDUCE_SCATTER(char, BYTE, BYTE, MIN, 0, PRINTVI)
 TEST_REDUCE_SCATTER(float, FLOAT, FLOAT, SUM, EPS, PRINTVF)
 TEST_REDUCE_SCATTER(float, FLOAT, FLOAT, PROD, EPS, PRINTVF)
 TEST_REDUCE_SCATTER(float, FLOAT, FLOAT, MAX, EPS, PRINTVF)
@@ -577,10 +565,6 @@ Suite* get_suite(void) {
   tcase_add_test(reds, test_gpucomm_reduce_INT_PROD);
   tcase_add_test(reds, test_gpucomm_reduce_INT_MAX);
   tcase_add_test(reds, test_gpucomm_reduce_INT_MIN);
-  tcase_add_test(reds, test_gpucomm_reduce_BYTE_SUM);
-  tcase_add_test(reds, test_gpucomm_reduce_BYTE_PROD);
-  tcase_add_test(reds, test_gpucomm_reduce_BYTE_MAX);
-  tcase_add_test(reds, test_gpucomm_reduce_BYTE_MIN);
   tcase_add_test(reds, test_gpucomm_reduce_FLOAT_SUM);
   tcase_add_test(reds, test_gpucomm_reduce_FLOAT_PROD);
   tcase_add_test(reds, test_gpucomm_reduce_FLOAT_MAX);
@@ -611,10 +595,6 @@ Suite* get_suite(void) {
   tcase_add_test(areds, test_gpucomm_all_reduce_INT_PROD);
   tcase_add_test(areds, test_gpucomm_all_reduce_INT_MAX);
   tcase_add_test(areds, test_gpucomm_all_reduce_INT_MIN);
-  tcase_add_test(areds, test_gpucomm_all_reduce_BYTE_SUM);
-  tcase_add_test(areds, test_gpucomm_all_reduce_BYTE_PROD);
-  tcase_add_test(areds, test_gpucomm_all_reduce_BYTE_MAX);
-  tcase_add_test(areds, test_gpucomm_all_reduce_BYTE_MIN);
   tcase_add_test(areds, test_gpucomm_all_reduce_FLOAT_SUM);
   tcase_add_test(areds, test_gpucomm_all_reduce_FLOAT_PROD);
   tcase_add_test(areds, test_gpucomm_all_reduce_FLOAT_MAX);
@@ -646,10 +626,6 @@ Suite* get_suite(void) {
   tcase_add_test(redscs, test_gpucomm_reduce_scatter_INT_PROD);
   tcase_add_test(redscs, test_gpucomm_reduce_scatter_INT_MAX);
   tcase_add_test(redscs, test_gpucomm_reduce_scatter_INT_MIN);
-  tcase_add_test(redscs, test_gpucomm_reduce_scatter_BYTE_SUM);
-  tcase_add_test(redscs, test_gpucomm_reduce_scatter_BYTE_PROD);
-  tcase_add_test(redscs, test_gpucomm_reduce_scatter_BYTE_MAX);
-  tcase_add_test(redscs, test_gpucomm_reduce_scatter_BYTE_MIN);
   tcase_add_test(redscs, test_gpucomm_reduce_scatter_FLOAT_SUM);
   tcase_add_test(redscs, test_gpucomm_reduce_scatter_FLOAT_PROD);
   tcase_add_test(redscs, test_gpucomm_reduce_scatter_FLOAT_MAX);
