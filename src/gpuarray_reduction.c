@@ -151,7 +151,7 @@ typedef struct redux_ctx redux_ctx;
 struct GpuReductionAttr{
 	gpucontext*   gpuCtx;
 	unsigned      numProcs;
-	size_t        maxLg, maxL0, maxGg, maxG0, maxLM;
+	size_t        maxL0, maxG0, maxLM;
 	
 	ga_reduce_op  op;
 	int           maxSrcDims;
@@ -491,9 +491,7 @@ GPUARRAY_PUBLIC int   GpuReductionAttr_new          (GpuReductionAttr**         
 	
 	(*grAttr)->gpuCtx     = gpuCtx;
 	if (gpucontext_property(gpuCtx, GA_CTX_PROP_NUMPROCS,  &(*grAttr)->numProcs) != GA_NO_ERROR ||
-	    gpucontext_property(gpuCtx, GA_CTX_PROP_MAXLSIZE,  &(*grAttr)->maxLg)    != GA_NO_ERROR ||
 	    gpucontext_property(gpuCtx, GA_CTX_PROP_MAXLSIZE0, &(*grAttr)->maxL0)    != GA_NO_ERROR ||
-	    gpucontext_property(gpuCtx, GA_CTX_PROP_MAXGSIZE,  &(*grAttr)->maxGg)    != GA_NO_ERROR ||
 	    gpucontext_property(gpuCtx, GA_CTX_PROP_MAXGSIZE0, &(*grAttr)->maxG0)    != GA_NO_ERROR ||
 	    gpucontext_property(gpuCtx, GA_CTX_PROP_LMEMSIZE,  &(*grAttr)->maxLM)    != GA_NO_ERROR ){
 		free(*grAttr);
@@ -1606,7 +1604,6 @@ static int         reduxGenInferProperties          (GpuReduction*        gr){
 
 static void        reduxGenSetMaxBS                 (GpuReduction*        gr){
 	gr->maxBS = gr->grAttr.maxLM/reduxGenGetReduxStateSize(gr);
-	gr->maxBS = gr->maxBS < gr->grAttr.maxLg ? gr->maxBS : gr->grAttr.maxLg;
 	gr->maxBS = gr->maxBS < gr->grAttr.maxL0 ? gr->maxBS : gr->grAttr.maxL0;
 	
 	/**
@@ -2856,7 +2853,6 @@ static int         reduxGenSrcAxisIsSplit           (GpuReduction*        gr,
 static int         reduxGenCompile                  (GpuReduction*        gr){
 	int ret, flags = 0;
 
-	flags |= GA_USE_CLUDA;
 	if (gr->TS0tc == GA_HALF || gr->TD0tc == GA_HALF){
 		flags |= GA_USE_HALF|GA_USE_SMALL;
 	}
@@ -3104,7 +3100,7 @@ static size_t      reduxGenEstimateParallelism      (const GpuReduction*  gr){
 	 */
 
 	size_t marginFactor = 16;
-	return marginFactor * gr->grAttr.numProcs * gr->grAttr.maxLg;
+	return marginFactor * gr->grAttr.numProcs * gr->grAttr.maxL0;
 }
 
 /**
