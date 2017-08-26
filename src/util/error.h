@@ -3,6 +3,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include <gpuarray/error.h>
 
