@@ -109,7 +109,7 @@ START_TEST(test_maxandargmax_reduction){
 
 	ga_assert_ok(GpuArray_empty(&gaS0, ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaD0, ctx, GA_FLOAT, 1, &dims[1], GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_SIZE,  1, &dims[1], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_ULONG, 1, &dims[1], GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaS0, pS0, sizeof(*pS0)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD0, -1));  /* 0xFFFFFFFF is a qNaN. */
@@ -220,7 +220,7 @@ START_TEST(test_maxandargmax_idxtranspose){
 
 	ga_assert_ok(GpuArray_empty(&gaS0, ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaD0, ctx, GA_FLOAT, 1, &dims[1], GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_SIZE,  1, &dims[1], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_ULONG, 1, &dims[1], GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaS0, pS0, sizeof(*pS0)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD0, -1));  /* 0xFFFFFFFF is a qNaN. */
@@ -327,7 +327,7 @@ START_TEST(test_maxandargmax_bigdestination){
 
 	ga_assert_ok(GpuArray_empty(&gaS0, ctx, GA_FLOAT, 2, &dims[0], GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaD0, ctx, GA_FLOAT, 1, &dims[1], GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_SIZE,  1, &dims[1], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_ULONG, 1, &dims[1], GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaS0, pS0, sizeof(*pS0)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD0, -1));  /* 0xFFFFFFFF is a qNaN. */
@@ -433,7 +433,7 @@ START_TEST(test_maxandargmax_veryhighrank){
 
 	ga_assert_ok(GpuArray_empty(&gaS0, ctx, GA_FLOAT, 8, dims,    GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaD0, ctx, GA_FLOAT, 4, rdxDims, GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_SIZE,  4, rdxDims, GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_ULONG, 4, rdxDims, GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaS0, pS0, sizeof(*pS0)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD0, -1));  /* 0xFFFFFFFF is a qNaN. */
@@ -553,7 +553,7 @@ START_TEST(test_maxandargmax_alldimsreduced){
 
 	ga_assert_ok(GpuArray_empty(&gaS0, ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaD0, ctx, GA_FLOAT, 0, NULL,     GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_SIZE,  0, NULL,     GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_ULONG, 0, NULL,     GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaS0, pS0, sizeof(*pS0)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD0, -1));  /* 0xFFFFFFFF is a qNaN. */
@@ -659,7 +659,7 @@ START_TEST(test_minandargmin_reduction){
 
 	ga_assert_ok(GpuArray_empty(&gaS0, ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaD0, ctx, GA_FLOAT, 1, &dims[1], GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_SIZE,  1, &dims[1], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_ULONG, 1, &dims[1], GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaS0, pS0, sizeof(*pS0)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD0, -1));  /* 0xFFFFFFFF is a qNaN. */
@@ -767,7 +767,7 @@ START_TEST(test_minandargmin_veryhighrank){
 
 	ga_assert_ok(GpuArray_empty(&gaS0, ctx, GA_FLOAT, 8, dims,    GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaD0, ctx, GA_FLOAT, 4, rdxDims, GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_SIZE,  4, rdxDims, GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_ULONG, 4, rdxDims, GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaS0, pS0, sizeof(*pS0)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD0, -1));  /* 0xFFFFFFFF is a qNaN. */
@@ -887,7 +887,7 @@ START_TEST(test_minandargmin_alldimsreduced){
 
 	ga_assert_ok(GpuArray_empty(&gaS0, ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
 	ga_assert_ok(GpuArray_empty(&gaD0, ctx, GA_FLOAT, 0, NULL,     GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_SIZE,  0, NULL,     GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_ULONG, 0, NULL,     GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaS0, pS0, sizeof(*pS0)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD0, -1));  /* 0xFFFFFFFF is a qNaN. */
@@ -991,7 +991,7 @@ START_TEST(test_argmax_reduction){
 	 */
 
 	ga_assert_ok(GpuArray_empty(&gaS0, ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_SIZE,  1, &dims[1], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_ULONG, 1, &dims[1], GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaS0, pS0, sizeof(*pS0)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD1, -1));
@@ -1092,7 +1092,7 @@ START_TEST(test_argmax_veryhighrank){
 	 */
 
 	ga_assert_ok(GpuArray_empty(&gaS0, ctx, GA_FLOAT, 8, dims,    GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_SIZE,  4, rdxDims, GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_ULONG, 4, rdxDims, GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaS0, pS0, sizeof(*pS0)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD1, -1));
@@ -1206,7 +1206,7 @@ START_TEST(test_argmax_alldimsreduced){
 	 */
 
 	ga_assert_ok(GpuArray_empty(&gaS0, ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_SIZE,  0, NULL,     GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_ULONG, 0, NULL,     GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaS0, pS0, sizeof(*pS0)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD1, -1));
@@ -1306,7 +1306,7 @@ START_TEST(test_argmin_reduction){
 	 */
 
 	ga_assert_ok(GpuArray_empty(&gaS0, ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_SIZE,  1, &dims[1], GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_ULONG, 1, &dims[1], GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaS0, pS0, sizeof(*pS0)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD1, -1));
@@ -1407,7 +1407,7 @@ START_TEST(test_argmin_veryhighrank){
 	 */
 
 	ga_assert_ok(GpuArray_empty(&gaS0,    ctx, GA_FLOAT, 8, dims,    GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_SIZE,  4, rdxDims, GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_ULONG, 4, rdxDims, GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaS0,    pS0, sizeof(*pS0)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD1, -1));
@@ -1521,7 +1521,7 @@ START_TEST(test_argmin_alldimsreduced){
 	 */
 
 	ga_assert_ok(GpuArray_empty(&gaS0, ctx, GA_FLOAT, 3, &dims[0], GA_C_ORDER));
-	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_SIZE,  0, NULL,     GA_C_ORDER));
+	ga_assert_ok(GpuArray_empty(&gaD1, ctx, GA_ULONG, 0, NULL,     GA_C_ORDER));
 
 	ga_assert_ok(GpuArray_write(&gaS0, pS0, sizeof(*pS0)*prodDims));
 	ga_assert_ok(GpuArray_memset(&gaD1, -1));
