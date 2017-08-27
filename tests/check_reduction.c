@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <math.h>
 
 
 extern void *ctx;
@@ -18,7 +19,9 @@ void teardown(void);
 /* Defines */
 #define MAXERRPRINT  16
 #define ga_assert_ok(e) ck_assert_int_eq(e, GA_NO_ERROR)
-
+#ifndef ck_assert_ptr_nonnull
+#define ck_assert_ptr_nonnull(p) ck_assert_msg((p), "Null Pointer!")
+#endif
 
 
 
