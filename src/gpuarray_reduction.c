@@ -648,6 +648,7 @@ GPUARRAY_PUBLIC void  GpuReductionAttr_free         (GpuReductionAttr*          
 }
 GPUARRAY_PUBLIC int   GpuReduction_new              (GpuReduction**             gr,
                                                      const GpuReductionAttr*    grAttr){
+	int           ret;
 	GpuReduction* grOut = NULL;
 	
 	if (!gr){
@@ -665,8 +666,16 @@ GPUARRAY_PUBLIC int   GpuReduction_new              (GpuReduction**             
 		grOut->ndd    = (int)grAttr->maxDstDims;
 		grOut->ndr    = (int)(grAttr->maxSrcDims - grAttr->maxDstDims);
 		
-		return reduxGenInit(grOut);
+		ret = reduxGenInit(grOut);
+		if(ret == GA_NO_ERROR){
+			*gr = grOut;
+		}else{
+			GpuReduction_free(grOut);
+			*gr = NULL;
+		}
+		return ret;
 	}else{
+		*gr = NULL;
 		return GA_MEMORY_ERROR;
 	}
 }
