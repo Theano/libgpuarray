@@ -19,7 +19,7 @@
 
 #define checkErr(err)  if (err != GA_NO_ERROR) return err;
 
-const int flags = GA_USE_CLUDA;
+const int flags = 0;
 
 /* 
  * Functions iDivUp, getSampleCount and  nextPowerOfTwo taken from 
