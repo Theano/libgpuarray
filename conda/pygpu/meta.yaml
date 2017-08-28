@@ -10,12 +10,13 @@ source:
 
 build:
   number: 0
-  script:
-    - export CFLAGS="${CFLAGS} -I${PREFIX}/include -L${PREFIX}/lib"  # [unix]
-    - python setup.py install --single-version-externally-managed --record record.txt
+  detect_binary_files_with_prefix: False
 
 requirements:
   build:
+    - m2-git         [win]
+    - m2-filesystem  [win]
+    - git            [not win]
     - python
     - cython >=0.25
     - numpy x.x
@@ -29,11 +30,6 @@ requirements:
     - mako
     - six
     - libgpuarray =={{ version }}
-
-test:
-  imports:
-    - pygpu
-    - pygpu.gpuarray
 
 about:
   home: http://github.com/Theano/libgpuarray

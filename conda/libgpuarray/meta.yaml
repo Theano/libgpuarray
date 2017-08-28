@@ -14,21 +14,20 @@ build:
   features:
     - vc9     # [win and py27]
     - vc10    # [win and py34]
-    - vc14    # [win and py35]
-    - vc14    # [win and py36]
+    - vc14    # [win and (py35 or py36)]
 
 requirements:
   build:
+    - m2-git         [win]
+    - m2-filesystem  [win]
+    - git            [not win]
     - cmake
-    - python  # [win]
-
-test:
-  requires:
-    - python {{ environ['PY_VER'] + '*' }}                      # [win]
-  commands:
-    - test -f ${PREFIX}/lib/libgpuarray.dylib                   # [osx]
-    - test -f ${PREFIX}/lib/libgpuarray.so                      # [linux]
-    - if not exist %PREFIX%\\Library\\lib\\gpuarray.lib exit 1  # [win]
+    - mako
+    - python
+  run:
+    - vs2008_runtime  [win and py27]
+    - vs2010_runtime  [win and py34]
+    - vs2015_runtime  [win and (py35 or py36)]
 
 about:
   home: http://github.com/Theano/libgpuarray
