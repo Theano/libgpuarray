@@ -1044,9 +1044,9 @@ static int copysrc2dst(GpuArray *dstKey, GpuArray *srcKey, GpuArray *dstArg, Gpu
   int err = GA_NO_ERROR;
   
   if (Nleft > 0) {
-    checkErr( GpuArray_copy(dstKey, srcKey, GA_C_ORDER) );
+    checkErr( GpuArray_move(dstKey, srcKey) );
     if (argSortFlg) {
-      checkErr( GpuArray_copy(dstArg, srcArg, GA_C_ORDER) );
+      checkErr( GpuArray_move(dstArg, srcArg) );
     }
   }
   return err;
@@ -1165,13 +1165,20 @@ static int sort(
       }
       checkErr( mergeGlobalMem(d_SrcKey, d_DstKey, d_SrcArg, d_DstArg, msConfig, &msKernels.k_merge_global, ctx) );      
 
-      checkErr( GpuArray_copy(d_DstKey, d_SrcKey, GA_C_ORDER) );
+      checkErr( GpuArray_move(d_DstKey, d_SrcKey) );
 
       if (msConfig->argSortFlg) {
-        checkErr( GpuArray_copy(d_DstArg, d_SrcArg, GA_C_ORDER) );
+        checkErr( GpuArray_move(d_DstArg, d_SrcArg) );
       }
     }
   }
+
+  GpuKernel_clear(&msKernels.k_bitonic);
+  GpuKernel_clear(&msKernels.k_ranks);
+  GpuKernel_clear(&msKernels.k_ranks_idxs);
+  GpuKernel_clear(&msKernels.k_merge);
+  GpuKernel_clear(&msKernels.k_merge_global);
+
   return err;
 }
 
@@ -1300,7 +1307,7 @@ int GpuArray_sort(
   GpuSortBuff msBuff;
   GpuSortData msData;
 
-  if (srcKey->nd > 1) return GA_IMPL_ERROR;
+  if (srcKey->nd > 1) return error_set(ctx->err, GA_IMPL_ERROR, "Only 1 dim supported");
 
   initMsConfig(&msConfig, srcKey, dstArg, sortDir, dstArg != NULL ? 1 : 0);
 
