@@ -17,16 +17,16 @@ requirements:
     - m2-git         [win]
     - m2-filesystem  [win]
     - git            [not win]
-    - python
+    - python {{ python }}
     - cython >=0.25
-    - numpy x.x
+    - numpy {{ numpy }}
     - mako
     - setuptools
     - libgpuarray =={{ version }}
 
   run:
-    - python
-    - numpy x.x
+    - python {{ python }}
+    - numpy {{ numpy }}
     - mako
     - six
     - libgpuarray =={{ version }}

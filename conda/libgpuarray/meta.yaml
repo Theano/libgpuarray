@@ -23,7 +23,7 @@ requirements:
     - git            [not win]
     - cmake
     - mako
-    - python
+    - python  # version doesn't matter here
   run:
     - vs2008_runtime  [win and py27]
     - vs2010_runtime  [win and py34]
