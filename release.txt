@@ -3,6 +3,7 @@ Release process:
 - Update the version in setup.py
 - Update the version in doc/conf.py
 - Update the version in .appveyor.yml
+- Update the version in conda/{libgpuarray,pygpu}/meta.yaml
 - Commit the changes with message "Changes for release X.Y.Z"
   git commit -m "Changes for release X.Y.Z"
 - Make a git tag
