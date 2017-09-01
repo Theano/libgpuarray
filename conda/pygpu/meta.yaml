@@ -1,4 +1,4 @@
-{% set version = environ.get('GIT_DESCRIBE_TAG')[1:] %}
+{% set version = environ.get('GPUARRAY_VERSION') %}
 
 package:
   name: pygpu
