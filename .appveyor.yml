@@ -16,8 +16,9 @@ configuration:
 environment:
   matrix:
     - CONDA_LOC: "C:\\Miniconda-x64"
+      VS_PATH: "C:\\Users\\appveyor\\AppData\\Local\\Programs\\Common\\Microsoft\\Visual C++ for Python\\9.0"
     - CONDA_LOC: "C:\\Miniconda35-x64"
-    - CONDA_LOC: "C:\\Miniconda36-x64"
+      VS_PATH: "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC"
 
 install:
   # This breaks conda-build because of git
@@ -30,6 +31,7 @@ build: off
 
 test_script:
   - cmd: for /f "tokens=*" %%i in ('python -c "import versioneer; print(versioneer.get_version())"') do set GPUARRAY_VERSION=%%i
+  - cmd: "%VS_PATH%"\vcvarsall x64
   - cmd: conda build conda
 
 deploy_script:
