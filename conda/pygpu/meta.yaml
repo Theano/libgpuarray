@@ -17,6 +17,7 @@ requirements:
     - m2-git         [win]
     - m2-filesystem  [win]
     - git            [not win]
+    - {{ compiler('c') }}
     - python {{ python }}
     - cython >=0.25
     - numpy {{ numpy }}
