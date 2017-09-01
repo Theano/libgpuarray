@@ -33,7 +33,4 @@ test_script:
   - cmd: conda build conda
 
 deploy_script:
-  - cmd: |
-    git describe --exact-match HEAD
-    if errorlevel 1 exit 0
-    echo "anaconda upload"
+  - cmd: .ci-support/upload.bat
