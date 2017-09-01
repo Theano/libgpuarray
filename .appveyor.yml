@@ -16,9 +16,7 @@ configuration:
 environment:
   matrix:
     - CONDA_LOC: "C:\\Miniconda-x64"
-      VS_PATH: "C:\\Users\\appveyor\\AppData\\Local\\Programs\\Common\\Microsoft\\Visual C++ for Python\\9.0"
     - CONDA_LOC: "C:\\Miniconda35-x64"
-      VS_PATH: "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC"
 
 install:
   # This breaks conda-build because of git
@@ -26,14 +24,15 @@ install:
   - cmd: call %CONDA_LOC%\Scripts\activate.bat
   - cmd: set PYTHONUNBUFFERED=1
   - cmd: conda install -n root --yes conda conda-env conda-build anaconda-client
+  # We borrow a trick from conda-forge to fix the VS2008 compiler
+  - cmd: conda config --append channels conda-forge
+  - cmd: conda install --yes vs2008_express_vc_python_patch
+  - cmd: call setup_x64
 
 build: off
 
 test_script:
   - cmd: for /f "tokens=*" %%i in ('python -c "import versioneer; print(versioneer.get_version())"') do set GPUARRAY_VERSION=%%i
-  - cd %VS_PATH%
-  - vcvarsall x64
-  - cd C:\projects\libgpuarray
   - cmd: conda build conda
 
 deploy_script:
