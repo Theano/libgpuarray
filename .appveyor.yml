@@ -26,10 +26,14 @@ install:
   - cmd: set PYTHONUNBUFFERED=1
   - cmd: conda install -n root --yes conda conda-env conda-build anaconda-client
 
-build: script
+build: off
 
-build_script:
+test_script:
   - cmd: for /f "tokens=*" %%i in ('python -c "import versioneer; print(versioneer.get_version())"') do set GPUARRAY_VERSION=%%i
   - cmd: conda build conda
 
-#deploy_script:
+deploy_script:
+  - cmd: |
+    git describe --exact-match HEAD
+    if errorlevel 1 exit 0
+    echo "anaconda upload"
