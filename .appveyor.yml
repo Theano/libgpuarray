@@ -3,8 +3,6 @@ version: '0.7.0.{build}'
 pull_requests:
   do_not_increment_build_number: true
 
-image: Visual Studio 2015
-
 init:
   - git config --global core.autocrlf input
   - cmd: cmake --version
@@ -21,25 +19,23 @@ configuration:
 
 environment:
   matrix:
-    - PYTHON: "C:\\Python27"
-      VS_PATH: "C:\\Users\\appveyor\\AppData\\Local\\Programs\\Common\\Microsoft\\Visual C++ for Python\\9.0"
-    - PYTHON: "C:\\Python35"
-      VS_PATH: "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC"
+    - PYTHON: "C:\\Miniconda-x64"
+      CONDA_PY: 27
+#      VS_PATH: "C:\\Users\\appveyor\\AppData\\Local\\Programs\\Common\\Microsoft\\Visual C++ for Python\\9.0"
+    - PYTHON: "C:\\Python36-x64"
+      CONDA_PY: 36
+#      VS_PATH: "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC"
 
 install:
-  - python -m pip install mako cython
-
-build_script:
-  - echo "Python:" "%PYTHON%"
-  - echo "Config:" "%CONFIGURATION%"
-  - echo "VS path:" "%VS_PATH%"
-  - cd "%VS_PATH%"
-  - vcvarsall x64
-  - set
-  - cd C:\projects\libgpuarray
-  - md %CONFIGURATION%
-  - cd %CONFIGURATION%
-  - cmake .. -DCMAKE_BUILD_TYPE=%CONFIGURATION% -G "NMake Makefiles"
-  - cmake --build . --config %CONFIGURATION%
+  # This breaks conda-build because of git
+  - cmd: rmdir C:\cygwin /s /q
+  - cmd: call %CONDA_LOC%\Scripts\activate.bat
+  - cmd: set PYTHONUNBUFFERED=1
+  - cmd: conda install -n root --yes conda conda-env conda-build anaconda-client
 
 build: script
+
+build_script:
+  - conda build conda --quiet
+
+#deploy_script:
