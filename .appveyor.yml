@@ -34,6 +34,14 @@ build: off
 test_script:
   - cmd: for /f "tokens=*" %%i in ('python -c "import versioneer; print(versioneer.get_version())"') do set GPUARRAY_VERSION=%%i
   - cmd: conda build conda
+  - cmd: mkdir pkgs
+  - cmd: xcopy "%CONDA_LOC%"\conda-bld\win-64\pygpu* pkgs\ /Y
+  - cmd: xcopy "%CONDA_LOC%"\conda-bld\win-64\libgpuarray* pkgs\ /Y
 
-deploy_script:
-  - cmd: .ci-support/upload.bat
+artifacts:
+  - path: pkgs/*
+    name: "Conda Packages"
+
+#deploy:
+#  on:
+#    appveyor_repo_tag: true
