@@ -1,6 +1,6 @@
 package:
   name: libgpuarray
-  version: {{ environ.get('GIT_DESCRIBE_TAG')[1:] }}
+  version: {{ environ.get('GPUARRAY_VERSION') }}
 
 source:
   path: ../../

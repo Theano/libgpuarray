@@ -29,6 +29,7 @@ install:
 build: script
 
 build_script:
-  - conda build conda
+  - cmd: for /f "tokens=*" %%i in ('python -c "import versioneer; print(versioneer.get_version())"') do set GPUARRAY_VERSION=%%i
+  - cmd: conda build conda
 
 #deploy_script:
