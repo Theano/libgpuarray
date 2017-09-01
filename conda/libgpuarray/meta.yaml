@@ -5,8 +5,7 @@ package:
   version: {{ version }}
 
 source:
-  fn: libgpuarray-{{ version }}.tar.gz
-  url: https://github.com/Theano/libgpuarray/archive/v{{ version }}.tar.gz
+  path: ../../
 
 build:
   number: 0
@@ -22,7 +21,6 @@ requirements:
     - m2-git         [win]
     - m2-filesystem  [win]
     - git            [not win]
-    - {{ compiler('c') }}
     - cmake
     - mako
     - python  # version doesn't matter here

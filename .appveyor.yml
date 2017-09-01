@@ -3,11 +3,6 @@ version: '0.7.0.{build}'
 pull_requests:
   do_not_increment_build_number: true
 
-init:
-  - git config --global core.autocrlf input
-  - cmd: cmake --version
-  - cmd: msbuild /version
-
 platform:
   - x64
 
