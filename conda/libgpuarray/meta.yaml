@@ -1,16 +1,12 @@
-{% set version = "0.7.0" %}
-
 package:
   name: libgpuarray
-  version: {{ version }}
+  version: {{ environ.get('GPUARRAY_VERSION') }}
 
 source:
-  fn: libgpuarray-{{ version }}.tar.gz
-  url: https://github.com/Theano/libgpuarray/archive/v{{ version }}.tar.gz
+  path: ../../
 
 build:
   number: 0
-  skip: true  # [win and py35]
   features:
     - vc9     # [win and py27]
     - vc10    # [win and py34]
@@ -19,11 +15,10 @@ build:
 requirements:
   build:
     - m2-git         [win]
-    - m2-filesystem  [win]
     - git            [not win]
     - cmake
     - mako
-    - python
+    - python  # version doesn't matter here
   run:
     - vs2008_runtime  [win and py27]
     - vs2010_runtime  [win and py34]

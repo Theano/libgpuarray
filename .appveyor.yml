@@ -1,45 +1,47 @@
-version: '0.7.0.{build}'
+version: '1.0.{build}'  # This number doesn't matter
 
 pull_requests:
   do_not_increment_build_number: true
 
-image: Visual Studio 2015
-
-init:
-  - git config --global core.autocrlf input
-  - cmd: cmake --version
-  - cmd: msbuild /version
-
 platform:
   - x64
+
+image: Visual Studio 2015
 
 clone_folder: C:\projects\libgpuarray
 
 configuration:
   - Release
-  - Debug
 
 environment:
   matrix:
-    - PYTHON: "C:\\Python27"
-      VS_PATH: "C:\\Users\\appveyor\\AppData\\Local\\Programs\\Common\\Microsoft\\Visual C++ for Python\\9.0"
-    - PYTHON: "C:\\Python35"
-      VS_PATH: "C:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC"
+    - CONDA_LOC: "C:\\Miniconda-x64"
+    - CONDA_LOC: "C:\\Miniconda35-x64"
 
 install:
-  - python -m pip install mako cython
+  # This breaks conda-build because of git
+  - cmd: rmdir C:\cygwin /s /q
+  - cmd: call %CONDA_LOC%\Scripts\activate.bat
+  - cmd: set PYTHONUNBUFFERED=1
+  - cmd: conda install -n root --yes conda conda-env conda-build anaconda-client
+  # We borrow a trick from conda-forge to fix the VS2008 compiler
+  - cmd: conda config --append channels conda-forge
+  - cmd: conda install --yes vs2008_express_vc_python_patch
+  - cmd: call setup_x64
 
-build_script:
-  - echo "Python:" "%PYTHON%"
-  - echo "Config:" "%CONFIGURATION%"
-  - echo "VS path:" "%VS_PATH%"
-  - cd "%VS_PATH%"
-  - vcvarsall x64
-  - set
-  - cd C:\projects\libgpuarray
-  - md %CONFIGURATION%
-  - cd %CONFIGURATION%
-  - cmake .. -DCMAKE_BUILD_TYPE=%CONFIGURATION% -G "NMake Makefiles"
-  - cmake --build . --config %CONFIGURATION%
+build: off
 
-build: script
+test_script:
+  - cmd: for /f "tokens=*" %%i in ('python -c "import versioneer; print(versioneer.get_version())"') do set GPUARRAY_VERSION=%%i
+  - cmd: conda build conda
+  - cmd: mkdir pkgs
+  - cmd: xcopy "%CONDA_LOC%"\conda-bld\win-64\pygpu* pkgs\ /Y
+  - cmd: xcopy "%CONDA_LOC%"\conda-bld\win-64\libgpuarray* pkgs\ /Y
+
+artifacts:
+  - path: pkgs/*
+    name: "Conda Packages"
+
+#deploy:
+#  on:
+#    appveyor_repo_tag: true
