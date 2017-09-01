@@ -1,12 +1,11 @@
-{% set version = "0.7.0" %}
+{% set version = environ.get('GIT_DESCRIBE_TAG')[1:] %}
 
 package:
   name: pygpu
   version: {{ version }}
 
 source:
-  fn: libgpuarray-{{ version }}.tar.gz
-  url: https://github.com/Theano/libgpuarray/archive/v{{ version }}.tar.gz
+  path: ../../
 
 build:
   number: 0
@@ -17,16 +16,16 @@ requirements:
     - m2-git         [win]
     - m2-filesystem  [win]
     - git            [not win]
-    - python {{ python }}
+    - python
     - cython >=0.25
-    - numpy {{ numpy }}
+    - numpy 1.11
     - mako
     - setuptools
     - libgpuarray =={{ version }}
 
   run:
-    - python {{ python }}
-    - {{ pin_compatible('numpy') }}
+    - python
+    - {{ pin_compatible('numpy', '1.11') }}
     - mako
     - six
     - libgpuarray =={{ version }}

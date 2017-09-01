@@ -1,16 +1,12 @@
-{% set version = "0.7.0" %}
-
 package:
   name: libgpuarray
-  version: {{ version }}
+  version: {{ environ.get('GIT_DESCRIBE_TAG')[1:] }}
 
 source:
   path: ../../
 
 build:
   number: 0
-  skip: true  # [win and py35]
-  skip: true  # [not win and not py27]
   features:
     - vc9     # [win and py27]
     - vc10    # [win and py34]
