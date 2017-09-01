@@ -31,7 +31,9 @@ build: off
 
 test_script:
   - cmd: for /f "tokens=*" %%i in ('python -c "import versioneer; print(versioneer.get_version())"') do set GPUARRAY_VERSION=%%i
-  - cmd: "%VS_PATH%"\vcvarsall x64
+  - cd %VS_PATH%
+  - vcvarsall x64
+  - cd C:\projects\libgpuarray
   - cmd: conda build conda
 
 deploy_script:
