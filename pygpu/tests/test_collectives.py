@@ -101,7 +101,7 @@ class TestGpuComm(unittest.TestCase):
         cls.ctx = gpuarray.init("cuda" + str(cls.rank))
         print("*** Collectives testing for", cls.ctx.devname, file=sys.stderr)
         cls.cid = GpuCommCliqueId(context=cls.ctx)
-        cls.mpicomm.Bcast(cls.cid, root=0)
+        cls.mpicomm.Bcast(cls.cid.comm_id, root=0)
         cls.gpucomm = GpuComm(cls.cid, cls.size, cls.rank)
 
     def test_count(self):
