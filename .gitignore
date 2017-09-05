@@ -23,6 +23,7 @@ doc/_build
 doc/_doxybuild
 pygpu/*.c
 pygpu/*.h
+pygpu/version.py
 src/gpuarray/abi_version.h
 src/private_config.h
 Makefile.conf
