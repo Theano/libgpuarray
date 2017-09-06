@@ -33,6 +33,7 @@ build: off
 
 test_script:
   - cmd: for /f "tokens=*" %%i in ('python -c "import versioneer; print(versioneer.get_version())"') do set GPUARRAY_VERSION=%%i
+  - cmd: echo %GPUARRAY_VERSION%
   - cmd: conda build conda
   - cmd: mkdir pkgs
   - cmd: xcopy "%CONDA_LOC%"\conda-bld\win-64\pygpu* pkgs\ /Y

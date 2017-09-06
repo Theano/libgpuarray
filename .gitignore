@@ -3,6 +3,7 @@ build
 Debug
 Release
 lib
+.idea
 .*.sw[po]
 *~
 *.pyc
