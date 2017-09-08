@@ -1048,7 +1048,7 @@ def git_pieces_from_vcs(tag_prefix, root, verbose, run_command=run_command):
     # if there isn't one, this yields HEX[-dirty] (no NUM)
     if sys.platform == 'win32':
         describe_out, rc = run_command(GITS, ["describe", "--tags", "--dirty",
-                                              "--always", "--long"],
+                                              "--always"],
                                        cwd=root)
     else:
         describe_out, rc = run_command(GITS, ["describe", "--tags", "--dirty",
