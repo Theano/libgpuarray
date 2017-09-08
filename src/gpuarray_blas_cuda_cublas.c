@@ -1636,9 +1636,9 @@ static int sgerBatch(cb_order order, size_t M, size_t N, float alpha,
 
 
   for (i = 0; i < batchCount; i++) {
-    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A[i], CUDA_WAIT_READ));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A[i], CUDA_WAIT_ALL));
     GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(x[i], CUDA_WAIT_READ));
-    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(y[i], CUDA_WAIT_ALL));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(y[i], CUDA_WAIT_READ));
   }
 
   cuda_exit(ctx);
@@ -1766,9 +1766,9 @@ static int dgerBatch(cb_order order, size_t M, size_t N, double alpha,
   }
 
   for (i = 0; i < batchCount; i++) {
-    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A[i], CUDA_WAIT_READ));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A[i], CUDA_WAIT_ALL));
     GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(x[i], CUDA_WAIT_READ));
-    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(y[i], CUDA_WAIT_ALL));
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(y[i], CUDA_WAIT_READ));
   }
 
   cuda_exit(ctx);
