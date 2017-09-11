@@ -41,6 +41,6 @@ test_script:
   - cmd: conda build conda
   - ps: |
       if($env:appveyor_repo_tag -eq 'False') {
-        anaconda upload --user=abergeron $CONDA_LOC\conda-bld\win-64\pygpu*
-        anaconda upload --user=abergeron $CONDA_LOC\conda-bld\win-64\libgpuarray*
+        cmd.exe /c "anaconda upload --user=abergeron $CONDA_LOC\conda-bld\win-64\pygpu*"
+        cmd.exe /c "anaconda upload --user=abergeron $CONDA_LOC\conda-bld\win-64\libgpuarray*"
       }
