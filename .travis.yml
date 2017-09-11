@@ -23,7 +23,7 @@ before_install:
   - export PREFIX=$HOME/.local
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update && brew install doxygen; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export PYTHONUSERBASE=$PREFIX; fi
-  - pip install --user breathe sphinx==1.5.1 sphinx_rtd_theme cython numpy 'mako>=0.7' six
+  - pip install --user breathe sphinx==1.6.3 sphinx_rtd_theme cython numpy 'mako>=0.7' six
   - export PATH=$PATH:$PREFIX/bin
   - export CPATH=$CPATH:$PREFIX/include
   - export LIBRARY_PATH=$LIBRARY_PATH:$PREFIX/lib
