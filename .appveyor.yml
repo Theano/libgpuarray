@@ -15,7 +15,7 @@ configuration:
 
 environment:
   BINSTAR_TOKEN:
-    secure: pPGGv/pzNILDCClm4VNOv9lJ9Bah+iuJ22j4oLCaHzM8eNre8bfALOhMRIERhd55
+    secure: znS5Hm/opLtSmNYpJON5sIX0wa+1rM+UnhfonkTKVMC4Lr8aRIHsD4YAz9hKjWXr
     #secure: jK8icdT9ukloE7xSj7fqiCmtM/aTNLTUEeD2HLRP5+9GI5oGkK4jt/uYEcKDtfwO
 
   matrix:
@@ -41,6 +41,6 @@ test_script:
   - cmd: conda build conda
   - ps: |
       if($env:appveyor_repo_tag -eq 'False') {
-        cmd /c "anaconda upload --user=abergeron $CONDA_LOC\conda-bld\win-64\pygpu* 2>&1"
-        cmd /c "anaconda upload --user=abergeron $CONDA_LOC\conda-bld\win-64\libgpuarray* 2>&1"
+        cmd /c "anaconda -t $BINSTAR_TOKEN upload --user=abergeron $CONDA_LOC\conda-bld\win-64\pygpu* 2>&1"
+        cmd /c "anaconda -t $BINSTAR_TOKEN upload --user=abergeron $CONDA_LOC\conda-bld\win-64\libgpuarray* 2>&1"
       }
