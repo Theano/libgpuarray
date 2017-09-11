@@ -45,7 +45,7 @@ test_script:
   - cmd: xcopy "%CONDA_LOC%"\conda-bld\win-64\libgpuarray* pkgs\ /Y
   - ps: |
       if($env:appveyor_repo_tag -eq 'False') {
-        cmd /c "anaconda -t $BINSTAR_TOKEN upload --user=abergeron pkgs/* 2>&1"
+        anaconda -t $BINSTAR_TOKEN upload --user=abergeron pkgs/* 2>&1
       }
 
 artifacts:
