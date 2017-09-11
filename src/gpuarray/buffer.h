@@ -170,6 +170,7 @@ GPUARRAY_PUBLIC int gpucontext_props_set_single_stream(gpucontext_props *p);
  * shared drives.
  *
  * \param p properties object
+ * \param path desired location of the kernel cache
  *
  * \returns GA_NO_ERROR or an error code if an error occurred.
  */
@@ -214,8 +215,6 @@ GPUARRAY_PUBLIC void gpucontext_props_del(gpucontext_props *p);
  *
  * \param res a pointer to a location that will be allocated
  * \param name the backend name.
- * \param dev the device number.  The precise meaning of the device
- *            number is backend-dependent
  * \param props a properties object for the context.  Can be NULL for
  *              defaults.
  *
