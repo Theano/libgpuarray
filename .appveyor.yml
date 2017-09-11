@@ -14,6 +14,10 @@ configuration:
   - Release
 
 environment:
+  BINSTAR_TOKEN:
+    secure: pPGGv/pzNILDCClm4VNOv9lJ9Bah+iuJ22j4oLCaHzM8eNre8bfALOhMRIERhd55
+    #secure: jK8icdT9ukloE7xSj7fqiCmtM/aTNLTUEeD2HLRP5+9GI5oGkK4jt/uYEcKDtfwO
+
   matrix:
     - CONDA_LOC: "C:\\Miniconda-x64"
     - CONDA_LOC: "C:\\Miniconda35-x64"
@@ -35,14 +39,8 @@ test_script:
   - cmd: for /f "tokens=*" %%i in ('python -c "import versioneer; print(versioneer.get_version())"') do set GPUARRAY_VERSION=%%i
   - cmd: echo %GPUARRAY_VERSION%
   - cmd: conda build conda
-  - cmd: mkdir pkgs
-  - cmd: xcopy "%CONDA_LOC%"\conda-bld\win-64\pygpu* pkgs\ /Y
-  - cmd: xcopy "%CONDA_LOC%"\conda-bld\win-64\libgpuarray* pkgs\ /Y
-
-artifacts:
-  - path: pkgs/*
-    name: "Conda Packages"
-
-#deploy:
-#  on:
-#    appveyor_repo_tag: true
+  - ps: |
+      if($env:appveyor_repo_tag -eq 'False') {
+        anaconda upload --user=abergeron "%CONDA_LOC%"\conda-bld\win-64\pygpu*
+        anaconda upload --user=abergeron "%CONDA_LOC%"\conda-bld\win-64\libgpuarray*
+      }
