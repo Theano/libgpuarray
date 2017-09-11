@@ -15,8 +15,7 @@ configuration:
 
 environment:
   BINSTAR_TOKEN:
-    secure: znS5Hm/opLtSmNYpJON5sIX0wa+1rM+UnhfonkTKVMC4Lr8aRIHsD4YAz9hKjWXr
-    #secure: jK8icdT9ukloE7xSj7fqiCmtM/aTNLTUEeD2HLRP5+9GI5oGkK4jt/uYEcKDtfwO
+    secure: 4KDgW9K3omzJ/ILWm1ApjsvTjefHJuECRy7nmnvuUul+0gbAYTUm5JanY+X1pccu
 
   matrix:
     - CONDA_LOC: "C:\\Miniconda-x64"
@@ -44,8 +43,8 @@ test_script:
   - cmd: xcopy "%CONDA_LOC%"\conda-bld\win-64\pygpu* pkgs\ /Y
   - cmd: xcopy "%CONDA_LOC%"\conda-bld\win-64\libgpuarray* pkgs\ /Y
   - ps: |
-      if($env:appveyor_repo_tag -eq 'False') {
-        anaconda -t $env:BINSTAR_TOKEN upload --user=abergeron pkgs/* 2>&1
+      if($env:appveyor_repo_tag -eq 'True') {
+        anaconda -t $env:BINSTAR_TOKEN upload --user=mila-udem pkgs/* 2>&1
       }
 
 artifacts:
