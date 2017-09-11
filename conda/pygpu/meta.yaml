@@ -13,9 +13,6 @@ build:
 
 requirements:
   build:
-    - m2-git         [win]
-    - m2-filesystem  [win]
-    - git            [not win]
     - python
     - cython >=0.25
     - numpy 1.11
