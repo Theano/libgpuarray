@@ -1,7 +1,7 @@
 version: 2
 
 jobs:
-  build:
+  build_pkgs:
     docker:
       - image: milaudem/libgpuarray:0
 
@@ -37,4 +37,4 @@ workflows:
   version: 2
   build_and_test:
     jobs:
-      - build
+      - build_pkgs
