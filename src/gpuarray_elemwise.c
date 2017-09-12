@@ -738,18 +738,24 @@ GpuElemwise *GpuElemwise_new(gpucontext *ctx,
 
 void GpuElemwise_free(GpuElemwise *ge) {
   unsigned int i;
-  for (i = 0; i < ge->nd; i++) {
-    if (k_initialized(&ge->k_basic_32[i]))
-      GpuKernel_clear(&ge->k_basic_32[i]);
-    if (k_initialized(&ge->k_basic[i]))
-      GpuKernel_clear(&ge->k_basic[i]);
-  }
+  if (ge->k_basic_32 != NULL)
+    for (i = 0; i < ge->nd; i++) {
+      if (k_initialized(&ge->k_basic_32[i]))
+        GpuKernel_clear(&ge->k_basic_32[i]);
+    }
+  if (ge->k_basic != NULL)
+    for (i = 0; i < ge->nd; i++) {
+      if (k_initialized(&ge->k_basic[i]))
+        GpuKernel_clear(&ge->k_basic[i]);
+    }
   if (ge->strides != NULL)
     for (i = 0; i < ge->narray; i++) {
       free(ge->strides[i]);
     }
   if (k_initialized(&ge->k_contig))
     GpuKernel_clear(&ge->k_contig);
+  free(ge->k_basic_32);
+  free(ge->k_basic);
   free_args(ge->n, ge->args);
   free((void *)ge->preamble);
   free((void *)ge->expr);
