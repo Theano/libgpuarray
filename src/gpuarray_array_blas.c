@@ -663,7 +663,7 @@ int GpuArray_rgemmBatch_3d(cb_transpose transA, cb_transpose transB, double alph
     C_offsets = (size_t*)malloc(batchCount * sizeof(size_t));
 
     if (A_datas == NULL || B_datas == NULL || C_datas == NULL ||
-        A_offsets == NULL || B_offsets == NULL || C_offsets) {
+        A_offsets == NULL || B_offsets == NULL || C_offsets == NULL) {
       err = error_sys(ctx->err, "malloc");
       goto old_cleanup;
     }
