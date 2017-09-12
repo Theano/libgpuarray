@@ -32,3 +32,9 @@ jobs:
           fi
        - store_artifacts:
          path: /miniconda/conda-bld/linux-64
+
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - build
