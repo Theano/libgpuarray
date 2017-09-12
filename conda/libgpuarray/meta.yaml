@@ -14,8 +14,6 @@ build:
 
 requirements:
   build:
-    - m2-git         [win]
-    - git            [not win]
     - cmake
     - mako
     - python  # version doesn't matter here

@@ -14,9 +14,13 @@ configuration:
   - Release
 
 environment:
+  BINSTAR_TOKEN:
+    secure: 4KDgW9K3omzJ/ILWm1ApjsvTjefHJuECRy7nmnvuUul+0gbAYTUm5JanY+X1pccu
+
   matrix:
     - CONDA_LOC: "C:\\Miniconda-x64"
     - CONDA_LOC: "C:\\Miniconda35-x64"
+    - CONDA_LOC: "C:\\Miniconda36-x64"
 
 install:
   # This breaks conda-build because of git
@@ -38,11 +42,11 @@ test_script:
   - cmd: mkdir pkgs
   - cmd: xcopy "%CONDA_LOC%"\conda-bld\win-64\pygpu* pkgs\ /Y
   - cmd: xcopy "%CONDA_LOC%"\conda-bld\win-64\libgpuarray* pkgs\ /Y
+  - ps: |
+      if($env:appveyor_repo_tag -eq 'True') {
+        anaconda -t $env:BINSTAR_TOKEN upload --user=mila-udem pkgs/* 2>&1
+      }
 
 artifacts:
   - path: pkgs/*
     name: "Conda Packages"
-
-#deploy:
-#  on:
-#    appveyor_repo_tag: true
