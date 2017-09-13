@@ -216,8 +216,15 @@ static int key_path(disk_cache *c, const cache_key_t key, char *out) {
   unsigned char hash[64];
   int i;
 
-  if (c->kwrite(&kb, key)) return -1;
-  if (Skein_512((unsigned char *)kb.s, kb.l, hash)) return -1;
+  if (c->kwrite(&kb, key)) {
+    strb_clear(&kb);
+    return -1;
+  }
+  if (Skein_512((unsigned char *)kb.s, kb.l, hash)) {
+    strb_clear(&kb);
+    return -1;
+  }
+  strb_clear(&kb);
   if (snprintf(out, 10, "%02x%02x/%02x%02x",
                hash[0], hash[1], hash[2], hash[3]) != 9)
     return -1;
