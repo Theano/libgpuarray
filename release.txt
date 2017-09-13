@@ -1,7 +1,5 @@
 Release process:
 - Make sure you are on the proper release branch
-- Commit the changes with message "Changes for release X.Y.Z"
-  git commit -m "Changes for release X.Y.Z"
 - Make a git tag
   git tag vX.Y.Z
 - Push to master the commit and the tag
