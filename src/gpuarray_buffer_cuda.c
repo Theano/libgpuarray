@@ -1223,6 +1223,8 @@ static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
 
   GA_CHECK(make_bin(ctx, &ptx, bin, log));
 
+  strb_clear(&ptx);
+
   if (ctx->disk_cache) {
     pk = calloc(sizeof(disk_key), 1);
     if (pk == NULL) {
@@ -1234,7 +1236,7 @@ static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
     memcpy(pk, &k, DISK_KEY_MM);
     strb_appendb(&pk->src, src);
     if (strb_error(&pk->src)) {
-      error_sys(ctx->err, "strb_appendb"); 
+      error_sys(ctx->err, "strb_appendb");
       fprintf(stderr, "Error adding kernel to disk cache %s\n",
               ctx->err->msg);
       disk_free((cache_key_t)pk);
@@ -1242,7 +1244,7 @@ static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
     }
     cbin = strb_alloc(bin->l);
     if (cbin == NULL) {
-      error_sys(ctx->err, "strb_alloc"); 
+      error_sys(ctx->err, "strb_alloc");
       fprintf(stderr, "Error adding kernel to disk cache: %s\n",
               ctx->err->msg);
       disk_free((cache_key_t)pk);
@@ -1250,7 +1252,7 @@ static int compile(cuda_context *ctx, strb *src, strb* bin, strb *log) {
     }
     strb_appendb(cbin, bin);
     if (strb_error(cbin)) {
-      error_sys(ctx->err, "strb_appendb"); 
+      error_sys(ctx->err, "strb_appendb");
       fprintf(stderr, "Error adding kernel to disk cache %s\n",
               ctx->err->msg);
       disk_free((cache_key_t)pk);
