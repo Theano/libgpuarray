@@ -1430,20 +1430,21 @@ cdef GpuArray pygpu_reshape(GpuArray a, unsigned int nd, const size_t *newdims,
     if cdims == NULL:
         raise MemoryError, "could not allocate cdims"
 
-    cdef size_t d
-    for i in range(nd):
-        d = newdims[i]
-        if i == caxis:
-            d = a.size // tot
+    try:
+        cdef size_t d
+        for i in range(nd):
+            d = newdims[i]
+            if i == caxis:
+                d = a.size // tot
 
-            if d * tot != a.size:
-                free(cdims)
-                raise GpuArrayException, "..."
-        cdims[i] = d
+                if d * tot != a.size:
+                    raise GpuArrayException, "..."
+            cdims[i] = d
 
-    array_reshape(res, a, nd, cdims, ord, nocopy)
-    free(cdims)
-    return res
+        array_reshape(res, a, nd, cdims, ord, nocopy)
+        return res
+    finally:
+        free(cdims)
 
 
 cdef GpuArray pygpu_transpose(GpuArray a, const unsigned int *newaxes):
