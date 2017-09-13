@@ -44,7 +44,7 @@ test_script:
   - cmd: xcopy "%CONDA_LOC%"\conda-bld\win-64\libgpuarray* pkgs\ /Y
   - ps: |
       if($env:appveyor_repo_tag -eq 'True') {
-        anaconda -t $env:BINSTAR_TOKEN upload --user=mila-udem pkgs/* 2>&1
+        cmd /c "anaconda -t $env:BINSTAR_TOKEN upload --user=mila-udem pkgs/* 2>&1"
       }
 
 artifacts:
