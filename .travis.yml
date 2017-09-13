@@ -7,8 +7,8 @@ matrix:
 
 before_install:
   - export PREFIX=$HOME/.local
-  - brew update && brew install doxygen; fi
-  - export PYTHONUSERBASE=$PREFIX; fi
+  - brew update && brew install doxygen
+  - export PYTHONUSERBASE=$PREFIX
   - pip install --user breathe sphinx==1.6.3 sphinx_rtd_theme cython numpy 'mako>=0.7' six
   - export PATH=$PATH:$PREFIX/bin
   - export CPATH=$CPATH:$PREFIX/include
