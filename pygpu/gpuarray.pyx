@@ -1428,7 +1428,6 @@ cdef GpuArray pygpu_reshape(GpuArray a, unsigned int nd, const size_t *newdims,
             tot *= newdims[i]
     cdims = <size_t *>calloc(nd, sizeof(size_t))
     if cdims == NULL:
-        free(cdims)
         raise MemoryError, "could not allocate cdims"
 
     cdef size_t d
