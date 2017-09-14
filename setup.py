@@ -1,6 +1,8 @@
 import sys
 import os
 import versioneer
+import distutils.command.clean
+import shutil
 
 have_cython = False
 
@@ -82,6 +84,22 @@ if sys.platform == 'win32' and not os.getenv('CONDA_BUILD'):
         raise RuntimeError('default binary dir {} does not exist, you may need to build the C library in release mode'.format(default_bin_dir))
     library_dirs += [default_bin_dir]
 
+class cmd_clean(distutils.command.clean.clean):
+    def run(self):
+        import glob
+        with open('.clean', 'r') as f:
+            ignores = f.read()
+            for wildcard in filter(bool, ignores.split('\n')):
+                for filename in glob.glob(wildcard):
+                    try:
+                        os.remove(filename)
+                    except OSError:
+                        shutil.rmtree(filename, ignore_errors=True)
+
+        # It's an old-style class in Python 2.7...
+        distutils.command.clean.clean.run(self)
+
+
 ea = []
 if sys.platform in ('darwin', 'linux'):
     # Silence unused stuff warnings
@@ -120,9 +138,12 @@ exts = [Extension('pygpu.gpuarray',
                   define_macros=[('GPUARRAY_SHARED', None)]
                   )]
 
+cmds=versioneer.get_cmdclass()
+cmds["clean"] = cmd_clean
+
 setup(name='pygpu',
       version=versioneer.get_version(),
-      cmdclass=versioneer.get_cmdclass(),
+      cmdclass=cmds,
       description='numpy-like wrapper on libgpuarray for GPU computations',
       packages=['pygpu', 'pygpu/tests'],
       include_package_data=True,
