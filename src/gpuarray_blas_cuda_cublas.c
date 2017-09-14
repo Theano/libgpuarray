@@ -835,7 +835,11 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
       return ctx->err->code;
     }
 
-    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Ta, CUDA_WAIT_READ));
+    if (cuda_wait(Ta, CUDA_WAIT_READ) != GA_NO_ERROR) {
+      gpudata_release(Ta);
+      cuda_exit(ctx);
+      return ctx->err->code;
+    }
 
     err = cublasSgemmBatched(h->h,
                              convT(transA), convT(transB),
@@ -843,6 +847,11 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
                              (const float **)Aa, lda,
                              (const float **)Ba, ldb, &beta,
                              (float **)Ca, ldc, batchCount);
+    if (cuda_record(Ta, CUDA_WAIT_READ) != GA_NO_ERROR) {
+      gpudata_release(Ta);
+      cuda_exit(ctx);
+      return ctx->err->code;
+    }
     gpudata_release(Ta);
     if (err != CUBLAS_STATUS_SUCCESS) {
       cuda_exit(ctx);
@@ -964,7 +973,11 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
       return ctx->err->code;
     }
 
-    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Ta, CUDA_WAIT_READ));
+    if (cuda_wait(Ta, CUDA_WAIT_READ) != GA_NO_ERROR) {
+      gpudata_release(Ta);
+      cuda_exit(ctx);
+      return ctx->err->code;
+    }
 
     err = cublasDgemmBatched(h->h,
                              convT(transA), convT(transB),
@@ -972,7 +985,14 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
                              (const double **)Aa, lda,
                              (const double **)Ba, ldb, &beta,
                              (double **)Ca, ldc, batchCount);
+
+    if (cuda_record(Ta, CUDA_WAIT_READ) != GA_NO_ERROR) {
+      gpudata_release(Ta);
+      cuda_exit(ctx);
+      return ctx->err->code;
+    }
     gpudata_release(Ta);
+
     if (err != CUBLAS_STATUS_SUCCESS) {
       cuda_exit(ctx);
       return error_cublas(ctx->err, "cublasDgemmBatched", err);
