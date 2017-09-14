@@ -1647,6 +1647,25 @@ def get_cmdclass():
                                   self._versioneer_generated_versions)
     cmds["sdist"] = cmd_sdist
 
+    import distutils.command.clean
+    import shutil
+
+    class cmd_clean(distutils.command.clean.clean):
+        def run(self):
+            import glob
+            with open('.clean', 'r') as f:
+                ignores = f.read()
+                for wildcard in filter(bool, ignores.split('\n')):
+                    for filename in glob.glob(wildcard):
+                        try:
+                            os.remove(filename)
+                        except OSError:
+                            shutil.rmtree(filename, ignore_errors=True)
+
+            # It's an old-style class in Python 2.7...
+            distutils.command.clean.clean.run(self)
+    cmds["clean"] = cmd_clean
+
     return cmds
 
 
