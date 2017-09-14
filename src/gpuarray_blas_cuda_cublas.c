@@ -835,6 +835,8 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
       return ctx->err->code;
     }
 
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Ta, CUDA_WAIT_READ));
+
     err = cublasSgemmBatched(h->h,
                              convT(transA), convT(transB),
                              M, N, K, &alpha,
@@ -961,6 +963,8 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
       cuda_exit(ctx);
       return ctx->err->code;
     }
+
+    GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(Ta, CUDA_WAIT_READ));
 
     err = cublasDgemmBatched(h->h,
                              convT(transA), convT(transB),
