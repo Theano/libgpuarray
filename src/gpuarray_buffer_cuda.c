@@ -851,8 +851,8 @@ static void cuda_free(gpudata *d) {
           d->ptr + d->sz == next->ptr) {
         d->sz = d->sz + next->sz;
         d->next = next->next;
-        cuda_wait(next, CUDA_WAIT_ALL);
-        cuda_record(d, CUDA_WAIT_ALL);
+        cuda_waits(next, CUDA_WAIT_ALL, d->ls);
+        cuda_records(d, CUDA_WAIT_ALL, d->ls);
         deallocate(next);
       } else {
         d->next = next;
