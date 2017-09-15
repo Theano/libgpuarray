@@ -1646,7 +1646,6 @@ def get_cmdclass():
             write_to_version_file(target_versionfile,
                                   self._versioneer_generated_versions)
     cmds["sdist"] = cmd_sdist
-
     return cmds
 
 
