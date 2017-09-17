@@ -113,7 +113,8 @@ cl_ctx *cl_make_ctx(cl_context ctx, gpucontext_props *p) {
   cl_command_queue_properties qprop;
   char vendor[32];
   char driver_version[64];
-  char device_version[32];
+  char *device_version = NULL;
+  size_t device_version_size = 0;
   cl_uint vendor_id;
   cl_int err;
   size_t len;
@@ -132,9 +133,19 @@ cl_ctx *cl_make_ctx(cl_context ctx, gpucontext_props *p) {
   id = get_dev(ctx, global_err);
   if (id == NULL) return NULL;
 
+  /* Query device version string size */
   CL_CHECKN(global_err, clGetDeviceInfo(id, CL_DEVICE_VERSION,
-                                        sizeof(device_version),
-                                        &device_version, NULL));
+                                        0, NULL, &device_version_size));
+  if (device_version_size > 1024) {
+    error_set(global_err, GA_UNSUPPORTED_ERROR,
+              "device version buffer too large");
+    return NULL;
+  }
+
+  device_version = alloca(device_version_size);
+  CL_CHECKN(global_err, clGetDeviceInfo(id, CL_DEVICE_VERSION,
+                                        device_version_size,
+                                        device_version, NULL));
   if (device_version[7] == '1' && device_version[9] < '2') {
     error_set(global_err, GA_UNSUPPORTED_ERROR,
               "We only support OpenCL 1.2 and up");
