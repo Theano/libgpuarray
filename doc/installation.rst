@@ -123,6 +123,7 @@ computer, you can install them in your home directory like this:
 ::
 
   cd <dir>
+  rm -rf ~/.local/lib/libgpuarray* ~/.local/include/gpuarray
   rm -rf build Build
   mkdir Build
   cd Build
