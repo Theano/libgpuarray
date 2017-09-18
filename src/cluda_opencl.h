@@ -112,6 +112,14 @@ static inline ga_half ga_float2half(ga_float f) {
 #define atom_add_Il(a, b) atomic_add(a, b)
 #define atom_xchg_Ig(a, b) atomic_xchg(a, b)
 #define atom_xchg_Il(a, b) atomic_xchg(a, b)
+/* ga_float */
+gen_atom32_add(atom_add_fg, ga_float, global)
+gen_atom32_add(atom_add_fl, ga_float, local)
+#define atom_xchg_fg(a, b) atomic_xchg(a, b)
+#define atom_xchg_fl(a, b) atomic_xchg(a, b)
+
+#ifdef cl_khr_int64_base_atomics
+#pragma OPENCL EXTENSION cl_khr_int64_base_atomics: enable
 /* ga_long */
 #define atom_add_lg(a, b) atom_add(a, b)
 #define atom_add_ll(a, b) atom_add(a, b)
@@ -122,17 +130,13 @@ static inline ga_half ga_float2half(ga_float f) {
 #define atom_add_Ll(a, b) atom_add(a, b)
 #define atom_xchg_Lg(a, b) atom_xchg(a, b)
 #define atom_xchg_Ll(a, b) atom_xchg(a, b)
-/* ga_float */
-gen_atom32_add(atom_add_fg, ga_float, global)
-gen_atom32_add(atom_add_fl, ga_float, local)
-#define atom_xchg_fg(a, b) atomic_xchg(a, b)
-#define atom_xchg_fl(a, b) atomic_xchg(a, b)
 /* ga_double */
 #ifdef cl_khr_fp64
 gen_atom64_add(atom_add_dg, ga_double, global)
 gen_atom64_add(atom_add_dl, ga_double, local)
 gen_atom64_xchg(atom_xchg_dg, ga_double, global)
 gen_atom64_xchg(atom_xchg_dl, ga_double, local)
+#endif
 #endif
 /* ga_half */
 #define gen_atomh_add(name, aspace)                                     \
