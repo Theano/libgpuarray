@@ -33,7 +33,10 @@
 #define ga_long long
 #define ga_ulong ulong
 #define ga_float float
+#ifdef cl_khr_fp64
+#pragma OPENCL EXTENSION cl_khr_fp64: enable
 #define ga_double double
+#endif
 #define ga_size ulong
 #define ga_ssize long
 #define GA_DECL_SHARED_PARAM(type, name) , __local type *name
@@ -125,10 +128,12 @@ gen_atom32_add(atom_add_fl, ga_float, local)
 #define atom_xchg_fg(a, b) atomic_xchg(a, b)
 #define atom_xchg_fl(a, b) atomic_xchg(a, b)
 /* ga_double */
+#ifdef cl_khr_fp64
 gen_atom64_add(atom_add_dg, ga_double, global)
 gen_atom64_add(atom_add_dl, ga_double, local)
 gen_atom64_xchg(atom_xchg_dg, ga_double, global)
 gen_atom64_xchg(atom_xchg_dl, ga_double, local)
+#endif
 /* ga_half */
 #define gen_atomh_add(name, aspace)                                     \
   ga_half name(volatile aspace ga_half *addr, ga_half val);             \
