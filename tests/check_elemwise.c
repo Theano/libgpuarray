@@ -371,7 +371,7 @@ START_TEST(test_basic_scalar) {
   GpuElemwise *ge;
 
   static const uint32_t data1[3] = {1, 2, 3};
-  static const uint32_t data2[3] = {4, 5};
+  static const uint32_t data2[2] = {4, 5};
   uint32_t data3[6] = {0};
 
   size_t dims[2];
