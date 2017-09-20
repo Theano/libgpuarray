@@ -15,7 +15,7 @@ configuration:
 
 environment:
   BINSTAR_TOKEN:
-    secure: 4KDgW9K3omzJ/ILWm1ApjsvTjefHJuECRy7nmnvuUul+0gbAYTUm5JanY+X1pccu
+    secure: 58KqJcKtfCBVCuIzpnkLm4XZLQqKq95Hs8Ly20HWaMSla67nusrp3y4sy6XzZOBQ
 
   matrix:
     - CONDA_LOC: "C:\\Miniconda-x64"
