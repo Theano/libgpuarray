@@ -72,6 +72,7 @@ typedef struct _blas_handle {
   GpuKernel dgemvBH_T_a1_b1_small;
   GpuKernel sgerBH_gen_small;
   GpuKernel dgerBH_gen_small;
+  uint8_t tensorCore;
 } blas_handle;
 
 #define LARGE_VAL(v) (v >= INT_MAX)
@@ -209,6 +210,13 @@ static int setup(gpucontext *c) {
   handle = calloc(1, sizeof(*handle));
   if (handle == NULL)
     return error_sys(ctx->err, "calloc");
+
+  /* Only try to use tensor core on cuda 9 and up */
+  if (ctx->major >= 9) {
+    handle->tensorCore = 1;
+  } else {
+    handle->tensorCore = 0;
+  }
 
   cuda_enter(ctx);
   err = cublasCreate(&handle->h);
@@ -443,8 +451,8 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   ASSERT_BUF(B);
   ASSERT_BUF(C);
 
-  if (cublasGemmEx == NULL && cublasSgemmEx == NULL)
-    return error_set(ctx->err, GA_DEVSUP_ERROR, "cublasSgemmEx unavailable");
+  if (cublasSgemmEx == NULL && (cublasGemmEx == NULL || h->tensorCore == 0))
+    return error_set(ctx->err, GA_DEVSUP_ERROR, "cublasSgemmEx|cublasGemmEx unavailable");
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
       LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
@@ -476,7 +484,7 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(B, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C, CUDA_WAIT_ALL));
 
-  if (cublasGemmEx) {
+  if (cublasGemmEx != NULL && h->tensorCore) {
     CUBLAS_EXIT_ON_ERROR(ctx, cublasGemmEx(h->h, convT(transA), convT(transB),
 					   M, N, K,
 					   &alpha, ((uint16_t *)A->ptr) + offA,
