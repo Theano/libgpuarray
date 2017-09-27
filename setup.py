@@ -138,11 +138,16 @@ exts = [Extension('pygpu.gpuarray',
                   define_macros=[('GPUARRAY_SHARED', None)]
                   )]
 
-cmds=versioneer.get_cmdclass()
+cmds = versioneer.get_cmdclass()
 cmds["clean"] = cmd_clean
 
+version_data = versioneer.get_versions()
+
+if version_data['error'] is not None:
+    raise ValueError("Can't determine version for build: %s\n  Please make sure that your git checkout includes tags." % (version_data['error'],))
+
 setup(name='pygpu',
-      version=versioneer.get_version(),
+      version=version_data['version'],
       cmdclass=cmds,
       description='numpy-like wrapper on libgpuarray for GPU computations',
       packages=['pygpu', 'pygpu/tests'],
