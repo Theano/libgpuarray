@@ -200,8 +200,10 @@ static const char *code_dgerBH_gen_small =                              \
 static int setup(gpucontext *c) {
   cuda_context *ctx = (cuda_context *)c;
   blas_handle *handle;
+  CUdevice dev;
   cublasStatus_t err;
   int types[10];
+  int major, minor;
   int e;
 
   if (ctx->blas_handle != NULL)
@@ -211,14 +213,24 @@ static int setup(gpucontext *c) {
   if (handle == NULL)
     return error_sys(ctx->err, "calloc");
 
+  cuda_enter(ctx);
+  {
+    CUresult err;
+    err = cuCtxGetDevice(&dev);
+    if (err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return error_cuda(ctx->err, "cuCtxGetDevice", err);
+    }
+  }
+  GA_CUDA_EXIT_ON_ERROR(ctx, get_cc(dev, &major, &minor, ctx->err));
+
   /* Only try to use tensor core on cuda 9 and up */
-  if (ctx->major >= 9) {
+  if (ctx->major >= 9 && major >= 7 && minor >= 0) {
     handle->tensorCore = 1;
   } else {
     handle->tensorCore = 0;
   }
 
-  cuda_enter(ctx);
   err = cublasCreate(&handle->h);
   if (err != CUBLAS_STATUS_SUCCESS) {
     cuda_exit(ctx);
@@ -507,7 +519,7 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
 					    CUDA_R_16F,
 					    ldc));
   }
-    
+
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(C, CUDA_WAIT_ALL));
