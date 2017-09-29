@@ -34,6 +34,34 @@ typedef enum cudaDataType_t
   CUDA_C_32U= 13   // complex as a pair of unsigned int numbers
 } cudaDataType;
 
+typedef cudaDataType cudaDataType_t;
+
+typedef enum {
+    CUBLAS_GEMM_DFALT               = -1,
+    CUBLAS_GEMM_ALGO0               =  0,
+    CUBLAS_GEMM_ALGO1               =  1,
+    CUBLAS_GEMM_ALGO2               =  2,
+    CUBLAS_GEMM_ALGO3               =  3,
+    CUBLAS_GEMM_ALGO4               =  4,
+    CUBLAS_GEMM_ALGO5               =  5,
+    CUBLAS_GEMM_ALGO6               =  6,
+    CUBLAS_GEMM_ALGO7               =  7,
+    CUBLAS_GEMM_ALGO8               =  8,
+    CUBLAS_GEMM_ALGO9               =  9,
+    CUBLAS_GEMM_ALGO10              =  10,
+    CUBLAS_GEMM_ALGO11              =  11,
+    CUBLAS_GEMM_ALGO12              =  12,
+    CUBLAS_GEMM_ALGO13              =  13,
+    CUBLAS_GEMM_ALGO14              =  14,
+    CUBLAS_GEMM_ALGO15              =  15,
+    CUBLAS_GEMM_ALGO16              =  16,
+    CUBLAS_GEMM_ALGO17              =  17,
+    CUBLAS_GEMM_DFALT_TENSOR_OP     =  99,
+    CUBLAS_GEMM_ALGO0_TENSOR_OP     =  100,
+    CUBLAS_GEMM_ALGO1_TENSOR_OP     =  101,
+    CUBLAS_GEMM_ALGO2_TENSOR_OP     =  102
+} cublasGemmAlgo_t;
+
 typedef struct CUstream_st *cudaStream_t;
 
 typedef enum {

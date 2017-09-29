@@ -443,7 +443,7 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   ASSERT_BUF(B);
   ASSERT_BUF(C);
 
-  if (cublasSgemmEx == NULL)
+  if (cublasGemmEx == NULL && cublasSgemmEx == NULL)
     return error_set(ctx->err, GA_DEVSUP_ERROR, "cublasSgemmEx unavailable");
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
@@ -476,16 +476,30 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(B, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C, CUDA_WAIT_ALL));
 
-  CUBLAS_EXIT_ON_ERROR(ctx, cublasSgemmEx(h->h, convT(transA), convT(transB),
-                                          M, N, K,
-                                          &alpha, ((uint16_t *)A->ptr) + offA,
-                                          CUDA_R_16F,
-                                          lda, ((uint16_t *)B->ptr) + offB,
-                                          CUDA_R_16F,
-                                          ldb, &beta, ((uint16_t *)C->ptr) + offC,
-                                          CUDA_R_16F,
-                                          ldc));
-
+  if (cublasGemmEx) {
+    CUBLAS_EXIT_ON_ERROR(ctx, cublasGemmEx(h->h, convT(transA), convT(transB),
+					   M, N, K,
+					   &alpha, ((uint16_t *)A->ptr) + offA,
+					   CUDA_R_16F,
+					   lda, ((uint16_t *)B->ptr) + offB,
+					   CUDA_R_16F,
+					   ldb, &beta, ((uint16_t *)C->ptr) + offC,
+					   CUDA_R_16F,
+					   ldc,
+					   CUDA_R_32F,
+					   CUBLAS_GEMM_DFALT_TENSOR_OP));
+  } else {
+    CUBLAS_EXIT_ON_ERROR(ctx, cublasSgemmEx(h->h, convT(transA), convT(transB),
+					    M, N, K,
+					    &alpha, ((uint16_t *)A->ptr) + offA,
+					    CUDA_R_16F,
+					    lda, ((uint16_t *)B->ptr) + offB,
+					    CUDA_R_16F,
+					    ldb, &beta, ((uint16_t *)C->ptr) + offC,
+					    CUDA_R_16F,
+					    ldc));
+  }
+    
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(C, CUDA_WAIT_ALL));
