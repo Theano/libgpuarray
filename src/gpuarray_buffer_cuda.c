@@ -219,12 +219,30 @@ cuda_context *cuda_make_ctx(CUcontext ctx, gpucontext_props *p) {
   cache *mem_cache;
   const char *cache_path;
   void *pp;
+  CUdevice dev;
   CUresult err;
+  int cc_major, cc_minor;
   int e;
 
   e = setup_lib();
   if (e != GA_NO_ERROR)
     return NULL;
+
+  err = cuCtxGetDevice(&dev);
+  if (err != CUDA_SUCCESS) {
+    error_cuda(global_err, "cuCtxGetDevice", err);
+    return NULL;
+  }
+
+  e = get_cc(dev, &cc_major, &cc_minor, global_err);
+  if (e != GA_NO_ERROR)
+    return NULL;
+
+  if ((major >= 9 && cc_major <= 2) || (major >= 7 && cc_major <= 1)) {
+    error_set(global_err, GA_UNSUPPORTED_ERROR,
+              "GPU is too old for CUDA version");
+    return NULL;
+  }
 
   res = calloc(1, sizeof(*res));
   if (res == NULL) {
