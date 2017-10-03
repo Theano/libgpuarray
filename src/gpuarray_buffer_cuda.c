@@ -1048,7 +1048,7 @@ static int cuda_memset(gpudata *dst, size_t dstoff, int data) {
     return GA_NO_ERROR;
 }
 
-static int get_cc(CUdevice dev, int *maj, int *min, error *e) {
+int get_cc(CUdevice dev, int *maj, int *min, error *e) {
   CUresult err;
   err = cuDeviceGetAttribute(maj,
                              CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,

@@ -157,4 +157,6 @@ struct _gpukernel {
 #endif
 };
 
+int get_cc(CUdevice dev, int *maj, int *min, error *e);
+
 #endif

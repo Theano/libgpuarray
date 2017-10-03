@@ -72,6 +72,7 @@ typedef struct _blas_handle {
   GpuKernel dgemvBH_T_a1_b1_small;
   GpuKernel sgerBH_gen_small;
   GpuKernel dgerBH_gen_small;
+  uint8_t tensorCore;
 } blas_handle;
 
 #define LARGE_VAL(v) (v >= INT_MAX)
@@ -199,8 +200,10 @@ static const char *code_dgerBH_gen_small =                              \
 static int setup(gpucontext *c) {
   cuda_context *ctx = (cuda_context *)c;
   blas_handle *handle;
+  CUdevice dev;
   cublasStatus_t err;
   int types[10];
+  int major, minor;
   int e;
 
   if (ctx->blas_handle != NULL)
@@ -211,6 +214,23 @@ static int setup(gpucontext *c) {
     return error_sys(ctx->err, "calloc");
 
   cuda_enter(ctx);
+  {
+    CUresult err;
+    err = cuCtxGetDevice(&dev);
+    if (err != CUDA_SUCCESS) {
+      cuda_exit(ctx);
+      return error_cuda(ctx->err, "cuCtxGetDevice", err);
+    }
+  }
+  GA_CUDA_EXIT_ON_ERROR(ctx, get_cc(dev, &major, &minor, ctx->err));
+
+  /* Only try to use tensor core on cuda 9 and up */
+  if (ctx->major >= 9 && major >= 7 && minor >= 0) {
+    handle->tensorCore = 1;
+  } else {
+    handle->tensorCore = 0;
+  }
+
   err = cublasCreate(&handle->h);
   if (err != CUBLAS_STATUS_SUCCESS) {
     cuda_exit(ctx);
@@ -443,8 +463,8 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   ASSERT_BUF(B);
   ASSERT_BUF(C);
 
-  if (cublasSgemmEx == NULL)
-    return error_set(ctx->err, GA_DEVSUP_ERROR, "cublasSgemmEx unavailable");
+  if (cublasSgemmEx == NULL && (cublasGemmEx == NULL || h->tensorCore == 0))
+    return error_set(ctx->err, GA_DEVSUP_ERROR, "cublasSgemmEx|cublasGemmEx unavailable");
 
   if (LARGE_VAL(M) || LARGE_VAL(N) || LARGE_VAL(K) ||
       LARGE_VAL(lda) || LARGE_VAL(ldb) || LARGE_VAL(ldc) ||
@@ -476,15 +496,29 @@ static int hgemm(cb_order order, cb_transpose transA, cb_transpose transB,
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(B, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_wait(C, CUDA_WAIT_ALL));
 
-  CUBLAS_EXIT_ON_ERROR(ctx, cublasSgemmEx(h->h, convT(transA), convT(transB),
-                                          M, N, K,
-                                          &alpha, ((uint16_t *)A->ptr) + offA,
-                                          CUDA_R_16F,
-                                          lda, ((uint16_t *)B->ptr) + offB,
-                                          CUDA_R_16F,
-                                          ldb, &beta, ((uint16_t *)C->ptr) + offC,
-                                          CUDA_R_16F,
-                                          ldc));
+  if (cublasGemmEx != NULL && h->tensorCore) {
+    CUBLAS_EXIT_ON_ERROR(ctx, cublasGemmEx(h->h, convT(transA), convT(transB),
+					   M, N, K,
+					   &alpha, ((uint16_t *)A->ptr) + offA,
+					   CUDA_R_16F,
+					   lda, ((uint16_t *)B->ptr) + offB,
+					   CUDA_R_16F,
+					   ldb, &beta, ((uint16_t *)C->ptr) + offC,
+					   CUDA_R_16F,
+					   ldc,
+					   CUDA_R_32F,
+					   CUBLAS_GEMM_DFALT_TENSOR_OP));
+  } else {
+    CUBLAS_EXIT_ON_ERROR(ctx, cublasSgemmEx(h->h, convT(transA), convT(transB),
+					    M, N, K,
+					    &alpha, ((uint16_t *)A->ptr) + offA,
+					    CUDA_R_16F,
+					    lda, ((uint16_t *)B->ptr) + offB,
+					    CUDA_R_16F,
+					    ldb, &beta, ((uint16_t *)C->ptr) + offC,
+					    CUDA_R_16F,
+					    ldc));
+  }
 
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(A, CUDA_WAIT_READ));
   GA_CUDA_EXIT_ON_ERROR(ctx, cuda_record(B, CUDA_WAIT_READ));
