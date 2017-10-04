@@ -177,7 +177,7 @@ static int gen_elemwise_basic_kernel(GpuKernel *k, gpucontext *ctx,
         ktypes[p++] = GA_SSIZE;
       }
     } else {
-      strb_appendf(&sb, "%s %s", ctype(args[i].typecode), args[j].name);
+      strb_appendf(&sb, "%s %s", ctype(args[j].typecode), args[j].name);
       ktypes[p++] = args[j].typecode;
     }
     if (j != (n - 1)) strb_appends(&sb, ", ");
