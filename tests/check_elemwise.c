@@ -470,7 +470,7 @@ START_TEST(test_basic_scalar_dtype) {
   gpuelemwise_arg args[3] = {{0}};
   void *rargs[3];
 
-  ga_assert_ok(GpuArray_empty(&x, ctx, GA_UINT, 2, dims, GA_C_ORDER));
+  ga_assert_ok(GpuArray_empty(&x, ctx, GA_INT, 2, dims, GA_C_ORDER));
   ga_assert_ok(GpuArray_write(&x, data1, sizeof(data1)));
 
   ga_assert_ok(GpuArray_empty(&y, ctx, GA_FLOAT, 2, dims, GA_F_ORDER));
