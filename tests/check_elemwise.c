@@ -6,6 +6,26 @@
 #include "gpuarray/error.h"
 #include "gpuarray/types.h"
 
+#if CHECK_MINOR_VERSION < 11
+
+#ifndef CK_FLOATING_DIG
+# define CK_FLOATING_DIG 6
+#endif /* CK_FLOATING_DIG */
+
+#define _ck_assert_floating(X, OP, Y, TP, TM) do { \
+    TP _ck_x = (X);                                \
+    TP _ck_y = (Y);                                \
+    ck_assert_msg(_ck_x OP _ck_y,                                  \
+                  "Assertion '%s' failed: %s == %.*"TM"g, %s == %.*"TM"g", \
+                  #X" "#OP" "#Y,                                        \
+                  #X, (int)CK_FLOATING_DIG, _ck_x,                      \
+                  #Y, (int)CK_FLOATING_DIG, _ck_y);                     \
+  } while (0)
+
+#define ck_assert_float_eq(X, Y) _ck_assert_floating(X, ==, Y, float, "")
+#endif
+
+
 extern void *ctx;
 
 void setup(void);
