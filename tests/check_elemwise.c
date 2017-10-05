@@ -434,6 +434,60 @@ START_TEST(test_basic_scalar) {
 }
 END_TEST
 
+START_TEST(test_basic_scalar_dtype) {
+  GpuArray x;
+  GpuArray y;
+  float a = 1.1f;
+
+  GpuElemwise *ge;
+
+  static const int32_t data1[4] = {0, 1, 2, 3};
+  static const float data2[4] = {2.0, 2.0, 2.0, 2.0};
+  float data3[4];
+
+  size_t dims[2] = {2, 2};
+
+  gpuelemwise_arg args[3] = {{0}};
+  void *rargs[3];
+
+  ga_assert_ok(GpuArray_empty(&x, ctx, GA_UINT, 2, dims, GA_C_ORDER));
+  ga_assert_ok(GpuArray_write(&x, data1, sizeof(data1)));
+
+  ga_assert_ok(GpuArray_empty(&y, ctx, GA_FLOAT, 2, dims, GA_F_ORDER));
+  ga_assert_ok(GpuArray_write(&y, data2, sizeof(data2)));
+
+  args[0].name = "a";
+  args[0].typecode = GA_FLOAT;
+  args[0].flags = GE_SCALAR;
+
+  args[1].name = "x";
+  args[1].typecode = GA_INT;
+  args[1].flags = GE_READ;
+
+  args[2].name = "y";
+  args[2].typecode = GA_FLOAT;
+  args[2].flags = GE_READ|GE_WRITE;
+
+  ge = GpuElemwise_new(ctx, "", "y = a * x + y", 3, args, 2, 0);
+
+  ck_assert_ptr_ne(ge, NULL);
+
+  rargs[0] = &a;
+  rargs[1] = &x;
+  rargs[2] = &y;
+
+  ga_assert_ok(GpuElemwise_call(ge, rargs, 0));
+
+  ga_assert_ok(GpuArray_read(data3, sizeof(data3), &y));
+
+  ck_assert_float_eq(data3[0], 2.0f);
+  ck_assert_float_eq(data3[1], 4.2f);
+
+  ck_assert_float_eq(data3[2], 3.1f);
+  ck_assert_float_eq(data3[3], 5.3f);
+}
+END_TEST
+
 START_TEST(test_basic_remove1) {
   GpuArray a;
   GpuArray b;
@@ -820,6 +874,7 @@ Suite *get_suite(void) {
   tcase_add_test(tc, test_basic_simple);
   tcase_add_test(tc, test_basic_f16);
   tcase_add_test(tc, test_basic_scalar);
+  tcase_add_test(tc, test_basic_scalar_dtype);
   tcase_add_test(tc, test_basic_offset);
   tcase_add_test(tc, test_basic_remove1);
   tcase_add_test(tc, test_basic_broadcast);
