@@ -3,7 +3,7 @@ version: 2
 jobs:
   build_pkgs:
     docker:
-      - image: milaudem/libgpuarray:0
+      - image: joaander/conda-build:20170905
 
     steps:
       - checkout
