@@ -19,8 +19,11 @@ environment:
 
   matrix:
     - CONDA_LOC: "C:\\Miniconda-x64"
+      PATCH_VS2008: "1"
     - CONDA_LOC: "C:\\Miniconda35-x64"
+      PATCH_VS2008: "0"
     - CONDA_LOC: "C:\\Miniconda36-x64"
+      PATCH_VS2008: "0"
 
 install:
   # This breaks conda-build because of git
@@ -29,9 +32,12 @@ install:
   - cmd: set PYTHONUNBUFFERED=1
   - cmd: conda install -n root --yes conda conda-env conda-build anaconda-client
   # We borrow a trick from conda-forge to fix the VS2008 compiler
-  - cmd: conda config --append channels conda-forge
-  - cmd: conda install --yes vs2008_express_vc_python_patch
-  - cmd: call setup_x64
+  - ps: |
+      if($env:PATCH_VS2008 -eq '1') {
+        cmd /c "conda config --append channels conda-forge 2>&1"
+        cmd /c "conda install --yes vs2008_express_vc_python_patch 2>&1"
+        cmd /c "call setup_x64 2>&1"
+      }
 
 build: off
 

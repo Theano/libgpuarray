@@ -3,7 +3,7 @@ version: 2
 jobs:
   build_pkgs:
     docker:
-      - image: milaudem/libgpuarray:0
+      - image: joaander/conda-build:20170905
 
     steps:
       - checkout
@@ -27,11 +27,11 @@ jobs:
           command: |
             if [[ -n "${CIRCLE_TAG}" ]]
             then
-                anaconda -t $BINSTAR_TOKEN upload --user=mila-udem /miniconda/conda-bld/linux-64/libgpuarray*
-                anaconda -t $BINSTAR_TOKEN upload --user=mila-udem /miniconda/conda-bld/linux-64/pygpu*
+                anaconda -t $BINSTAR_TOKEN upload --user=mila-udem /opt/conda/conda-bld/linux-64/libgpuarray*
+                anaconda -t $BINSTAR_TOKEN upload --user=mila-udem /opt/conda/conda-bld/linux-64/pygpu*
             fi
       - store_artifacts:
-          path: /miniconda/conda-bld/linux-64
+          path: /opt/conda/conda-bld/linux-64
 
 workflows:
   version: 2
