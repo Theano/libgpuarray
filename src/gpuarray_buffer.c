@@ -56,7 +56,7 @@ int gpucontext_props_cuda_dev(gpucontext_props *p, int devno) {
 }
 
 int gpucontext_props_opencl_dev(gpucontext_props *p, int platno, int devno) {
-  p->dev = platno << 16 || devno;
+  p->dev = (platno << 16) | devno;
   return GA_NO_ERROR;
 }
 
