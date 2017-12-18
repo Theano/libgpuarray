@@ -9,7 +9,7 @@ before_install:
   - export PREFIX=$HOME/.local
   - brew update && brew install doxygen
   - export PYTHONUSERBASE=$PREFIX
-  - pip install --user breathe sphinx==1.6.3 sphinx_rtd_theme cython numpy 'mako>=0.7' six
+  - pip2 install --user breathe sphinx==1.6.3 sphinx_rtd_theme cython numpy 'mako>=0.7' six
   - export PATH=$PATH:$PREFIX/bin
   - export CPATH=$CPATH:$PREFIX/include
   - export LIBRARY_PATH=$LIBRARY_PATH:$PREFIX/lib

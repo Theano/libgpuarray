@@ -176,7 +176,7 @@ static int setup_lib(void) {
     res = load_libnvrtc(major, minor, global_err);
     if (res != GA_NO_ERROR) {
       /* Else, let's try to find a nvrtc corresponding to supported CUDA versions. */
-      int versions[][2] = {{9, 0}, {8, 0}, {7, 5}, {7, 0}};
+      int versions[][2] = {{9, 1}, {9, 0}, {8, 0}, {7, 5}, {7, 0}};
       int versions_length = sizeof(versions) / sizeof(versions[0]);
       int i = 0;
       /* Skip versions that are higher or equal to the driver version */
