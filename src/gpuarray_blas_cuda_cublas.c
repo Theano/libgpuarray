@@ -53,7 +53,8 @@ static const char *estr(cublasStatus_t err) {
 
 static inline int error_cublas(error *e, const char *msg, cublasStatus_t err) {
   return error_fmt(e, (err == CUBLAS_STATUS_ARCH_MISMATCH) ? GA_DEVSUP_ERROR : GA_BLAS_ERROR,
-                   "%s: %s", msg, estr(err));
+                   "%s: %s%s", msg, estr(err),
+		   err == CUBLAS_STATUS_NOT_INITIALIZED ? " (Possibly because the driver version is too old for the cuda version)" : "");
 }
 
 #define CUBLAS_EXIT_ON_ERROR(ctx, cmd) do {       \
