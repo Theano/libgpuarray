@@ -634,15 +634,22 @@ def init(dev, sched='default', single_stream=False, kernel_cache_path=None,
         raise MemoryError
     try:
         if sched == 'single':
-            gpucontext_props_sched(p, GA_CTX_SCHED_SINGLE)
+            err = gpucontext_props_sched(p, GA_CTX_SCHED_SINGLE)
         elif sched == 'multi':
-            gpucontext_props_sched(p, GA_CTX_SCHED_MULTI)
+            err = gpucontext_props_sched(p, GA_CTX_SCHED_MULTI)
         elif sched != 'default':
             raise TypeError('unexpected value for parameter sched: %s' % (sched,))
+        if err != GA_NO_ERROR:
+            raise get_exc(err), gpucontext_error(NULL, err)
+
         if kernel_cache_path:
             kernel_cache_path_b = _s(kernel_cache_path)
             gpucontext_props_kernel_cache(p, <const char *>kernel_cache_path_b)
-        gpucontext_props_alloc_cache(p, initial_cache_size, max_cache_size)
+
+        err = gpucontext_props_alloc_cache(p, initial_cache_size,
+                                           max_cache_size)
+        if err != GA_NO_ERROR:
+            raise get_exc(err), gpucontext_error(NULL, err)
         if single_stream:
             gpucontext_props_set_single_stream(p);
     except:
