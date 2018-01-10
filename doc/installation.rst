@@ -123,7 +123,7 @@ computer, you can install them in your home directory like this:
 ::
 
   cd <dir>
-  rm -rf ~/.local/lib/libgpuarray* ~/.local/include/gpuarray
+  rm -rf ~/.local/lib/libgpuarray* ~/.local/include/gpuarray  ~/.local/lib/python*/site-packages/pygpu*
   rm -rf build Build
   mkdir Build
   cd Build
@@ -217,7 +217,7 @@ If you get an error message similar to this one:
 This means either you don't have check installed or it wasn't found by
 the cmake detection script.
 
-To run the python tests, install pygpu, then move outside its
+To run the python tests, install pygpu, then **move outside** its
 directory and run this command:
 
 ::
