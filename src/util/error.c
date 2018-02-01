@@ -24,7 +24,7 @@ int error_set(error *e, int code, const char *msg) {
   e->code = code;
   strlcpy(e->msg, msg, ERROR_MSGBUF_LEN);
 #ifdef DEBUG
-  fprintf(stderr, "ERROR %d: %s\n", e->code, e->msg);
+  fprintf(stderr, "(Debug) ERROR %d: %s\n", e->code, e->msg);
 #endif
   return code;
 }
@@ -37,7 +37,7 @@ int error_fmt(error *e, int code, const char *fmt, ...) {
   vsnprintf(e->msg, ERROR_MSGBUF_LEN, fmt, ap);
   va_end(ap);
 #ifdef DEBUG
-  fprintf(stderr, "ERROR %d: %s\n", e->code, e->msg);
+  fprintf(stderr, "(Debug) ERROR %d: %s\n", e->code, e->msg);
 #endif
   return code;
 }
