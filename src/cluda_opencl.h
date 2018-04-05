@@ -50,7 +50,7 @@ typedef struct _ga_half {
 #define ga_half2float(p) vload_half(0, &((p).data))
 static inline ga_half ga_float2half(ga_float f) {
   ga_half r;
-  vstore_half_rtn(f, 0, &r.data);
+  vstore_half_rte(f, 0, &r.data);
   return r;
 }
 
