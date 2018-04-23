@@ -195,7 +195,7 @@ def asfortranarray(shp, dtype, offseted_outer, offseted_inner, sliced, order):
 
     # numpy upcast with a view to 1d scalar.
     if gpu.flags['F_CONTIGUOUS']:
-        assert b.gpudata == gpu.gpudata
+        assert ctx.kind != b'cuda' or b.gpudata == gpu.gpudata
     elif (sliced != 1 or shp == () or (offseted_outer and len(shp) > 1) or
           (order != 'f' and len(shp) > 1)):
         assert b is not gpu
@@ -286,7 +286,8 @@ def test_mapping_getitem_ellipsis():
 def mapping_getitem_ellipsis(shp, dtype, offseted):
     a, a_gpu = gen_gpuarray(shp, dtype, offseted, ctx=ctx)
     b = a_gpu[...]
-    assert b.gpudata == a_gpu.gpudata
+    if ctx.kind == b'cuda':
+        assert b.gpudata == a_gpu.gpudata
     assert b.strides == a.strides
     assert b.shape == a.shape
     b_cpu = numpy.asarray(b)
