@@ -159,6 +159,7 @@ static int minor = -1;
 static int setup_lib(void) {
   CUresult err;
   int res, tmp;
+  int orig_major, orig_minor;
 
   if (!setup_done) {
     res = load_libcuda(global_err);
@@ -174,9 +175,11 @@ static int setup_lib(void) {
     minor = (tmp / 10) % 10;
     /* Let's try to load a nvrtc corresponding to detected CUDA version. */
     res = load_libnvrtc(major, minor, global_err);
+    orig_major = major;
+    orig_minor = minor;
     if (res != GA_NO_ERROR) {
       /* Else, let's try to find a nvrtc corresponding to supported CUDA versions. */
-      int versions[][2] = {{9, 1}, {9, 0}, {8, 0}, {7, 5}, {7, 0}};
+      int versions[][2] = {{10, 0}, {9, 2}, {9, 1}, {9, 0}, {8, 0}, {7, 5}, {7, 0}};
       int versions_length = sizeof(versions) / sizeof(versions[0]);
       int i = 0;
       /* Skip versions that are higher or equal to the driver version */
@@ -190,7 +193,8 @@ static int setup_lib(void) {
       } while (res != GA_NO_ERROR && i < versions_length);
     }
     if (res != GA_NO_ERROR)
-      return res;
+      // Return the error from the original attempt
+      return load_libnvrtc(orig_major, orig_minor, global_err);
     setup_done = 1;
   }
   return GA_NO_ERROR;
