@@ -85,7 +85,7 @@ static const char *estr(CLBlastStatusCode err) {
   case CLBlastUnexpectedError:
     return "Unexpected error";
   default:
-    return "Unknow error";
+    return "Unknown error";
   }
 }
 
