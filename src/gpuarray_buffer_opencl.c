@@ -1104,6 +1104,8 @@ static int cl_transfer(gpudata *dst, size_t dstoff,
   return error_set(dst->ctx->err, GA_UNSUPPORTED_ERROR, "Operation not supported");
 }
 
+#define clipto_sizet(x) (((x) < SIZE_MAX) ? (x) : SIZE_MAX)
+
 static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
                        void *res) {
   cl_ctx *ctx = NULL;
@@ -1132,6 +1134,7 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
   switch (prop_id) {
     size_t sz;
     size_t *psz;
+    cl_ulong ul;
     cl_device_id id;
     cl_uint ui;
 
@@ -1149,8 +1152,8 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     CL_CHECK(ctx->err, clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES,
                                         sizeof(id), &id, NULL));
     CL_CHECK(ctx->err, clGetDeviceInfo(id, CL_DEVICE_LOCAL_MEM_SIZE,
-                                       sizeof(sz), &sz, NULL));
-    *((size_t *)res) = sz;
+                                       sizeof(ul), &ul, NULL));
+    *((size_t *)res) = clipto_sizet(ul);
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_NUMPROCS:
@@ -1173,8 +1176,8 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     CL_CHECK(ctx->err, clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES,
                                         sizeof(id), &id, NULL));
     CL_CHECK(ctx->err, clGetDeviceInfo(id, CL_DEVICE_GLOBAL_MEM_SIZE,
-                                       sizeof(sz), &sz, NULL));
-    *((size_t *)res) = sz;
+                                       sizeof(ul), &ul, NULL));
+    *((size_t *)res) = clipto_sizet(ul);
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_FREE_GMEM:
@@ -1184,8 +1187,8 @@ static int cl_property(gpucontext *c, gpudata *buf, gpukernel *k, int prop_id,
     CL_CHECK(ctx->err, clGetContextInfo(ctx->ctx, CL_CONTEXT_DEVICES,
                                         sizeof(id), &id, NULL));
     CL_CHECK(ctx->err, clGetDeviceInfo(id, CL_DEVICE_MAX_MEM_ALLOC_SIZE,
-                                       sizeof(sz), &sz, NULL));
-    *((size_t *)res) = sz;
+                                       sizeof(ul), &ul, NULL));
+    *((size_t *)res) = clipto_sizet(ul);
     return GA_NO_ERROR;
 
   case GA_CTX_PROP_NATIVE_FLOAT16:
