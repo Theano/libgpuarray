@@ -75,7 +75,7 @@ static const char *estr(clblasStatus err) {
   case clblasInsufficientMemVecY:
     return "memory object for vector Y is too small";
   default:
-    return "Unknow error";
+    return "Unknown error";
   }
 }
 

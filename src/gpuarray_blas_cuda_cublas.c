@@ -31,7 +31,7 @@ static const char *estr(cublasStatus_t err) {
   case CUBLAS_STATUS_NOT_INITIALIZED:
     return "(cublas) Library not initialized.";
   case CUBLAS_STATUS_ALLOC_FAILED:
-    return "(cublas) GPU ressource allocation failed.";
+    return "(cublas) GPU resource allocation failed.";
   case CUBLAS_STATUS_INVALID_VALUE:
     return "(cublas) Invalid value.";
   case CUBLAS_STATUS_ARCH_MISMATCH:

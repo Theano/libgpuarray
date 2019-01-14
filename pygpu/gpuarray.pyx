@@ -76,10 +76,10 @@ def cuda_wrap_ctx(size_t ptr, bint own):
     Wrap an existing CUDA driver context (CUcontext) into a GpuContext
     class.
 
-    If `own` is true, libgpuarray is now reponsible for the context and
+    If `own` is true, libgpuarray is now responsible for the context and
     it will be destroyed once there are no references to it.
     Otherwise, the context will not be destroyed and it is the calling
-    code's reponsability.
+    code's responsibility.
     """
     cdef gpucontext *(*cuda_make_ctx)(void *, int)
     cdef int flags
@@ -876,7 +876,7 @@ def from_gpudata(size_t data, offset, dtype, shape, GpuContext context=None,
 
     Notes
     -----
-    This function might be deprecated in a later relase since the only
+    This function might be deprecated in a later release since the only
     way to create gpudata pointers is through libgpuarray functions
     that aren't exposed at the python level. It can be used with the
     value of the `gpudata` attribute of an existing GpuArray.
@@ -940,7 +940,7 @@ def array(proto, dtype=None, copy=True, order=None, unsigned int ndmin=0,
     match its properties and `copy` is False.
 
     The properties of the resulting array depend on the input data
-    except if overriden by other parameters.
+    except if overridden by other parameters.
 
     This function is similar to :meth:`numpy.array` except that it returns
     GpuArrays.
@@ -1561,7 +1561,7 @@ cdef class GpuArray:
 
     To create instances of this class use
     :meth:`~pygpu.gpuarray.zeros`, :meth:`~pygpu.gpuarray.empty` or
-    :meth:`~pygpu.gpuarray.array`.  It cannot be instanciated
+    :meth:`~pygpu.gpuarray.array`.  It cannot be instantiated
     directly.
 
     You can also subclass this class and make the module create your
@@ -2278,7 +2278,7 @@ cdef class GpuKernel:
 
     The `have_*` parameter are there to tell libgpuarray that we need
     the particular type or feature to work for this kernel.  If the
-    request can't be satified a :class:`.UnsupportedException` will be
+    request can't be satisfied a :class:`.UnsupportedException` will be
     raised in the constructor.
 
     Once you have the kernel object you can simply call it like so::
@@ -2335,7 +2335,7 @@ cdef class GpuKernel:
 
         If you do not set the `have_` flags properly, you will either
         get a device-specific error (the good case) or silent
-        completly bogus data (the bad case).
+        completely bogus data (the bad case).
 
 
     """
