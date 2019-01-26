@@ -35,7 +35,7 @@ static inline clblasTranspose convT(cb_transpose trans) {
 static unsigned int refcnt = 0;
 
 static const char *estr(clblasStatus err) {
-  if (err > -1024)
+  if (err > -900)
     return cl_error_string((cl_int)err);
   switch (err) {
   case clblasNotImplemented:
