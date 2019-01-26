@@ -132,6 +132,7 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   cl_uint num_ev = 0;
 
   for (i = 0; i < batchCount; i++) {
+    num_ev = 0;
     ARRAY_INIT(A[i]);
     ARRAY_INIT(B[i]);
     ARRAY_INIT(C[i]);
@@ -163,6 +164,7 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   cl_uint num_ev = 0;
 
   for (i = 0; i < batchCount; i++) {
+    num_ev = 0;
     ARRAY_INIT(A[i]);
     ARRAY_INIT(B[i]);
     ARRAY_INIT(C[i]);
