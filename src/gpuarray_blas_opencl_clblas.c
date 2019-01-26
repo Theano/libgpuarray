@@ -35,8 +35,12 @@ static inline clblasTranspose convT(cb_transpose trans) {
 static unsigned int refcnt = 0;
 
 static const char *estr(clblasStatus err) {
-  if (err > -900)
+  if (err > -900) {
+    if (err == CL_INVALID_DEVICE) {
+      return "Invalid device, or double precision requested on a device that does not support double precision";
+    }
     return cl_error_string((cl_int)err);
+  }
   switch (err) {
   case clblasNotImplemented:
     return "Unimplemented feature";
