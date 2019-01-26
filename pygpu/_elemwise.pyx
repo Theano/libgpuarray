@@ -15,6 +15,11 @@ cdef bytes to_bytes(s):
       return <bytes>(<unicode>s).encode('ascii')
   raise TypeError("Can't convert to bytes")
 
+cdef extern from "gpuarray/buffer.h":
+    ctypedef struct gpucontext:
+        pass
+    char *gpucontext_error(gpucontext *ctx, int err)
+
 cdef extern from "gpuarray/elemwise.h":
     ctypedef struct _GpuElemwise "GpuElemwise":
         pass
@@ -141,7 +146,8 @@ cdef class GpuElemwise:
         finally:
             free(_args)
         if self.ge is NULL:
-            raise GpuArrayException("Could not initialize C GpuElemwise instance")
+            error_message = gpucontext_error(ctx.ctx, 0).decode(encoding='latin-1')
+            raise GpuArrayException("Could not initialize C GpuElemwise instance: " + error_message)
 
     def __dealloc__(self):
         cdef unsigned int i
