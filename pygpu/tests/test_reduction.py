@@ -52,8 +52,13 @@ def test_red_big_array():
                   [False, True, False]]:
         yield red_array_sum, 'float32', (2000, 30, 100), redux
 
-
+# this test needs a guard_devsup because Python 'float' is double,
+# and placing one directly on a test_* makes nose not know that it's a test
 def test_red_broadcast():
+    red_broadcast()
+
+@guard_devsup
+def red_broadcast():
     from pygpu.tools import as_argument
 
     dtype = float
@@ -78,7 +83,6 @@ def test_red_broadcast():
 
     assert numpy.allclose(nz, numpy.asarray(gz))
 
-
 def test_reduction_ops():
     for axis in [None, 0, 1]:
         for op in ['all', 'any']:
@@ -88,6 +92,7 @@ def test_reduction_ops():
                 yield reduction_op, op, dtype, axis
 
 
+@guard_devsup
 def reduction_op(op, dtype, axis):
     c, g = gen_gpuarray((2, 3), dtype=dtype, ctx=context, cls=elemary)
 

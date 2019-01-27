@@ -318,24 +318,29 @@ neg_infinity() {return -INFINITY;}
 
 def test_infinity():
     for dtype in ['float32', 'float64']:
-        ac, ag = gen_gpuarray((2,), dtype, ctx=context, cls=elemary)
-        out_g = ag._empty_like_me()
-        flt = 'ga_float' if dtype == 'float32' else 'ga_double'
-        out_arg = arg('out', out_g.dtype, scalar=False, read=False, write=True)
-        preamble = _inf_preamb_tpl.render(flt=flt)
+        yield infinity, dtype
 
-        # +infinity
-        ac[:] = numpy.inf
-        expr_inf = 'out = infinity()'
-        kernel = GpuElemwise(context, expr_inf, [out_arg],
-                             preamble=preamble)
-        kernel(out_g)
-        assert numpy.array_equal(ac, numpy.asarray(out_g))
 
-        # -infinity
-        ac[:] = -numpy.inf
-        expr_neginf = 'out = neg_infinity()'
-        kernel = GpuElemwise(context, expr_neginf, [out_arg],
-                             preamble=preamble)
-        kernel(out_g)
-        assert numpy.array_equal(ac, numpy.asarray(out_g))
+@guard_devsup
+def infinity(dtype):
+    ac, ag = gen_gpuarray((2,), dtype, ctx=context, cls=elemary)
+    out_g = ag._empty_like_me()
+    flt = 'ga_float' if dtype == 'float32' else 'ga_double'
+    out_arg = arg('out', out_g.dtype, scalar=False, read=False, write=True)
+    preamble = _inf_preamb_tpl.render(flt=flt)
+
+    # +infinity
+    ac[:] = numpy.inf
+    expr_inf = 'out = infinity()'
+    kernel = GpuElemwise(context, expr_inf, [out_arg],
+                         preamble=preamble)
+    kernel(out_g)
+    assert numpy.array_equal(ac, numpy.asarray(out_g))
+
+    # -infinity
+    ac[:] = -numpy.inf
+    expr_neginf = 'out = neg_infinity()'
+    kernel = GpuElemwise(context, expr_neginf, [out_arg],
+                         preamble=preamble)
+    kernel(out_g)
+    assert numpy.array_equal(ac, numpy.asarray(out_g))
