@@ -1,7 +1,8 @@
 from string import Template
 from .gpuarray import GpuArray, GpuKernel, SIZE, dtype_to_ctype
+import numpy
 
-def _generate_kernel(ctx, cols, ctype, upper=True):
+def _generate_kernel(ctx, cols, dtype, upper=True):
     tmpl = Template("""
     #include "cluda.h"
     KERNEL void extract_tri(GLOBAL_MEM ${ctype} *a, ga_size a_off, ga_uint N) {
@@ -20,9 +21,21 @@ def _generate_kernel(ctx, cols, ctype, upper=True):
         le = '>'
     else:
         le = '<'
+    ctype = dtype_to_ctype(dtype)
     src = tmpl.substitute(cols=cols, ctype=ctype, le=le)
     spec = [GpuArray, SIZE, 'uint32']
-    k = GpuKernel(src, "extract_tri", spec, context=ctx)
+    have_small = False
+    have_double = False
+    have_complex = False
+    if dtype.itemsize < 4:
+        have_small = True
+    if dtype in [numpy.float64, numpy.complex128]:
+        have_double = True
+    if dtype in [numpy.complex64, numpy.complex128]:
+        have_complex = True
+    k = GpuKernel(src, "extract_tri", spec, context=ctx,
+                  have_double=have_double, have_small=have_small,
+                  have_complex=have_complex)
     return k
 
 
@@ -40,8 +53,7 @@ def triu(A, inplace=True):
     else:
         upper = True
         cols = A.shape[1]
-    ctype = dtype_to_ctype(A.dtype)
-    k = _generate_kernel(A.context, cols, ctype, upper)
+    k = _generate_kernel(A.context, cols, A.dtype, upper)
     k(A, A.offset, A.shape[0] * A.shape[1], n=A.shape[0] * A.shape[1])
     return A
 
@@ -60,7 +72,6 @@ def tril(A, inplace=True):
     else:
         upper = False
         cols = A.shape[1]
-    ctype = dtype_to_ctype(A.dtype)
-    k = _generate_kernel(A.context, cols, ctype, upper)
+    k = _generate_kernel(A.context, cols, A.dtype, upper)
     k(A, A.offset, A.shape[0] * A.shape[1], n=A.shape[0] * A.shape[1])
     return A

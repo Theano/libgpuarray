@@ -781,7 +781,9 @@ static int cl_check_extensions(const char **preamble, unsigned int *count,
     (*count)++;
   }
   if (flags & GA_USE_DOUBLE) {
-    GA_CHECK(check_ext(ctx, CL_DOUBLE));
+    if (check_ext(ctx, CL_DOUBLE) != GA_NO_ERROR) {
+      return error_set(ctx->err, GA_DEVSUP_ERROR, "This device does not support double precision (pygpu int/int, int32+float32, and floating point literals default to double precision)");
+    }
     preamble[*count] = PRAGMA CL_DOUBLE ENABLE;
     (*count)++;
   }

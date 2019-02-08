@@ -1,4 +1,4 @@
-from pygpu.gpuarray import GpuArrayException
+from pygpu.gpuarray import GpuArrayException, UnsupportedException
 from pygpu.gpuarray cimport (gpucontext, GA_NO_ERROR, get_typecode,
                              typecode_to_dtype, GpuContext, GpuArray,
                              get_exc, gpuarray_get_elsize)
@@ -14,6 +14,11 @@ cdef bytes to_bytes(s):
   if isinstance(s, unicode):
       return <bytes>(<unicode>s).encode('ascii')
   raise TypeError("Can't convert to bytes")
+
+cdef extern from "gpuarray/buffer.h":
+    ctypedef struct gpucontext:
+        pass
+    char *gpucontext_error(gpucontext *ctx, int err)
 
 cdef extern from "gpuarray/elemwise.h":
     ctypedef struct _GpuElemwise "GpuElemwise":
@@ -141,7 +146,11 @@ cdef class GpuElemwise:
         finally:
             free(_args)
         if self.ge is NULL:
-            raise GpuArrayException("Could not initialize C GpuElemwise instance")
+            error_message = gpucontext_error(ctx.ctx, 0).decode(encoding='latin-1')
+            # getting the error type this way is fragile, but the alternative is breaking ABI
+            raise (UnsupportedException if
+            "This device does not support double precision" in error_message else
+             GpuArrayException)("Could not initialize C GpuElemwise instance: " + error_message)
 
     def __dealloc__(self):
         cdef unsigned int i

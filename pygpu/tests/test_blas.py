@@ -14,6 +14,19 @@ except ImportError as e:
     raise SkipTest("no scipy blas to compare against")
 
 import pygpu.blas as gblas
+from pygpu.gpuarray import (GpuArrayException, UnsupportedException)
+
+def guard_devsup_blasdouble(func):
+    def f(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except UnsupportedException as e:
+            raise SkipTest("operation not supported")
+        except GpuArrayException as e:
+            if 'float64' in args and "does not support double precision" in str(e):
+                raise SkipTest("double precision not supported")
+            raise
+    return f
 
 
 def test_dot():
@@ -25,7 +38,7 @@ def test_dot():
         yield dot, 666, 'float32', False, False, overwrite, init_z
 
 
-@guard_devsup
+@guard_devsup_blasdouble
 def dot(N, dtype, offseted_i, sliced, overwrite, init_z):
     cX, gX = gen_gpuarray((N,), dtype, offseted_inner=offseted_i,
                           sliced=sliced, ctx=context)
@@ -60,7 +73,7 @@ def test_gemv():
                overwrite, True, alpha, beta)
 
 
-@guard_devsup
+@guard_devsup_blasdouble
 def gemv(shp, dtype, order, trans, offseted_i, sliced,
          overwrite, init_y, alpha=1.0, beta=0.0):
     cA, gA = gen_gpuarray(shp, dtype, order=order, offseted_inner=offseted_i,
@@ -108,7 +121,7 @@ def test_gemm():
                (False, False), False, 1, overwrite, True, alpha, beta)
 
 
-@guard_devsup
+@guard_devsup_blasdouble
 def gemm(m, n, k, dtype, order, trans, offseted_o, sliced, overwrite,
          init_res, alpha=1.0, beta=0.0):
     if trans[0]:
@@ -152,7 +165,7 @@ def test_ger():
     for init_res, overwrite in product(bools, bools):
         yield ger, 4, 5, 'float32', 'f', 1, 1, init_res, overwrite
 
-
+@guard_devsup_blasdouble
 def ger(m, n, dtype, order, sliced_x, sliced_y, init_res, overwrite=False):
     cX, gX = gen_gpuarray((m,), dtype, order, sliced=sliced_x, ctx=context)
     cY, gY = gen_gpuarray((n,), dtype, order, sliced=sliced_y, ctx=context)
@@ -191,7 +204,7 @@ def test_rgemmBatch_3d():
                (False, False), False, 1, overwrite, True, alpha, beta)
 
 
-@guard_devsup
+@guard_devsup_blasdouble
 def rgemmBatch_3d(b, m, n, k, dtype, order, trans, offseted_o, sliced,
                   overwrite, init_res, alpha=1.0, beta=0.0):
     if trans[0]:
