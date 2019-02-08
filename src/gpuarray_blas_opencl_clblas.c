@@ -35,7 +35,7 @@ static inline clblasTranspose convT(cb_transpose trans) {
 static unsigned int refcnt = 0;
 
 static const char *estr(clblasStatus err) {
-  if (err > -1024)
+  if (err > -900)
     return cl_error_string((cl_int)err);
   switch (err) {
   case clblasNotImplemented:
@@ -132,6 +132,7 @@ static int sgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   cl_uint num_ev = 0;
 
   for (i = 0; i < batchCount; i++) {
+    num_ev = 0;
     ARRAY_INIT(A[i]);
     ARRAY_INIT(B[i]);
     ARRAY_INIT(C[i]);
@@ -163,6 +164,7 @@ static int dgemmBatch(cb_order order, cb_transpose transA, cb_transpose transB,
   cl_uint num_ev = 0;
 
   for (i = 0; i < batchCount; i++) {
+    num_ev = 0;
     ARRAY_INIT(A[i]);
     ARRAY_INIT(B[i]);
     ARRAY_INIT(C[i]);

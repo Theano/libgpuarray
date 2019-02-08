@@ -37,10 +37,9 @@ def dot(N, dtype, offseted_i, sliced, overwrite, init_z):
     else:
         gZ = None
 
-    if dtype == 'float32':
-        cr = fblas.sdot(cX, cY)
-    else:
-        cr = fblas.ddot(cX, cY)
+    # Always check against double precision: scipy's single precision
+    # has enough error that this sometimes fails when we're closer
+    cr = fblas.ddot(cX, cY)
     gr = gblas.dot(gX, gY, gZ, overwrite_z=overwrite)
     numpy.testing.assert_allclose(cr, numpy.asarray(gr), rtol=1e-6)
 

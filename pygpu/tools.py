@@ -177,7 +177,6 @@ def lru_cache(maxsize=20):
         @functools.wraps(user_function)
         def wrapper(*key):
             time[0] += 1
-            last_use[key] = time[0]
 
             try:
                 result = cache[key]
@@ -189,11 +188,12 @@ def lru_cache(maxsize=20):
 
                 # purge least recently used cache entries
                 if len(cache) > wrapper.maxsize:
-                    for key, _ in nsmallest(wrapper.maxsize // 10,
+                    for key0, _ in nsmallest(wrapper.maxsize // 10,
                                             six.iteritems(last_use),
                                             key=itemgetter(1)):
-                        del cache[key], last_use[key]
+                        del cache[key0], last_use[key0]
 
+            last_use[key] = time[0]
             return result
 
         def clear():

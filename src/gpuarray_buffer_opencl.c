@@ -275,7 +275,7 @@ gpudata *cl_make_buf(gpucontext *c, cl_mem buf) {
   CL_CHECKN(ctx->err, clGetMemObjectInfo(buf, CL_MEM_CONTEXT, sizeof(buf_ctx),
                                          &buf_ctx, NULL));
   if (buf_ctx != ctx->ctx) {
-    error_set(ctx->err, GA_VALUE_ERROR, "Requested context doesn't macth object context");
+    error_set(ctx->err, GA_VALUE_ERROR, "Requested context doesn't match object context");
     return NULL;
   }
 
