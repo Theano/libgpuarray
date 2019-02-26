@@ -4,7 +4,7 @@ def get_include():
     assert os.path.exists(os.path.join(p, 'gpuarray_api.h'))
     return p
 
-from . import gpuarray, elemwise, reduction
+from . import gpuarray, elemwise, reduction, ufuncs
 from .gpuarray import (init, set_default_context, get_default_context,
                        array, zeros, empty, asarray, ascontiguousarray,
                        asfortranarray, register_dtype)

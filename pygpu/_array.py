@@ -1,9 +1,9 @@
 from __future__ import division
-import numpy as np
+import numpy
 
-from .elemwise import elemwise1, elemwise2, ielemwise2, compare, arg, GpuElemwise, as_argument
-from .reduction import reduce1
-from .dtypes import dtype_to_ctype, get_np_obj, get_common_dtype
+from .elemwise import elemwise1, arg, GpuElemwise, as_argument
+from .dtypes import dtype_to_ctype, get_common_dtype
+from . import ufuncs
 from . import gpuarray
 
 
@@ -19,125 +19,126 @@ class ndgpuarray(gpuarray.GpuArray):
     more like a drop-in replacement for numpy.ndarray than the raw
     GpuArray class.
     """
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        # Unwrap out if necessary
+        out_tuple = kwargs.pop('out', ())
+        if not all(isinstance(out, gpuarray.GpuArray) for out in out_tuple):
+            return NotImplemented
+
+        if len(out_tuple) == 1:
+            kwargs['out'] = out_tuple[0]
+        elif len(out_tuple) == 2:
+            kwargs['out1'] = out_tuple[0]
+            kwargs['out2'] = out_tuple[1]
+
+        native_ufunc = getattr(ufuncs, ufunc.__name__, None)
+        if native_ufunc is None:
+            return NotImplemented
+
+        if method == '__call__':
+            return native_ufunc(*inputs, **kwargs)
+        else:
+            function = getattr(native_ufunc, method, None)
+            return function(*inputs, **kwargs)
+
+    # The special methods call explicitly into __array_ufunc__ to make
+    # sure that the native ufuncs are used also for Numpy 1.12 and below.
+    # The only difference will be the behavior when Numpy ufuncs are
+    # used: for 1.12 and below, numpy.add(x_gpu, y) will cast x_gpu to
+    # a Numpy array, 1.13 and above calls into the native GPU ufunc.
+
     # add
     def __add__(self, other):
-        return elemwise2(self, '+', other, self, broadcast=True)
+        return self.__array_ufunc__(numpy.add, '__call__', self, other)
 
     def __radd__(self, other):
-        return elemwise2(other, '+', self, self, broadcast=True)
+        return self.__array_ufunc__(numpy.add, '__call__', other, self)
 
     def __iadd__(self, other):
-        return ielemwise2(self, '+', other, broadcast=True)
+        return self.__array_ufunc__(numpy.add, '__call__', self, other,
+                                    out=self)
 
     # sub
     def __sub__(self, other):
-        return elemwise2(self, '-', other, self, broadcast=True)
+        return self.__array_ufunc__(numpy.subtract, '__call__', self, other)
 
     def __rsub__(self, other):
-        return elemwise2(other, '-', self, self, broadcast=True)
+        return self.__array_ufunc__(numpy.subtract, '__call__', other, self)
 
     def __isub__(self, other):
-        return ielemwise2(self, '-', other, broadcast=True)
+        return self.__array_ufunc__(numpy.subtract, '__call__', self, other,
+                                    out=self)
 
     # mul
     def __mul__(self, other):
-        return elemwise2(self, '*', other, self, broadcast=True)
+        return self.__array_ufunc__(numpy.multiply, '__call__', self, other)
 
     def __rmul__(self, other):
-        return elemwise2(other, '*', self, self, broadcast=True)
+        return self.__array_ufunc__(numpy.multiply, '__call__', other, self)
 
     def __imul__(self, other):
-        return ielemwise2(self, '*', other, broadcast=True)
+        return self.__array_ufunc__(numpy.multiply, '__call__', self, other,
+                                    out=self)
 
     # div
     def __div__(self, other):
-        return elemwise2(self, '/', other, self, broadcast=True)
+        return self.__array_ufunc__(numpy.divide, '__call__', self, other)
 
     def __rdiv__(self, other):
-        return elemwise2(other, '/', self, self, broadcast=True)
+        return self.__array_ufunc__(numpy.divide, '__call__', other, self)
 
     def __idiv__(self, other):
-        return ielemwise2(self, '/', other, broadcast=True)
+        return self.__array_ufunc__(numpy.divide, '__call__', self, other,
+                                    out=self)
 
     # truediv
     def __truediv__(self, other):
-        np1 = get_np_obj(self)
-        np2 = get_np_obj(other)
-        res = (np1.__truediv__(np2)).dtype
-        return elemwise2(self, '/', other, self, odtype=res, broadcast=True)
+        return self.__array_ufunc__(numpy.true_divide, '__call__',
+                                    self, other)
 
     def __rtruediv__(self, other):
-        np1 = get_np_obj(self)
-        np2 = get_np_obj(other)
-        res = (np2.__truediv__(np1)).dtype
-        return elemwise2(other, '/', self, self, odtype=res, broadcast=True)
+        return self.__array_ufunc__(numpy.true_divide, '__call__',
+                                    other, self)
 
     def __itruediv__(self, other):
-        np2 = get_np_obj(other)
-        kw = {'broadcast': True}
-        if self.dtype == np.float32 or np2.dtype == np.float32:
-            kw['op_tmpl'] = "a = (float)a / (float)b"
-        if self.dtype == np.float64 or np2.dtype == np.float64:
-            kw['op_tmpl'] = "a = (double)a / (double)b"
-        return ielemwise2(self, '/', other, **kw)
+        return self.__array_ufunc__(numpy.true_divide, '__call__',
+                                    self, other, out=self)
 
     # floordiv
     def __floordiv__(self, other):
-        out_dtype = get_common_dtype(self, other, True)
-        kw = {'broadcast': True}
-        if out_dtype.kind == 'f':
-            kw['op_tmpl'] = "res = floor((%(out_t)s)a / (%(out_t)s)b)"
-        return elemwise2(self, '/', other, self, odtype=out_dtype, **kw)
+        return self.__array_ufunc__(numpy.floor_divide, '__call__',
+                                    self, other)
 
     def __rfloordiv__(self, other):
-        out_dtype = get_common_dtype(other, self, True)
-        kw = {'broadcast': True}
-        if out_dtype.kind == 'f':
-            kw['op_tmpl'] = "res = floor((%(out_t)s)a / (%(out_t)s)b)"
-        return elemwise2(other, '/', self, self, odtype=out_dtype, **kw)
+        return self.__array_ufunc__(numpy.floor_divide, '__call__',
+                                    other, self)
 
     def __ifloordiv__(self, other):
-        out_dtype = self.dtype
-        kw = {'broadcast': True}
-        if out_dtype == np.float32:
-            kw['op_tmpl'] = "a = floor((float)a / (float)b)"
-        if out_dtype == np.float64:
-            kw['op_tmpl'] = "a = floor((double)a / (double)b)"
-        return ielemwise2(self, '/', other, **kw)
+        return self.__array_ufunc__(numpy.floor_divide, '__call__',
+                                    self, other, out=self)
 
     # mod
     def __mod__(self, other):
-        out_dtype = get_common_dtype(self, other, True)
-        kw = {'broadcast': True}
-        if out_dtype.kind == 'f':
-            kw['op_tmpl'] = "res = fmod((%(out_t)s)a, (%(out_t)s)b)"
-        return elemwise2(self, '%', other, self, odtype=out_dtype, **kw)
+        return self.__array_ufunc__(numpy.mod, '__call__', self, other)
 
     def __rmod__(self, other):
-        out_dtype = get_common_dtype(other, self, True)
-        kw = {'broadcast': True}
-        if out_dtype.kind == 'f':
-            kw['op_tmpl'] = "res = fmod((%(out_t)s)a, (%(out_t)s)b)"
-        return elemwise2(other, '%', self, self, odtype=out_dtype, **kw)
+        return self.__array_ufunc__(numpy.mod, '__call__', other, self)
 
     def __imod__(self, other):
-        out_dtype = get_common_dtype(self, other, self.dtype == np.float64)
-        kw = {'broadcast': True}
-        if out_dtype == np.float32:
-            kw['op_tmpl'] = "a = fmod((float)a, (float)b)"
-        if out_dtype == np.float64:
-            kw['op_tmpl'] = "a = fmod((double)a, (double)b)"
-        return ielemwise2(self, '%', other, **kw)
+        return self.__array_ufunc__(numpy.mod, '__call__', self, other,
+                                    out=self)
 
     # divmod
     def __divmod__(self, other):
         if not isinstance(other, gpuarray.GpuArray):
-            other = np.asarray(other)
+            other = numpy.asarray(other)
         odtype = get_common_dtype(self, other, True)
 
         a_arg = as_argument(self, 'a', read=True)
         b_arg = as_argument(other, 'b', read=True)
-        args = [arg('div', odtype, write=True), arg('mod', odtype, write=True), a_arg, b_arg]
+        args = [arg('div', odtype, write=True),
+                arg('mod', odtype, write=True),
+                a_arg, b_arg]
 
         div = self._empty_like_me(dtype=odtype)
         mod = self._empty_like_me(dtype=odtype)
@@ -157,12 +158,14 @@ class ndgpuarray(gpuarray.GpuArray):
 
     def __rdivmod__(self, other):
         if not isinstance(other, gpuarray.GpuArray):
-            other = np.asarray(other)
+            other = numpy.asarray(other)
         odtype = get_common_dtype(other, self, True)
 
         a_arg = as_argument(other, 'a', read=True)
         b_arg = as_argument(self, 'b', read=True)
-        args = [arg('div', odtype, write=True), arg('mod', odtype, write=True), a_arg, b_arg]
+        args = [arg('div', odtype, write=True),
+                arg('mod', odtype, write=True),
+                a_arg, b_arg]
 
         div = self._empty_like_me(dtype=odtype)
         mod = self._empty_like_me(dtype=odtype)
@@ -180,42 +183,112 @@ class ndgpuarray(gpuarray.GpuArray):
         k(div, mod, other, self, broadcast=True)
         return (div, mod)
 
+    # unary ops
     def __neg__(self):
-        return elemwise1(self, '-')
+        return self.__array_ufunc__(numpy.negative, '__call__', self)
 
     def __pos__(self):
         return elemwise1(self, '+')
 
     def __abs__(self):
-        if self.dtype.kind == 'u':
-            return self.copy()
-        if self.dtype.kind == 'f':
-            oper = "res = fabs(a)"
-        elif self.dtype.itemsize < 4:
-            # cuda 5.5 finds the c++ stdlib definition if we don't cast here.
-            oper = "res = abs((int)a)"
-        else:
-            oper = "res = abs(a)"
-        return elemwise1(self, None, oper=oper)
+        return self.__array_ufunc__(numpy.abs, '__call__', self)
+
+    def __invert__(self):
+        return self.__array_ufunc__(numpy.invert, '__call__', self)
 
     # richcmp
     def __lt__(self, other):
-        return compare(self, '<', other, broadcast=True)
+        return self.__array_ufunc__(numpy.less, '__call__', self, other)
 
     def __le__(self, other):
-        return compare(self, '<=', other, broadcast=True)
+        return self.__array_ufunc__(numpy.less_equal, '__call__', self, other)
 
     def __eq__(self, other):
-        return compare(self, '==', other, broadcast=True)
+        return self.__array_ufunc__(numpy.equal, '__call__', self, other)
 
     def __ne__(self, other):
-        return compare(self, '!=', other, broadcast=True)
-
-    def __ge__(self, other):
-        return compare(self, '>=', other, broadcast=True)
+        return self.__array_ufunc__(numpy.not_equal, '__call__', self, other)
 
     def __gt__(self, other):
-        return compare(self, '>', other, broadcast=True)
+        return self.__array_ufunc__(numpy.greater, '__call__', self, other)
+
+    def __ge__(self, other):
+        return self.__array_ufunc__(numpy.greater_equal, '__call__', self,
+                                    other)
+
+    # pow
+    # TODO: pow can take a third modulo argument
+    def __pow__(self, other):
+        return self.__array_ufunc__(numpy.power, '__call__', self, other)
+
+    def __rpow__(self, other):
+        return self.__array_ufunc__(numpy.power, '__call__', other, self)
+
+    def __ipow__(self, other):
+        return self.__array_ufunc__(numpy.power, '__call__', self, other,
+                                    out=self)
+
+    # shifts
+    def __lshift__(self, other):
+        return self.__array_ufunc__(numpy.left_shift, '__call__',
+                                    self, other)
+
+    def __rlshift__(self, other):
+        return self.__array_ufunc__(numpy.left_shift, '__call__',
+                                    other, self)
+
+    def __ilshift__(self, other):
+        return self.__array_ufunc__(numpy.left_shift, '__call__',
+                                    self, other, out=self)
+
+    def __rshift__(self, other):
+        return self.__array_ufunc__(numpy.right_shift, '__call__',
+                                    self, other)
+
+    def __rrshift__(self, other):
+        return self.__array_ufunc__(numpy.right_shift, '__call__',
+                                    other, self)
+
+    def __irshift__(self, other):
+        return self.__array_ufunc__(numpy.right_shift, '__call__',
+                                    self, other, out=self)
+
+    # logical ops
+    def __and__(self, other):
+        return self.__array_ufunc__(numpy.logical_and, '__call__',
+                                    self, other)
+
+    def __rand__(self, other):
+        return self.__array_ufunc__(numpy.logical_and, '__call__',
+                                    other, self)
+
+    def __iand__(self, other):
+        return self.__array_ufunc__(numpy.logical_and, '__call__',
+                                    self, other, out=self)
+
+    def __or__(self, other):
+        return self.__array_ufunc__(numpy.logical_or, '__call__',
+                                    self, other)
+
+    def __ror__(self, other):
+        return self.__array_ufunc__(numpy.logical_or, '__call__',
+                                    other, self)
+
+    def __ior__(self, other):
+        return self.__array_ufunc__(numpy.logical_or, '__call__',
+                                    self, other, out=self)
+
+    def __xor__(self, other):
+        return self.__array_ufunc__(numpy.logical_xor, '__call__',
+                                    self, other)
+
+    def __rxor__(self, other):
+        return self.__array_ufunc__(numpy.logical_xor, '__call__',
+                                    other, self)
+
+    def __ixor__(self, other):
+        return self.__array_ufunc__(numpy.logical_xor, '__call__',
+                                    self, other, out=self)
 
     # misc other things
     @property
@@ -235,60 +308,20 @@ Since these functions are untested (thus probably wrong), we disable them.
         self[...] = value
 """
     # reductions
-    def all(self, axis=None, out=None):
-        if self.ndim == 0:
-            return self.copy()
-        return reduce1(self, '&&', '1', np.dtype('bool'),
-                       axis=axis, out=out)
+    def all(self, axis=None, out=None, keepdims=False):
+        return ufuncs.all(self, axis, out, keepdims)
 
-    def any(self, axis=None, out=None):
-        if self.ndim == 0:
-            return self.copy()
-        return reduce1(self, '||', '0', np.dtype('bool'),
-                       axis=axis, out=out)
+    def any(self, axis=None, out=None, keepdims=False):
+        return ufuncs.any(self, axis, out, keepdims)
 
-    def prod(self, axis=None, dtype=None, out=None):
-        if dtype is None:
-            dtype = self.dtype
-            # we only upcast integers that are smaller than the plaform default
-            if dtype.kind == 'i':
-                di = np.dtype('int')
-                if di.itemsize > dtype.itemsize:
-                    dtype = di
-            if dtype.kind == 'u':
-                di = np.dtype('uint')
-                if di.itemsize > dtype.itemsize:
-                    dtype = di
-        return reduce1(self, '*', '1', dtype, axis=axis, out=out)
+    def prod(self, axis=None, out=None, keepdims=False):
+        return ufuncs.prod(self, axis, out, keepdims)
 
-#    def max(self, axis=None, out=None);
-#        nd = self.ndim
-#        if nd == 0:
-#            return self.copy()
-#        idx = (0,) * nd
-#        n = str(self.__getitem__(idx).__array__())
-#        return reduce1(self, '', n, self.dtype, axis=axis, out=out,
-#                       oper='max(a, b)')
+    def sum(self, axis=None, out=None, keepdims=False):
+        return ufuncs.sum(self, axis, out, keepdims)
 
-#    def min(self, axis=None, out=None):
-#        nd = self.ndim
-#        if nd == 0:
-#            return self.copy()
-#        idx = (0,) * nd
-#        n = str(self.__getitem__(idx).__array__())
-#        return reduce1(self, '', n, self.dtype, axis=axis, out=out,
-#                       oper='min(a, b)')
+    def min(self, axis=None, out=None, keepdims=False):
+        return ufuncs.amin(self, axis, out, keepdims)
 
-    def sum(self, axis=None, dtype=None, out=None):
-        if dtype is None:
-            dtype = self.dtype
-            # we only upcast integers that are smaller than the plaform default
-            if dtype.kind == 'i':
-                di = np.dtype('int')
-                if di.itemsize > dtype.itemsize:
-                    dtype = di
-            if dtype.kind == 'u':
-                di = np.dtype('uint')
-                if di.itemsize > dtype.itemsize:
-                    dtype = di
-        return reduce1(self, '+', '0', dtype, axis=axis, out=out)
+    def max(self, axis=None, out=None, keepdims=False):
+        return ufuncs.amax(self, axis, out, keepdims)
