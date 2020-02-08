@@ -2,6 +2,7 @@ from string import Template
 from .gpuarray import GpuArray, GpuKernel, SIZE, dtype_to_ctype
 import numpy
 
+
 def _generate_kernel(ctx, cols, dtype, upper=True):
     tmpl = Template("""
     #include "cluda.h"
@@ -38,6 +39,7 @@ def _generate_kernel(ctx, cols, dtype, upper=True):
                   have_complex=have_complex)
     return k
 
+
 def triu(A, inplace=True):
     if A.ndim != 2:
         raise ValueError("triu only works for 2d arrays")
@@ -59,7 +61,7 @@ def triu(A, inplace=True):
         ls = n
         gs = 1
     else:
-        (gs,r) = divmod(n,ls)
+        (gs, r) = divmod(n, ls)
         if r > 0:
             gs += 1
 
@@ -88,7 +90,7 @@ def tril(A, inplace=True):
         ls = n
         gs = 1
     else:
-        (gs,r) = divmod(n,ls)
+        (gs, r) = divmod(n, ls)
         if r > 0:
             gs += 1
 
