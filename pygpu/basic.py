@@ -2,6 +2,7 @@ from string import Template
 from .gpuarray import GpuArray, GpuKernel, SIZE, dtype_to_ctype
 import numpy
 
+
 def _generate_kernel(ctx, cols, dtype, upper=True):
     tmpl = Template("""
     #include "cluda.h"
@@ -54,7 +55,17 @@ def triu(A, inplace=True):
         upper = True
         cols = A.shape[1]
     k = _generate_kernel(A.context, cols, A.dtype, upper)
-    k(A, A.offset, A.shape[0] * A.shape[1], n=A.shape[0] * A.shape[1])
+    n = int(A.shape[0]*A.shape[1])
+    ls = 256
+    if n < ls:
+        ls = n
+        gs = 1
+    else:
+        (gs, r) = divmod(n, ls)
+        if r > 0:
+            gs += 1
+
+    k(A, A.offset, A.shape[0] * A.shape[1], ls=ls, gs=gs)
     return A
 
 
@@ -73,5 +84,15 @@ def tril(A, inplace=True):
         upper = False
         cols = A.shape[1]
     k = _generate_kernel(A.context, cols, A.dtype, upper)
-    k(A, A.offset, A.shape[0] * A.shape[1], n=A.shape[0] * A.shape[1])
+    n = int(A.shape[0]*A.shape[1])
+    ls = 256
+    if n < ls:
+        ls = n
+        gs = 1
+    else:
+        (gs, r) = divmod(n, ls)
+        if r > 0:
+            gs += 1
+
+    k(A, A.offset, A.shape[0] * A.shape[1], ls=ls, gs=gs)
     return A
